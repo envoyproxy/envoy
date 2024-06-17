@@ -5207,7 +5207,11 @@ TEST_P(Http1ClientConnectionImplTest, FirstLineInvalidCR) {
     EXPECT_EQ(0u, buffer.length());
   } else {
     EXPECT_TRUE(isCodecProtocolError(status));
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+#else
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
+#endif
   }
 }
 
@@ -5300,7 +5304,11 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
     EXPECT_EQ(0u, buffer.length());
   } else {
     EXPECT_TRUE(isCodecProtocolError(status));
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
+#else
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
+#endif
   }
 }
 
@@ -5339,7 +5347,11 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
     EXPECT_EQ(0u, buffer.length());
   } else {
     EXPECT_TRUE(isCodecProtocolError(status));
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
+#else
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
+#endif
   }
 }
 
