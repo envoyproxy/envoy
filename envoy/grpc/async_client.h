@@ -79,6 +79,9 @@ public:
    */
   virtual void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks& callbacks) PURE;
 
+  /***
+   * Remove previously set watermark callbacks.
+   */
   virtual void removeWatermarkCallbacks() PURE;
 };
 
