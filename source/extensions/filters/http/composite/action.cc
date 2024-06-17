@@ -13,8 +13,8 @@ float ExecuteFilterActionFactory::getSampleRatio(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action) {
   // In default case, if sample_percent is not populated, sample_ratio is 100%, i.e, all sampled.
   if (!composite_action.has_sample_percent()) {
-    float all_sampled = 1;
-    return all_sampled;
+    // 1, i.e, 100%,  means all sampled.
+    return 1;
   }
   const auto& sample_percent = composite_action.sample_percent();
   float denominator = 100;
