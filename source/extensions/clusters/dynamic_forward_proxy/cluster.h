@@ -62,7 +62,8 @@ private:
           Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager);
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+          absl::Status& creation_status);
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();

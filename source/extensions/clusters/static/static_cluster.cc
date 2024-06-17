@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Upstream {
 
 StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                     ClusterFactoryContext& context)
-    : ClusterImplBase(cluster, context),
+                                     ClusterFactoryContext& context, absl::Status& creation_status)
+    : ClusterImplBase(cluster, context, creation_status),
       priority_state_manager_(new PriorityStateManager(
           *this, context.serverFactoryContext().localInfo(), nullptr, random_)) {
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
@@ -68,8 +68,12 @@ StaticClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
                       cluster.name()));
     }
   }
-  return std::make_pair(std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context)),
-                        nullptr);
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::make_pair(
+      std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context, creation_status)),
+      nullptr);
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 /**

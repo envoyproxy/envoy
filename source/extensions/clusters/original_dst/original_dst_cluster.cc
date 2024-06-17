@@ -189,8 +189,9 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
 }
 
 OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                                       ClusterFactoryContext& context)
-    : ClusterImplBase(config, context),
+                                       ClusterFactoryContext& context,
+                                       absl::Status& creation_status)
+    : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
@@ -343,7 +344,10 @@ OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::C
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster = std::shared_ptr<OriginalDstCluster>(new OriginalDstCluster(cluster, context));
+  absl::Status creation_status = absl::OkStatus();
+  auto new_cluster = std::shared_ptr<OriginalDstCluster>(
+      new OriginalDstCluster(cluster, context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(
       std::make_shared<OriginalDstClusterHandle>(new_cluster));
   return std::make_pair(new_cluster, std::move(lb));

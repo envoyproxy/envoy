@@ -131,7 +131,7 @@ private:
   friend class OriginalDstClusterFactory;
   friend class OriginalDstClusterTest;
   OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context);
+                     ClusterFactoryContext& context, absl::Status& creation_status);
 
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}

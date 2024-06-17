@@ -24,7 +24,7 @@ private:
   friend class UpstreamImplTestBase;
 
   StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context);
+                    ClusterFactoryContext& context, absl::Status& creation_status);
 
   // ClusterImplBase
   void startPreInit() override;
