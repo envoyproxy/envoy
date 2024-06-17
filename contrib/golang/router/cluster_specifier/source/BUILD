@@ -21,8 +21,8 @@ envoy_cc_library(
     ],
     deps = [
         ":cgo",
-        "//contrib/golang/filters/http/source:golang_filter_lib",
         "//contrib/golang/common/dso:dso_lib",
+        "//contrib/golang/filters/http/source:golang_filter_lib",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//source/common/common:utility_lib",
         "//source/common/http:utility_lib",
