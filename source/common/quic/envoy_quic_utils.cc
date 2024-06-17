@@ -150,7 +150,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
           : 0u;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram, local_addr, peer_addr,
-      Network::SocketCreationOptions{false, max_addresses_cache_size_});
+      Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");

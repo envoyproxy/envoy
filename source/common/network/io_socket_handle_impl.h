@@ -120,11 +120,11 @@ protected:
 private:
   // Returns the destination address if the control message carries it.
   // Otherwise returns nullptr.
-  Address::InstanceConstSharedPtr
-  maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port, os_fd_t fd, bool v6only);
+  Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
+                                                               uint32_t self_port);
 
-  Address::InstanceConstSharedPtr Address::InstanceConstSharedPtr
-  getOrCreateEnvoyAddressInstance(sockaddr_storage ss);
+  Address::InstanceConstSharedPtr getOrCreateEnvoyAddressInstance(sockaddr_storage ss,
+                                                                  socklen_t ss_len);
 
   // Caches the address instances of the most recently received packets on this socket.
   // Should only be used by UDP sockets to avoid creating multiple address instances for the same
