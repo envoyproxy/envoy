@@ -798,6 +798,10 @@ public:
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
+  /**
+   * @return uint32_t the current buffer limit
+   */
+  uint32_t bufferLimit() const { return buffer_limit_; }
 
   /**
    * @return bool whether any above high watermark triggers are currently active

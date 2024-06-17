@@ -563,6 +563,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           route, per_request_buffer_limit_bytes, vhost->retryShadowBufferLimit())),
+      max_request_buffer_bytes_(route.max_request_buffer_bytes()),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),

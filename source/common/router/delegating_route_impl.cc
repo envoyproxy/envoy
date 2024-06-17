@@ -96,6 +96,10 @@ const std::vector<Router::ShadowPolicyPtr>& DelegatingRouteEntry::shadowPolicies
   return base_route_->routeEntry()->shadowPolicies();
 }
 
+uint32_t DelegatingRouteEntry::maxRequestBufferBytes() const {
+  return base_route_->routeEntry()->maxRequestBufferBytes();
+}
+
 std::chrono::milliseconds DelegatingRouteEntry::timeout() const {
   return base_route_->routeEntry()->timeout();
 }

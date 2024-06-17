@@ -434,6 +434,7 @@ public:
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestBufferBytes, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(bool, usingNewTimeouts, (), (const));

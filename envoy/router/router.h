@@ -994,6 +994,11 @@ public:
   virtual const std::vector<ShadowPolicyPtr>& shadowPolicies() const PURE;
 
   /**
+   * @return uint32_t the route's configured max request buffer bytes.
+   */
+  virtual uint32_t maxRequestBufferBytes() const PURE;
+
+  /**
    * @return std::chrono::milliseconds the route's timeout.
    */
   virtual std::chrono::milliseconds timeout() const PURE;

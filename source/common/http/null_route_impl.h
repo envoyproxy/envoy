@@ -140,6 +140,7 @@ struct RouteEntryImpl : public Router::RouteEntry {
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
     return shadow_policies_;
   }
+  uint32_t maxRequestBufferBytes() const override { return 0; }
   std::chrono::milliseconds timeout() const override {
     if (timeout_) {
       return timeout_.value();

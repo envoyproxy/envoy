@@ -1436,6 +1436,102 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
   }
 }
 
+// Test hitting the decoder buffer filter set via the route configuration
+TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimitFromRoute) {
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  // As max_request_buffer_bytes can only increase the limit, we set a small limit first.
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->set_max_request_buffer_bytes(1024 * 65);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 66);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  // With HTTP/1 there's a possible race where if the connection backs up early,
+  // the 413-and-connection-close may be sent while the body is still being
+  // sent, resulting in a write error and the connection being closed before the
+  // response is read.
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->complete());
+  }
+  if (response->complete()) {
+    EXPECT_EQ("413", response->headers().getStatusValue());
+  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimitFromRouteRequestPass) {
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  // As max_request_buffer_bytes can only increase the limit, we set a small limit first.
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->set_max_request_buffer_bytes(1024 * 65);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 64);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimitFromRouteIgnoreReduction) {
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        // reduce the limit under the default, which should be ignored.
+        route->set_max_request_buffer_bytes(1024);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 2);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Test hitting the encoder buffer filter with too many response bytes to buffer. Given the request
 // headers are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
