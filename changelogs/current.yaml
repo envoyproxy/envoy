@@ -45,8 +45,9 @@ minor_behavior_changes:
     disabled by setting the runtime feature ``envoy.reloadable_features.dns_details`` to false.
 - area: grpc
   change: |
-    Changes in ``AsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
-    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`. Previously, tracing context headers
+    Changes in ``AsyncStreamImpl`` and ``GoogleAsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
+    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>` or
+    :ref:`Google C++ gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>`. Previously, tracing context headers
     were not being set when calling external services such as ``ext_proc``.
 - area: http
   change: |
@@ -178,6 +179,11 @@ bug_fixes:
   change: |
     Added one option to disable the response body buffering for mirror request. Also introduced a 32MB cap for the response
     buffer, which can be changed by the runtime flag ``http.async_response_buffer_limit`` based on the product needs.
+- area: ext_authz
+  change: |
+    Validate http service path_prefix
+    :ref:`path_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_prefix>`,
+    Validate http service path_prefix configuration must start with ``/``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -214,6 +220,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.hmac_base64_encoding_only`` runtime flag and legacy code paths.
 - area: upstream
   change: |
     Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and legacy code paths.
@@ -235,6 +244,9 @@ removed_config_or_runtime:
 - area: jwt
   change: |
     Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart
