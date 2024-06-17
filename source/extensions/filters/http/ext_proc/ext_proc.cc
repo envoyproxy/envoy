@@ -176,6 +176,50 @@ ProcessingMode allDisabledMode() {
 
 } // namespace
 
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+    const std::chrono::milliseconds message_timeout, const uint32_t max_message_timeout_ms,
+    Stats::Scope& scope, const std::string& stats_prefix, bool is_upstream,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
+    : failure_mode_allow_(config.failure_mode_allow()),
+      route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
+      max_message_timeout_ms_(max_message_timeout_ms),
+      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      processing_mode_(config.processing_mode()),
+      mutation_checker_(config.mutation_rules(), context.regexEngine()),
+      filter_metadata_(config.filter_metadata()),
+      allow_mode_override_(config.allow_mode_override()),
+      disable_immediate_response_(config.disable_immediate_response()),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+      is_upstream_(is_upstream),
+      untyped_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().untyped().begin(),
+          config.metadata_options().forwarding_namespaces().untyped().end()),
+      typed_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().typed().begin(),
+          config.metadata_options().forwarding_namespaces().typed().end()),
+      untyped_receiving_namespaces_(
+          config.metadata_options().receiving_namespaces().untyped().begin(),
+          config.metadata_options().receiving_namespaces().untyped().end()),
+      expression_manager_(builder, context.localInfo(), config.request_attributes(),
+                          config.response_attributes()),
+      immediate_mutation_checker_(context.regexEngine()),
+      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+  if (config.disable_clear_route_cache() &&
+      (route_cache_action_ !=
+       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+    throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
+                         "be set to none-default at the same time.");
+  }
+  if (config.disable_clear_route_cache()) {
+    route_cache_action_ = envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
+  }
+  thread_local_stream_manager_slot_->set(
+      [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
+}
+
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,

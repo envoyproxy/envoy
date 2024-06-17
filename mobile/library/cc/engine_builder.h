@@ -188,8 +188,10 @@ public:
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
 
   EngineBuilder& addPlatformFilter(const std::string& name);
-
-  EngineBuilder& setRuntimeGuard(std::string guard, bool value);
+  // Adds a runtime guard for the `envoy.reloadable_features.<guard>`.
+  // For example if the runtime guard is `envoy.reloadable_features.use_foo`, the guard name is
+  // `use_foo`.
+  EngineBuilder& addRuntimeGuard(std::string guard, bool value);
 
   // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);

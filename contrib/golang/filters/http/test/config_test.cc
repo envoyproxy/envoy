@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using ::testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,6 +25,8 @@ std::string genSoPath(std::string name) {
   return TestEnvironment::substitute(
       "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
 }
+
+void cleanup() { Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest(); }
 
 TEST(GolangFilterConfigTest, InvalidateEmptyConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -62,12 +65,15 @@ TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_))
+      .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); }));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
   std::string str;
   EXPECT_TRUE(plugin_config.SerializeToString(&str));
   cb(filter_callback);
+
+  cleanup();
 }
 
 TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
@@ -88,12 +94,15 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_))
+      .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); }));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
   std::string str;
   EXPECT_TRUE(plugin_config.SerializeToString(&str));
   cb(filter_callback);
+
+  cleanup();
 }
 
 } // namespace

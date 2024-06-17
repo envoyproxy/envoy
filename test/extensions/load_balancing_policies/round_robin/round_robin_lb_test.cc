@@ -21,10 +21,6 @@ public:
       common_config_.mutable_locality_weighted_lb_config();
     }
 
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.locality_routing_use_new_routing_logic",
-                                 GetParam().use_new_locality_routing ? "true" : "false"}});
-
     lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
                                                    runtime_, random_, common_config_,
                                                    round_robin_lb_config_, simTime());
@@ -245,8 +241,8 @@ TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, FailoverTest,
-                         ::testing::Values(LoadBalancerTestParam{true, false},
-                                           LoadBalancerTestParam{true, true}));
+                         ::testing::Values(LoadBalancerTestParam{true},
+                                           LoadBalancerTestParam{false}));
 
 TEST_P(RoundRobinLoadBalancerTest, NoHosts) {
   init(false);
@@ -490,8 +486,6 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeedOldInit) {
 // Validate that low weighted hosts will be chosen when the LB is created.
 TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.locality_routing_use_new_routing_logic",
-                               GetParam().use_new_locality_routing ? "true" : "false"}});
   // This test should be kept just the runtime override removed once the
   // feature-flag is deprecated.
   scoped_runtime.mergeValues(
@@ -766,23 +760,14 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality_b;
   updateHosts(hosts, local_hosts_per_locality_b);
 
-  if (GetParam().use_new_locality_routing) {
-    // Expect zone-aware routing still enabled even though there is no upstream host in zone B
-    // Since zone A has no residual, we should always pick an upstream from zone C.
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(4999));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-  } else {
-    // When using the legacy locality routing algorithm, it falls back to non-zone aware routing in
-    // zone B.
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  }
+  // Expect zone-aware routing still enabled even though there is no upstream host in zone B
+  // Since zone A has no residual, we should always pick an upstream from zone C.
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(4999));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareResidualsMismatched) {
@@ -891,74 +876,31 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareResidualsMismatched) {
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
   EXPECT_EQ(2U, stats_.lb_zone_routing_sampled_.value());
 
-  if (GetParam().use_new_locality_routing) {
-    // The other 5/8 of the time, traffic will go to cross-zone upstreams with residual capacity
-    // Zone B has no upstream hosts
-    // Zone C has a residual capacity of 20.83% (20.84% with rounding error): sampled value 0-2083
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(3750))
-        .WillOnce(Return(2083));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-    // Zone D has a residual capacity of 20.83% (20.84% with rounding error): sampled value
-    // 2084-4167
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(9999))
-        .WillOnce(Return(2084));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(9999))
-        .WillOnce(Return(4167));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
-    // Zone E has a residual capacity of 12.5%: sampled value 4168-5417
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(9999))
-        .WillOnce(Return(4168));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(9999))
-        .WillOnce(Return(5417));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
-    // At sampled value 5418, we loop back to the beginning of the vector and select zone C again
-  } else {
-    // When using the legacy locality routing algorithm, the routing is unfair.
-    // Zone C has a residual capacity of 4.16% (4.17% with rounding error): sampled value 0-416
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(416));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-    // Zone D has a residual capacity of 20.83%: sampled value 417-2500
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(417));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(9999))
-        .WillOnce(Return(2500));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
-    // After this, we loop back to the beginning of the vector and select zone C again
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(3750))
-        .WillOnce(Return(2501));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][2], lb_->chooseHost(nullptr));
-    EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
-  }
+  // The other 5/8 of the time, traffic will go to cross-zone upstreams with residual capacity
+  // Zone B has no upstream hosts
+  // Zone C has a residual capacity of 20.83% (20.84% with rounding error): sampled value 0-2083
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(2083));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
+  // Zone D has a residual capacity of 20.83% (20.84% with rounding error): sampled value
+  // 2084-4167
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2084));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(4167));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
+  // Zone E has a residual capacity of 12.5%: sampled value 4168-5417
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(4168));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(5417));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
+  // At sampled value 5418, we loop back to the beginning of the vector and select zone C again
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
@@ -1004,94 +946,22 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 3))
       .WillRepeatedly(Return(3));
 
-  if (GetParam().use_new_locality_routing) {
-    // 2/3 of the time we should get the host in zone B
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6665));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_sampled_.value());
+  // 2/3 of the time we should get the host in zone B
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6665));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(2U, stats_.lb_zone_routing_sampled_.value());
 
-    // 1/3 of the time we should sample the residuals across zones
-    // The only upstream zone with residual capacity is zone C
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6666)).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(9999))
-        .WillOnce(Return(3333));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-  } else {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
-    EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
-    EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
-  }
-}
-
-TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSizeDisabled) {
-  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
-    return;
-  }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.enable_zone_routing_different_zone_counts", "false"}});
-
-  envoy::config::core::v3::Locality zone_a;
-  zone_a.set_zone("A");
-  envoy::config::core::v3::Locality zone_b;
-  zone_b.set_zone("B");
-  envoy::config::core::v3::Locality zone_c;
-  zone_c.set_zone("C");
-
-  HostVectorSharedPtr upstream_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)}));
-  HostVectorSharedPtr local_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_b)}));
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)}});
-  HostsPerLocalitySharedPtr local_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_b)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a)}});
-
-  hostSet().healthy_hosts_ = *upstream_hosts;
-  hostSet().hosts_ = *upstream_hosts;
-  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
-  common_config_.mutable_healthy_panic_threshold()->set_value(100);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(3);
-  init(true);
-  updateHosts(local_hosts, local_hosts_per_locality);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
-      .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 98))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 3))
-      .WillRepeatedly(Return(3));
-
-  // Zone-aware routing should be disabled because the local zone and upstream zone count
-  // are different and the runtime feature flag is disabled.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
-  EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
-  EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
-  EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
+  // 1/3 of the time we should sample the residuals across zones
+  // The only upstream zone with residual capacity is zone C
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6666)).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(3333));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
@@ -1244,36 +1114,24 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareNoMatchingZones) {
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
-  if (GetParam().use_new_locality_routing) {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3333));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6665));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6666));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(0))
-        .WillOnce(Return(9998)); // Rounding error: 3333 * 3 = 9999 != 10000
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
-  } else {
-    // When using the legacy locality routing algorithm, locality routing is disabled as the
-    // upstream has no hosts in the local zone.
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
-    EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
-    EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
-  }
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3333));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6665));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6666));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(9998)); // Rounding error: 3333 * 3 = 9999 != 10000
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareNotEnoughLocalZones) {
@@ -1441,58 +1299,46 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareEmptyLocalities) {
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
-  if (GetParam().use_new_locality_routing) {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(832));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(832));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(833));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(0))
-        .WillOnce(Return(2498)); // rounding error
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(833));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(2498)); // rounding error
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
 
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(2499));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3331));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(2499));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3331));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
 
-    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(7U, stats_.lb_zone_routing_cross_zone_.value());
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(0))
-        .WillOnce(Return(4997)); // rounding error
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(8U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(7U, stats_.lb_zone_routing_cross_zone_.value());
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(4997)); // rounding error
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(8U, stats_.lb_zone_routing_cross_zone_.value());
 
-    EXPECT_CALL(random_, random())
-        .WillOnce(Return(0))
-        .WillOnce(Return(0))
-        .WillOnce(Return(4998)); // wrap around
-    EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(9U, stats_.lb_zone_routing_cross_zone_.value());
-  } else {
-    // When using the legacy locality routing algorithm, locality routing is disabled as the
-    // upstream has no hosts in the local zone.
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-    EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
-    EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
-    EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
-  }
+  EXPECT_CALL(random_, random())
+      .WillOnce(Return(0))
+      .WillOnce(Return(0))
+      .WillOnce(Return(4998)); // wrap around
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(9U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
 TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
@@ -1725,10 +1571,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, RoundRobinLoadBalancerTest,
-                         ::testing::Values(LoadBalancerTestParam{true, false},
-                                           LoadBalancerTestParam{true, true},
-                                           LoadBalancerTestParam{false, false},
-                                           LoadBalancerTestParam{false, true}));
+                         ::testing::Values(LoadBalancerTestParam{true},
+                                           LoadBalancerTestParam{false}));
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   init(false);

@@ -574,7 +574,6 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
-
     auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
         route.direct_response().body(), factory_context.mainThreadDispatcher(),
         factory_context.threadLocal(), factory_context.api(), true,

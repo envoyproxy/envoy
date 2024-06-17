@@ -30,6 +30,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fetch_client_test",
     srcs = ["fetch_client_test.cc"],
+    exec_properties = {
+        "dockerNetwork": "standard",
+    },
     repository = "@envoy",
     deps = [
         "//examples/cc/fetch_client:fetch_client_lib",

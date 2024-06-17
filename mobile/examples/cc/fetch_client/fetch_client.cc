@@ -27,14 +27,19 @@ Fetch::Fetch()
   Envoy::Event::Libevent::Global::initialize();
 }
 
-void Fetch::fetch(const std::vector<absl::string_view>& urls) {
+envoy_status_t Fetch::fetch(const std::vector<absl::string_view>& urls,
+                            const std::vector<absl::string_view>& quic_hints) {
   absl::Notification engine_running;
   dispatcher_ = api_->allocateDispatcher("fetch_client");
   Thread::ThreadPtr envoy_thread = api_->threadFactory().createThread(
-      [this, &engine_running]() -> void { runEngine(engine_running); });
+      [this, &engine_running, &quic_hints]() -> void { runEngine(engine_running, quic_hints); });
   engine_running.WaitForNotification();
+  envoy_status_t status = ENVOY_SUCCESS;
   for (const absl::string_view url : urls) {
-    sendRequest(url);
+    status = sendRequest(url);
+    if (status == ENVOY_FAILURE) {
+      break;
+    }
   }
   dispatcher_->exit();
   envoy_thread->join();
@@ -42,13 +47,14 @@ void Fetch::fetch(const std::vector<absl::string_view>& urls) {
     absl::MutexLock lock(&engine_mutex_);
     engine_->terminate();
   }
+  return status;
 }
 
-void Fetch::sendRequest(absl::string_view url_string) {
+envoy_status_t Fetch::sendRequest(absl::string_view url_string) {
   Http::Utility::Url url;
   if (!url.initialize(url_string, /*is_connect_request=*/false)) {
     std::cerr << "Unable to parse url: '" << url_string << "'\n";
-    return;
+    return ENVOY_FAILURE;
   }
   std::cout << "Fetching url: " << url.toString() << "\n";
 
@@ -58,6 +64,7 @@ void Fetch::sendRequest(absl::string_view url_string) {
     absl::MutexLock lock(&engine_mutex_);
     stream_prototype = engine_->streamClient()->newStreamPrototype();
   }
+  envoy_status_t status = ENVOY_SUCCESS;
   EnvoyStreamCallbacks stream_callbacks;
   stream_callbacks.on_headers_ = [](const Http::ResponseHeaderMap& headers, bool /* end_stream */,
                                     envoy_stream_intel intel) {
@@ -79,8 +86,10 @@ void Fetch::sendRequest(absl::string_view url_string) {
               << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
     request_finished.Notify();
   };
-  stream_callbacks.on_error_ = [&request_finished](const EnvoyError& error, envoy_stream_intel,
-                                                   envoy_final_stream_intel final_intel) {
+  stream_callbacks.on_error_ = [&request_finished, &status](const EnvoyError& error,
+                                                            envoy_stream_intel,
+                                                            envoy_final_stream_intel final_intel) {
+    status = ENVOY_FAILURE;
     std::cerr << "Request failed after " << final_intel.stream_end_ms - final_intel.stream_start_ms
               << "ms with error message: " << error.message_ << "\n";
     request_finished.Notify();
@@ -102,12 +111,20 @@ void Fetch::sendRequest(absl::string_view url_string) {
   stream->sendHeaders(std::move(headers), true);
 
   request_finished.WaitForNotification();
+  return status;
 }
 
-void Fetch::runEngine(absl::Notification& engine_running) {
+void Fetch::runEngine(absl::Notification& engine_running,
+                      const std::vector<absl::string_view>& quic_hints) {
   Platform::EngineBuilder engine_builder;
   engine_builder.setLogLevel(Logger::Logger::debug);
   engine_builder.setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
+  if (!quic_hints.empty()) {
+    engine_builder.enableHttp3(true);
+    for (const auto& quic_hint : quic_hints) {
+      engine_builder.addQuicHint(std::string(quic_hint), 443);
+    }
+  }
 
   {
     absl::MutexLock lock(&engine_mutex_);

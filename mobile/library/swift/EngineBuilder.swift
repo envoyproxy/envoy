@@ -553,14 +553,16 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Set a runtime guard with the provided value.
+  // Adds a runtime guard for the `envoy.reloadable_features.<guard>`.
+  // For example if the runtime guard is `envoy.reloadable_features.use_foo`, the guard name is
+  // `use_foo`.
   ///
   /// - parameter name:  the name of the runtime guard, e.g. test_feature_false.
   /// - parameter value: the value for the runtime guard.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setRuntimeGuard(_ name: String, _ value: Bool) -> Self {
+  public func addRuntimeGuard(_ name: String, _ value: Bool) -> Self {
     self.runtimeGuards[name] = value
     return self
   }

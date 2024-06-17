@@ -1299,20 +1299,6 @@ TEST_P(ExtAuthzHttpIntegrationTest, UnmodifiedForwardedForHeader) {
   EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("x-forwarded-for", "1.2.3.4"));
 }
 
-// Verifies that local address is appended to "X-Forwarded-For" header
-// if "envoy.reloadable_features.ext_authz_http_send_original_xff" runtime guard is disabled.
-TEST_P(ExtAuthzHttpIntegrationTest, LegacyAppendLocalAddressToForwardedForHeader) {
-  TestScopedRuntime scoped_runtime_;
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_authz_http_send_original_xff", "false"}});
-
-  setup(false);
-
-  const auto local_address = test_server_->server().localInfo().address()->ip()->addressAsString();
-  EXPECT_THAT(ext_authz_request_->headers(),
-              Http::HeaderValueOf("x-forwarded-for", absl::StrCat("1.2.3.4", ",", local_address)));
-}
-
 // Verifies that by default HTTP service uses the case-sensitive string matcher
 // (uses new config for allowed_headers).
 TEST_P(ExtAuthzHttpIntegrationTest, Body) {

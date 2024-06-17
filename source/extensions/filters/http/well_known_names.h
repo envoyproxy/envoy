@@ -76,6 +76,10 @@ public:
   const std::string JwtAuthn = "envoy.filters.http.jwt_authn";
   // Header to metadata filter
   const std::string HeaderToMetadata = "envoy.filters.http.header_to_metadata";
+  // Json to metadata filter
+  const std::string JsonToMetadata = "envoy.filters.http.json_to_metadata";
+  // Thrift to metadata filter
+  const std::string ThriftToMetadata = "envoy.filters.http.thrift_to_metadata";
   // Tap filter
   const std::string Tap = "envoy.filters.http.tap";
   // Adaptive concurrency limit filter

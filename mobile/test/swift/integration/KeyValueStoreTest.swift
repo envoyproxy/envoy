@@ -52,7 +52,7 @@ final class KeyValueStoreTests: XCTestCase {
         // swiftlint:disable:next line_length
         typedConfig: "[\(kvStoreType)]{ kv_store_name: 'envoy.key_value.platform_test', test_key: 'foo', test_value: 'bar'}"
       )
-      .setRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_false", true)
       .build()
 
     let client = engine.streamClient()

@@ -233,20 +233,47 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
   });
 }
 
+/**
+ * This function generates an STS Endpoint from a region string.
+ * If a SigV4A region set has been provided, it will use the first region in region set, and if
+ * that region still contains a wildcard, the STS Endpoint will be set to us-east-1 global endpoint
+ * (or FIPS if compiled for FIPS support)
+ */
 std::string Utility::getSTSEndpoint(absl::string_view region) {
-  if (region == "cn-northwest-1" || region == "cn-north-1") {
-    return fmt::format("sts.{}.amazonaws.com.cn", region);
+  std::string single_region;
+
+  // If we contain a comma or asterisk it looks like a region set.
+  if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
+    // Use the first element from a region set if we have multiple regions specified.
+    const std::vector<std::string> region_v = absl::StrSplit(region, ',');
+    // If we still have a * in the first element, then send them to us-east-1 fips or global
+    // endpoint.
+    if (absl::StrContains(region_v[0], '*')) {
+#ifdef ENVOY_SSL_FIPS
+      return "sts-fips.us-east-1.amazonaws.com";
+#else
+      return "sts.amazonaws.com";
+#endif
+    }
+    single_region = region_v[0];
+  } else {
+    // Otherwise it's a standard region, so use that.
+    single_region = region;
+  }
+
+  if (single_region == "cn-northwest-1" || single_region == "cn-north-1") {
+    return fmt::format("sts.{}.amazonaws.com.cn", single_region);
   }
 #ifdef ENVOY_SSL_FIPS
   // Use AWS STS FIPS endpoints in FIPS mode https://docs.aws.amazon.com/general/latest/gr/sts.html.
   // Note: AWS GovCloud doesn't have separate fips endpoints.
   // TODO(suniltheta): Include `ca-central-1` when sts supports a dedicated FIPS endpoint.
-  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
-      region == "us-west-2") {
-    return fmt::format("sts-fips.{}.amazonaws.com", region);
+  if (single_region == "us-east-1" || single_region == "us-east-2" ||
+      single_region == "us-west-1" || single_region == "us-west-2") {
+    return fmt::format("sts-fips.{}.amazonaws.com", single_region);
   }
 #endif
-  return fmt::format("sts.{}.amazonaws.com", region);
+  return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
 static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {

@@ -664,7 +664,11 @@ typed_config:
     cleanup();
   }
 
-  void cleanup() { cleanupUpstreamAndDownstream(); }
+  void cleanup() {
+    cleanupUpstreamAndDownstream();
+
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
+  }
 
   void testDynamicMetadata(std::string path) {
     initializeBasicFilter(BASIC, "*", true);

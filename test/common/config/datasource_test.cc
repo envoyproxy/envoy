@@ -156,6 +156,50 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
 #endif
 }
 
+TEST(DataSourceTest, NotExistFileTest) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  const std::string filename = TestEnvironment::temporaryPath("envoy_test/not_exist_file");
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       filename);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+  EXPECT_EQ(config.filename(), filename);
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_EQ(DataSource::read(config, false, *api, 555).status().message(),
+            fmt::format("file {} does not exist", filename));
+}
+
+TEST(DataSourceTest, EmptyFileTest) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  const std::string filename = TestEnvironment::temporaryPath("envoy_test/empty_file");
+  {
+    std::ofstream file(filename);
+    file.close();
+  }
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       filename);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+  EXPECT_EQ(config.filename(), filename);
+
+  Api::ApiPtr api = Api::createApiForTest();
+
+  EXPECT_EQ(DataSource::read(config, false, *api, 555).status().message(),
+            fmt::format("file {} is empty", filename));
+
+  const auto file_data = DataSource::read(config, true, *api, 555).value();
+  EXPECT_TRUE(file_data.empty());
+}
+
 TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
@@ -176,7 +220,7 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider_or_error =
-      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
   EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
 }
 

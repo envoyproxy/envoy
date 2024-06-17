@@ -108,24 +108,6 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
   return {};
 }
 
-absl::StatusOr<std::string>
-ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route, Api::Api& api,
-                                       uint32_t max_body_size_bytes) {
-  if (!route.has_direct_response() || !route.direct_response().has_body()) {
-    return EMPTY_STRING;
-  }
-  const auto& body = route.direct_response().body();
-
-  auto body_or_error = Envoy::Config::DataSource::read(body, true, api, max_body_size_bytes);
-  RETURN_IF_STATUS_NOT_OK(body_or_error);
-  const std::string& string_body = body_or_error.value();
-  if (string_body.length() > max_body_size_bytes) {
-    return absl::InvalidArgumentError(fmt::format("response body size is {} bytes; maximum is {}",
-                                                  string_body.length(), max_body_size_bytes));
-  }
-  return string_body;
-}
-
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     const envoy::config::route::v3::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {

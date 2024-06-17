@@ -18,91 +18,34 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 /**
- * Stream flags from request or response to control the behavior of the
- * generic proxy filter. This is mainly used as part of FrameFlags.
- * All these flags could be ignored for the simple ping-pong use case.
- */
-class StreamFlags {
-public:
-  StreamFlags(uint64_t stream_id = 0, bool one_way_stream = false, bool drain_close = false,
-              bool is_heartbeat = false)
-      : stream_id_(stream_id), one_way_stream_(one_way_stream), drain_close_(drain_close),
-        is_heartbeat_(is_heartbeat) {}
-
-  /**
-   * @return the stream id of the request or response. This is used to match the
-   * downstream request with the upstream response.
-
-   * NOTE: In most cases, the stream id is not needed and will be ignored completely.
-   * The stream id is only used when we can't match the downstream request
-   * with the upstream response by the active stream instance self directly.
-   * For example, when the multiple downstream requests are multiplexed into one
-   * upstream connection.
-   */
-  uint64_t streamId() const { return stream_id_; }
-
-  /**
-   * @return whether the stream is one way stream. If request is one way stream, the
-   * generic proxy filter will not wait for the response from the upstream.
-   */
-  bool oneWayStream() const { return one_way_stream_; }
-
-  /**
-   * @return whether the downstream/upstream connection should be drained after
-   * current active stream are finished.
-   */
-  bool drainClose() const { return drain_close_; }
-
-  /**
-   * @return whether the current request/response is a heartbeat request/response.
-   * NOTE: It would be better to handle heartbeat request/response by another L4
-   * filter. Then the generic proxy filter can be used for the simple ping-pong
-   * use case.
-   */
-  bool isHeartbeat() const { return is_heartbeat_; }
-
-private:
-  uint64_t stream_id_{0};
-
-  bool one_way_stream_{false};
-  bool drain_close_{false};
-  bool is_heartbeat_{false};
-};
-
-/**
  * Flags of stream frame. This is used to control the behavior of the generic proxy filter.
  * All these flags could be ignored for the simple ping-pong use case.
  */
 class FrameFlags {
 public:
+  static constexpr uint32_t FLAG_EMPTY = 0x0000;
+  static constexpr uint32_t FLAG_END_STREAM = 0x0001;
+  static constexpr uint32_t FLAG_ONE_WAY = 0x0002;
+  static constexpr uint32_t FLAG_DRAIN_CLOSE = 0x0004;
+  static constexpr uint32_t FLAG_HEARTBEAT = 0x0008;
+
   /**
    * Construct FrameFlags with stream flags and end stream flag. The stream flags MUST be
    * same for all frames of the same stream.
-   * @param stream_flags StreamFlags of the stream.
-   * @param end_stream whether the current frame is the last frame of the request or response.
+   * @param stream_id the stream id of the request or response.
+   * @param flags flags of the current frame. Only the flags that defined in FrameFlags
+   * could be used. Multiple flags could be combined by bitwise OR.
    * @param frame_tags frame tags of the current frame. The meaning of the frame tags is
    * application protocol specific.
    */
-  FrameFlags(StreamFlags stream_flags = StreamFlags(), bool end_stream = true,
-             uint32_t frame_tags = 0)
-      : stream_flags_(stream_flags), frame_tags_(frame_tags), end_stream_(end_stream) {}
+  FrameFlags(uint64_t stream_id = 0, uint32_t flags = FLAG_END_STREAM, uint32_t frame_tags = 0)
+      : stream_id_(stream_id), flags_(flags), frame_tags_(frame_tags) {}
 
   /**
-   * Get flags of stream that the frame belongs to. The flags MUST be same for all frames of the
-   * same stream. Copy semantics is used because the flags are lightweight (only 16 bytes for now).
-   * @return StreamFlags of the stream.
+   * @return the stream id of the request or response. All frames of the same stream
+   * MUST have the same stream id.
    */
-  StreamFlags streamFlags() const { return stream_flags_; }
-
-  /**
-   * @return the stream id of the request or response.
-   */
-  uint64_t streamId() const { return stream_flags_.streamId(); }
-
-  /**
-   * @return whether the current frame is the last frame of the request or response.
-   */
-  bool endStream() const { return end_stream_; }
+  uint64_t streamId() const { return stream_id_; }
 
   /**
    * @return frame tags of the current frame. The meaning of the frame tags is application
@@ -114,12 +57,35 @@ public:
    */
   uint32_t frameTags() const { return frame_tags_; }
 
-private:
-  StreamFlags stream_flags_{};
+  /**
+   * @return whether the current frame is the last frame of the request or response.
+   */
+  bool endStream() const { return flags_ & FLAG_END_STREAM; }
 
+  /**
+   * @return whether the downstream/upstream connection should be drained after
+   * current active stream are finished.
+   * NOTE: Only the response header frame's drainClose() flag will be used.
+   */
+  bool drainClose() const { return flags_ & FLAG_DRAIN_CLOSE; }
+
+  /**
+   * @return whether the stream is one way stream. If request is one way stream, the
+   * generic proxy filter will not wait for the response from the upstream.
+   * NOTE: Only the request header frame's oneWayStream() flag will be used.
+   */
+  bool oneWayStream() const { return flags_ & FLAG_ONE_WAY; }
+
+  /**
+   * @return whether the current request/response is a heartbeat request/response.
+   * NOTE: Only the header frame's isHeartbeat() flag will be used.
+   */
+  bool isHeartbeat() const { return flags_ & FLAG_HEARTBEAT; }
+
+private:
+  uint64_t stream_id_{};
+  uint32_t flags_{};
   uint32_t frame_tags_{};
-  // Default to true for backward compatibility.
-  bool end_stream_{true};
 };
 
 /**

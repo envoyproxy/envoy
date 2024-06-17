@@ -7567,69 +7567,6 @@ TEST_F(ConfigUtilityTest, ParseResponseCode) {
   }
 }
 
-TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
-  constexpr uint64_t MaxResponseBodySizeBytes = 4096;
-  envoy::config::route::v3::Route route;
-  EXPECT_EQ(EMPTY_STRING,
-            ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes).value());
-
-  route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
-  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
-                .status()
-                .message(),
-            "file missing_file does not exist");
-
-  // The default max body size in bytes is 4096 (MaxResponseBodySizeBytes).
-  const std::string body(MaxResponseBodySizeBytes + 1, '*');
-  std::string expected_message("response body size is 4097 bytes; maximum is 4096");
-  route.mutable_direct_response()->mutable_body()->set_inline_string(body);
-  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
-                .status()
-                .message(),
-            expected_message);
-
-  // Change the max body size to 2048 (MaxResponseBodySizeBytes/2) bytes.
-  auto filename = TestEnvironment::writeStringToFileForTest("body", body);
-  route.mutable_direct_response()->mutable_body()->set_filename(filename);
-  expected_message = "file " + filename + " size is 4097 bytes; maximum is 2048";
-  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes / 2)
-                .status()
-                .message(),
-            expected_message);
-
-  // Update the max body size to 4098 bytes (MaxResponseBodySizeBytes + 2), hence the parsing is
-  // successful.
-  EXPECT_EQ(
-      MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
-  route.mutable_direct_response()->mutable_body()->set_filename(EMPTY_STRING);
-  route.mutable_direct_response()->mutable_body()->set_inline_bytes(body);
-  EXPECT_EQ(
-      MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
-}
-
-TEST_F(ConfigUtilityTest, ParseDirectResponseBodyWithEnv) {
-  constexpr uint64_t MaxResponseBodySizeBytes = 4096;
-  envoy::config::route::v3::Route route;
-
-  const std::string body(MaxResponseBodySizeBytes + 1, '*');
-  TestEnvironment::setEnvVar("ResponseBodyContents", body, 1);
-  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ResponseBodyContents"); });
-
-  route.mutable_direct_response()->mutable_body()->set_environment_variable("ResponseBodyContents");
-
-  std::string expected_message("response body size is 4097 bytes; maximum is 4096");
-
-  EXPECT_EQ(ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes)
-                .status()
-                .message(),
-            expected_message);
-  EXPECT_EQ(
-      MaxResponseBodySizeBytes + 1,
-      ConfigUtility::parseDirectResponseBody(route, *api_, MaxResponseBodySizeBytes + 2)->size());
-}
-
 TEST_F(RouteConfigurationV2, RedirectCode) {
   const std::string yaml = R"EOF(
 virtual_hosts:

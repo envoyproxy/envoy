@@ -674,7 +674,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 }
 
 TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
-  builder_.setRuntimeGuard("reresolve_null_addresses", true);
+  builder_.addRuntimeGuard("reresolve_null_addresses", true);
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
   Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
@@ -1333,8 +1333,8 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
 }
 
 TEST_P(ClientIntegrationTest, TestRuntimeSet) {
-  builder_.setRuntimeGuard("test_feature_true", false);
-  builder_.setRuntimeGuard("test_feature_false", true);
+  builder_.addRuntimeGuard("test_feature_true", false);
+  builder_.addRuntimeGuard("test_feature_false", true);
   initialize();
 
   // Verify that the Runtime config values are from the RTDS response.

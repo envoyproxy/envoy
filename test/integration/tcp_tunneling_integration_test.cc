@@ -171,6 +171,48 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
   sendBidirectionalDataAndCleanShutdown();
 }
 
+TEST_P(ConnectTerminationIntegrationTest, ManyStreams) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    // Resetting an individual stream requires HTTP/2 or later.
+    return;
+  }
+  autonomous_upstream_ = true; // Sending raw HTTP/1.1
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  initialize();
+
+  auto upstream = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get());
+  upstream->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+  upstream->setResponseBody("");
+  std::string response_body = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::vector<Http::RequestEncoder*> encoders;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  const int num_loops = 50;
+
+  // Do 2x loops and reset half the streams to fuzz lifetime issues
+  for (int i = 0; i < num_loops * 2; ++i) {
+    auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+    if (i % 2 == 0) {
+      codec_client_->sendReset(encoder_decoder.first);
+    } else {
+      encoders.push_back(&encoder_decoder.first);
+      responses.push_back(std::move(encoder_decoder.second));
+    }
+  }
+
+  // Finish up the non-reset streams. The autonomous upstream will send the response.
+  for (int i = 0; i < num_loops; ++i) {
+    // Send some data upstream.
+    codec_client_->sendData(*encoders[i], "GET / HTTP/1.1\r\nHost: www.google.com\r\n\r\n", false);
+    responses[i]->waitForBodyData(response_body.length());
+    EXPECT_EQ(response_body, responses[i]->body());
+  }
+
+  codec_client_->close();
+}
+
 TEST_P(ConnectTerminationIntegrationTest, LogOnSuccessfulTunnel) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

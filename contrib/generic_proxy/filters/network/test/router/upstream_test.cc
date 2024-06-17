@@ -377,10 +377,10 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccess) {
   EXPECT_EQ(2, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_1->stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  request_1->stream_frame_flags_ = FrameFlags(1);
 
   auto request_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_2->stream_frame_flags_ = FrameFlags(StreamFlags(2));
+  request_2->stream_frame_flags_ = FrameFlags(2);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -431,10 +431,10 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccessWithMultipleFrames) {
   EXPECT_EQ(2, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_1->stream_frame_flags_ = FrameFlags(StreamFlags(1), false);
+  request_1->stream_frame_flags_ = FrameFlags(1, FrameFlags::FLAG_EMPTY);
 
   auto request_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_2->stream_frame_flags_ = FrameFlags(StreamFlags(2), false);
+  request_2->stream_frame_flags_ = FrameFlags(2, FrameFlags::FLAG_EMPTY);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -453,10 +453,10 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccessWithMultipleFrames) {
   EXPECT_EQ(2, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
-  request_1_frame->stream_frame_flags_ = FrameFlags(StreamFlags(1), true);
+  request_1_frame->stream_frame_flags_ = FrameFlags(1);
 
   auto request_2_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
-  request_2_frame->stream_frame_flags_ = FrameFlags(StreamFlags(2), true);
+  request_2_frame->stream_frame_flags_ = FrameFlags(2);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -504,10 +504,10 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailureAndNoUpstreamConnectionC
   EXPECT_EQ(2, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_1->stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  request_1->stream_frame_flags_ = FrameFlags(1);
 
   auto request_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_2->stream_frame_flags_ = FrameFlags(StreamFlags(2));
+  request_2->stream_frame_flags_ = FrameFlags(2);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -557,10 +557,10 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailure) {
   EXPECT_EQ(2, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_1->stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  request_1->stream_frame_flags_ = FrameFlags(1);
 
   auto request_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_2->stream_frame_flags_ = FrameFlags(StreamFlags(2));
+  request_2->stream_frame_flags_ = FrameFlags(2);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -733,7 +733,7 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccess) {
   EXPECT_EQ(1, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_1->stream_frame_flags_ = FrameFlags(StreamFlags(1));
+  request_1->stream_frame_flags_ = FrameFlags(1);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -773,7 +773,7 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccessWithMultipleFrames) {
   EXPECT_EQ(1, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  request_1->stream_frame_flags_ = FrameFlags(StreamFlags(1), false);
+  request_1->stream_frame_flags_ = FrameFlags(1, FrameFlags::FLAG_EMPTY);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
@@ -789,7 +789,7 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccessWithMultipleFrames) {
   EXPECT_EQ(1, generic_upstream->waitingResponseRequestsSize());
 
   auto request_1_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
-  request_1_frame->stream_frame_flags_ = FrameFlags(StreamFlags(1), true);
+  request_1_frame->stream_frame_flags_ = FrameFlags(1);
 
   EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
       .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {

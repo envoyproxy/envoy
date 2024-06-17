@@ -490,7 +490,7 @@ A maximum of 100 entries will be stored.
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-``setRuntimeGuard``
+``addRuntimeGuard``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Adds a runtime guard key value pair to envoy configuration.  The guard is of the short form "feature"
@@ -500,10 +500,10 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
 **Example**::
 
   // Kotlin
-  builder.setRuntimeGuard("feature", true)
+  builder.addRuntimeGuard("feature", true)
 
   // Swift
-  builder.setRuntimeGuard("feature", true)
+  builder.addRuntimeGuard("feature", true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``setXds``

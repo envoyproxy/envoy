@@ -151,11 +151,7 @@ public:
   Type type() const override { return type_; }
 
 private:
-  void checkType(Type type) const {
-    if (type_ != type) {
-      ExceptionUtil::throwEnvoyException("invalid BSON field type cast");
-    }
-  }
+  void checkType(Type type) const;
 
   /**
    * All of the possible variadic values that a field can be.

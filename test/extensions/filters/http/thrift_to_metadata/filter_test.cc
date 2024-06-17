@@ -3,6 +3,7 @@
 #include "envoy/http/header_map.h"
 
 #include "source/extensions/filters/http/thrift_to_metadata/filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
 
 #include "test/common/buffer/utility.h"
@@ -151,7 +152,7 @@ response_rules:
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->encodeHeaders(response_headers_, false));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-    EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+    EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                  MapEq(expected_metadata)));
 
     Buffer::OwnedImpl buffer;
@@ -387,7 +388,7 @@ TEST_F(FilterTest, NoResponseBody) {
       {"response_reply_type", "unknown"}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
@@ -442,7 +443,7 @@ TEST_P(FilterTest, IncompleteResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl whole_message;
@@ -505,7 +506,7 @@ TEST_P(FilterTest, IncompleteResponseWithTrailer) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl whole_message;
@@ -558,7 +559,7 @@ TEST_F(FilterTest, MalformedResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl buffer{"malformed thrift body"};
@@ -582,7 +583,7 @@ TEST_F(FilterTest, ApplicationExceptionResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl buffer;
@@ -651,7 +652,7 @@ TEST_P(FilterTest, EncodeTwoDataStreams) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl whole_message;
@@ -898,7 +899,7 @@ TEST_F(FilterTest, ResponseAllowEmptyContentType) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(headers_without_content_type, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl buffer;
@@ -960,7 +961,7 @@ TEST_F(FilterTest, CustomResponseAllowContentTypeAccepted) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(headers_without_content_type, false));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.filters.http.thrift_to_metadata",
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
                                                MapEq(expected_metadata)));
 
   Buffer::OwnedImpl buffer;

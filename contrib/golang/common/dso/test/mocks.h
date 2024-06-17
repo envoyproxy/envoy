@@ -24,6 +24,7 @@ public:
   MOCK_METHOD(void, envoyGoFilterOnHttpLog, (httpRequest * p0, int p1));
   MOCK_METHOD(void, envoyGoFilterOnHttpDestroy, (httpRequest * p0, int p1));
   MOCK_METHOD(void, envoyGoRequestSemaDec, (httpRequest * p0));
+  MOCK_METHOD(void, envoyGoFilterCleanUp, ());
 };
 
 class MockNetworkFilterDsoImpl : public NetworkFilterDso {

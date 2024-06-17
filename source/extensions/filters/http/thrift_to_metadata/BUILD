@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/http:header_utility_lib",
+        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/network/thrift_proxy:auto_protocol_lib",
         "//source/extensions/filters/network/thrift_proxy:auto_transport_lib",

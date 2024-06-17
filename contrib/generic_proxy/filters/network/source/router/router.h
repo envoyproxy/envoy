@@ -48,7 +48,7 @@ class UpstreamRequest : public UpstreamRequestCallbacks,
                         public EncodingContext,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  UpstreamRequest(RouterFilter& parent, StreamFlags stream_flags,
+  UpstreamRequest(RouterFilter& parent, FrameFlags header_frame_flags,
                   GenericUpstreamSharedPtr generic_upstream);
 
   void startStream();

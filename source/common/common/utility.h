@@ -636,16 +636,85 @@ private:
   double m2_{0};
 };
 
-template <class Value> struct TrieEntry {
-  Value value_{};
-  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
-};
-
 /**
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ *
+ * Type of Value must be empty-constructible and moveable, e.g. smart pointers and POD types.
  */
-template <class Value> struct TrieLookupTable {
+template <class Value> class TrieLookupTable {
+  // A TrieNode aims to be a good balance of performant and
+  // space-efficient, by allocating a vector the size of the range of children
+  // the node contains. This should be good for most use-cases.
+  //
+  // For example, a node with children 'a' and 'z' will contain a vector of
+  // size 26, containing two values and 24 nulls. A node with only one
+  // child will contain a vector of size 1. A node with no children will
+  // contain an empty vector.
+  //
+  // Compared to allocating 256 entries for every node, this makes insertions
+  // a little bit inefficient (especially insertions in reverse order), but
+  // trie lookups remain O(length-of-longest-matching-prefix) with just a
+  // couple of very cheap operations extra per step.
+  //
+  // By size, having 256 entries for every node makes each node's overhead
+  // (excluding values) consume 8KB; even a trie containing only a single
+  // prefix "foobar" consumes 56KB.
+  // Using ranged vectors like this makes a single prefix "foobar" consume
+  // less than 20 bytes per node, for a total of 0.14KB.
+  class TrieNode {
+  public:
+    Value value_{};
 
+    // Returns a pointer to the child branch at child_index, or nullptr if
+    // there are no entries in the trie on that branch.
+    const TrieNode* operator[](uint8_t child_index) const {
+      if (child_index >= min_child_ && child_index < (min_child_ + children_.size())) {
+        return children_[child_index - min_child_].get();
+      }
+      return nullptr;
+    }
+
+    // Returns a pointer to the child branch at child_index, or nullptr if
+    // there are no entries in the trie on that branch.
+    TrieNode* operator[](uint8_t child_index) {
+      return const_cast<TrieNode*>(std::as_const(*this)[child_index]);
+    }
+
+    // Populates a child branch at child_index, with the child specified
+    // by `node`. If the branch already exists it will be overwritten.
+    void set(uint8_t child_index, std::unique_ptr<TrieNode> node) {
+      if (children_.empty()) {
+        children_.reserve(1);
+        children_.emplace_back(std::move(node));
+        min_child_ = child_index;
+        return;
+      }
+      if (child_index < min_child_) {
+        // Expand the vector backwards, by moving the existing vector onto
+        // the end of a newly allocated one.
+        std::vector<std::unique_ptr<TrieNode>> new_children;
+        new_children.reserve(min_child_ - child_index + children_.size());
+        new_children.resize(min_child_ - child_index);
+        std::move(children_.begin(), children_.end(), std::back_inserter(new_children));
+        new_children[0] = std::move(node);
+        min_child_ = child_index;
+        children_ = std::move(new_children);
+        return;
+      }
+      if (child_index >= (min_child_ + children_.size())) {
+        // Expand the vector forwards.
+        children_.resize(child_index - min_child_ + 1);
+        // Fall through to "insert" behavior.
+      }
+      children_[child_index - min_child_] = std::move(node);
+    }
+
+  private:
+    uint8_t min_child_{0};
+    std::vector<std::unique_ptr<TrieNode>> children_;
+  };
+
+public:
   /**
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.
@@ -655,12 +724,12 @@ template <class Value> struct TrieLookupTable {
    * @return false when a value already exists for the given key.
    */
   bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
-    TrieEntry<Value>* current = &root_;
+    TrieNode* current = &root_;
     for (uint8_t c : key) {
-      if (!current->entries_[c]) {
-        current->entries_[c] = std::make_unique<TrieEntry<Value>>();
+      if ((*current)[c] == nullptr) {
+        current->set(c, std::make_unique<TrieNode>());
       }
-      current = current->entries_[c].get();
+      current = (*current)[c];
     }
     if (current->value_ && !overwrite_existing) {
       return false;
@@ -672,31 +741,34 @@ template <class Value> struct TrieLookupTable {
   /**
    * Finds the entry associated with the key.
    * @param key the key used to find.
-   * @return the value associated with the key.
+   * @return the Value associated with the key, or an empty-initialized Value
+   *         if there is no matching key.
    */
   Value find(absl::string_view key) const {
-    const TrieEntry<Value>* current = &root_;
+    const TrieNode* current = &root_;
     for (uint8_t c : key) {
-      current = current->entries_[c].get();
+      current = (*current)[c];
       if (current == nullptr) {
-        return nullptr;
+        return {};
       }
     }
     return current->value_;
   }
 
   /**
-   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix,
-   * key length)).
+   * Finds the entry with the longest key that is a prefix of the specified key.
+   * Complexity is O(min(longest key prefix, key length)).
    * @param key the key used to find.
-   * @return the value matching the longest prefix based on the key.
+   * @return a value whose key is a prefix of the specified key. If there are
+   *         multiple such values, the one with the longest key. If there are
+   *         no keys that are a prefix of the input key, an empty-initialized Value.
    */
   Value findLongestPrefix(absl::string_view key) const {
-    const TrieEntry<Value>* current = &root_;
-    const TrieEntry<Value>* result = current;
+    const TrieNode* current = &root_;
+    const TrieNode* result = current;
 
     for (uint8_t c : key) {
-      current = current->entries_[c].get();
+      current = (*current)[c];
 
       if (current == nullptr) {
         return result ? result->value_ : nullptr;
@@ -707,7 +779,8 @@ template <class Value> struct TrieLookupTable {
     return result ? result->value_ : nullptr;
   }
 
-  TrieEntry<Value> root_;
+private:
+  TrieNode root_;
 };
 
 /**

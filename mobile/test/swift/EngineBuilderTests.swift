@@ -13,10 +13,10 @@ final class EngineBuilderTests: XCTestCase {
     MockEnvoyEngine.onRunWithConfig = nil
   }
 
-  func testSetRuntimeGuard() {
+  func testAddRuntimeGuard() {
     let bootstrapDebugDescription = EngineBuilder()
-      .setRuntimeGuard("test_feature_false", true)
-      .setRuntimeGuard("test_feature_true", false)
+      .addRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_true", false)
       .bootstrapDebugDescription()
     XCTAssertTrue(
       bootstrapDebugDescription.contains(#""test_feature_false" value { bool_value: true }"#)

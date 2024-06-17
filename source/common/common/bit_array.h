@@ -129,13 +129,14 @@ private:
   }
 
   static inline void storeUnsignedWord(void* destination, uint64_t value) {
+    value = htole64(value);
     safeMemcpyUnsafeDst(destination, &value);
   }
 
   static inline uint64_t loadUnsignedWord(const void* source) {
     uint64_t destination;
     safeMemcpyUnsafeSrc(&destination, source);
-    return destination;
+    return le64toh(destination);
   }
 
   // Backing storage for the underlying array of bits.

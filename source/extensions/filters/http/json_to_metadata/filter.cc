@@ -3,6 +3,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -189,8 +190,7 @@ void Filter::applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval,
 }
 
 const std::string& Filter::decideNamespace(const std::string& nspace) const {
-  static const std::string& jsonToMetadata = "envoy.filters.http.json_to_metadata";
-  return nspace.empty() ? jsonToMetadata : nspace;
+  return nspace.empty() ? HttpFilterNames::get().JsonToMetadata : nspace;
 }
 
 bool Filter::addMetadata(const std::string& meta_namespace, const std::string& key,

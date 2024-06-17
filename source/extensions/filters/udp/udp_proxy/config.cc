@@ -102,7 +102,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.serverFactoryContext().options().localAddressIpVersion())) {
-    ExceptionUtil::throwEnvoyException(
+    throw EnvoyException(
         "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
         "is not running with the CAP_NET_ADMIN capability.");
   }

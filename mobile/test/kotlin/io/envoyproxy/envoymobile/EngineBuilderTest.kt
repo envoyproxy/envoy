@@ -217,8 +217,8 @@ class EngineBuilderTest {
   fun `specifying runtime guards work`() {
     engineBuilder = EngineBuilder()
     engineBuilder
-      .setRuntimeGuard("test_feature_false", true)
-      .setRuntimeGuard("test_feature_true", false)
+      .addRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_true", false)
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_false"]).isEqualTo("true")
     assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_true"]).isEqualTo("false")

@@ -560,10 +560,8 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, LeastRequestLoadBalancerTest,
-                         ::testing::Values(LoadBalancerTestParam{true, false},
-                                           LoadBalancerTestParam{true, true},
-                                           LoadBalancerTestParam{false, false},
-                                           LoadBalancerTestParam{false, true}));
+                         ::testing::Values(LoadBalancerTestParam{true},
+                                           LoadBalancerTestParam{false}));
 
 } // namespace
 } // namespace Upstream
