@@ -144,11 +144,11 @@ public:
   std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
   void shutdownAll() override {}
   std::shared_ptr<Config::GrpcMux>
-  create(std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-         Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-         const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-         BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-         OptRef<Config::XdsResourcesDelegate>, bool) override {
+  create(std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
+         Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
+         const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+         std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+         OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>, bool) override {
     return std::make_shared<NiceMock<Config::MockGrpcMux>>();
   }
 };

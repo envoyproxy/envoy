@@ -7,41 +7,6 @@
 namespace Envoy {
 namespace Bridge {
 
-TEST(EnvoyMapConvenientInitializerTest, FromCppToCEmpty) {
-  const auto map = Utility::makeEnvoyMap({});
-
-  EXPECT_EQ(map.length, 0);
-  release_envoy_map(map);
-}
-
-TEST(EnvoyMapConvenientInitializerTest, FromCppToC) {
-  const auto map = Utility::makeEnvoyMap({{"foo", "bar"}});
-
-  EXPECT_EQ(Bridge::Utility::copyToString(map.entries[0].key), "foo");
-  EXPECT_EQ(Bridge::Utility::copyToString(map.entries[0].value), "bar");
-  EXPECT_EQ(map.length, 1);
-  release_envoy_map(map);
-}
-
-TEST(DataConstructorTest, FromCToCppEmpty) {
-  envoy_data empty_data = {0, nullptr, free, nullptr};
-
-  Buffer::InstancePtr cpp_data = Utility::toInternalData(empty_data);
-
-  ASSERT_EQ(cpp_data->length(), 0);
-}
-
-TEST(DataConstructorTest, FromCToCpp) {
-  std::string s = "test string";
-  envoy_data c_data = {s.size(), reinterpret_cast<const uint8_t*>(s.c_str()), free, nullptr};
-  ;
-
-  Buffer::InstancePtr cpp_data = Utility::toInternalData(c_data);
-
-  ASSERT_EQ(cpp_data->length(), c_data.length);
-  ASSERT_EQ(cpp_data->toString(), s);
-}
-
 TEST(DataConstructorTest, FromCppToCEmpty) {
   Buffer::OwnedImpl empty_data;
 

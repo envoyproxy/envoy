@@ -732,8 +732,8 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -807,8 +807,8 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -820,8 +820,8 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -834,8 +834,8 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -1879,8 +1879,9 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     return;
   }
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
-  // This is the only value currently.
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   status_message_ = "reset";
   // Deferred "after VM call" actions are going to be executed upon returning from
   // ContextBase::*, which might include deleting Context object via proxy_done().

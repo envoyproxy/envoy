@@ -132,7 +132,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
   filter->decodeHeaders(headers_, false);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
+  const auto expected_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
@@ -209,7 +209,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
   callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Network::Utility::parseInternetAddress("1.2.3.4"));
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4"));
   filter->decodeHeaders(headers_, true);
 
   // No new expectations => no side effects from calling these.
@@ -226,7 +226,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
   callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Network::Utility::parseInternetAddress("1.2.3.4"));
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4"));
   filter->decodeHeaders(headers_, false);
 
   // No new expectations => no side effects from calling these.

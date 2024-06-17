@@ -441,6 +441,7 @@ envoy_cc_library(
         "//envoy/router:shadow_writer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
     ],
 )
