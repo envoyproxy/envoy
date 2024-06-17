@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.mtls_failure_response.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+import "envoy/type/v3/token_bucket.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.mtls_failure_response.v3";
+option java_outer_classname = "MtlsFailureResponseProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+
+// [#protodoc-title: MtlsFailureResponse]
+// [#extension: envoy.filters.network.mtls_failure_response]
+
+// Configuration for the mTLS Failure Response filter. As opposed to returning a SSL failure to a client after failed
+// client cert validation, this filter allows for customization of the response.
+message MtlsFailureResponse {
+
+  enum ValidationMode {
+    PRESENTED = 0;
+    VALIDATED = 1;
+  }
+
+  // Specify whether client cert is expected to be only presented
+  // or also validated based on
+  // :ref:`validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context>`
+  //
+  // .. warning::
+  //    Client certificate validation is not currently performed upon TLS session resumption. For
+  //    a resumed TLS session the route will match only when ``validated`` is false, regardless of
+  //    whether the client TLS certificate is valid.
+  //
+  //    The only known workaround for this issue is to disable TLS session resumption entirely, by
+  //    setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+  //    and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
+  ValidationMode validation_mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  enum FailureMode {
+    CLOSE_CONNECTION = 0;
+    KEEP_CONNECTION_OPEN = 1;
+  }
+
+  // Specify whether the connection should be closed without SSL failure response
+  // or keep the connection open (Tarpitting) to drain ill intentioned client's resources.
+  //
+  // .. warning::
+  //    It is recommended to use token_bucket when using KEEP_CONNECTION_OPEN
+  //    for limiting open connections. This would help avoid self inflicting DoS.
+  FailureMode failure_mode = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // TokenBucket used to limit number of open connections if KEEP_CONNECTION_OPEN is set as failure_mode.
+  // Each connection that fails the validation consumes a single token.
+  // If the token is available, the connection will be allowed.
+  // If no tokens are available, the connection will be immediately closed.
+  type.v3.TokenBucket token_bucket = 3;
+
+}

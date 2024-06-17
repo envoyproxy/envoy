@@ -171,6 +171,7 @@ proto_library(
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
         "//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",
+        "//envoy/extensions/filters/network/mtls_failure_response/v3:pkg",
         "//envoy/extensions/filters/network/ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/rbac/v3:pkg",
         "//envoy/extensions/filters/network/redis_proxy/v3:pkg",

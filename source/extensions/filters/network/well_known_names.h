@@ -33,6 +33,8 @@ public:
   const std::string LocalRateLimit = "envoy.filters.network.local_ratelimit";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.filters.network.mongo_proxy";
+  // Mtls Failure Response filter
+  const std::string MtlsFailureResponse = "envoy.filters.network.mtls_failure_response";
   // MySQL proxy filter
   const std::string MySQLProxy = "envoy.filters.network.mysql_proxy";
   // Postgres proxy filter
