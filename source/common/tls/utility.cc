@@ -248,8 +248,8 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       if (san_char != nullptr) {
         san.assign(san_char);
         OPENSSL_free(san_char);
-        break;
       }
+      break;
     }
     case V_ASN1_OBJECT: {
       char tmp_obj[256]; // OID Max length
