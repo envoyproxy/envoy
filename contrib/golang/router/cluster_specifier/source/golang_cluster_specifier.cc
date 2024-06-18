@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-
 namespace Envoy {
 namespace Router {
 namespace Golang {
