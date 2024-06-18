@@ -663,8 +663,6 @@ template <class Value> class TrieLookupTable {
   // less than 20 bytes per node, for a total of 0.14KB.
   class TrieNode {
   public:
-    Value value_{};
-
     // Returns a pointer to the child branch at child_index, or nullptr if
     // there are no entries in the trie on that branch.
     const TrieNode* operator[](uint8_t child_index) const {
@@ -709,6 +707,7 @@ template <class Value> class TrieLookupTable {
       children_[child_index - min_child_] = std::move(node);
     }
 
+    Value value_{};
     uint8_t min_child_{0};
     std::vector<std::unique_ptr<TrieNode>> children_;
   };
