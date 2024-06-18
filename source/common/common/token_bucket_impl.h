@@ -38,7 +38,7 @@ private:
 /**
  * Atomic token bucket. This class is thread-safe.
  * TODO(wbpcode): this could be used to replace the SharedTokenBucketImpl once this
-  * implementation is proven to be robust.
+ * implementation is proven to be robust.
  */
 class AtomicTokenBucketImpl : public TokenBucket {
 public:
@@ -69,6 +69,8 @@ private:
   const double fill_rate_{};
   std::atomic<double> total_tokens_{};
   std::atomic<bool> could_fill_{true};
+  // The last time the bucket was filled or reset. It is that ensured only one thread could fill the
+  // bucket and update the last_fill_ at the same time by the could_fill_ flag.
   MonotonicTime last_fill_;
   TimeSource& time_source_;
 };
