@@ -62,9 +62,13 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   }
 
   Stats::TestUtil::TestStore stats_store;
-  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  // Create a mock client and immediately pack it into a unique_ptr. This way if the ConfigSharedPtr
+  // constructor fails the client will not get leaked.
+  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
+  auto client_ptr = Filters::Common::ExtAuthz::ClientPtr{client};
 
   ConfigSharedPtr config;
   try {
@@ -73,7 +77,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
     ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
     return;
   }
-  auto filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+
+  auto filter = std::make_unique<Filter>(config, std::move(client_ptr));
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
