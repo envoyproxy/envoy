@@ -97,6 +97,7 @@ public:
   MOCK_METHOD(bool, isIpAddress, (), (const));
   MOCK_METHOD(void, touch, ());
   MOCK_METHOD(bool, firstResolveComplete, (), (const));
+  MOCK_METHOD(std::string, details, ());
 
   Network::Address::InstanceConstSharedPtr address_;
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;

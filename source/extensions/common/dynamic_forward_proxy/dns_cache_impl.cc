@@ -219,7 +219,8 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   // If the DNS request was simply to create a host endpoint in a Dynamic Forward Proxy cluster,
   // fast fail the look-up as the address is not needed.
   if (is_proxy_lookup) {
-    finishResolve(host, Network::DnsResolver::ResolutionStatus::Success, {}, {}, true);
+    finishResolve(host, Network::DnsResolver::ResolutionStatus::Success, "proxy_resolve", {}, {},
+                  true);
   } else {
     startResolve(host, *primary_host);
   }
@@ -262,7 +263,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
+  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {});
 }
 
 void DnsCacheImpl::onReResolveAlarm(const std::string& host) {
@@ -342,16 +343,17 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   stats_.dns_query_attempt_.inc();
 
   host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
-  host_info.active_query_ =
-      resolver_->resolve(host_info.host_info_->resolvedHost(), dns_lookup_family_,
-                         [this, host](Network::DnsResolver::ResolutionStatus status,
-                                      std::list<Network::DnsResponse>&& response) {
-                           finishResolve(host, status, std::move(response));
-                         });
+  host_info.active_query_ = resolver_->resolve(
+      host_info.host_info_->resolvedHost(), dns_lookup_family_,
+      [this, host](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
+                   std::list<Network::DnsResponse>&& response) {
+        finishResolve(host, status, details, std::move(response));
+      });
 }
 
 void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
+                                 absl::string_view details,
                                  std::list<Network::DnsResponse>&& response,
                                  absl::optional<MonotonicTime> resolution_time,
                                  bool is_proxy_lookup) {
@@ -436,6 +438,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                     current_address ? current_address->asStringView() : "<empty>",
                     new_address ? new_address->asStringView() : "<empty>");
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
+    primary_host_info->host_info_->setDetails(std::string(details));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
     if (Runtime::runtimeFeatureEnabled(
@@ -444,6 +447,11 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     }
     address_changed = true;
     stats_.host_address_changed_.inc();
+  } else if (current_address == nullptr) {
+    // We only set details here if current address is null because but
+    // non-null->null resolutions we don't update the address so will use a
+    // previously resolved address + details.
+    primary_host_info->host_info_->setDetails(std::string(details));
   }
 
   if (first_resolve) {
@@ -635,8 +643,8 @@ void DnsCacheImpl::loadCacheEntries(
         key, accumulateToString<Network::DnsResponse>(responses, [](const auto& dns_response) {
           return dns_response.addrInfo().address_->asString();
         }));
-    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(responses),
-                  resolution_time);
+    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, "from_cache",
+                  std::move(responses), resolution_time);
     stats_.cache_load_.inc();
     return KeyValueStore::Iterate::Continue;
   };
