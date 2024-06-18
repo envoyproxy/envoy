@@ -208,6 +208,42 @@ TEST_F(ThunderingHerdHandlerTest, UnblockPeriodTimeoutDoesNotRunIfRequestAlready
                               Event::Dispatcher::RunType::Block);
 }
 
+TEST_F(ThunderingHerdHandlerTest, FilterDeletionAfterQueueDeletionIsOkay) {
+  envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
+  config.mutable_block_until_completion();
+  initHandler(config);
+  // Nothing should happen if we receive a completion on a nonexistent queue.
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+}
+
+TEST_F(ThunderingHerdHandlerTest, FilterDeletionWhenQueueIsEmptyIsOkay) {
+  envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
+  config.mutable_block_until_completion();
+  initHandler(config);
+  EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
+  handler_->handleUpstreamRequest(mock_filter_, &mock_decoder_callbacks_, key_, request_headers_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  // Nothing should happen if we receive a completion on an empty queue.
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+}
+
+TEST_F(ThunderingHerdHandlerTest, NotCacheableResponseMakesSubsequentRequestsNotBlock) {
+  envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
+  config.mutable_block_until_completion();
+  initHandler(config);
+  EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
+  handler_->handleUpstreamRequest(mock_filter_, &mock_decoder_callbacks_, key_, request_headers_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::NotCacheable);
+  EXPECT_CALL(mock_decoder_callbacks_2_, continueDecoding());
+  EXPECT_CALL(mock_decoder_callbacks_3_, continueDecoding());
+  handler_->handleUpstreamRequest(mock_filter_2_, &mock_decoder_callbacks_2_, key_,
+                                  request_headers_);
+  handler_->handleUpstreamRequest(mock_filter_3_, &mock_decoder_callbacks_3_, key_,
+                                  request_headers_);
+}
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

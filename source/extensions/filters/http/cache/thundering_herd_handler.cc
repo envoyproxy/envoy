@@ -40,8 +40,8 @@ class ThunderingHerdHandlerBlockUntilCompletion
     // a fraction of a second in the future. This is necessary to resolve the race in
     // which a cache lookup occurred, then insertion completed from another request,
     // then the queue unblocked, then the thundering herd check is applied on the cache
-    // miss; we want it to retry and get a cache hit. Without this timer this race
-    // would instead pass an additional request through to the upstream.
+    // miss; we want it to retry and get a cache hit. Without this retry, this race
+    // would instead pass an additional unexpected request through to the upstream.
     SystemTime retry_until_;
     std::deque<Event::TimerPtr> blockers_;
     std::deque<Blocked> blocked_;
