@@ -81,7 +81,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   }
   maybeMarkHttp3Broken();
 
-  auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
+  grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
@@ -111,8 +111,8 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
 }
 
 void ConnectivityGrid::WrapperCallbacks::deleteThis() {
-  // By removing the entry from the list, it will be deleted.
-  removeFromList(grid_.wrapped_callbacks_);
+  // Set this to delete on the next dispatcher loop.
+  grid_.dispatcher_.deferredDelete(removeFromList(grid_.wrapped_callbacks_));
 }
 
 ConnectivityGrid::StreamCreationResult
@@ -139,7 +139,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     maybeMarkHttp3Broken();
   }
 
-  auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
+  grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   // If an HTTP/3 connection attempts is in progress, let it complete so that if it succeeds
@@ -334,18 +334,17 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   if (ret->newStream(*pool) == StreamCreationResult::ImmediateResult) {
     // If newStream succeeds, return nullptr as the caller has received their
     // callback and does not need a cancellable handle. At this point the
-    // WrappedCallbacks object has also been deleted.
+    // WrappedCallbacks object is queued to be deleted.
     return nullptr;
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
-    absl::optional<StreamCreationResult> result = ret->tryAnotherConnection();
-    if (result.has_value() && result.value() == StreamCreationResult::ImmediateResult) {
-      // As above, if we have an immediate success, return nullptr.
-      return nullptr;
-    }
+    ret->tryAnotherConnection();
   }
-  return ret;
+
+  // Return a handle if the caller hasn't yet been notified of success/failure.
+  // Note there may still be connection attempts, if we'e waiting on a slow H3 connection.
+  return ret->hasNotifiedCaller() ? nullptr : ret;
 }
 
 void ConnectivityGrid::addIdleCallback(IdleCb cb) {

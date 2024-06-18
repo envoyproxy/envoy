@@ -43,17 +43,25 @@ public:
   // It also relays cancellation calls between the original caller and the
   // current connection attempts.
   class WrapperCallbacks : public ConnectionPool::Cancellable,
-                           public LinkedObject<WrapperCallbacks> {
+                           public LinkedObject<WrapperCallbacks>,
+                           public Event::DeferredDeletable {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder,
                      ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
+    bool hasNotifiedCaller() { return inner_callbacks_ == nullptr; }
+    void deleteIsPending() override {
+      next_attempt_timer_.reset();
+    }
+
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
-                                       public LinkedObject<ConnectionAttemptCallbacks> {
+                                       public LinkedObject<ConnectionAttemptCallbacks>,
+                             public Event::DeferredDeletable{
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, ConnectionPool::Instance& pool);
       ~ConnectionAttemptCallbacks() override;
+      void deleteIsPending() override {}
 
       StreamCreationResult newStream();
 

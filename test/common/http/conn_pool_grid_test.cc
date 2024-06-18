@@ -181,7 +181,6 @@ public:
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   ConnectivityGrid::ConnectivityOptions options_;
   Upstream::ClusterConnectivityState state_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
   HttpServerPropertiesCacheSharedPtr alternate_protocols_;
@@ -189,7 +188,6 @@ public:
   Quic::QuicStatNames quic_stat_names_;
   PersistentQuicInfoPtr quic_connection_persistent_info_;
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
-  std::unique_ptr<ConnectivityGridForTest> grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
   NiceMock<ConnPoolCallbacks> callbacks_;
@@ -200,6 +198,8 @@ public:
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::unique_ptr<ConnectivityGridForTest> grid_;
 };
 
 // Test the first pool successfully connecting.
