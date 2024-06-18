@@ -6,6 +6,7 @@
 
 #include "contrib/envoy/extensions/router/cluster_specifier/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/common/dso/dso.h"
+#include "contrib/golang/filters/http/source/processor_state.h"
 
 namespace Envoy {
 namespace Router {

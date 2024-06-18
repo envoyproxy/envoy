@@ -1,4 +1,5 @@
 #include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
+#include "contrib/golang/filters/http/source/processor_state.h"
 
 namespace Envoy {
 namespace Router {
@@ -40,6 +41,15 @@ int envoyGoClusterSpecifierGetHeader(unsigned long long header_ptr, void* key, v
     return static_cast<int>(GetHeaderResult::Found);
   }
   return static_cast<int>(GetHeaderResult::Mising);
+}
+
+CAPIStatus envoyGoFilterHttpCopyHeaders(void* s, void* strs, void* buf) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s, [strs, buf](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+        auto go_strs = reinterpret_cast<GoString*>(strs);
+        auto go_buf = reinterpret_cast<char*>(buf);
+        return filter->copyHeaders(state, go_strs, go_buf);
+      });
 }
 
 // Log the message with the error level.
