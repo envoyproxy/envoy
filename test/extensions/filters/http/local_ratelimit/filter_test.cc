@@ -105,7 +105,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
 
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;

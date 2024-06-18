@@ -22,7 +22,7 @@ namespace LocalRateLimit {
 TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Event::MockDispatcher> dispatcher;
-  Singleton::ManagerImpl manager(Thread::threadFactoryForTest());
+  Singleton::ManagerImpl manager;
 
   NiceMock<Upstream::MockPrioritySet> priority_set;
   cm.local_cluster_name_ = "local_cluster";
