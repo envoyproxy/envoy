@@ -55,6 +55,7 @@ public:
     } else {
       http2_pool_.reset(instance);
     }
+    pools_.push_back(instance);
     ON_CALL(*instance, newStream(_, _, _))
         .WillByDefault(
             Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
@@ -668,6 +669,7 @@ TEST_F(ConnectivityGridTest, IdleCallbacks) {
 
   // Notify the grid the second pool is idle. This should not be
   // passed up to the original callers.
+  EXPECT_CALL(*grid_->second(), isIdle()).WillOnce(Return(true));
   EXPECT_CALL(*grid_->first(), isIdle()).WillOnce(Return(false));
   grid_->second()->idle_cb_();
   EXPECT_FALSE(idle_received);

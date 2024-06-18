@@ -225,6 +225,8 @@ private:
   // The connection pools to use to create new streams
   ConnectionPool::InstancePtr http3_pool_;
   ConnectionPool::InstancePtr http2_pool_;
+  // A convenience list to allow taking actions on all pools.
+  std::list<ConnectionPool::Instance*> pools_;
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
