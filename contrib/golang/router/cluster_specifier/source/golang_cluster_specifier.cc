@@ -10,26 +10,6 @@
 
 #include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 
-// header filter inclusions
-
-#include "envoy/http/codes.h"
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/base64.h"
-#include "source/common/common/enum_to_int.h"
-#include "source/common/common/lock_guard.h"
-#include "source/common/common/utility.h"
-#include "source/common/grpc/common.h"
-#include "source/common/grpc/context_impl.h"
-#include "source/common/grpc/status.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/http1/codec_impl.h"
-#include "source/extensions/filters/common/expr/context.h"
-#include "eval/public/cel_value.h"
-#include "eval/public/containers/field_access.h"
-#include "eval/public/containers/field_backed_list_impl.h"
-#include "eval/public/containers/field_backed_map_impl.h"
-#include "eval/public/structs/cel_proto_wrapper.h"
-
 namespace Envoy {
 namespace Router {
 namespace Golang {
