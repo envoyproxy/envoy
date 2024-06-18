@@ -84,7 +84,8 @@ TEST_F(DnsFilterUtilsTest, ServiceNameParsingTest) {
 
 TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
   const std::string pipe_path(Platform::null_device_path);
-  const auto pipe = std::make_shared<Network::Address::PipeInstance>(pipe_path, 600);
+  const Network::Address::InstanceConstSharedPtr pipe =
+      *Network::Address::PipeInstance::create(pipe_path, 600);
   auto addr_type = getAddressRecordType(pipe);
   EXPECT_EQ(addr_type, absl::nullopt);
 
