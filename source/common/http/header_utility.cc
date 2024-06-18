@@ -201,11 +201,18 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
                                                              http2::adapter::ObsTextOption::kAllow);
 }
 
-bool HeaderUtility::headerNameIsValid(const absl::string_view header_key) {
+bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   if (!header_key.empty() && header_key[0] == ':') {
-    // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
-    return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
-                                     header_key.size()) != 0;
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.sanitize_http2_headers_without_nghttp2")) {
+      // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
+      return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
+                                       header_key.size()) != 0;
+    }
+    header_key.remove_prefix(1);
+    if (header_key.empty()) {
+      return false;
+    }
   }
   // For all other header use HTTP/1 semantics. The only difference from HTTP/2 is that
   // uppercase characters are allowed. This allows HTTP filters to add header with mixed

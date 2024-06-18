@@ -173,11 +173,7 @@ std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_vi
 std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
                        absl::string_view expires, absl::string_view token = "",
                        absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_base64_encoding_only")) {
-    return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
-  } else {
-    return encodeHmacHexBase64(secret, host, expires, token, id_token, refresh_token);
-  }
+  return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
 }
 
 } // namespace
@@ -674,12 +670,7 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
   std::string max_age;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.oauth_use_standard_max_age_value")) {
-    max_age = expires_in_;
-  } else {
-    max_age = new_expires_;
-  }
+  max_age = expires_in_;
 
   // We use HTTP Only cookies.
   const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
