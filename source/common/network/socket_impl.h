@@ -87,7 +87,7 @@ public:
     listener_info_ = std::move(listener_info);
   }
 
-  const std::vector<std::string>& requestedApplicationProtocols() override {
+  const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
   void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
