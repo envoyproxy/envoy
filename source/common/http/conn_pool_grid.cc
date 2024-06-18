@@ -115,9 +115,10 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
-ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance* pool) {
-  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
-            describePool(*pool), grid_.origin_.hostname_);
+ConnectivityGrid::StreamCreationResult
+ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance* pool) {
+  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(*pool),
+            grid_.origin_.hostname_);
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {
@@ -206,7 +207,8 @@ ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   // return true regardless of if newStream resulted in an immediate result or
   // an async call, as either way the attempt will result in success/failure
   // callbacks.
-  grid_.createNextPool();  // Make sure the HTTP/2 pool exists
+  grid_.createNextPool(); // Make sure the HTTP/2 pool exists
+  has_attempted_http2_ = true;
   return newStream(grid_.http2_pool_.get());
 }
 
@@ -283,9 +285,9 @@ ConnectionPool::Instance* ConnectivityGrid::createNextPool() {
     setupPool(*http3_pool_);
     return http3_pool_.get();
   }
-  http2_pool_ = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
-                                                        options_, transport_socket_options_, state_,
-                                                        origin_, alternate_protocols_);
+  http2_pool_ = std::make_unique<HttpConnPoolImplMixed>(
+      dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_, state_,
+      origin_, alternate_protocols_);
   setupPool(*http2_pool_);
   return http2_pool_.get();
 }
@@ -298,7 +300,7 @@ bool ConnectivityGrid::hasActiveConnections() const {
   if (http3_pool_ && http3_pool_->hasActiveConnections()) {
     return true;
   }
-  if (http3_pool_ && http2_pool_->hasActiveConnections()) {
+  if (http2_pool_ && http2_pool_->hasActiveConnections()) {
     return true;
   }
   return false;
@@ -367,8 +369,8 @@ void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior dra
   if (http3_pool_) {
     http3_pool_->drainConnections(drain_behavior);
   }
-  if (http3_pool_) {
-    http3_pool_->drainConnections(drain_behavior);
+  if (http2_pool_) {
+    http2_pool_->drainConnections(drain_behavior);
   }
 }
 

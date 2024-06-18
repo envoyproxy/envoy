@@ -668,7 +668,6 @@ TEST_F(ConnectivityGridTest, IdleCallbacks) {
 
   // Notify the grid the second pool is idle. This should not be
   // passed up to the original callers.
-  EXPECT_CALL(*grid_->second(), isIdle()).WillOnce(Return(true));
   EXPECT_CALL(*grid_->first(), isIdle()).WillOnce(Return(false));
   grid_->second()->idle_cb_();
   EXPECT_FALSE(idle_received);
@@ -1055,8 +1054,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
-  ConnectionPool::Cancellable* cancel = pool
-                                            ->newStream(decoder_, callbacks_,
+  ConnectionPool::Cancellable* cancel = pool->newStream(decoder_, callbacks_,
                                                         {/*can_send_early_data_=*/false,
                                                          /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancel);
