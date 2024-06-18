@@ -46,7 +46,11 @@ public:
   }
 
   float getSampleRatio(
-      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action);
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Envoy::Runtime::Loader& runtime);
+
+  bool isSampled(const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+                 Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
 
 private:
   Matcher::ActionFactoryCb createAtionFactoryCbCommon(
@@ -70,16 +74,14 @@ private:
             server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
 
     Random::RandomGenerator& random = server_factory_context.api().randomGenerator();
-    float sample_ratio = getSampleRatio(composite_action);
-    return [provider = std::move(provider), n = std::move(name), sample_ratio,
-            &random]() -> Matcher::ActionPtr {
-      auto config_value = provider->config();
-      UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
-
-      // Perform dice roll. If negative, then skip the action.
-      if (!random.bernoulli(sample_ratio_uf)) {
+    Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+    return [provider = std::move(provider), n = std::move(name), composite_action = std::move(composite_action),
+            &random, &runtime, this]() -> Matcher::ActionPtr {
+      if (!isSampled(composite_action, random, runtime)) {
         return nullptr;
       }
+
+      auto config_value = provider->config();
       if (config_value.has_value()) {
         auto factory_cb = config_value.value().get().factory_cb;
         return std::make_unique<ExecuteFilterAction>(factory_cb, n);

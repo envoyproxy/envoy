@@ -208,8 +208,9 @@ public:
                     typed_config:
                         "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                         sample_percent:
-                          numerator: %d
-                          denominator: HUNDRED
+                          default_value:
+                            numerator: %d
+                            denominator: HUNDRED
                         dynamic_config:
                           name: set-response-code
                           config_discovery:
@@ -672,8 +673,9 @@ public:
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                       sample_percent:
-                        numerator: %d
-                        denominator: HUNDRED
+                        default_value:
+                          numerator: %d
+                          denominator: HUNDRED
                       typed_config:
                         name: server-factory-context-filter
                         typed_config:

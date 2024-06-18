@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.composite.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
-import "envoy/type/v3/percent.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -59,10 +59,14 @@ message ExecuteFilterAction {
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
-  // Percentage of traffic the action filter will be executed. By default this is 100%.
+  // Percentage of traffic the action filter will be executed. If not specified, this is 100%.
   // This is to support sampling behavior for certain filters like ext_proc, access_logging ...
-  // For example, if ``sample_percent`` is configured with 30%, a dice roll with that
+  // For example, if
+  // :ref:`default_value <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.default_value>`
+  // under the ``sample_percent`` is configured with 30%, a dice roll with that
   // probability is done. The underline action filter will only be executed if the
   // dice roll returns positive. Otherwise, the action filter is skipped.
-  type.v3.FractionalPercent sample_percent = 3;
+  // BTW, this ``default_value`` can be overridden by a runtime_key:
+  // :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>`
+  config.core.v3.RuntimeFractionalPercent sample_percent = 3;
 }
