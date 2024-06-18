@@ -19,9 +19,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.header_mutation"],
     deps = [
         "//source/extensions/filters/http/header_mutation:config",
+        "//source/extensions/string_matcher/lua:config",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],

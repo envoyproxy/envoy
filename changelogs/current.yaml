@@ -277,6 +277,10 @@ new_features:
   change: |
     Added field :ref:`match_upstream <envoy_v3_api_field_config.core.v3.SchemeHeaderTransformation.match_upstream>`,
     which, when set to true, will set the downstream request ``:scheme`` to match the upstream transport protocol.
+- area: http
+  change: |
+    Added field :ref:`remove_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_match>`,
+    which removes a header based on a :ref:`string match <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`.
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.

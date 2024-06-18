@@ -1,5 +1,6 @@
 #include "source/common/http/header_mutation.h"
 
+#include "source/common/common/matchers.h"
 #include "source/common/router/header_parser.h"
 
 namespace Envoy {
@@ -65,18 +66,35 @@ public:
 private:
   const Envoy::Http::LowerCaseString header_name_;
 };
+
+class RemoveMatchMutation : public HeaderEvaluator {
+public:
+  RemoveMatchMutation(Envoy::Matchers::StringMatcherPtr&& remove_match)
+      : remove_match_{std::move(remove_match)} {}
+
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext&,
+                       const StreamInfo::StreamInfo&) const override {
+    headers.removeIf(
+        [this](const auto& entry) { return remove_match_->match(entry.key().getStringView()); });
+  }
+
+private:
+  const Envoy::Matchers::StringMatcherPtr remove_match_;
+};
 } // namespace
 
 absl::StatusOr<std::unique_ptr<HeaderMutations>>
-HeaderMutations::create(const ProtoHeaderMutatons& header_mutations) {
+HeaderMutations::create(const ProtoHeaderMutatons& header_mutations,
+                        Server::Configuration::ServerFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret =
-      std::unique_ptr<HeaderMutations>(new HeaderMutations(header_mutations, creation_status));
+  auto ret = std::unique_ptr<HeaderMutations>(
+      new HeaderMutations(header_mutations, context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
+                                 Server::Configuration::ServerFactoryContext& context,
                                  absl::Status& creation_status) {
   for (const auto& mutation : header_mutations) {
     switch (mutation.action_case()) {
@@ -89,6 +107,11 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
       break;
     case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kRemove:
       header_mutations_.emplace_back(std::make_unique<RemoveMutation>(mutation.remove()));
+      break;
+    case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kRemoveMatch:
+      header_mutations_.emplace_back(std::make_unique<RemoveMatchMutation>(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              mutation.remove_match(), context)));
       break;
     default:
       PANIC_DUE_TO_PROTO_UNSET;

@@ -24,11 +24,13 @@ void Mutations::mutateResponseHeaders(Http::HeaderMap& headers,
   response_mutations_->evaluateHeaders(headers, ctx, stream_info);
 }
 
-PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config)
-    : mutations_(config.mutations()) {}
+PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config,
+                                               Server::Configuration::ServerFactoryContext& context)
+    : mutations_(config.mutations(), context) {}
 
-HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config)
-    : mutations_(config.mutations()),
+HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config,
+                                           Server::Configuration::ServerFactoryContext& context)
+    : mutations_(config.mutations(), context),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {}
 
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {

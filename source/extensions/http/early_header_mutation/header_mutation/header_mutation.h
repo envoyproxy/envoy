@@ -19,7 +19,8 @@ using ProtoHeaderMutation =
 
 class HeaderMutation : public Envoy::Http::EarlyHeaderMutation {
 public:
-  HeaderMutation(const ProtoHeaderMutation& mutations);
+  HeaderMutation(const ProtoHeaderMutation& mutations,
+                 Server::Configuration::ServerFactoryContext& context);
 
   bool mutate(Envoy::Http::RequestHeaderMap& headers,
               const StreamInfo::StreamInfo& stream_info) const override;
