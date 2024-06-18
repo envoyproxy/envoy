@@ -17,7 +17,7 @@ namespace {
 // string.
 std::string maybeSet(absl::StatusOr<std::string> to_set, absl::Status error) {
   if (to_set.status().ok()) {
-    return to_set.value();
+    return std::move(to_set.value());
   }
   error = to_set.status();
   return "";

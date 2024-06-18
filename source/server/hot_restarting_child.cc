@@ -92,8 +92,7 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
       udp_forwarding_rpc_stream_.domain_socket_,
       [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        onSocketEventUdpForwarding();
-        return absl::OkStatus();
+        return onSocketEventUdpForwarding();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
@@ -266,7 +265,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
 }
 
-void HotRestartingChild::onSocketEventUdpForwarding() {
+absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
   while ((wrapped_request =
               udp_forwarding_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::No))) {
@@ -280,8 +279,12 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
     case HotRestartMessage::Request::kForwardedUdpPacket: {
       const auto& req = wrapped_request->request().forwarded_udp_packet();
       Network::UdpRecvData packet;
-      packet.addresses_.local_ = Network::Utility::resolveUrl(req.local_addr());
-      packet.addresses_.peer_ = Network::Utility::resolveUrl(req.peer_addr());
+      auto local_or_error = Network::Utility::resolveUrl(req.local_addr());
+      RETURN_IF_NOT_OK(local_or_error.status());
+      packet.addresses_.local_ = *local_or_error;
+      auto peer_or_error = Network::Utility::resolveUrl(req.peer_addr());
+      RETURN_IF_NOT_OK(peer_or_error.status());
+      packet.addresses_.peer_ = *peer_or_error;
       if (!packet.addresses_.local_ || !packet.addresses_.peer_) {
         break;
       }
@@ -299,6 +302,7 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
     }
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace Server

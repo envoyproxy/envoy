@@ -1114,7 +1114,7 @@ private:
  * given a cluster configuration and transport socket factory
  * context.
  */
-Network::UpstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 createTransportSocketFactory(const envoy::config::cluster::v3::Cluster& config,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 

@@ -35,7 +35,9 @@ DnsCacheImpl::DnsCacheImpl(
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext())),
+      resolver_(THROW_OR_RETURN_VALUE(
+          selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext()),
+          Network::DnsResolverSharedPtr)),
       tls_slot_(context.serverFactoryContext().threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
@@ -82,7 +84,7 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
-Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
+absl::StatusOr<Network::DnsResolverSharedPtr> DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher,
     Server::Configuration::CommonFactoryContext& context) {
@@ -98,8 +100,9 @@ DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
-DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_port,
-                                bool is_proxy_lookup, LoadDnsCacheEntryCallbacks& callbacks) {
+DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint16_t default_port,
+                                                bool is_proxy_lookup, bool force_refresh,
+                                                LoadDnsCacheEntryCallbacks& callbacks) {
   std::string host = DnsHostInfo::normalizeHostForDfp(raw_host, default_port);
 
   ENVOY_LOG(debug, "thread local lookup for host '{}' {}", host,
@@ -108,7 +111,7 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_por
 
   bool is_overflow = false;
   absl::optional<DnsHostInfoSharedPtr> host_info = absl::nullopt;
-  bool ignore_cached_entries = false;
+  bool ignore_cached_entries = force_refresh;
 
   {
     absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
@@ -125,8 +128,8 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view raw_host, uint16_t default_por
         !is_proxy_lookup && *host_info && (*host_info)->address() == nullptr) {
       ENVOY_LOG(debug, "ignoring null address cache hit for miss for host '{}'", host);
       ignore_cached_entries = true;
-      // fall through to handle below
-    } else {
+    }
+    if (!ignore_cached_entries) {
       return {LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
     }
   }
@@ -203,15 +206,13 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   }();
 
   if (primary_host) {
-    if (!ignore_cached_entries) {
-      // This may mean a resolve is in-progress, or a resolve completed before we
-      // switched contexts to startCacheLoad. Either way the caller will be informed.
+    if (!ignore_cached_entries || !primary_host->host_info_->firstResolveComplete()) {
       ENVOY_LOG(debug, "main thread resolve for host '{}' skipped. Entry present", host);
       return;
     }
     // The host was in cache but we want to force a refresh. Remove the host
     // entirely to ensure initial resolve logic works as expected.
-    removeHost(host, *primary_host);
+    removeHost(host, *primary_host, false);
   }
 
   primary_host = createHost(host, default_port);
@@ -275,13 +276,14 @@ void DnsCacheImpl::onReResolveAlarm(const std::string& host) {
             last_used_time.count(), host_ttl_.count());
   if ((now_duration - last_used_time) > host_ttl_) {
     ENVOY_LOG(debug, "host='{}' TTL expired, removing", host);
-    removeHost(host, primary_host);
+    removeHost(host, primary_host, true);
   } else {
     startResolve(host, primary_host);
   }
 }
 
-void DnsCacheImpl::removeHost(const std::string& host, const PrimaryHostInfo& primary_host) {
+void DnsCacheImpl::removeHost(const std::string& host, const PrimaryHostInfo& primary_host,
+                              bool update_threads) {
   // If we need to erase the host, hold onto the PrimaryHostInfo object that owns this callback.
   // This is defined at function scope so that it is only erased on function exit to avoid
   // use-after-free issues
@@ -301,7 +303,11 @@ void DnsCacheImpl::removeHost(const std::string& host, const PrimaryHostInfo& pr
     host_to_erase = std::move(host_it->second);
     primary_hosts_.erase(host_it);
   }
-  notifyThreads(host, primary_host.host_info_);
+  // In the case of force-remove and resolve, don't cancel outstanding resolve
+  // callbacks on remove, as a resolve is pending.
+  if (update_threads) {
+    notifyThreads(host, primary_host.host_info_);
+  }
 }
 
 void DnsCacheImpl::forceRefreshHosts() {

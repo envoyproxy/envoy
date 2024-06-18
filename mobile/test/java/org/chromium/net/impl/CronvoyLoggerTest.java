@@ -2,13 +2,13 @@ package org.chromium.net.impl;
 
 import static org.junit.Assert.assertEquals;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import org.junit.rules.ExpectedException;
 import org.chromium.net.testing.Feature;
 import org.junit.runner.RunWith;
 import org.junit.Rule;
 import org.junit.Test;
+import org.robolectric.RobolectricTestRunner;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -19,7 +19,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 /**
  * Tests that ConvoyLogger works as expected.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronvoyLoggerTest {
 
   @Rule public final ExpectedException thrown = ExpectedException.none();

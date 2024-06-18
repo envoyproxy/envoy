@@ -4,9 +4,10 @@
 
 // Interface for starting and managing a test server. Calls into to test_server.cc
 //
-// NB: Any test that utilizes this class must have a `no-remote-exec` tag in its BUILD target.
-// EnvoyTestServer binds to a listening socket on the machine it runs on, and on CI, this
-// operation is not permitted in remote execution environments.
+// NB: Any test that utilizes this class must have a `"sandboxNetwork": "standard"`
+// `exec_properties` in its BUILD target to allow binding a listening socket on
+// the EngFlow machines
+// (https://docs.engflow.com/re/client/platform-options-reference.html#sandboxallowed).
 @interface EnvoyTestServer : NSObject
 
 // Get the port of the upstream server.

@@ -136,6 +136,12 @@ public:
    * @return trace ID
    */
   virtual std::string getTraceId() const PURE;
+
+  /**
+   * Retrieve the span's identifier.
+   * @return span ID as a hex string
+   */
+  virtual std::string getSpanId() const PURE;
 };
 
 /**
