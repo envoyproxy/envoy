@@ -34,7 +34,10 @@
 
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+
+#ifdef ENVOY_NGHTTP2
 #include "nghttp2/nghttp2.h"
+#endif
 #include "quiche/http2/adapter/http2_adapter.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
@@ -42,6 +45,23 @@
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+enum ErrorType {
+  NO_ERROR,
+  PROTOCOL_ERROR,
+  INTERNAL_ERROR,
+  FLOW_CONTROL_ERROR,
+  SETTINGS_TIMEOUT,
+  STREAM_CLOSED,
+  FRAME_SIZE_ERROR,
+  REFUSED_STREAM,
+  CANCEL,
+  COMPRESSION_ERROR,
+  CONNECT_ERROR,
+  ENHANCE_YOUR_CALM,
+  INADEQUATE_SECURITY,
+  HTTP_1_1_REQUIRED,
+};
 
 class Http2CodecImplTestFixture;
 
@@ -89,9 +109,11 @@ public:
   create(ConnectionImplType* connection,
          const http2::adapter::OgHttp2Adapter::Options& options) PURE;
 
+#ifdef ENVOY_NGHTTP2
   // Returns a new HTTP/2 session to be used with |connection|.
   virtual std::unique_ptr<http2::adapter::Http2Adapter> create(ConnectionImplType* connection,
                                                                const nghttp2_option* options) PURE;
+#endif
 
   // Initializes the |session|.
   virtual void init(ConnectionImplType* connection,
@@ -104,8 +126,10 @@ public:
   create(ConnectionImpl* connection,
          const http2::adapter::OgHttp2Adapter::Options& options) override;
 
+#ifdef ENVOY_NGHTTP2
   std::unique_ptr<http2::adapter::Http2Adapter> create(ConnectionImpl* connection,
                                                        const nghttp2_option* options) override;
+#endif
 
   void init(ConnectionImpl* connection,
             const envoy::config::core::v3::Http2ProtocolOptions& options) override;
@@ -241,11 +265,15 @@ protected:
                  uint32_t max_headers_kb);
     ~Http2Options();
 
+#ifdef ENVOY_NGHTTP2
     const nghttp2_option* options() { return options_; }
+#endif
     const http2::adapter::OgHttp2Adapter::Options& ogOptions() { return og_options_; }
 
   protected:
+#ifdef ENVOY_NGHTTP2
     nghttp2_option* options_;
+#endif
     http2::adapter::OgHttp2Adapter::Options og_options_;
   };
 
