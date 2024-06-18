@@ -1,5 +1,6 @@
 #include "source/common/router/config_impl.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
+#include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 
 #include <chrono>
 #include <cstddef>
@@ -8,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 
 namespace Envoy {
 namespace Router {
