@@ -321,6 +321,13 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
 // Validates that when there's a failover defined, and the primary returns a
 // gRPC failure, then Envoy will use the failover, and will receive a valid config.
 TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailure) {
+#ifdef ENVOY_ENABLE_UHV
+  // With UHV the finishGrpcStream() isn't detected as invalid frame because of
+  // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
+  // is also enabled.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
   initialize();
 
   // Expect a connection to the primary. Send a gRPC failure immediately.
@@ -353,8 +360,55 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailure) {
   validateAllXdsResponsesAndDataplaneRequest(failover_xds_stream_.get());
 }
 
+// Validates that when there's a failover defined, and the primary returns a
+// gRPC failure after sending headers, then Envoy will use the failover, and will receive a valid
+// config.
+TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailureAfterHeaders) {
+#ifdef ENVOY_ENABLE_UHV
+  // With UHV the finishGrpcStream() isn't detected as invalid frame because of
+  // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
+  // is also enabled.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  initialize();
+
+  // Expect a connection to the primary. Send a gRPC failure immediately.
+  AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  xds_stream_->startGrpcStream();
+  xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // Second attempt to the primary, reusing stream as headers were previously
+  // sent.
+  result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  xds_stream_->startGrpcStream();
+  xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  ASSERT(failover_xds_connection_ == nullptr);
+  result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  // Failover is healthy, start the ADS gRPC stream.
+  result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  failover_xds_stream_->startGrpcStream();
+
+  // Ensure basic flow using the failover source works.
+  validateAllXdsResponsesAndDataplaneRequest(failover_xds_stream_.get());
+}
+
 // Validate that once primary answers, failover will not be used, even after disconnecting.
 TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
+#ifdef ENVOY_ENABLE_UHV
+  // With UHV the finishGrpcStream() isn't detected as invalid frame because of
+  // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
+  // is also enabled.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
   initialize();
 
   // Let the primary source respond.
@@ -429,6 +483,13 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
 
 // Validate that once failover answers, primary will not be used, even after disconnecting.
 TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
+#ifdef ENVOY_ENABLE_UHV
+  // With UHV the finishGrpcStream() isn't detected as invalid frame because of
+  // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
+  // is also enabled.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
   initialize();
 
   // 2 consecutive primary failures.
