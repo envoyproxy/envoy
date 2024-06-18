@@ -147,6 +147,16 @@ private:
       address_list_ = std::move(list);
     }
 
+    void setDetails(std::string details) {
+      absl::WriterMutexLock lock{&resolve_lock_};
+      details_ = details;
+    }
+
+    std::string details() override {
+      absl::ReaderMutexLock lock{&resolve_lock_};
+      return details_;
+    }
+
     std::chrono::steady_clock::duration lastUsedTime() const { return last_used_time_.load(); }
 
     bool firstResolveComplete() const override {
@@ -168,6 +178,7 @@ private:
     Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(resolve_lock_);
     std::vector<Network::Address::InstanceConstSharedPtr>
         address_list_ ABSL_GUARDED_BY(resolve_lock_);
+    std::string details_ ABSL_GUARDED_BY(resolve_lock_){"not_resolved"};
 
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
@@ -212,7 +223,7 @@ private:
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
 
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
-                     std::list<Network::DnsResponse>&& response,
+                     absl::string_view details, std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {},
                      bool is_proxy_lookup = false);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);

@@ -221,6 +221,7 @@ struct StreamInfoImpl : public StreamInfo {
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
+    // Callers should sanitize with StringUtil::replaceAllEmptySpace if necessary.
     ASSERT(!StringUtil::hasEmptySpace(rc_details));
     response_code_details_.emplace(rc_details);
   }
