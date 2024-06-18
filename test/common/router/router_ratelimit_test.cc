@@ -451,7 +451,7 @@ actions:
   setupTest(yaml);
 
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::PipeInstance>("/hello"));
+      *Network::Address::PipeInstance::create("/hello"));
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);
   EXPECT_TRUE(descriptors_.empty());
