@@ -6330,7 +6330,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
                                                          Http::Protocol::Http11, &lb_context)));
 }
 
-TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_TCP) {
+TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_tcp) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -6365,7 +6365,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_TCP) {
         .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
     EXPECT_EQ(conn_pool_vector.back(),
               TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                          ->tcpConnPool(ResourcePriority::Default, &lb_context)));
+                                           ->tcpConnPool(ResourcePriority::Default, &lb_context)));
   }
 
   // Check that the first entry is still in the pool map
@@ -6374,7 +6374,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_TCP) {
   }));
   EXPECT_EQ(conn_pool_vector.front(),
             TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                        ->tcpConnPool(ResourcePriority::Default, &lb_context)));
+                                         ->tcpConnPool(ResourcePriority::Default, &lb_context)));
 }
 
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
