@@ -40,17 +40,21 @@ public:
     return grid.getHttp3StatusTracker().hasHttp3FailedRecently();
   }
 
-  static absl::optional<PoolIterator> forceCreateNextPool(ConnectivityGrid& grid) {
+  static ConnectionPool::Instance* forceCreateNextPool(ConnectivityGrid& grid) {
     return grid.createNextPool();
   }
 
-  absl::optional<ConnectivityGrid::PoolIterator> createNextPool() override {
-    if (pools_.size() == 2) {
-      return absl::nullopt;
+  ConnectionPool::Instance* createNextPool() override {
+    if (http2_pool_ && http3_pool_) {
+      return nullptr;
     }
     ConnectionPool::MockInstance* instance = new NiceMock<ConnectionPool::MockInstance>();
     setupPool(*instance);
-    pools_.push_back(ConnectionPool::InstancePtr{instance});
+    if (!http3_pool_) {
+      http3_pool_.reset(instance);
+    } else {
+      http2_pool_.reset(instance);
+    }
     ON_CALL(*instance, newStream(_, _, _))
         .WillByDefault(
             Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
@@ -75,30 +79,24 @@ public:
               callbacks_.push_back(&callbacks);
               return cancel_;
             }));
-    if (pools_.size() == 1) {
+    if (!http2_pool_) {
       EXPECT_CALL(*first(), protocolDescription())
           .Times(AnyNumber())
           .WillRepeatedly(Return("first"));
 
-      return pools_.begin();
+      return instance;
     }
     EXPECT_CALL(*second(), protocolDescription())
         .Times(AnyNumber())
         .WillRepeatedly(Return("second"));
-    return ++pools_.begin();
+    return instance;
   }
 
   ConnectionPool::MockInstance* first() {
-    if (pools_.empty()) {
-      return nullptr;
-    }
-    return static_cast<ConnectionPool::MockInstance*>(&*pools_.front());
+    return static_cast<ConnectionPool::MockInstance*>(http3_pool_.get());
   }
   ConnectionPool::MockInstance* second() {
-    if (pools_.size() < 2) {
-      return nullptr;
-    }
-    return static_cast<ConnectionPool::MockInstance*>(&**(++pools_.begin()));
+    return static_cast<ConnectionPool::MockInstance*>(http2_pool_.get());
   }
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
@@ -981,19 +979,19 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   EXPECT_FALSE(grid.hasActiveConnections());
 
   // Create the HTTP/3 pool.
-  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it1.has_value());
-  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+  auto pool1 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool1);
+  EXPECT_EQ("HTTP/3", pool1->protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
   // Create the mixed pool.
-  auto optional_it2 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it2.has_value());
-  EXPECT_EQ("HTTP/1 HTTP/2 ALPN", (**optional_it2)->protocolDescription());
+  auto pool2 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool2);
+  EXPECT_EQ("HTTP/1 HTTP/2 ALPN", pool2->protocolDescription());
 
   // There is no third option currently.
-  auto optional_it3 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_FALSE(optional_it3.has_value());
+  auto pool3 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool3 == nullptr);
 }
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
@@ -1023,9 +1021,9 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
-  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it1.has_value());
-  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+  auto pool = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool != nullptr);
+  EXPECT_EQ("HTTP/3", pool->protocolDescription());
 
   const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
   Api::InterfaceAddressVector interfaces{};
@@ -1057,7 +1055,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
-  ConnectionPool::Cancellable* cancel = (**optional_it1)
+  ConnectionPool::Cancellable* cancel = pool
                                             ->newStream(decoder_, callbacks_,
                                                         {/*can_send_early_data_=*/false,
                                                          /*can_use_http3_=*/true});
