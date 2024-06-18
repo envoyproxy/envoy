@@ -84,7 +84,7 @@ minor_behavior_changes:
     Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
 - area: log
   change: |
-    Redact sensitive fields before outputting the configuration when Envoy failed to start.
+    Redact sensitive fields before outputting the configuration when Envoy failed to start. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.redact_bootstrap_before_outputting`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
