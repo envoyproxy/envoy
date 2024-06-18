@@ -37,6 +37,8 @@ private:
 
 /**
  * Atomic token bucket. This class is thread-safe.
+ * TODO(wbpcode): this could be used to replace the SharedTokenBucketImpl once this
+  * implementation is proven to be robust.
  */
 class AtomicTokenBucketImpl : public TokenBucket {
 public:
