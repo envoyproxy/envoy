@@ -47,11 +47,11 @@ float ExecuteFilterActionFactory::getSampleRatio(
   const std::string runtime_key = composite_action.sample_percent().runtime_key();
   if (!runtime_key.empty()) {
     // If sample_percent runtime_key is configured, it has to be a number between
-    // [0, 100]. Using 101 to indicate this runtime_key is not configured.
+    // [0, 100]. Using 101 to indicate this runtime_key is either not configured or invalid.
+    // Only override the default_value if the runtime_key is in a valid range [0, 100].
     const uint64_t NO_SAMPLE_PERCENT_RUNTIME = 101;
     uint64_t sample_percent_runtime = runtime.snapshot().getInteger(runtime_key, NO_SAMPLE_PERCENT_RUNTIME);
     if (sample_percent_runtime < NO_SAMPLE_PERCENT_RUNTIME) {
-      // runtime_key is configured with a valid number. Only in this case, using it to Override the default_value.
       sample_ratio = static_cast<float>(sample_percent_runtime) / 100;
     }
   }
