@@ -115,8 +115,15 @@ public:
         data.erase("one_way");
       }
 
-      auto frame_flags =
-          FrameFlags(StreamFlags(stream_id.value_or(0), one_way_stream, false, false), end_stream);
+      uint32_t flags = 0;
+      if (end_stream) {
+        flags |= FrameFlags::FLAG_END_STREAM;
+      }
+      if (one_way_stream) {
+        flags |= FrameFlags::FLAG_ONE_WAY;
+      }
+
+      FrameFlags frame_flags(stream_id.value_or(0), flags);
 
       const auto it = data.find("message_type");
 
@@ -208,8 +215,7 @@ public:
 
       buffer += fmt::format("stream_id:{};", response.frameFlags().streamId());
       buffer += fmt::format("end_stream:{};", response.frameFlags().endStream());
-      buffer +=
-          fmt::format("close_connection:{};", response.frameFlags().streamFlags().drainClose());
+      buffer += fmt::format("close_connection:{};", response.frameFlags().drainClose());
 
       ENVOY_LOG(debug, "FakeServerCodec::encode: {}", buffer);
 
@@ -274,8 +280,15 @@ public:
         data.erase("close_connection");
       }
 
-      auto frame_flags = FrameFlags(
-          StreamFlags(stream_id.value_or(0), false, close_connection, false), end_stream);
+      uint32_t flags = 0;
+      if (end_stream) {
+        flags |= FrameFlags::FLAG_END_STREAM;
+      }
+      if (close_connection) {
+        flags |= FrameFlags::FLAG_DRAIN_CLOSE;
+      }
+
+      FrameFlags frame_flags(stream_id.value_or(0), flags);
 
       const auto it = data.find("message_type");
 
@@ -371,7 +384,7 @@ public:
 
       buffer += fmt::format("stream_id:{};", request.frameFlags().streamId());
       buffer += fmt::format("end_stream:{};", request.frameFlags().endStream());
-      buffer += fmt::format("one_way:{};", request.frameFlags().streamFlags().oneWayStream());
+      buffer += fmt::format("one_way:{};", request.frameFlags().oneWayStream());
 
       ENVOY_LOG(debug, "FakeClientCodec::encode: {}", buffer);
 
