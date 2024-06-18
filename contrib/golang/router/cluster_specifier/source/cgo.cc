@@ -1,5 +1,4 @@
 #include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
-#include "contrib/golang/filters/http/source/processor_state.h"
 
 namespace Envoy {
 namespace Router {
