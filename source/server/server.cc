@@ -409,10 +409,16 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
   MULTI_CATCH(
       const EnvoyException& e,
       {
-        envoy::config::bootstrap::v3::Bootstrap redacted_bootstrap = options_.configProto();
-        MessageUtil::redact(redacted_bootstrap);
+        std::string config_proto_debug_string;
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.redact_bootstrap_before_outputting")) {
+          envoy::config::bootstrap::v3::Bootstrap redacted_bootstrap = options_.configProto();
+          MessageUtil::redact(redacted_bootstrap);
+          config_proto_debug_string = redacted_bootstrap.DebugString();
+        } else {
+          config_proto_debug_string = options_.configProto().DebugString();
+        }
         ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
-                  redacted_bootstrap.DebugString(), options_.configYaml(),
+                  config_proto_debug_string, options_.configYaml(),
                   options_.configPath(), e.what());
         terminate();
         throw;
