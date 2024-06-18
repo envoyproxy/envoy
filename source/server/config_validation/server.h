@@ -23,6 +23,7 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
@@ -95,7 +96,7 @@ public:
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
-  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   bool healthCheckFailed() override { return false; }
@@ -172,7 +173,7 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
-  Singleton::ManagerPtr singleton_manager_;
+  Singleton::ManagerImpl singleton_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;
   Random::RandomGeneratorImpl random_generator_;
   Configuration::MainImpl config_;

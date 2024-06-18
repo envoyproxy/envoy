@@ -76,6 +76,7 @@ public:
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
   }
 
   void setup(const std::string& lib_id, const std::string& lib_path,
@@ -179,6 +180,8 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   auto req = new HttpRequestInternal(*filter_);
 
   EXPECT_EQ(CAPINotInGo, filter_->setHeader(req->decodingState(), "foo", "bar", HeaderSet));
+
+  delete req;
 }
 
 // invalid config for routeconfig filter

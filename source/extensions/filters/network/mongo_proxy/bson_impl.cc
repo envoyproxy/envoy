@@ -211,6 +211,11 @@ int32_t FieldImpl::byteSize() const {
   return 0; // for gcc
 }
 
+void FieldImpl::checkType(Type type) const {
+  if (type_ != type) {
+    throw EnvoyException("invalid BSON field type cast");
+  }
+}
 void FieldImpl::encode(Buffer::Instance& output) const {
   output.add(&type_, sizeof(type_));
   BufferHelper::writeCString(output, key_);

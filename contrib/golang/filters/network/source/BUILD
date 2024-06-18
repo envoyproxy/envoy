@@ -19,6 +19,7 @@ envoy_cc_library(
         ":cgo",
         ":upstream",
         "//contrib/golang/common/dso:dso_lib",
+        "//source/common/router:string_accessor_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/golang/v3alpha:pkg_cc_proto",
     ],
 )
