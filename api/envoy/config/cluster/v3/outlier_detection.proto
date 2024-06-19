@@ -43,7 +43,7 @@ message OutlierDetection {
   google.protobuf.Duration base_ejection_time = 3 [(validate.rules).duration = {gt {}}];
 
   // The maximum % of an upstream cluster that can be ejected due to outlier detection. Defaults to 10% .
-  // Will eject at least one host regardless of the value if :ref:`base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.may_always_eject_one>` is enabled
+  // Will eject at least one host regardless of the value if :ref:`base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.may_always_eject_one>` is enabled.
   google.protobuf.UInt32Value max_ejection_percent = 4 [(validate.rules).uint32 = {lte: 100}];
 
   // The % chance that a host will be actually ejected when an outlier status
@@ -174,7 +174,7 @@ message OutlierDetection {
   // [#not-implemented-hide:]
   repeated core.v3.TypedExtensionConfig monitors = 24;
 
-  // If may_always_eject_one is enabled, :ref:`base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>` is not considered for first ejection.
+  // If enabled, :ref:`base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>` is not considered for first ejection.
   // Defaults to false.
   google.protobuf.BoolValue may_always_eject_one = 25;
 }
