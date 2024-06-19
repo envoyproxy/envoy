@@ -79,7 +79,7 @@ public:
     sockets_.push_back(mock_socket);
 
     if (absl::StartsWith(destination_address, "/")) {
-      local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
+      local_address_ = *Network::Address::PipeInstance::create(destination_address);
     } else {
       local_address_ =
           Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port);
@@ -94,7 +94,7 @@ public:
         .WillByDefault(ReturnRef(application_protocols));
 
     if (absl::StartsWith(source_address, "/")) {
-      remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
+      remote_address_ = *Network::Address::PipeInstance::create(source_address);
     } else {
       remote_address_ = Network::Utility::parseInternetAddressNoThrow(source_address, source_port);
     }
