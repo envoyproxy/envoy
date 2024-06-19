@@ -124,6 +124,14 @@ public:
    */
   static bool safeFileNameMatch(absl::string_view pattern, absl::string_view str);
 
+  /**
+   * Remove a fine grain log entry for testing only.
+   */
+  void removeFineGrainLogEntry(absl::string_view key) ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+    absl::WriterMutexLock wl(&fine_grain_log_lock_);
+    fine_grain_log_map_->erase(key);
+  }
+
 private:
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.
@@ -189,6 +197,8 @@ FineGrainLogContext& getFineGrainLogContext();
   do {                                                                                             \
     static std::atomic<spdlog::logger*> flogger{0};                                                \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
+    bool n = local_flogger == nullptr;                                                             \
+    std::cout << "boteng fine logger nultptr? " << n << std::endl;                                 \
     if (!local_flogger) {                                                                          \
       ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                    \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \

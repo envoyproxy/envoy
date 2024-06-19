@@ -503,9 +503,26 @@ public:
 
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level())
 
-// Compare levels before invoking logger. This is an optimization to avoid
-// executing expressions computing log contents when they would be suppressed.
-// The same filtering will also occur in spdlog::logger.
+/**
+ * Compare levels and use the fine grain logger if fine grain logging is enabled.
+ */
+#define ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)                                          \
+  (Envoy::Logger::Context::useFineGrainLogger() ? ([&]() -> bool {                                 \
+    static std::atomic<spdlog::logger*> flogger{0};                                                \
+    spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
+    if (!local_flogger) {                                                                          \
+      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                    \
+      local_flogger = flogger.load(std::memory_order_relaxed);                                     \
+    }                                                                                              \
+    return ENVOY_SPDLOG_LEVEL(LEVEL) >= (*local_flogger).level();                                  \
+  })()                                                                                             \
+                                                : (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level()))
+
+/**
+ * Compare levels before invoking logger. This is an optimization to avoid
+ * executing expressions computing log contents when they would be suppressed.
+ * The same filtering will also occur in spdlog::logger.
+ */
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (Envoy::Logger::should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                        \
@@ -580,7 +597,7 @@ public:
 
 #define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       std::map<std::string, std::string> log_tags;                                                 \
       log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
       ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
@@ -590,7 +607,7 @@ public:
 
 #define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       std::map<std::string, std::string> log_tags;                                                 \
       log_tags.emplace("ConnectionId",                                                             \
                        (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
@@ -646,7 +663,7 @@ public:
 #define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
     ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
                                                               fmt::format(__VA_ARGS__));           \
     }                                                                                              \
@@ -654,7 +671,7 @@ public:
 
 #define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(ENVOY_LOGGER(), LEVEL)) {                               \
       std::map<std::string, std::string> log_tags;                                                 \
       log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
       ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, "{}" FORMAT,                                      \
