@@ -71,6 +71,8 @@ without further review.
   * Wasm
 * doujiang24 ([doujiang24] https://github.com/doujiang24) (doujiang24@gmail.com)
   * Golang
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
+  * Wasm, JWT, gRPC-JSON transcoder
 
 # Envoy security team
 

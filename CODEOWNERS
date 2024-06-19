@@ -32,7 +32,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch @yanavlasov
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @htuch @yanavlasov
 # jwt_authn http filter extension
-/*/extensions/filters/http/jwt_authn @taoxuy @lizan
+/*/extensions/filters/http/jwt_authn @taoxuy @lizan @UNOWNED
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
@@ -42,23 +42,23 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tcp_stats transport socket extension
 /*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @lizan @ggreenway
+/*/extensions/transport_sockets/tls @RyanTheOptimist @ggreenway @botengyao
 # tls SPIFFE certificate validator extension
-/*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @lizan
+/*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @UNOWNED
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
 /*/extensions/transport_sockets/common @alyssawilk @wez470
 # starttls transport socket
-/*/extensions/transport_sockets/starttls @cpakulski @lizan
+/*/extensions/transport_sockets/starttls @cpakulski @botengyao @UNOWNED
 # proxy transport socket
 /*extensions/transport_sockets/http_11_proxy @alyssawilk @ryantheoptimist
 # internal upstream transport socket
 /*/extensions/transport_sockets/internal_upstream @kyessenov @alyssawilk
 # sni_cluster extension
-/*/extensions/filters/network/sni_cluster @rshriram @lizan
+/*/extensions/filters/network/sni_cluster @rshriram @UNOWNED
 # sni_dynamic_forward_proxy extension
-/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @lizan
+/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
@@ -97,32 +97,32 @@ extensions/filters/common/original_src @klarose @mattklein123
 # admission control extension.
 /*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
-/*/extensions/filters/listener/http_inspector @yxue @lizan
+/*/extensions/filters/listener/http_inspector @yxue @wbpcode
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @tyxia
 # webassembly access logger extensions
-/*/extensions/access_loggers/wasm @mpwarres @lizan
+/*/extensions/access_loggers/wasm @mpwarres @lizan @UNOWNED
 # webassembly bootstrap extensions
-/*/extensions/bootstrap/wasm @mpwarres @lizan
+/*/extensions/bootstrap/wasm @mpwarres @lizan @UNOWNED
 # webassembly http extensions
-/*/extensions/filters/http/wasm @mpwarres @lizan
+/*/extensions/filters/http/wasm @mpwarres @lizan @UNOWNED
 # webassembly network extensions
-/*/extensions/filters/network/wasm @mpwarres @lizan
+/*/extensions/filters/network/wasm @mpwarres @lizan @UNOWNED
 # webassembly common extension
-/*/extensions/common/wasm @mpwarres @lizan
+/*/extensions/common/wasm @mpwarres @lizan @UNOWNED
 # webassembly runtimes
-/*/extensions/wasm_runtime/ @mpwarres @lizan
+/*/extensions/wasm_runtime/ @mpwarres @lizan @UNOWNED
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
-/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @lizan
+/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @lizan @UNOWNED
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
-/*/extensions/filters/http/grpc_web @fengli79 @lizan
-/*/extensions/filters/http/grpc_stats @kyessenov @lizan
+/*/extensions/filters/http/grpc_web @fengli79 @lizan @UNOWNED
+/*/extensions/filters/http/grpc_stats @kyessenov @botengyao
 /*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
@@ -135,7 +135,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
-/*/extensions/stat_sinks/wasm @mpwarres @lizan
+/*/extensions/stat_sinks/wasm @mpwarres @lizan @UNOWNED
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch @nezdolik
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch @nezdolik
@@ -170,7 +170,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # Rate limit expression descriptor
-/*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
+/*/extensions/rate_limit_descriptors/expr @kyessenov @UNOWNED
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @donyu @mattklein123
 # runtime fraction input matcher
@@ -210,7 +210,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
-/*/extensions/formatter/metadata @cpakulski @lizan
+/*/extensions/formatter/metadata @cpakulski @UNOWNED
 /*/extensions/formatter/cel @kyessenov @zirain
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @mattklein123
@@ -281,7 +281,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
 # original dst
-/*/extensions/filters/listener/original_dst @kyessenov @lizan
+/*/extensions/filters/listener/original_dst @kyessenov @UNOWNED
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
 # formatter
@@ -312,7 +312,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # path rewrite by pattern
 /*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
 # Dubbo codec
-/*/extensions/common/dubbo @wbpcode @lizan
+/*/extensions/common/dubbo @wbpcode @UNOWNED
 # upstream load balancing policies
 /*/extensions/load_balancing_policies/common @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
@@ -378,7 +378,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /mobile/ @RyanTheOptimist @alyssawilk @abeyad @fredyw
 
 # Contrib
-/contrib/exe/ @mattklein123 @lizan
+/contrib/exe/ @mattklein123 @UNOWNED
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/checksum/ @ravenblackx @phlax
 /contrib/common/sqlutils/ @cpakulski @cpakulski
