@@ -357,7 +357,8 @@ public:
   /**
    * @param Set requested application protocol(s) (e.g. ALPN in TLS).
    */
-  virtual void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) PURE;
+  virtual void
+  setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
