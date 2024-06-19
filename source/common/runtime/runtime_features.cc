@@ -103,7 +103,7 @@ RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
-RUNTIME_GUARD(envoy_restart_features_proxy_104);
+RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
