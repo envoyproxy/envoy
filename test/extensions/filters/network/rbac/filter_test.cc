@@ -356,6 +356,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
   setDestinationPort(789);
 
   // Only call close() once since the connection is delay denied.
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Event::MockTimer* delay_timer =

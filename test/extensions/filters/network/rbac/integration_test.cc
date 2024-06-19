@@ -147,10 +147,12 @@ typed_config:
         principals:
           - not_id:
               any: true
-  delay_deny: 0.5s
+  delay_deny: 1s
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  std::string buff(16 * 1024 * 1024, 'a');
+  // Write 16MB of data in 500ms. This should complete if the RBAC filter does not pause the read.
+  ASSERT_TRUE(tcp_client->partialWrite(buff, false, std::chrono::milliseconds(500)));
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());

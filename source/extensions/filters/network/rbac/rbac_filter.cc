@@ -126,10 +126,12 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
 
     std::chrono::milliseconds duration = config_->delayDenyMs();
     if (duration > std::chrono::milliseconds(0)) {
-      ENVOY_LOG(debug, "connection will be delay denied in {}ms", std::to_string(duration.count()));
+      ENVOY_LOG(debug, "connection will be delay denied in {}ms", duration.count());
       delay_timer_ = callbacks_->connection().dispatcher().createTimer(
           [this]() -> void { closeConnection(); });
+      ASSERT(!is_delay_denied_);
       is_delay_denied_ = true;
+      callbacks_->connection().readDisable(true);
       delay_timer_->enableTimer(duration);
     } else {
       closeConnection();
