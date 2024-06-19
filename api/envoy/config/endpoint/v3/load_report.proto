@@ -51,25 +51,27 @@ message UpstreamLocalityStats {
   uint64 total_issued_requests = 8;
 
   // The total number of connections in an established state at the time of the
-  // report. This information may be based on upstream_cx_active metric
-  // aggregated over all the upstream endpoints in the locality.
+  // report. This field is aggregated over all the upstream endpoints in the
+  // locality.
+  // In Envoy, this information may be based on ``upstream_cx_active metric``.
   // [#not-implemented-hide:]
   uint64 total_active_connections = 9 [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // The total number of connections opened since the last report. This
-  // information may be based on upstream_cx_total metric compared to itself
-  // between start and end of an interval, i.e. upstream_cx_total(now) -
-  // upstream_cx_total(now - load_report_interval). It is aggregated over all
-  // the upstream endpoints in the locality.
+  // The total number of connections opened since the last report.
+  // This field is aggregated over all the upstream endpoints in the locality.
+  // In Envoy, this information may be based on ``upstream_cx_total`` metric
+  // compared to itself between start and end of an interval, i.e.
+  // ``upstream_cx_total``(now) - ``upstream_cx_total``(now -
+  // load_report_interval).
   // [#not-implemented-hide:]
   uint64 total_new_connections = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // The total number of connections failures since the last report. This
-  // information may be based on upstream_cx_connect_fail metric compared to
-  // itself between start and end of an interval, i.e.
-  // upstream_cx_connect_fail(now) - upstream_cx_connect_fail(now -
-  // load_report_interval). It is aggregated over all the upstream endpoints in
-  // the locality.
+  // The total number of connection failures since the last report.
+  // This field is aggregated over all the upstream endpoints in the locality.
+  // In Envoy, this information may be based on ``upstream_cx_connect_fail``
+  // metric compared to itself between start and end of an interval, i.e.
+  // ``upstream_cx_connect_fail``(now) - ``upstream_cx_connect_fail``(now -
+  // load_report_interval).
   // [#not-implemented-hide:]
   uint64 total_fail_connections = 11 [(xds.annotations.v3.field_status).work_in_progress = true];
 
