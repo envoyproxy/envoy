@@ -4818,16 +4818,16 @@ TEST(SubstitutionFormatterTest, AccessLogIdFormatterTest) {
   auto providers1 = SubstitutionFormatParser::parse("%ACCESS_LOG_ID%");
 
   ASSERT_EQ(providers1.size(), 1);
-  auto id1 = providers1[0]->format(request_headers, response_headers, response_trailers, stream_info,
-                                 body, AccessLog::AccessLogType::NotSet);
+  auto id1 = providers1[0]->format(request_headers, response_headers, response_trailers,
+                                   stream_info, body, AccessLog::AccessLogType::NotSet);
   ASSERT_TRUE(id1.has_value());
 
-  //Invoke parser again to check if the values generated will be unique
+  // Invoke parser again to check if the values generated will be unique
   auto providers2 = SubstitutionFormatParser::parse("%ACCESS_LOG_ID%");
 
   ASSERT_EQ(providers2.size(), 1);
-  auto id2 = providers2[0]->format(request_headers, response_headers, response_trailers, stream_info,
-                                 body, AccessLog::AccessLogType::NotSet);
+  auto id2 = providers2[0]->format(request_headers, response_headers, response_trailers,
+                                   stream_info, body, AccessLog::AccessLogType::NotSet);
   ASSERT_TRUE(id2.has_value());
   EXPECT_NE(id1, id2);
 }
