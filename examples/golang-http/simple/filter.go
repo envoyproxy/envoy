@@ -95,7 +95,7 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 }
 
 // OnLog is called when the HTTP stream is ended on HTTP Connection Manager filter.
-func (f *filter) OnLog() {
+func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
 	code, _ := f.callbacks.StreamInfo().ResponseCode()
 	respCode := strconv.Itoa(int(code))
 	api.LogDebug(respCode)
@@ -121,13 +121,13 @@ func (f *filter) OnLog() {
 
 // OnLogDownstreamStart is called when HTTP Connection Manager filter receives a new HTTP request
 // (required the corresponding access log type is enabled)
-func (f *filter) OnLogDownstreamStart() {
+func (f *filter) OnLogDownstreamStart(reqHeader api.RequestHeaderMap) {
 	// also support kicking off a goroutine here, like OnLog.
 }
 
 // OnLogDownstreamPeriodic is called on any HTTP Connection Manager periodic log record
 // (required the corresponding access log type is enabled)
-func (f *filter) OnLogDownstreamPeriodic() {
+func (f *filter) OnLogDownstreamPeriodic(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
 	// also support kicking off a goroutine here, like OnLog.
 }
 

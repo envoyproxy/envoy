@@ -265,8 +265,16 @@ func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64
 	return uint64(status)
 }
 
+type logHandler func(api.RequestHeaderMap, api.RequestTrailerMap, api.ResponseHeaderMap, api.ResponseTrailerMap)
+
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
+	decodingS *C.processState, encodingS *C.processState,
+	reqHeaderNum, reqHeaderBytes, reqTrailerNum, reqTrailerBytes,
+	respHeaderNum, respHeaderBytes, respTrailerNum, respTrailerBytes uint64) {
+
+	decodingState := getOrCreateState(decodingS)
+	encodingState := getOrCreateState(encodingS)
 	req := getRequest(r)
 	if req == nil {
 		req = createRequest(r)
@@ -276,16 +284,97 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 
 	v := api.AccessLogType(logType)
 
+	// Request headers must exist because the HTTP filter won't be run if the headers are
+	// not sent yet.
+	reqHeader := &requestHeaderMapImpl{
+		requestOrResponseHeaderMapImpl{
+			headerMapImpl{
+				state:       decodingState,
+				headerNum:   reqHeaderNum,
+				headerBytes: reqHeaderBytes,
+			},
+		},
+	}
+
+	var reqTrailer *requestTrailerMapImpl
+	if reqTrailerNum != 0 {
+		reqTrailer = &requestTrailerMapImpl{
+			requestOrResponseTrailerMapImpl{
+				headerMapImpl{
+					state:       decodingState,
+					headerNum:   reqTrailerNum,
+					headerBytes: reqTrailerBytes,
+				},
+			},
+		}
+	}
+
+	var respHeader *responseHeaderMapImpl
+	if respHeaderNum != 0 {
+		respHeader = &responseHeaderMapImpl{
+			requestOrResponseHeaderMapImpl{
+				headerMapImpl{
+					state:       encodingState,
+					headerNum:   respHeaderNum,
+					headerBytes: respHeaderBytes,
+				},
+			},
+		}
+	}
+
+	var respTrailer *responseTrailerMapImpl
+	if respTrailerNum != 0 {
+		respTrailer = &responseTrailerMapImpl{
+			requestOrResponseTrailerMapImpl{
+				headerMapImpl{
+					state:       encodingState,
+					headerNum:   respTrailerNum,
+					headerBytes: respTrailerBytes,
+				},
+			},
+		}
+	}
+
 	f := req.httpFilter
+	var h logHandler
+
 	switch v {
-	case api.AccessLogDownstreamStart:
-		f.OnLogDownstreamStart()
-	case api.AccessLogDownstreamPeriodic:
-		f.OnLogDownstreamPeriodic()
 	case api.AccessLogDownstreamEnd:
-		f.OnLog()
+		h = f.OnLog
+	case api.AccessLogDownstreamPeriodic:
+		h = f.OnLogDownstreamPeriodic
+	case api.AccessLogDownstreamStart:
+		f.OnLogDownstreamStart(reqHeader)
+		return
 	default:
 		api.LogErrorf("access log type %d is not supported yet", logType)
+		return
+	}
+
+	// If we pass the nil ResponseHeaderMap or other nil interface directly, the user
+	// code need to use reflect to check them out. This behavior is not friendly, so
+	// we decide to list all cases manually.
+	if respHeaderNum != 0 {
+		if reqTrailerNum != 0 {
+			if respTrailerNum != 0 {
+				h(reqHeader, reqTrailer, respHeader, respTrailer)
+			} else {
+				h(reqHeader, reqTrailer, respHeader, nil)
+			}
+		} else {
+			if respTrailerNum != 0 {
+				h(reqHeader, nil, respHeader, respTrailer)
+			} else {
+				h(reqHeader, nil, respHeader, nil)
+			}
+		}
+	} else {
+		if reqTrailerNum != 0 {
+			h(reqHeader, reqTrailer, nil, nil)
+			// if the resp header doesn't exist, the resp trailer doesn't exist either
+		} else {
+			h(reqHeader, nil, nil, nil)
+		}
 	}
 }
 
