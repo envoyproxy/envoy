@@ -131,6 +131,188 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameNullTypeMatched) 
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBitStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("01010101"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameOctetStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.4", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("48656C6C6F20576F726C64"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNamePrintableStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.5", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("PrintableStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameT61StringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.6", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("T61StringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIA5StringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.7", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("IA5StringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.8", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("GeneralStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUniversalStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.9", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("UniversalStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUtcTimeTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.10", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("230616120000Z"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralizedTimeTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.11", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("20230616120000Z"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameVisibleStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.12", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("VisibleStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.13", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("UTF8StringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSetTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(.*test1.*test2.*)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSequenceTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(.*test3.*test4.*)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDnsAndOtherNameMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 

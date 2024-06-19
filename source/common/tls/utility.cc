@@ -260,21 +260,78 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       san.assign(tmp_obj);
       break;
     }
-    case V_ASN1_BIT_STRING:
-    case V_ASN1_OCTET_STRING:
-    case V_ASN1_PRINTABLESTRING:
-    case V_ASN1_T61STRING:
-    case V_ASN1_IA5STRING:
-    case V_ASN1_GENERALSTRING:
-    case V_ASN1_BMPSTRING:
-    case V_ASN1_UNIVERSALSTRING:
-    case V_ASN1_UTCTIME:
-    case V_ASN1_GENERALIZEDTIME:
-    case V_ASN1_VISIBLESTRING:
-    case V_ASN1_UTF8STRING:
-    case V_ASN1_SET:
+    case V_ASN1_BIT_STRING: {
+      ASN1_BIT_STRING* str = value->value.bit_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_OCTET_STRING: {
+      ASN1_OCTET_STRING* str = value->value.octet_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_PRINTABLESTRING: {
+      ASN1_PRINTABLESTRING* str = value->value.printablestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_T61STRING: {
+      ASN1_T61STRING* str = value->value.t61string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_IA5STRING: {
+      ASN1_IA5STRING* str = value->value.ia5string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_GENERALSTRING: {
+      ASN1_GENERALSTRING* str = value->value.generalstring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_BMPSTRING: {
+      ASN1_BMPSTRING* str = value->value.bmpstring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_UNIVERSALSTRING: {
+      // ASN1_UNIVERSALSTRING is encoded using UCS-4, which needs conversion to UTF-8.
+      unsigned char* tmp = nullptr;
+      if (ASN1_STRING_to_UTF8(&tmp, value->value.universalstring) < 0) {
+        break;
+      }
+      san.assign(reinterpret_cast<const char*>(tmp));
+      OPENSSL_free(tmp);
+      break;
+    }
+    case V_ASN1_UTCTIME: {
+      ASN1_UTCTIME* str = value->value.utctime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_GENERALIZEDTIME: {
+      ASN1_GENERALIZEDTIME* str = value->value.generalizedtime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_VISIBLESTRING: {
+      ASN1_VISIBLESTRING* str = value->value.visiblestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_UTF8STRING: {
+      ASN1_UTF8STRING* str = value->value.utf8string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
+    case V_ASN1_SET: {
+      ASN1_STRING* str = value->value.set;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+      break;
+    }
     case V_ASN1_SEQUENCE: {
-      str = value->value.asn1_string;
+      ASN1_STRING* str = value->value.sequence;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
