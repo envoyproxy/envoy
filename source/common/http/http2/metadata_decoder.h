@@ -4,8 +4,8 @@
 #include <string>
 
 #include "envoy/http/codec.h"
-
 #include "envoy/http/metadata_interface.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/logger.h"

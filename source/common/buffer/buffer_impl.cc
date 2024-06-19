@@ -10,12 +10,14 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/common/assert.h"
+
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "envoy/buffer/buffer.h"
-#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Buffer {
