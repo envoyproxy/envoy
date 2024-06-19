@@ -34,7 +34,8 @@
 
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
@@ -241,7 +242,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   }
 #ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
-  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+  Network::Address::InstanceConstSharedPtr server_addr = *Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
@@ -322,7 +323,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
-            return Network::Utility::parseInternetAddress(
+            return Network::Utility::parseInternetAddressNoThrow(
                 Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}

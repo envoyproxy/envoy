@@ -12,42 +12,27 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
 
   try {
-    Network::Utility::parseInternetAddress(string_buffer);
+    Network::Utility::parseInternetAddressNoThrow(string_buffer);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
 
-  try {
-    Network::Utility::parseInternetAddressAndPort(string_buffer);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-  }
+  Network::Utility::parseInternetAddressAndPortNoThrow(string_buffer);
 
-  try {
-    std::list<Network::PortRange> port_range_list;
-    Network::Utility::parsePortRangeList(string_buffer, port_range_list);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-  }
-
-  try {
+  {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path(string_buffer);
-    Network::Utility::protobufAddressToAddress(proto_address);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    Network::Utility::protobufAddressToAddressNoThrow(proto_address);
   }
 
-  try {
+  {
     FuzzedDataProvider provider(buf, len);
     envoy::config::core::v3::Address proto_address;
     const auto port_value = provider.ConsumeIntegral<uint16_t>();
     const std::string address_value = provider.ConsumeRemainingBytesAsString();
     proto_address.mutable_socket_address()->set_address(address_value);
     proto_address.mutable_socket_address()->set_port_value(port_value);
-    Network::Utility::protobufAddressToAddress(proto_address);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    Network::Utility::protobufAddressToAddressNoThrow(proto_address);
   }
 
   try {
@@ -58,12 +43,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
 
-  try {
-    envoy::config::core::v3::Address proto_address;
-    Network::Address::PipeInstance address(string_buffer);
-    Network::Utility::addressToProtobufAddress(address, proto_address);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+  envoy::config::core::v3::Address proto_address;
+  auto address_or_error = Network::Address::PipeInstance::create(string_buffer);
+  if (address_or_error.status().ok()) {
+    Network::Utility::addressToProtobufAddress(*(address_or_error.value()), proto_address);
   }
 }
 

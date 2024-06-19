@@ -449,6 +449,7 @@ envoy_cc_library(
         ":headers_lib",
         "//envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:compiled_string_map_lib",
         "//source/common/common:dump_state_utils",
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",

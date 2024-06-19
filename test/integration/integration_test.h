@@ -31,7 +31,7 @@ public:
       : HttpIntegrationTest(
             Http::CodecType::HTTP1,
             [](int) {
-              return Network::Utility::parseInternetAddress(
+              return Network::Utility::parseInternetAddressNoThrow(
                   Network::Test::getLoopbackAddressString(std::get<0>(GetParam())), 0);
             },
             std::get<0>(GetParam())),

@@ -2,8 +2,6 @@
 
 #include "test/test_common/utility.h"
 
-#include "library/jni/jni_support.h"
-
 // NOLINT(namespace-envoy)
 
 extern "C" JNIEXPORT jstring JNICALL

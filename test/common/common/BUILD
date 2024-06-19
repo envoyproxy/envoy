@@ -282,6 +282,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "compiled_string_map_test",
+    srcs = ["compiled_string_map_test.cc"],
+)
+
+envoy_cc_test(
     name = "packed_struct_test",
     srcs = ["packed_struct_test.cc"],
     deps = [
@@ -385,6 +390,23 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "utility_speed_test_benchmark_test",
     benchmark_binary = "utility_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "utility_trie_speed_test",
+    srcs = ["utility_trie_speed_test.cc"],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "utility_trie_speed_test_benchmark_test",
+    benchmark_binary = "utility_trie_speed_test",
 )
 
 envoy_cc_test(

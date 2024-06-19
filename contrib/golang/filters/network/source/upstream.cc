@@ -59,12 +59,15 @@ UpstreamConn::UpstreamConn(std::string addr, Dso::NetworkFilterDsoPtr dynamic_li
   }
   stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
-  stream_info_->filterState()->setData(
-      "envoy.network.transport_socket.original_dst_address",
-      std::make_shared<Network::AddressObject>(
-          Network::Utility::parseInternetAddressAndPort(addr, false)),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
-      StreamInfo::StreamSharingMayImpactPooling::None);
+  auto address = std::make_shared<Network::AddressObject>(
+      Network::Utility::parseInternetAddressAndPortNoThrow(addr, false));
+  if (!address) {
+    throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", addr));
+  }
+  stream_info_->filterState()->setData("envoy.network.transport_socket.original_dst_address",
+                                       address, StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain,
+                                       StreamInfo::StreamSharingMayImpactPooling::None);
 }
 
 void UpstreamConn::connect() {
@@ -95,6 +98,17 @@ void UpstreamConn::connect() {
   if (cancellable) {
     handler_ = cancellable;
   }
+}
+
+void UpstreamConn::enableHalfClose(bool enabled) {
+  if (closed_) {
+    ENVOY_LOG(warn, "connection has closed, addr: {}", addr_);
+    return;
+  }
+  ASSERT(conn_ != nullptr);
+  conn_->connection().enableHalfClose(enabled);
+  ENVOY_CONN_LOG(debug, "set enableHalfClose to addr: {}, enabled: {}, actualEnabled: {}",
+                 conn_->connection(), addr_, enabled, conn_->connection().isHalfCloseEnabled());
 }
 
 void UpstreamConn::write(Buffer::Instance& buf, bool end_stream) {

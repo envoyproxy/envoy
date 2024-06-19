@@ -16,7 +16,6 @@ envoy_contrib_package()
 make(
     name = "dlb",
     env = {"DLB_DISABLE_DOMAIN_SERVER": "TRUE"},
-    includes = [],
     lib_source = "@intel_dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
     postfix_script = "mv libdlb.a $INSTALLDIR/lib && rm -rf $INSTALLDIR/include && mkdir -p $INSTALLDIR/include && cp -L *.h $INSTALLDIR/include",

@@ -259,6 +259,30 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
   EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
 }
 
+// "pragma:no-cache" is ignored if ignoreRequestCacheControlHeader is true.
+TEST_F(LookupRequestTest, IgnoreRequestCacheControlHeaderIgnoresPragma) {
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_,
+                                     /*ignore_request_cache_control_header=*/true);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is not expired and no-cache is ignored.
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+}
+
+// "cache-control:no-cache" is ignored if ignoreRequestCacheControlHeader is true.
+TEST_F(LookupRequestTest, IgnoreRequestCacheControlHeaderIgnoresCacheControl) {
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_,
+                                     /*ignore_request_cache_control_header=*/true);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is not expired and no-cache is ignored.
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+}
+
 TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma,
                                    "no-cache, custom-directive=custom-value");

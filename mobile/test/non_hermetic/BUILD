@@ -26,7 +26,7 @@ envoy_cc_test_binary(
     repository = "@envoy",
     deps = [
         "//library/common:internal_engine_lib_no_stamp",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/types:c_types_lib",
         "//test/common/integration:base_client_integration_test_lib",
         "@envoy//source/common/config:api_version_lib",

@@ -555,7 +555,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
 
   // Setup test host
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+  host_info->address_ = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -595,7 +595,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
-  const auto pre_address = Network::Utility::parseInternetAddress("1.2.3.3", 80);
+  const auto pre_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 80);
   auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
   address_obj->address_ = pre_address;
   filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
@@ -606,7 +606,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // Setup test host
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+  host_info->address_ = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -656,7 +656,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   InSequence s;
 
   // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  auto host_info =
+      std::make_shared<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>();
   host_info->address_ = nullptr;
 
   EXPECT_CALL(callbacks_, route());
@@ -674,7 +675,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_CALL(*host_info, address());
   EXPECT_CALL(callbacks_,
               sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
-                             Eq("dns_resolution_failure")));
+                             Eq("dns_resolution_failure{}")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

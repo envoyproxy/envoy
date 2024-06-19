@@ -6,7 +6,6 @@ import android.content.Context;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
@@ -51,7 +50,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
   private final boolean mEnableInterfaceBinding = false;
-  private final boolean mEnableProxying = false;
+  private boolean mEnableProxying = false;
   private final int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
@@ -121,6 +120,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Enable Android system proxying.
+   *
+   * @param enable If true, enable Android proxying; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
+    mEnableProxying = enable;
+    return this;
+  }
+
+  /**
    * Set the DNS minimum refresh time, in seconds, which ensures that we wait to refresh a DNS
    * entry for at least the minimum refresh time. For example, if the DNS record TTL is 60 seconds
    * and setMinDnsRefreshSeconds(120) is invoked, then at least 120 seconds will transpire before
@@ -149,16 +158,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
-   * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
+   * Adds the boolean value for the reloadable runtime feature flag value. For example, to set the
    * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
-   * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
-   *
-   * TODO(abeyad): Change the name to setRuntimeFeature here and in the C++ APIs.
+   * call `addRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
    *
    * @param feature The reloadable runtime feature flag name.
    * @param value The Boolean value to set the runtime feature flag to.
    */
-  public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
+  public NativeCronvoyEngineBuilderImpl addRuntimeGuard(String feature, boolean value) {
     mRuntimeGuards.put(feature, value);
     return this;
   }
@@ -209,7 +216,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
                            String logLevel) {
     AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
-    AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;

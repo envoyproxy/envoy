@@ -28,6 +28,16 @@ public:
     ASSERT(inner_metadata_ != nullptr);
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasRequest());
+
+    uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
+    if (!inner_metadata_->context().isTwoWay()) {
+      frame_flags |= FrameFlags::FLAG_ONE_WAY;
+    }
+    if (inner_metadata_->context().heartbeat()) {
+      frame_flags |= FrameFlags::FLAG_HEARTBEAT;
+    }
+
+    stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId()), frame_flags};
   }
 
   // Request
@@ -43,9 +53,10 @@ public:
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
 
-  FrameFlags stream_frame_flags_;
-
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
+
+private:
+  FrameFlags stream_frame_flags_;
 };
 
 class DubboResponse : public Response {
@@ -56,6 +67,16 @@ public:
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasResponse());
     refreshStatus();
+
+    uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
+    if (!inner_metadata_->context().isTwoWay()) {
+      frame_flags |= FrameFlags::FLAG_ONE_WAY;
+    }
+    if (inner_metadata_->context().heartbeat()) {
+      frame_flags |= FrameFlags::FLAG_HEARTBEAT;
+    }
+
+    stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId()), frame_flags};
   }
 
   void refreshStatus();
@@ -67,10 +88,11 @@ public:
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
 
-  FrameFlags stream_frame_flags_;
-
   StreamStatus status_;
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
+
+private:
+  FrameFlags stream_frame_flags_;
 };
 
 class DubboCodecBase : public Logger::Loggable<Logger::Id::connection> {
@@ -136,12 +158,9 @@ public:
         return Common::Dubbo::DecodeStatus::Success;
       }
 
-      auto message = std::make_unique<DecoderMessageType>(metadata_);
-      message->stream_frame_flags_ = {{static_cast<uint64_t>(metadata_->requestId()),
-                                       !metadata_->context().isTwoWay(), false,
-                                       metadata_->context().heartbeat()},
-                                      true};
+      auto message = std::make_unique<DecoderMessageType>(std::move(metadata_));
       metadata_.reset();
+
       callback_->onDecodingSuccess(std::move(message));
 
       return Common::Dubbo::DecodeStatus::Success;
@@ -165,17 +184,25 @@ public:
     }
   }
 
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override {
+  EncodingResult encode(const StreamFrame& frame, EncodingContext&) override {
     ASSERT(dynamic_cast<const EncoderMessageType*>(&frame) != nullptr);
     const auto* typed_message = static_cast<const EncoderMessageType*>(&frame);
 
-    Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *typed_message->inner_metadata_);
-    callbacks.onEncodingSuccess(buffer, true);
+    codec_->encode(encoding_buffer_, *typed_message->inner_metadata_);
+    const uint64_t encoded_size = encoding_buffer_.length();
+
+    // Write the encoded data to the connection and clean the buffer for the next encoding.
+    callback_->writeToConnection(encoding_buffer_);
+    encoding_buffer_.drain(encoding_buffer_.length());
+
+    return encoded_size;
   }
 
   Common::Dubbo::MessageMetadataSharedPtr metadata_;
   CallBackType* callback_{};
+
+private:
+  Buffer::OwnedImpl encoding_buffer_;
 };
 
 class DubboServerCodec

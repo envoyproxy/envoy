@@ -159,7 +159,7 @@ struct Harness {
         &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_, *dispatcher_.get(),
         quic::kDefaultFlowControlSendWindow * 1.5, quic_stat_names_,
         mock_listener_config_.listenerScope(), crypto_stream_factory_, std::move(stream_info),
-        connection_stats_);
+        connection_stats_, std::nullopt);
     session->Initialize();
     session->setHeadersWithUnderscoreAction(envoy::config::core::v3::HttpProtocolOptions::ALLOW);
     session->setHttp3Options(http3_options_);

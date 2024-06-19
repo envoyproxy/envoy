@@ -35,17 +35,14 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
-#include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -99,7 +96,6 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       dispatcher_(api_->allocateDispatcher("main_thread")),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -264,9 +260,9 @@ void InstanceBase::updateServerStats() {
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   if (!options().hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                          parent_stats.parent_connections_);
   }
+  server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                        parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
@@ -530,6 +526,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
+  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
+      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
+
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
@@ -621,6 +620,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = createOverloadManager();
+  null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
 
@@ -755,9 +755,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       !bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> lds_resources_locator;
     if (!bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
-      lds_resources_locator =
-          std::make_unique<xds::core::v3::ResourceLocator>(Config::XdsResourceIdentifier::decodeUrl(
-              bootstrap_.dynamic_resources().lds_resources_locator()));
+      lds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
+          THROW_OR_RETURN_VALUE(Config::XdsResourceIdentifier::decodeUrl(
+                                    bootstrap_.dynamic_resources().lds_resources_locator()),
+                                xds::core::v3::ResourceLocator));
     }
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
                                     lds_resources_locator.get());
@@ -765,7 +766,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
-  runtime().initialize(clusterManager());
+  RETURN_IF_NOT_OK(runtime().initialize(clusterManager()));
 
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
@@ -889,7 +890,7 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> post_init_cb)
+                     OverloadManager& null_overload_manager, std::function<void()> post_init_cb)
     : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
           post_init_cb();
@@ -924,6 +925,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+  null_overload_manager.start();
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
@@ -964,11 +966,12 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
-                                    access_log_manager_, init_manager_, overloadManager(), [this] {
-                                      notifyCallbacksForStage(Stage::PostInit);
-                                      startWorkers();
-                                    });
+  const auto run_helper =
+      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
+                overloadManager(), nullOverloadManager(), [this] {
+                  notifyCallbacksForStage(Stage::PostInit);
+                  startWorkers();
+                });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -1120,8 +1123,9 @@ Network::DnsResolverSharedPtr InstanceBase::getOrCreateDnsResolver() {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
-    dns_resolver_ =
-        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
+    dns_resolver_ = THROW_OR_RETURN_VALUE(
+        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config),
+        Network::DnsResolverSharedPtr);
   }
   return dns_resolver_;
 }

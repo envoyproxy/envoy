@@ -39,7 +39,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -113,7 +113,7 @@ public:
   /**
    * Create a dns resolver to be used by the cluster.
    */
-  Network::DnsResolverSharedPtr
+  absl::StatusOr<Network::DnsResolverSharedPtr>
   selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context);
 

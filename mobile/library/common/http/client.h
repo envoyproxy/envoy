@@ -18,6 +18,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
+#include "library/common/engine_types.h"
 #include "library/common/event/provisional_dispatcher.h"
 #include "library/common/network/synthetic_address_impl.h"
 #include "library/common/types/c_types.h"
@@ -65,10 +66,10 @@ public:
    * opening a stream may fail. The returned handle is immediately valid for use with this API, but
    * there is no guarantee it will ever functionally represent an open stream.
    * @param stream, the stream to start.
-   * @param bridge_callbacks, wrapper for callbacks for events on this stream.
+   * @param stream_callbacks, the callbacks for events on this stream.
    * @param explicit_flow_control, whether the stream will require explicit flow control.
    */
-  void startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+  void startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
                    bool explicit_flow_control);
 
   /**
@@ -143,7 +144,7 @@ private:
    */
   class DirectStreamCallbacks : public ResponseEncoder, public Logger::Loggable<Logger::Id::http> {
   public:
-    DirectStreamCallbacks(DirectStream& direct_stream, envoy_http_callbacks bridge_callbacks,
+    DirectStreamCallbacks(DirectStream& direct_stream, EnvoyStreamCallbacks&& stream_callbacks,
                           Client& http_client);
     virtual ~DirectStreamCallbacks();
 
@@ -160,8 +161,7 @@ private:
     Stream& getStream() override { return direct_stream_; }
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
     void encode1xxHeaders(const ResponseHeaderMap&) override {
-      // TODO(goaway): implement?
-      PANIC("not implemented");
+      IS_ENVOY_BUG("Unexpected 100 continue"); // proxy_100_continue_ false by default.
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
     void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
@@ -170,7 +170,7 @@ private:
                                               Http::ResponseTrailerMapConstSharedPtr,
                                               StreamInfo::StreamInfo&) override {}
 
-    void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
+    void encodeMetadata(const MetadataMapVector&) override { IS_ENVOY_BUG("Unexpected metadata"); }
 
     void onHasBufferedData();
     void onBufferedDataDrained();
@@ -189,7 +189,11 @@ private:
     void latchError();
 
   private:
-    bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
+    bool hasDataToSend() {
+      return (
+          (response_data_ && response_data_->length() != 0) ||
+          (remote_end_stream_received_ && !remote_end_stream_forwarded_ && !response_trailers_));
+    }
 
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);
@@ -198,9 +202,9 @@ private:
     envoy_final_stream_intel& finalStreamIntel();
 
     DirectStream& direct_stream_;
-    const envoy_http_callbacks bridge_callbacks_;
+    EnvoyStreamCallbacks stream_callbacks_;
     Client& http_client_;
-    absl::optional<envoy_error> error_;
+    absl::optional<EnvoyError> error_;
     bool success_{};
 
     // Buffered response data when in explicit flow control mode.

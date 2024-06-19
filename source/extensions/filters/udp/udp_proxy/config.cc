@@ -21,7 +21,9 @@ const std::string& TunnelResponseTrailers::key() {
 
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
-    : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
+    : header_parser_(
+          THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
+                                Envoy::Router::HeaderParserPtr)),
       target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
@@ -100,7 +102,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.serverFactoryContext().options().localAddressIpVersion())) {
-    ExceptionUtil::throwEnvoyException(
+    throw EnvoyException(
         "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
         "is not running with the CAP_NET_ADMIN capability.");
   }

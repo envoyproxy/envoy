@@ -26,7 +26,6 @@ envoy_cc_library(
         ":engine_common_lib",
         ":engine_types_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
@@ -86,6 +85,8 @@ envoy_cc_library(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/strings",
+        "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:base_logger_lib",
+        "@envoy//source/common/http:header_map_lib",
     ],
 )

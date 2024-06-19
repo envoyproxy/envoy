@@ -194,6 +194,21 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithB
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
+TEST(OnDemandConfigTest, Basic) {
+  NiceMock<Upstream::MockClusterManager> cm;
+  ProtobufMessage::StrictValidationVisitorImpl visitor;
+  envoy::extensions::filters::http::on_demand::v3::OnDemand config;
+
+  OnDemandFilterConfig config1(config, cm, visitor);
+
+  config.mutable_odcds();
+  OnDemandFilterConfig config2(config, cm, visitor);
+
+  config.mutable_odcds()->set_resources_locator("foo");
+  EXPECT_THROW_WITH_MESSAGE({ OnDemandFilterConfig config3(config, cm, visitor); }, EnvoyException,
+                            "foo does not have a xdstp:, http: or file: scheme");
+}
+
 } // namespace OnDemand
 } // namespace HttpFilters
 } // namespace Extensions

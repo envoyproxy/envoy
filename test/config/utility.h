@@ -122,7 +122,7 @@ public:
     }
 
     bool allow_expired_certificate_{};
-    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
+    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};

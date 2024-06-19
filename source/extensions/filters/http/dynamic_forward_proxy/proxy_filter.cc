@@ -239,15 +239,36 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  bool force_cache_refresh = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections")) {
+    // For Envoy Mobile, we need to handle endpoints becoming unreachable and needing a new DNS
+    // resolution on network change (WIFI to cellular and vice versa). This is expected to be
+    // more performant than the current pattern when enable_drain_post_dns_refresh_ = true
+    // in mobile/library/common/network/connectivity_manager.cc because that force-drains endpoints
+    // even if addresses don't change where this does induce DNS latency if there hasn't been a
+    // network change if the endpoint hasn't been referenced recently, but also guarantees there
+    // will be a DNS resolution relevant to the current network and is more consistent with other
+    // vetted and tested client stacks and resolution any time an endpoint becomes unreachable.
+    //
+    // If this runtime guard proves useful for Envoy Mobile, it will be replaced
+    // either with a permanent knob or non-reloadable runtime guard (see TODO in
+    // runtime_features.cc)
+    auto dfp_lb =
+        dynamic_cast<Extensions::Common::DynamicForwardProxy::DfpLb*>(&cluster->loadBalancer());
+    if (dfp_lb) {
+      std::string hostname = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(
+          headers.getHostValue(), default_port);
+      auto host = dfp_lb->findHostByName(hostname);
+      if (host && !host->used()) {
+        force_cache_refresh = true;
+      }
+    }
+  }
+
   latchTime(decoder_callbacks_, DNS_START);
-  // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded
-  // ports.
-  // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
-  //                     not obvious to the user if something is misconfigured. We should see if
-  //                     we can do better here, perhaps by checking the cache to see if anything
-  //                     else is attached to it or something else?
-  auto result = config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
-                                                   default_port, isProxying(), *this);
+  auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
+      headers.Host()->value().getStringView(), default_port, isProxying(), force_cache_refresh,
+      *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();
@@ -261,7 +282,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
     if (!host.has_value() || !host.value()->address()) {
-      onDnsResolutionFail();
+      onDnsResolutionFail((host.has_value() && *host) ? ((*host)->details()) : "no_host");
       return Http::FilterHeadersStatus::StopIteration;
     }
     addHostAddressToFilterState(host.value()->address());
@@ -366,7 +387,7 @@ void ProxyFilter::onClusterInitTimeout() {
                                      absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);
 }
 
-void ProxyFilter::onDnsResolutionFail() {
+void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
   if (isProxying()) {
     decoder_callbacks_->continueDecoding();
     return;
@@ -374,9 +395,14 @@ void ProxyFilter::onDnsResolutionFail() {
 
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
-                                     ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                     absl::nullopt, RcDetails::get().DnsResolutionFailure);
+  std::string details_str = "";
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_details")) {
+    details_str = StringUtil::replaceAllEmptySpace(details);
+    ASSERT(details_str != "not_resolved");
+  }
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::ServiceUnavailable, ResponseStrings::get().DnsResolutionFailure, nullptr,
+      absl::nullopt, absl::StrCat(RcDetails::get().DnsResolutionFailure, "{", details_str, "}"));
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
@@ -388,7 +414,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   circuit_breaker_.reset();
 
   if (!host_info->address()) {
-    onDnsResolutionFail();
+    onDnsResolutionFail(host_info->details());
     return;
   }
   addHostAddressToFilterState(host_info->address());

@@ -544,11 +544,20 @@ envoy.filters.http.tap:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.tap.v3.Tap
+envoy.filters.http.thrift_to_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata
 envoy.filters.http.wasm:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.wasm.v3.Wasm
 envoy.filters.http.stateful_session:
@@ -906,6 +915,13 @@ envoy.http.injected_credentials.generic:
   status: alpha
   type_urls:
   - envoy.extensions.http.injected_credentials.generic.v3.Generic
+envoy.http.injected_credentials.oauth2:
+  categories:
+  - envoy.http.injected_credentials
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
 envoy.internal_redirect_predicates.allow_listed_routes:
   categories:
   - envoy.internal_redirect_predicates
@@ -1748,3 +1764,10 @@ envoy.tracers.opentelemetry.resource_detectors.dynatrace:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig
+envoy.quic.connection_debug_visitor.basic:
+  categories:
+  - envoy.quic.connection_debug_visitor
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig

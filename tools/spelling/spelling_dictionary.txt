@@ -81,6 +81,7 @@ ETB
 ETX
 FS
 FIXME
+gperf
 HEXDIG
 HEXDIGIT
 HPE
@@ -258,6 +259,7 @@ KiB
 Kille
 LBs
 LC
+LCOV
 LDS
 LEDS
 LEV
@@ -1347,6 +1349,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars
@@ -1451,6 +1454,7 @@ viewport
 vip
 virtualhost
 virtualize
+virtualized
 vptr
 vtable
 vtt
@@ -1509,4 +1513,5 @@ PCIE
 EDNS
 CNAME
 NAT
+NXDOMAIN
 DNAT

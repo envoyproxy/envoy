@@ -51,7 +51,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/least_request:config",

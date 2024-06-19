@@ -234,8 +234,11 @@ void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
 
   dlb_event_ = listener->dispatcher().createFileEvent(
       DlbConnectionBalanceFactorySingleton::get().efds[index_],
-      [this](uint32_t events) -> void { onDlbEvents(events); }, Event::FileTriggerType::Level,
-      Event::FileReadyType::Read);
+      [this](uint32_t events) {
+        onDlbEvents(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Level, Event::FileReadyType::Read);
   dlb_event_->setEnabled(Event::FileReadyType::Read);
 }
 

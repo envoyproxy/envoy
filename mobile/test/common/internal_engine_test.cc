@@ -8,13 +8,13 @@
 #include "test/common/integration/test_server.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/mocks/thread/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/external.h"
-#include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 
@@ -25,6 +25,7 @@ using testing::ByMove;
 using testing::Return;
 
 constexpr Logger::Logger::Levels LOG_LEVEL = Logger::Logger::Levels::debug;
+constexpr int kDefaultTimeoutSec = 3 * TIMEOUT_FACTOR;
 
 struct EngineTestContext {
   absl::Notification on_engine_running;
@@ -71,8 +72,8 @@ std::unique_ptr<EngineCallbacks> createDefaultEngineCallbacks(EngineTestContext&
   std::map<std::string, std::string> new_map;
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     envoy_map_entry header = map.entries[i];
-    const auto key = Data::Utility::copyToString(header.key);
-    const auto value = Data::Utility::copyToString(header.value);
+    const auto key = Bridge::Utility::copyToString(header.key);
+    const auto value = Bridge::Utility::copyToString(header.value);
     new_map.emplace(key, value);
   }
 
@@ -85,8 +86,8 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   Http::ResponseHeaderMapPtr transformed_headers = Http::ResponseHeaderMapImpl::create();
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(
-        Http::LowerCaseString(Data::Utility::copyToString(headers.entries[i].key)),
-        Data::Utility::copyToString(headers.entries[i].value));
+        Http::LowerCaseString(Bridge::Utility::copyToString(headers.entries[i].key)),
+        Bridge::Utility::copyToString(headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
@@ -148,7 +149,7 @@ TEST_F(InternalEngineTest, AccessEngineAfterInitialization) {
 
   absl::Notification getClusterManagerInvoked;
   // Running engine functions should work because the engine is running
-  EXPECT_EQ("runtime.load_success: 1\n", engine_->engine_->dumpStats());
+  EXPECT_THAT(engine_->engine_->dumpStats(), testing::HasSubstr("runtime.load_success: 1\n"));
 
   engine_->terminate();
   ASSERT_TRUE(engine_->isTerminated());
@@ -167,11 +168,13 @@ TEST_F(InternalEngineTest, RecordCounter) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   EXPECT_EQ(ENVOY_SUCCESS, engine->recordCounterInc("counter", envoy_stats_notags, 1));
 
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, Logger) {
@@ -188,13 +191,17 @@ TEST_F(InternalEngineTest, Logger) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  ASSERT_TRUE(test_context.on_log.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
+  ASSERT_TRUE(
+      test_context.on_log.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 
   engine->terminate();
   engine.reset();
-  ASSERT_TRUE(test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
@@ -210,7 +217,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
       Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
   EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker == nullptr);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   // Simulate a failed assertion by invoking a debug assertion failure
   // record action.
   // Verify that no crash if the assertion fails when no real event
@@ -218,7 +226,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
   Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
 
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
@@ -236,16 +245,19 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   const auto registered_event_tracker = static_cast<std::unique_ptr<EnvoyEventTracker>*>(
       Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
   EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker != nullptr);
 
   (*registered_event_tracker)->on_track_({{"foo", "bar"}});
 
-  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
@@ -264,16 +276,19 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   // Simulate a failed assertion by invoking a debug assertion failure
   // record action.
   // Verify that an envoy event is emitted when an event tracker is passed
   // at engine's initialization time.
   Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
 
-  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
@@ -293,16 +308,19 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   // Simulate an envoy bug by invoking an Envoy bug failure
   // record action.
   // Verify that an envoy event is emitted when an event tracker is passed
   // at engine's initialization time.
   Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly("foo_location");
 
-  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 #ifdef ENVOY_ENABLE_FULL_PROTOS
@@ -322,28 +340,18 @@ TEST_F(InternalEngineTest, BasicStream) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_complete_notification;
-  envoy_http_callbacks stream_cbs{
-      [](envoy_headers c_headers, bool, envoy_stream_intel, void*) -> void {
-        auto response_headers = toResponseHeaders(c_headers);
-        EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
-      } /* on_headers */,
-      [](envoy_data data, bool, envoy_stream_intel, void*) -> void {
-        data.release(data.context);
-      } /* on_data */,
-      nullptr /* on_metadata */,
-      [](envoy_headers, envoy_stream_intel, void*) -> void {} /* on_trailers */,
-      nullptr /* on_error */,
-      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
-        auto* on_complete_notification = static_cast<absl::Notification*>(context);
-        on_complete_notification->Notify();
-      } /* on_complete */,
-      nullptr /* on_cancel */,
-      nullptr /* on_send_window_available*/,
-      &on_complete_notification /* context */};
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool /* end_stream */,
+                                     envoy_stream_intel) {
+    EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+  };
+  stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+    on_complete_notification.Notify();
+  };
 
   envoy_stream_t stream = engine->initStream();
 
-  engine->startStream(stream, stream_cbs, false);
+  engine->startStream(stream, std::move(stream_callbacks), false);
 
   engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
   engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), false);
@@ -370,23 +378,14 @@ TEST_F(InternalEngineTest, ResetStream) {
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_cancel_notification;
-  envoy_http_callbacks stream_cbs{
-      nullptr /* on_headers */,
-      nullptr /* on_data */,
-      nullptr /* on_metadata */,
-      nullptr /* on_trailers */,
-      nullptr /* on_error */,
-      nullptr /* on_complete */,
-      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
-        auto* on_cancel_notification = static_cast<absl::Notification*>(context);
-        on_cancel_notification->Notify();
-      } /* on_cancel */,
-      nullptr /* on_send_window_available */,
-      &on_cancel_notification /* context */};
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_cancel_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+    on_cancel_notification.Notify();
+  };
 
   envoy_stream_t stream = engine->initStream();
 
-  engine->startStream(stream, stream_cbs, false);
+  engine->startStream(stream, std::move(stream_callbacks), false);
 
   engine->cancelStream(stream);
 
@@ -421,12 +420,14 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
       createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
 
   ASSERT_EQ(ENVOY_SUCCESS, engine->resetConnectivityState());
 
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, ThreadCreationFailed) {
@@ -464,29 +465,18 @@ protected:
     };
 
     CallbackContext context;
-    envoy_http_callbacks stream_cbs{
-        [](envoy_headers c_headers, bool, envoy_stream_intel, void* context) -> void {
-          release_envoy_map(c_headers);
-          // Gets the thread priority, so we can check that it's the same thread priority we set.
-          auto* callback_context = static_cast<CallbackContext*>(context);
-          callback_context->thread_priority = getpriority(PRIO_PROCESS, 0);
-        } /* on_headers */,
-        [](envoy_data data, bool, envoy_stream_intel, void*) -> void {
-          data.release(data.context);
-        } /* on_data */,
-        nullptr /* on_metadata */,
-        [](envoy_headers, envoy_stream_intel, void*) -> void {} /* on_trailers */,
-        nullptr /* on_error */,
-        [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void {
-          auto* callback_context = static_cast<CallbackContext*>(context);
-          callback_context->on_complete_notification.Notify();
-        } /* on_complete */,
-        nullptr /* on_cancel */,
-        nullptr /* on_send_window_available*/,
-        &context};
+    EnvoyStreamCallbacks stream_callbacks;
+    stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap&, bool /* end_stream */,
+                                       envoy_stream_intel) {
+      // Gets the thread priority, so we can check that it's the same thread priority we set.
+      context.thread_priority = getpriority(PRIO_PROCESS, 0);
+    };
+    stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
+      context.on_complete_notification.Notify();
+    };
 
     envoy_stream_t stream = engine->initStream();
-    engine->startStream(stream, stream_cbs, false);
+    engine->startStream(stream, std::move(stream_callbacks), false);
     engine->sendHeaders(stream, createLocalhostRequestHeaders(test_server.getAddress()), false);
     engine->sendData(stream, std::make_unique<Buffer::OwnedImpl>("request body"), true);
 
@@ -517,7 +507,7 @@ TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
   // range, and the behavior could be system dependent. On Linux, if the supplied priority value
   // is greater than 19, then the thread priority value that gets set is 19. But since the behavior
   // could be system dependent, we just verify that the thread priority that gets set is not the
-  // out-of-range one that we initialiazed the engine with.
+  // out-of-range one that we initialized the engine with.
   EXPECT_NE(actual_thread_priority, expected_thread_priority);
 }
 

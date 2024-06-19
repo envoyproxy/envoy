@@ -20,7 +20,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/subset/subset_lb_config.h"
 

@@ -90,8 +90,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
-/*/extensions/grpc_credentials/aws_iam @suniltheta @lavignes @mattklein123
-/*/extensions/common/aws @suniltheta @lavignes @mattklein123
+/*/extensions/grpc_credentials/aws_iam @suniltheta @mattklein123 @nbaws
+/*/extensions/common/aws @suniltheta @mattklein123 @nbaws
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # admission control extension.
@@ -99,7 +99,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @yxue @lizan
 # attribute context
-/*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
+/*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan @tyxia
 # webassembly access logger extensions
 /*/extensions/access_loggers/wasm @mpwarres @lizan
 # webassembly bootstrap extensions
@@ -153,8 +153,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
-/*/extensions/filters/http/aws_request_signing @derekargueta @suniltheta @mattklein123 @marcomagdy
-/*/extensions/filters/http/aws_lambda @suniltheta @mattklein123 @marcomagdy @lavignes
+/*/extensions/filters/http/aws_request_signing @derekargueta @suniltheta @mattklein123 @marcomagdy @nbaws
+/*/extensions/filters/http/aws_lambda @suniltheta @mattklein123 @marcomagdy @nbaws
 /*/extensions/filters/http/buffer @alyssawilk @mattklein123
 /*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
 # Watchdog Extensions
@@ -293,6 +293,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 /*/extensions/health_checkers/thrift @zuercher @JuniorHsu
+# Thrift to metadata
+/*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
 # IP tagging
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
@@ -348,6 +350,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
 /*/extensions/http/injected_credentials/common @zhaohuabing @kyessenov
 /*/extensions/http/injected_credentials/generic @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/oauth2 @vikaschoudhary16 @wbpcode
 
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode

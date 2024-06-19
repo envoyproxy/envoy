@@ -314,6 +314,7 @@ private:
   // freed.
   uint32_t inflight_tags_{};
 
+  Tracing::SpanPtr current_span_;
   // This is unused.
   StreamInfo::StreamInfoImpl unused_stream_info_;
 

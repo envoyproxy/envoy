@@ -17,7 +17,6 @@ layered_runtime:
     rtds_layer:
       name: rtds
       rtds_config:
-        resource_api_version: V3
         path_config_source:
           path: /config_map/rtds/rtds.yaml
           watched_directory:
@@ -25,13 +24,11 @@ layered_runtime:
 
 dynamic_resources:
   cds_config:
-    resource_api_version: V3
     path_config_source:
       path: /config_map/cds/cds.yaml
       watched_directory:
         path: /config_map/cds
   lds_config:
-    resource_api_version: V3
     path_config_source:
       path: /config_map/lds/lds.yaml
       watched_directory:

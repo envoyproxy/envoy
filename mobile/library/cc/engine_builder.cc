@@ -410,7 +410,7 @@ EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
+EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.emplace_back(std::move(guard), value);
   return *this;
 }
@@ -843,6 +843,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
   list->add_patterns()->set_prefix("runtime.load_success");
+  list->add_patterns()->set_prefix("dns_cache");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");

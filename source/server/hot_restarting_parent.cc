@@ -51,9 +51,10 @@ void HotRestartingParent::Internal::handle(uint32_t worker_index,
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   socket_event_ = dispatcher.createFileEvent(
       main_rpc_stream_.domain_socket_,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   dispatcher_ = dispatcher;
@@ -139,7 +140,8 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   HotRestartMessage wrapped_reply;
   wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(-1);
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::resolveUrl(request.pass_listen_socket().address());
+      THROW_OR_RETURN_VALUE(Network::Utility::resolveUrl(request.pass_listen_socket().address()),
+                            Network::Address::InstanceConstSharedPtr);
 
   for (const auto& listener : server_->listenerManager().listeners()) {
     for (auto& socket_factory : listener.get().listenSocketFactories()) {
