@@ -1916,7 +1916,8 @@ max_ejection_time_jitter: 13s
 }
 
 TEST_F(OutlierDetectorImplTest, MaxEjectionPercentageOverride) {
-  // Should eject one host even if mep doesn't allow it.
+  // Should eject one host even if max_ejection_percent doesn't allow it.
+  // One host represents 33% which isn't allowed by max_ejection_percent, which is 30.
   const std::string yaml = R"EOF(
 max_ejection_percent: 30
 may_always_eject_one: true
