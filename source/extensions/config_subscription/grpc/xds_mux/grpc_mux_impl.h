@@ -22,7 +22,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/grpc/common.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
-#include "source/extensions/config_subscription/grpc/grpc_stream.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
@@ -107,7 +107,14 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
-  GrpcStream<RQ, RS>& grpcStreamForTest() { return grpc_stream_; }
+  GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
+    // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+    // return grpc_stream_.currentStreamForTest() directly (defined in GrpcMuxFailover).
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      return dynamic_cast<GrpcMuxFailover<RQ, RS>*>(grpc_stream_.get())->currentStreamForTest();
+    }
+    return *grpc_stream_.get();
+  }
 
 protected:
   class WatchImpl : public Envoy::Config::GrpcMuxWatch {
@@ -137,10 +144,10 @@ protected:
   };
 
   void sendGrpcMessage(RQ& msg_proto, S& sub_state);
-  void maybeUpdateQueueSizeStat(uint64_t size) { grpc_stream_.maybeUpdateQueueSizeStat(size); }
-  bool grpcStreamAvailable() { return grpc_stream_.grpcStreamAvailable(); }
-  bool rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
-  void sendMessage(RQ& msg_proto) { grpc_stream_.sendMessage(msg_proto); }
+  void maybeUpdateQueueSizeStat(uint64_t size) { grpc_stream_->maybeUpdateQueueSizeStat(size); }
+  bool grpcStreamAvailable() { return grpc_stream_->grpcStreamAvailable(); }
+  bool rateLimitAllowsDrain() { return grpc_stream_->checkRateLimitAllowsDrain(); }
+  void sendMessage(RQ& msg_proto) { grpc_stream_->sendMessage(msg_proto); }
 
   S& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
@@ -157,6 +164,12 @@ protected:
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
 
 private:
+  // Helper function to create the grpc_stream_ object.
+  // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
+  // is deprecated.
+  std::unique_ptr<GrpcStreamInterface<RQ, RS>>
+  createGrpcStreamObject(GrpcMuxContext& grpc_mux_context);
+
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a (Delta)DiscoveryRequest).
   bool canSendDiscoveryRequest(const std::string& type_url);
@@ -172,7 +185,10 @@ private:
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
 
-  GrpcStream<RQ, RS> grpc_stream_;
+  // Multiplexes the stream to the primary and failover sources.
+  // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+  // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
+  std::unique_ptr<GrpcStreamInterface<RQ, RS>> grpc_stream_;
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for

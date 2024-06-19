@@ -83,7 +83,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addH2ConnectionKeepaliveTimeoutSeconds(333)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
-      .setRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .setForceAlwaysUsev6(true)
@@ -129,8 +129,8 @@ TEST(TestConfig, ConfigIsApplied) {
 
 TEST(TestConfig, MultiFlag) {
   EngineBuilder engine_builder;
-  engine_builder.setRuntimeGuard("test_feature_false", true)
-      .setRuntimeGuard("test_feature_true", false);
+  engine_builder.addRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_true", false);
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   const std::string bootstrap_str = bootstrap->ShortDebugString();
@@ -409,7 +409,7 @@ TEST(TestConfig, XdsConfig) {
 
 TEST(TestConfig, MoveConstructor) {
   EngineBuilder engine_builder;
-  engine_builder.setRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
+  engine_builder.addRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   std::string bootstrap_str = bootstrap->ShortDebugString();

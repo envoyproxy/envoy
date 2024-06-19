@@ -435,9 +435,9 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -478,7 +478,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 
 TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
-  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
+  auto addr4 = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
   // First, create a resolver with no fallback. Check to see if cares default is
   // the only nameserver.
@@ -539,11 +539,11 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4_a = Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
-  auto addr4_b = Network::Utility::parseInternetAddressAndPort("5.6.7.8:81");
+  auto addr4_a = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80");
+  auto addr4_b = Network::Utility::parseInternetAddressAndPortNoThrow("5.6.7.8:81");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6_a = Network::Utility::parseInternetAddressAndPort("[::2]:90");
-  auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
+  auto addr6_a = Network::Utility::parseInternetAddressAndPortNoThrow("[::2]:90");
+  auto addr6_b = Network::Utility::parseInternetAddressAndPortNoThrow("[::3]:91");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -738,6 +738,7 @@ public:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, *server_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     updateDnsResolverOptions();
 
@@ -800,7 +801,8 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=, this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                  std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -831,14 +833,15 @@ public:
 
   ActiveDnsQuery* resolveWithNoRecordsExpectation(const std::string& address,
                                                   const DnsLookupFamily lookup_family) {
-    return resolver_->resolve(
-        address, lookup_family,
-        [=, this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          std::list<std::string> address_as_string_list = getAddressAsStringList(results);
-          EXPECT_EQ(0, address_as_string_list.size());
-          dispatcher_->exit();
-        });
+    return resolver_->resolve(address, lookup_family,
+                              [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                        std::list<DnsResponse>&& results) -> void {
+                                EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                std::list<std::string> address_as_string_list =
+                                    getAddressAsStringList(results);
+                                EXPECT_EQ(0, address_as_string_list.size());
+                                dispatcher_->exit();
+                              });
   }
 
   ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
@@ -846,6 +849,7 @@ public:
                                                     bool expected_to_execute) {
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
+                                                    absl::string_view,
                                                     std::list<DnsResponse>&& results) -> void {
                                 EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
@@ -858,6 +862,7 @@ public:
                                        const DnsLookupFamily lookup_family, T exception_object) {
     return resolver_->resolve(address, lookup_family,
                               [exception_object](DnsResolver::ResolutionStatus status,
+                                                 absl::string_view,
                                                  std::list<DnsResponse>&& results) -> void {
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
@@ -885,7 +890,7 @@ public:
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
             .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
               for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-                auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+                auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                 vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
               }
               return {0, 0};
