@@ -512,8 +512,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
       content_type_.assign(content_type.begin(), content_type.end());
     }
 
-    auto stream_size_before = request_in_.bytesStored();
-    auto buffer_size_before = initial_request_data_.length();
+    uint64_t stream_size_before = request_in_.bytesStored();
+    uint64_t buffer_size_before = initial_request_data_.length();
     bool done = !readToBuffer(*transcoder_->RequestOutput(), initial_request_data_);
     if (!done) {
       ENVOY_STREAM_LOG(
@@ -526,9 +526,13 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
           absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
       return Http::FilterHeadersStatus::StopIteration;
     }
-    stats_->transcoder_request_buffer_bytes_.add(initial_request_data_.length() -
-                                                 buffer_size_before);
-    stats_->transcoder_request_buffer_bytes_.sub(stream_size_before - request_in_.bytesStored());
+    uint64_t added = initial_request_data_.length() - buffer_size_before;
+    uint64_t removed = stream_size_before - request_in_.bytesStored();
+    if (added > removed) {
+      stats_->transcoder_request_buffer_bytes_.add(added - removed);
+    } else if (removed > added) {
+      stats_->transcoder_request_buffer_bytes_.sub(removed - added);
+    }
     if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -553,7 +557,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     request_in_.finish();
 
     Buffer::OwnedImpl data;
-    auto stream_size_before = request_in_.bytesStored();
+    uint64_t stream_size_before = request_in_.bytesStored();
     readToBuffer(*transcoder_->RequestOutput(), data);
     stats_->transcoder_request_buffer_bytes_.sub(stream_size_before - request_in_.bytesStored());
     if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
@@ -603,7 +607,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     }
 
     // Move the transcoded data to the output buffer.
-    auto stream_size_before = request_in_.bytesStored();
+    uint64_t stream_size_before = request_in_.bytesStored();
     readToBuffer(*transcoder_->RequestOutput(), data);
     stats_->transcoder_request_buffer_bytes_.sub(stream_size_before - request_in_.bytesStored());
   }
@@ -632,7 +636,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTra
     request_in_.finish();
 
     Buffer::OwnedImpl data;
-    auto stream_size_before = request_in_.bytesStored();
+    uint64_t stream_size_before = request_in_.bytesStored();
     readToBuffer(*transcoder_->RequestOutput(), data);
     stats_->transcoder_request_buffer_bytes_.sub(stream_size_before - request_in_.bytesStored());
 
@@ -723,11 +727,16 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     response_in_.finish();
   }
 
-  auto stream_size_before = response_in_.bytesStored();
-  auto buffer_size_before = response_data_.length();
+  uint64_t stream_size_before = response_in_.bytesStored();
+  uint64_t buffer_size_before = response_data_.length();
   readToBuffer(*transcoder_->ResponseOutput(), response_data_);
-  stats_->transcoder_response_buffer_bytes_.add(response_data_.length() - buffer_size_before);
-  stats_->transcoder_response_buffer_bytes_.sub(stream_size_before - response_in_.bytesStored());
+  uint64_t added = response_data_.length() - buffer_size_before;
+  uint64_t removed = stream_size_before - response_in_.bytesStored();
+  if (added > removed) {
+    stats_->transcoder_response_buffer_bytes_.add(added - removed);
+  } else if (removed > added) {
+    stats_->transcoder_response_buffer_bytes_.sub(removed - added);
+  }
   if (checkAndRejectIfResponseTranscoderFailed()) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -769,8 +778,8 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   }
 
   if (!method_->response_type_is_http_body_) {
-    auto stream_size_before = response_in_.bytesStored();
-    auto buffer_size_before = response_data_.length();
+    uint64_t stream_size_before = response_in_.bytesStored();
+    uint64_t buffer_size_before = response_data_.length();
     readToBuffer(*transcoder_->ResponseOutput(), response_data_);
     stats_->transcoder_response_buffer_bytes_.add(response_data_.length() - buffer_size_before);
     stats_->transcoder_response_buffer_bytes_.sub(stream_size_before - response_in_.bytesStored());
