@@ -170,7 +170,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # Rate limit expression descriptor
-/*/extensions/rate_limit_descriptors/expr @kyessenov @UNOWNED
+/*/extensions/rate_limit_descriptors/expr @kyessenov @cpakulski
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @donyu @mattklein123
 # runtime fraction input matcher
@@ -180,7 +180,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
 # format string matching
-/*/extensions/matching/actions/format_string @kyessenov @UNOWNED
+/*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input
 /*/extensions/matching/http/cel_input @tyxia @yanavlasov
 # user space socket pair, event, connection and listener
@@ -281,7 +281,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
 # original dst
-/*/extensions/filters/listener/original_dst @kyessenov @UNOWNED
+/*/extensions/filters/listener/original_dst @kyessenov @cpakulski
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
 # formatter
@@ -327,7 +327,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
 # String matching extensions
-/*/extensions/string_matcher/ @ggreenway @UNOWNED
+/*/extensions/string_matcher/ @ggreenway @cpakulski
 # Header mutation
 /*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
 # Health checkers
