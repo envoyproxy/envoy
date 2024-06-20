@@ -606,7 +606,7 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
                            const std::string& uds_path, const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory),
                    Network::SocketPtr{new Network::UdsListenSocket(
-                       std::make_shared<Network::Address::PipeInstance>(uds_path))},
+                       *Network::Address::PipeInstance::create(uds_path))},
                    config) {}
 
 static Network::SocketPtr
@@ -616,8 +616,8 @@ makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 
 static Network::Address::InstanceConstSharedPtr makeAddress(uint32_t port,
                                                             Network::Address::IpVersion version) {
-  return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
-                                                port);
+  return Network::Utility::parseInternetAddressNoThrow(
+      Network::Test::getLoopbackAddressString(version), port);
 }
 
 static Network::SocketPtr

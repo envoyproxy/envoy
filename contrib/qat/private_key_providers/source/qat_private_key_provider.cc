@@ -39,9 +39,9 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
             status = CPA_STATUS_FAIL;
           }
           ctx->setOpStatus(status);
-          return absl::OkStatus();
         }
         this->cb_.onPrivateKeyMethodComplete();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }

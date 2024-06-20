@@ -30,6 +30,10 @@ namespace Network {
 namespace Address {
 namespace {
 
+std::unique_ptr<PipeInstance> createPipeInstance(std::string path) {
+  return THROW_OR_RETURN_VALUE(PipeInstance::create(path), std::unique_ptr<PipeInstance>);
+}
+
 TEST(TruncateIpAddressAndLength, Various) {
   std::map<std::pair<std::string, int>, std::pair<std::string, int>> test_cases = {
       // IPv4
@@ -69,7 +73,7 @@ TEST(TruncateIpAddressAndLength, Various) {
       {{"ffff::ffff", 999}, {"ffff::ffff", 128}},
   };
   for (const auto& kv : test_cases) {
-    InstanceConstSharedPtr inPtr = Utility::parseInternetAddress(kv.first.first);
+    InstanceConstSharedPtr inPtr = Utility::parseInternetAddressNoThrow(kv.first.first);
     EXPECT_NE(inPtr, nullptr) << kv.first.first;
     int length_io = kv.first.second;
     InstanceConstSharedPtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
@@ -96,7 +100,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("9.255.255.255")));
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("0.0.0.0")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
-    EXPECT_FALSE(rng.isInRange(PipeInstance("foo")));
+    EXPECT_FALSE(rng.isInRange(*createPipeInstance("foo")));
   }
 
   {
@@ -119,7 +123,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001::")));
     EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
-    EXPECT_FALSE(rng.isInRange(PipeInstance("foo")));
+    EXPECT_FALSE(rng.isInRange(*createPipeInstance("foo")));
   }
 
   {
@@ -202,7 +206,7 @@ TEST(CidrRangeTest, OperatorIsEqual) {
 TEST(CidrRangeTest, InvalidCidrRange) { EXPECT_FALSE(CidrRange::create("foo").status().ok()); }
 
 TEST(Ipv4CidrRangeTest, InstanceConstSharedPtrAndLengthCtor) {
-  InstanceConstSharedPtr ptr = Utility::parseInternetAddress("1.2.3.5");
+  InstanceConstSharedPtr ptr = Utility::parseInternetAddressNoThrow("1.2.3.5");
   CidrRange rng(*CidrRange::create(ptr, 31)); // Copy ctor.
   EXPECT_EQ(rng.length(), 31);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v4);
@@ -267,7 +271,7 @@ TEST(Ipv4CidrRangeTest, BigRange) {
 }
 
 TEST(Ipv6CidrRange, InstanceConstSharedPtrAndLengthCtor) {
-  InstanceConstSharedPtr ptr = Utility::parseInternetAddress("abcd::0345");
+  InstanceConstSharedPtr ptr = Utility::parseInternetAddressNoThrow("abcd::0345");
   CidrRange rng(*CidrRange::create(ptr, 127)); // Copy ctor.
   EXPECT_EQ(rng.length(), 127);
   EXPECT_EQ(rng.ip()->version(), IpVersion::v6);
@@ -377,7 +381,7 @@ TEST(IpListTest, Normal) {
   EXPECT_FALSE(list->contains(Address::Ipv4Instance("10.16.0.0")));
 
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, AddressVersionMix) {
@@ -403,7 +407,7 @@ TEST(IpListTest, AddressVersionMix) {
   EXPECT_TRUE(list->contains(Address::Ipv6Instance("::1")));
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::")));
 
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAny) {
@@ -417,7 +421,7 @@ TEST(IpListTest, MatchAny) {
   EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyImplicitPrefixLen) {
@@ -436,7 +440,7 @@ TEST(IpListTest, MatchAnyImplicitPrefixLen) {
   EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyAll) {
@@ -455,7 +459,7 @@ TEST(IpListTest, MatchAnyAll) {
   EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::")));
   EXPECT_TRUE(list->contains(Address::Ipv6Instance("ffee::")));
 
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 } // namespace

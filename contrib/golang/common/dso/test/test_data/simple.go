@@ -119,5 +119,9 @@ func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 }
 
+//export envoyGoFilterCleanUp
+func envoyGoFilterCleanUp() {
+}
+
 func main() {
 }
