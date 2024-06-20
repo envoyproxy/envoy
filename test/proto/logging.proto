@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package logging;
 
-import "google/api/monitored_resource.proto";
-
 message TestBucket {
   string name = 1;
   float ratio = 2;
@@ -60,9 +58,6 @@ message TestRequest {
 
   TestBucket bucket = 2;
 
-  string monitored_resource_string = 19;
-  google.api.MonitoredResource monitored_resource = 20;
-
   TestProto2Message proto2_message = 18;
 
   repeated string repeated_strings = 3;
@@ -98,8 +93,6 @@ message TestRequest {
 
 message TestResponse {
   repeated TestBucket buckets = 1;
-
-  google.api.MonitoredResource monitored_resource = 2;
 
   map<string, TestBucket> sub_buckets = 3;
 

@@ -143,8 +143,6 @@ bool ScrubToStruct(
     const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
     const google::protobuf::Type& type,
     google::protobuf::util::TypeResolver& type_info,
-    const std::function<const google::protobuf::Type*(const std::string&)>&
-        type_finder,
     google::protobuf::field_extraction::MessageData* message,
     google::protobuf::Struct* message_struct);
 

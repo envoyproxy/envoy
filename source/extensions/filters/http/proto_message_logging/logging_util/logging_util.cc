@@ -477,8 +477,6 @@ absl::Status ConvertToStruct(
 bool ScrubToStruct(
     const ProtoScrubber* scrubber, const google::protobuf::Type& type,
     TypeResolver& type_resolver,
-    const std::function<const google::protobuf::Type*(const std::string&)>&
-        type_finder,
     google::protobuf::field_extraction::MessageData* message,
     google::protobuf::Struct* message_struct) {
   message_struct->Clear();
@@ -540,7 +538,7 @@ bool ScrubToStruct(
   }
 
   // Scrub the message.
-  if (!ScrubToStruct(scrubber, type, type_resolver, type_finder, message,
+  if (!ScrubToStruct(scrubber, type, type_resolver, message,
                      message_struct)) {
     return false;
   }

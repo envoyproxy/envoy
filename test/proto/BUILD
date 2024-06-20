@@ -66,9 +66,6 @@ envoy_proto_library(
     srcs = [
         "logging.proto",
     ],
-    deps = [
-        "@com_google_googleapis//google/api:monitored_resource_proto",
-    ],
 )
 
 envoy_proto_descriptor(
@@ -77,9 +74,6 @@ envoy_proto_descriptor(
         "logging.proto",
     ],
     out = "logging.descriptor",
-    external_deps = [
-        "@com_google_googleapis//google/api:monitored_resource_proto",
-    ],
 )
 
 envoy_proto_library(
