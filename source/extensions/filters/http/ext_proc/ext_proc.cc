@@ -421,13 +421,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
-  ProcessingRequest req;
-  addAttributes(state, req);
-  addDynamicMetadata(state, req);
-  auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
-                                *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_stream);
+  ProcessingRequest req =
+      buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/false);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -624,6 +619,22 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   return result;
 }
 
+ProcessingRequest Filter::buildHeaderRequest(ProcessorState& state,
+                                             Http::RequestOrResponseHeaderMap& headers,
+                                             bool end_stream, bool observability_mode) {
+  ProcessingRequest req;
+  if (observability_mode) {
+    req.set_observability_mode(true);
+  }
+  addAttributes(state, req);
+  addDynamicMetadata(state, req);
+  auto* headers_req = state.mutableHeaders(req);
+  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
+                                *headers_req->mutable_headers());
+  headers_req->set_end_of_stream(end_stream);
+  return req;
+}
+
 FilterHeadersStatus
 Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers,
                                        ProcessorState& state, bool end_stream) {
@@ -637,15 +648,9 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
     break;
   }
 
-  ProcessingRequest req;
-  req.set_observability_mode(true);
-  addAttributes(state, req);
-  addDynamicMetadata(state, req);
-  auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
-                                *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_stream);
-  ENVOY_LOG(debug, "Sending headers message");
+  ProcessingRequest req =
+      buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
+  ENVOY_LOG(debug, "Sending headers message in observability mode");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 

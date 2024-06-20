@@ -452,6 +452,10 @@ private:
                                                      bool end_stream);
   void deferredCloseStream();
 
+  envoy::service::ext_proc::v3::ProcessingRequest
+  buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
+                     bool end_stream, bool observability_mode);
+
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
