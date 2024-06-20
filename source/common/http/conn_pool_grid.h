@@ -50,14 +50,12 @@ public:
                      ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     bool hasNotifiedCaller() { return inner_callbacks_ == nullptr; }
-    void deleteIsPending() override {
-      next_attempt_timer_.reset();
-    }
+    void deleteIsPending() override { next_attempt_timer_.reset(); }
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
                                        public LinkedObject<ConnectionAttemptCallbacks>,
-                             public Event::DeferredDeletable{
+                                       public Event::DeferredDeletable {
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, ConnectionPool::Instance& pool);
       ~ConnectionAttemptCallbacks() override;
@@ -214,9 +212,9 @@ private:
   // that specifies HTTP/3 and HTTP/3 is not broken.
   bool shouldAttemptHttp3();
 
-  // Creates the next pool in the priority list, or nullptr if all pools have been created.
-  // TODO(alyssawilk) replace this now we have explicit pools.
-  virtual ConnectionPool::Instance* createNextPool();
+  // Creates the requested pool
+  virtual ConnectionPool::Instance* getOrCreateHttp3Pool();
+  virtual ConnectionPool::Instance* getOrCreateHttp2Pool();
 
   // This batch of member variables are latched objects required for pool creation.
   Event::Dispatcher& dispatcher_;
