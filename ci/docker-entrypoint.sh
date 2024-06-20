@@ -25,7 +25,7 @@ if [ "$ENVOY_UID" != "0" ] && [ "$USERID" = 0 ]; then
         groupmod -g "$ENVOY_GID" envoy
     fi
     # Ensure the envoy user is able to write to container logs
-    chown envoy:envoy /dev/stdout /dev/stderr
+    usermod -a -G tty envoy
     exec su-exec envoy "${@}"
 else
     exec "${@}"
