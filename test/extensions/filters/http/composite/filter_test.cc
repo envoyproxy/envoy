@@ -534,7 +534,8 @@ TEST(ConfigTest, TestSamplePercentConfigBadDenominator) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.getSampleRatio(config, server_factory_context.runtime()), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.getSampleRatio(config, server_factory_context.runtime()),
+                            EnvoyException,
                             "ExecuteFilterAction sample_percent config denominator setting is "
                             "invalid : 5. Valid range 0~2.");
 }
@@ -722,7 +723,6 @@ TEST(ConfigTest, TestRuntimeConfigOverrideEmptry) {
   ExecuteFilterActionFactory factory;
   EXPECT_EQ(float(0.8), factory.getSampleRatio(config, runtime));
 }
-
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
   const std::string yaml_string = R"EOF(

@@ -49,8 +49,9 @@ public:
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Envoy::Runtime::Loader& runtime);
 
-  bool isSampled(const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-                 Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
+  bool isSampled(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
 
 private:
   Matcher::ActionFactoryCb createAtionFactoryCbCommon(
@@ -75,8 +76,9 @@ private:
 
     Random::RandomGenerator& random = server_factory_context.api().randomGenerator();
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
-    return [provider = std::move(provider), n = std::move(name), composite_action = std::move(composite_action),
-            &random, &runtime, this]() -> Matcher::ActionPtr {
+    return [provider = std::move(provider), n = std::move(name),
+            composite_action = std::move(composite_action), &random, &runtime,
+            this]() -> Matcher::ActionPtr {
       if (!isSampled(composite_action, random, runtime)) {
         return nullptr;
       }

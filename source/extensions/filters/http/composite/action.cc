@@ -50,7 +50,8 @@ float ExecuteFilterActionFactory::getSampleRatio(
     // [0, 100]. Using 101 to indicate this runtime_key is either not configured or invalid.
     // Only override the default_value if the runtime_key is in a valid range [0, 100].
     const uint64_t NO_SAMPLE_PERCENT_RUNTIME = 101;
-    uint64_t sample_percent_runtime = runtime.snapshot().getInteger(runtime_key, NO_SAMPLE_PERCENT_RUNTIME);
+    uint64_t sample_percent_runtime =
+        runtime.snapshot().getInteger(runtime_key, NO_SAMPLE_PERCENT_RUNTIME);
     if (sample_percent_runtime < NO_SAMPLE_PERCENT_RUNTIME) {
       sample_ratio = static_cast<float>(sample_percent_runtime) / 100;
     }
@@ -59,8 +60,9 @@ float ExecuteFilterActionFactory::getSampleRatio(
   return sample_ratio;
 }
 
-bool ExecuteFilterActionFactory::isSampled(const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-                                           Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime) {
+bool ExecuteFilterActionFactory::isSampled(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime) {
   float sample_ratio = getSampleRatio(composite_action, runtime);
   UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
 
@@ -144,8 +146,9 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
   Random::RandomGenerator& random = context.server_factory_context_->api().randomGenerator();
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
-  return [cb = std::move(callback), n = std::move(name), composite_action = std::move(composite_action),
-          &random, &runtime, this]() -> Matcher::ActionPtr {
+  return [cb = std::move(callback), n = std::move(name),
+          composite_action = std::move(composite_action), &random, &runtime,
+          this]() -> Matcher::ActionPtr {
     if (isSampled(composite_action, random, runtime)) {
       return std::make_unique<ExecuteFilterAction>(cb, n);
     }
