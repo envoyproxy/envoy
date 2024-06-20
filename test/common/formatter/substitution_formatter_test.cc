@@ -610,7 +610,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("[::1]:19443")));
 
     // Validate for Pipe
-    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    address =
+        Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
     EXPECT_EQ("/foo", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
@@ -647,7 +648,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::numberValue(19443)));
 
     // Validate for Pipe
-    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    address =
+        Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
     EXPECT_EQ("", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
@@ -848,7 +850,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::numberValue(9443)));
 
     // Validate for Pipe
-    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    address =
+        Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.downstream_connection_info_provider_->setLocalAddress(address);
     EXPECT_EQ("", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),

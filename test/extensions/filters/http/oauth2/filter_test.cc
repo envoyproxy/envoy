@@ -1793,46 +1793,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndNoExpClaimI
                                    std::chrono::seconds(600));
 }
 
-TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens_oauth_use_standard_max_age_value) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_use_standard_max_age_value", "false"},
-  });
-
-  oauthHMAC = "/Dcdntz/d3PMuU4EQ4qdmxFRa3SSDds1OIoLN4TfnoM=;";
-
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  // host_ must be set, which is guaranteed (ASAN).
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/_signout"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-  };
-  filter_->decodeHeaders(request_headers, false);
-
-  // Expected response after the callback is complete.
-  Http::TestRequestHeaderMapImpl expected_headers{
-      {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(), "OauthExpires=600;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().Location.get(), ""},
-  };
-
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-
-  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
-                                   std::chrono::seconds(600));
-}
-
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
