@@ -19,13 +19,37 @@ namespace {
 }
 } // namespace
 
+Network::TransportSocketOptionsConstSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                           Upstream::HostConstSharedPtr host) {
+  const auto& upstream_http_protocol_options = host->cluster().upstreamHttpProtocolOptions();
+  if (upstream_http_protocol_options && upstream_http_protocol_options->auto_sni_from_upstream()) {
+    const absl::string_view hostname = host->hostname();
+    if (!hostname.empty()) {
+      if (transport_socket_options) {
+        return std::make_shared<Network::ServerNameDecoratingTransportSocketOptions>(
+            hostname, transport_socket_options);
+      } else {
+        return std::make_shared<Network::TransportSocketOptionsImpl>(
+            hostname, std::vector<std::string>{}, std::vector<std::string>{},
+            std::vector<std::string>{});
+      }
+    } else {
+      return transport_socket_options;
+    }
+  } else {
+    return transport_socket_options;
+  }
+}
+
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
-      socket_options_(options), transport_socket_options_(transport_socket_options),
+      socket_options_(options),
+      transport_socket_options_(wrapTransportSocketOptions(transport_socket_options, host)),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {

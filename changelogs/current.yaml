@@ -374,6 +374,10 @@ new_features:
     The RBAC filter will now log the enforced rule to the dynamic metadata field
     "enforced_effective_policy_id" and the result to the dynamic metadata field
     "enforced_engine_result". These are only populated if a non-shadow engine exists.
+- area: conn pool
+  change: |
+    Added :ref:`auto_sni_from_upstream <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni_from_upstream>`
+    to use value of :ref:`hostnames <config.endpoint.v3.Endpoint.hostname>` of upstream cluster's endpoints as the value for SNI.
 
 deprecated:
 - area: tracing
