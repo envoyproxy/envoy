@@ -39,6 +39,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: dfp
+  change: |
+    Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
+    disabled by setting the runtime feature ``envoy.reloadable_features.dns_details`` to false.
 - area: grpc
   change: |
     Changes in ``AsyncStreamImpl`` and ``GoogleAsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
@@ -99,6 +103,10 @@ minor_behavior_changes:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
+- area: http
+  change: |
+    Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
+    guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -186,9 +194,15 @@ removed_config_or_runtime:
 - area: tls
   change: |
     Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.oauth_use_standard_max_age_value`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.restart_features.send_goaway_for_premature_rst_streams`` runtime flag and legacy code paths.
 - area: load_balancing
   change: |
     Removed ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` runtime flag and legacy code paths.

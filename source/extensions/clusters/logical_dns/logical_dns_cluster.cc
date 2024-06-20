@@ -95,10 +95,10 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address_, dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
-        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 
