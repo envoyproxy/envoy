@@ -84,6 +84,7 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
     networkCallback = new NetworkCallback() {
       @Override
       public void onAvailable(Network network) {
+        envoyEngine.onNetworkChanged();
         handleNetworkChange();
       }
       @Override

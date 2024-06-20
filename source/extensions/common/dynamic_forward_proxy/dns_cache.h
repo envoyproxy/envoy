@@ -270,6 +270,9 @@ public:
    * can be used in response to network changes which might alter DNS responses, for example.
    */
   virtual void forceRefreshHosts() PURE;
+
+  /** Sets the `IpVersion` addresses to be removed from the DNS responses. */
+  virtual void setIpVersionToRemove(Network::Address::IpVersion ip_version) PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

@@ -36,6 +36,7 @@ public:
   MOCK_METHOD(NetworkType, getPreferredNetwork, ());
   MOCK_METHOD(Network::SocketMode, getSocketMode, ());
   MOCK_METHOD(envoy_netconf_t, getConfigurationKey, ());
+  MOCK_METHOD(envoy_netconf_t, updateConfigurationKey, ());
   MOCK_METHOD(Envoy::Network::ProxySettingsConstSharedPtr, getProxySettings, ());
   MOCK_METHOD(void, reportNetworkUsage, (envoy_netconf_t configuration_key, bool network_fault));
   MOCK_METHOD(void, setProxySettings, (Envoy::Network::ProxySettingsConstSharedPtr proxy_settings));

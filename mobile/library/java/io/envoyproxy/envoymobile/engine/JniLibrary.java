@@ -230,6 +230,13 @@ public class JniLibrary {
   protected static native int setPreferredNetwork(long engine, int network);
 
   /**
+   * A callback for the network change event.
+   *
+   * @param engine the handle to the engine.
+   */
+  protected static native void onNetworkChanged(long engine);
+
+  /**
    * Update the proxy settings.
    *
    * @param engine Handle to the engine whose proxy settings should be updated.

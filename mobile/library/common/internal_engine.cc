@@ -5,6 +5,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
@@ -13,6 +14,8 @@
 namespace Envoy {
 namespace {
 constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
+// Google DNS address used for IPv6 probes.
+constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
 } // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
@@ -160,6 +163,10 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
+          if (!hasIpV6Connectivity()) {
+            connectivity_manager_->dnsCache()->setIpVersionToRemove(
+                Network::Address::IpVersion::v6);
+          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -269,10 +276,17 @@ envoy_status_t InternalEngine::resetConnectivityState() {
 }
 
 envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
-  return dispatcher_->post([&, network]() -> void {
-    envoy_netconf_t configuration_key =
-        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+  return dispatcher_->post(
+      [&, network]() -> void { Network::ConnectivityManagerImpl::setPreferredNetwork(network); });
+}
+
+void InternalEngine::onNetworkChanged() {
+  dispatcher_->post([&]() -> void {
+    envoy_netconf_t configuration_key = connectivity_manager_->updateConfigurationKey();
     connectivity_manager_->refreshDns(configuration_key, true);
+    if (!hasIpV6Connectivity()) {
+      connectivity_manager_->dnsCache()->setIpVersionToRemove(Network::Address::IpVersion::v6);
+    }
   });
 }
 
@@ -375,6 +389,28 @@ void InternalEngine::logInterfaces(absl::string_view event,
     return all_names;
   };
   ENVOY_LOG_EVENT(debug, event, "{}", all_names_printer(interfaces));
+}
+
+bool InternalEngine::hasIpV6Connectivity() {
+  ENVOY_LOG(trace, "Checking for IPv6 connectivity.");
+  int domain = AF_INET6;
+  const Api::SysCallSocketResult socket_result =
+      Api::OsSysCallsSingleton::get().socket(domain, SOCK_DGRAM, /* protocol= */ 0);
+  if (!SOCKET_VALID(socket_result.return_value_)) {
+    ENVOY_LOG(trace, "Unable to create a datagram socket with errno: {}.", socket_result.errno_);
+    return false;
+  }
+  Network::IoSocketHandleImpl socket_handle(socket_result.return_value_, /* socket_v6only= */ true,
+                                            {domain});
+  Api::SysCallIntResult connect_result = socket_handle.connect(
+      std::make_shared<Network::Address::Ipv6Instance>(std::string(IPV6_PROBE_ADDRESS)));
+  bool has_ipv6_connectivity = connect_result.return_value_ == 0;
+  if (has_ipv6_connectivity) {
+    ENVOY_LOG(trace, "Found IPv6 connectivity.");
+  } else {
+    ENVOY_LOG(trace, "No IPv6 connectivity found with errno: {}.", connect_result.errno_);
+  }
+  return has_ipv6_connectivity;
 }
 
 } // namespace Envoy

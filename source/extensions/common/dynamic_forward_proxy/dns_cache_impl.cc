@@ -335,6 +335,10 @@ void DnsCacheImpl::forceRefreshHosts() {
   }
 }
 
+void DnsCacheImpl::setIpVersionToRemove(Network::Address::IpVersion ip_version) {
+  ip_version_to_remove_ = ip_version;
+}
+
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
             host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
@@ -358,6 +362,15 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  absl::optional<MonotonicTime> resolution_time,
                                  bool is_proxy_lookup) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+    absl::optional<Network::Address::IpVersion> ip_version_to_remove = ip_version_to_remove_.load();
+    if (ip_version_to_remove.has_value()) {
+      response.remove_if([&ip_version_to_remove](const Network::DnsResponse& dns_resp) {
+        return dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
+      });
+    }
+  }
   ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
                   "main thread resolve complete for host '{}': {}", host,
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -396,7 +409,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                               *(response.front().addrInfo().address_), primary_host_info->port_)
                         : nullptr;
   auto address_list = DnsUtils::generateAddressList(response, primary_host_info->port_);
-
   // Only the change the address if:
   // 1) The new address is valid &&
   // 2a) The host doesn't yet have an address ||

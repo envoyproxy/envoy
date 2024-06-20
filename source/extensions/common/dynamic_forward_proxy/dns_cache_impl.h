@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/common/backoff_strategy.h"
 #include "envoy/common/key_value_store.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
@@ -69,6 +71,7 @@ public:
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
   void forceRefreshHosts() override;
+  void setIpVersionToRemove(Network::Address::IpVersion ip_version) override;
 
 private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
@@ -269,6 +272,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
+  std::atomic<absl::optional<Network::Address::IpVersion>> ip_version_to_remove_{absl::nullopt};
 };
 
 } // namespace DynamicForwardProxy

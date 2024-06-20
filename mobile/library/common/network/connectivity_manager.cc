@@ -135,6 +135,11 @@ envoy_netconf_t ConnectivityManagerImpl::getConfigurationKey() {
   return network_state_.configuration_key_;
 }
 
+envoy_netconf_t ConnectivityManagerImpl::updateConfigurationKey() {
+  Thread::LockGuard lock{network_state_.mutex_};
+  return ++network_state_.configuration_key_;
+}
+
 // This call contains the main heuristic that will determine if the network connectivity_manager
 // switches socket modes: If the configuration_key isn't current, don't do anything. If there was no
 // fault (i.e. success) reset remaining_faults_ to MaxFaultTreshold. If there was a network fault,
