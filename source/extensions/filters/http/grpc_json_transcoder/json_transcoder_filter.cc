@@ -528,11 +528,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     }
     uint64_t added = initial_request_data_.length() - buffer_size_before;
     uint64_t removed = stream_size_before - request_in_.bytesStored();
-    if (added > removed) {
-      stats_->transcoder_request_buffer_bytes_.add(added - removed);
-    } else if (removed > added) {
-      stats_->transcoder_request_buffer_bytes_.sub(removed - added);
-    }
+    stats_->transcoder_request_buffer_bytes_.adjust(added, removed);
     if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -732,11 +728,8 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), response_data_);
   uint64_t added = response_data_.length() - buffer_size_before;
   uint64_t removed = stream_size_before - response_in_.bytesStored();
-  if (added > removed) {
-    stats_->transcoder_response_buffer_bytes_.add(added - removed);
-  } else if (removed > added) {
-    stats_->transcoder_response_buffer_bytes_.sub(removed - added);
-  }
+  stats_->transcoder_response_buffer_bytes_.adjust(added, removed);
+
   if (checkAndRejectIfResponseTranscoderFailed()) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -892,17 +885,13 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
 }
 
 void JsonTranscoderFilter::onDestroy() {
-  if (request_data_.length()) {
-    stats_->transcoder_request_buffer_bytes_.sub(request_data_.length());
+  if (request_data_.length() || request_in_.bytesStored()) {
+    stats_->transcoder_request_buffer_bytes_.sub(request_data_.length() +
+                                                 request_in_.bytesStored());
   }
-  if (response_data_.length()) {
-    stats_->transcoder_response_buffer_bytes_.sub(response_data_.length());
-  }
-  if (request_in_.bytesStored()) {
-    stats_->transcoder_request_buffer_bytes_.sub(request_in_.bytesStored());
-  }
-  if (response_in_.bytesStored()) {
-    stats_->transcoder_response_buffer_bytes_.sub(response_in_.bytesStored());
+  if (response_data_.length() || response_in_.bytesStored()) {
+    stats_->transcoder_response_buffer_bytes_.sub(response_data_.length() +
+                                                  response_in_.bytesStored());
   }
 }
 

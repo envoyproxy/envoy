@@ -151,6 +151,15 @@ public:
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
+  // When adjusting a gauge both ways (e.g. buffer size update when simultaneously
+  // streaming in and out), using this helper avoids touching the atomic twice.
+  inline void adjust(uint64_t add_amount, uint64_t sub_amount) {
+    if (add_amount > sub_amount) {
+      add(add_amount - sub_amount);
+    } else {
+      sub(sub_amount - add_amount);
+    }
+  }
   virtual uint64_t value() const PURE;
 
   /**
