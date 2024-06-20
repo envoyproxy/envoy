@@ -118,7 +118,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
-/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @alyssar
+/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @alyssawilk
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan @alyssawilk
@@ -184,7 +184,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # CEL data input
 /*/extensions/matching/http/cel_input @tyxia @yanavlasov
 # user space socket pair, event, connection and listener
-/*/extensions/io_socket/user_space @kyessenov @UNOWNED
+/*/extensions/io_socket/user_space @kyessenov @lambdai
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
@@ -281,7 +281,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
 # original dst
-/*/extensions/filters/listener/original_dst @kyessenov @cpakulski
+/*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
 # formatter
