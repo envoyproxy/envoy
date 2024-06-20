@@ -110,8 +110,9 @@ minor_behavior_changes:
 - area: http
   change: |
     http: envoy will now proxy 104 headers from upstream, though as with 100s only the first 1xx response
-    headers will be sent. This behavioral can be temporarily reverted by setting runtime guard
-    envoy.reloadable_features.proxy_104 to false. 104 headers are designated by ietf's draft-ietf-httpbis-resumable-upload rfc.
+    headers will be sent.104 headers are designated by ietf's draft-ietf-httpbis-resumable-upload rfc.
+    This behavioral can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.proxy_104`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
