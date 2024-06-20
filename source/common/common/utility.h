@@ -779,19 +779,19 @@ public:
 
   ~TrieLookupTable() {
     // To avoid stack overflow on recursive destruction if the tree is very deep,
-    // flatten the branches first.
-    std::stack<std::unique_ptr<TrieNode>> flat_tree;
+    // delete it iteratively (or, really, delete it using a stack on the heap).
+    std::stack<std::unique_ptr<TrieNode>> nodes_to_delete;
     for (std::unique_ptr<TrieNode>& child : root_.children_) {
       if (child != nullptr) {
-        flat_tree.push(std::move(child));
+        nodes_to_delete.push(std::move(child));
       }
     }
-    while (!flat_tree.empty()) {
-      std::unique_ptr<TrieNode> node = std::move(flat_tree.top());
-      flat_tree.pop();
+    while (!nodes_to_delete.empty()) {
+      std::unique_ptr<TrieNode> node = std::move(nodes_to_delete.top());
+      nodes_to_delete.pop();
       for (std::unique_ptr<TrieNode>& child : node->children_) {
         if (child != nullptr) {
-          flat_tree.push(std::move(child));
+          nodes_to_delete.push(std::move(child));
         }
       }
     }
