@@ -188,19 +188,28 @@ private:
 FineGrainLogContext& getFineGrainLogContext();
 
 /**
- * Macro for fine-grain logger.
+ * Macro to get a fine-grain logger.
  * Uses a global map to store logger and take use of thread-safe spdlog::logger.
  * The local pointer is used to avoid another load() when logging. Here we use
  * spdlog::logger* as atomic<shared_ptr> is a C++20 feature.
  */
-#define FINE_GRAIN_LOG(LEVEL, ...)                                                                 \
-  do {                                                                                             \
-    static std::atomic<spdlog::logger*> flogger{0};                                                \
+#define FINE_GRAIN_LOGGER()                                                                        \
+  ([]() -> spdlog::logger* {                                                                       \
+    static std::atomic<spdlog::logger*> flogger{nullptr};                                          \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
-      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                    \
+      Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                      \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
+    return local_flogger;                                                                          \
+  }())
+
+/**
+ * Macro for fine-grain logger to log.
+ */
+#define FINE_GRAIN_LOG(LEVEL, ...)                                                                 \
+  do {                                                                                             \
+    spdlog::logger* local_flogger = FINE_GRAIN_LOGGER();                                           \
     if (ENVOY_LOG_COMP_LEVEL(*local_flogger, LEVEL)) {                                             \
       local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
                          ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \

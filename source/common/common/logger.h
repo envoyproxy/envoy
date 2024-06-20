@@ -507,16 +507,9 @@ public:
  * Compare levels and use the fine grain logger if fine grain logging is enabled.
  */
 #define ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)                                          \
-  (Envoy::Logger::Context::useFineGrainLogger() ? ([&]() -> bool {                                 \
-    static std::atomic<spdlog::logger*> flogger{0};                                                \
-    spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
-    if (!local_flogger) {                                                                          \
-      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, flogger);                    \
-      local_flogger = flogger.load(std::memory_order_relaxed);                                     \
-    }                                                                                              \
-    return ENVOY_SPDLOG_LEVEL(LEVEL) >= (*local_flogger).level();                                  \
-  })()                                                                                             \
-                                                : (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level()))
+  (Envoy::Logger::Context::useFineGrainLogger()                                                    \
+       ? (ENVOY_SPDLOG_LEVEL(LEVEL) >= (*FINE_GRAIN_LOGGER()).level())                             \
+       : (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level()))
 
 /**
  * Compare levels before invoking logger. This is an optimization to avoid
