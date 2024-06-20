@@ -5,6 +5,7 @@
 #include <ios>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -661,8 +662,7 @@ template <class Value> class TrieLookupTable {
   // prefix "foobar" consumes 56KB.
   // Using ranged vectors like this makes a single prefix "foobar" consume
   // less than 20 bytes per node, for a total of 0.14KB.
-  class TrieNode {
-  public:
+  struct TrieNode {
     // Returns a pointer to the child branch at child_index, or nullptr if
     // there are no entries in the trie on that branch.
     const TrieNode* operator[](uint8_t child_index) const {
@@ -779,17 +779,19 @@ public:
 
   ~TrieLookupTable() {
     // To avoid stack overflow on recursive destruction if the tree is very deep,
-    // flatten the tree first.
-    std::vector<std::unique_ptr<TrieNode>> flat_tree;
+    // flatten the branches first.
+    std::stack<std::unique_ptr<TrieNode>> flat_tree;
     for (std::unique_ptr<TrieNode>& child : root_.children_) {
       if (child != nullptr) {
-        flat_tree.push_back(std::move(child));
+        flat_tree.push(std::move(child));
       }
     }
-    for (uint32_t i = 0; i < flat_tree.size(); i++) {
-      for (std::unique_ptr<TrieNode>& child : flat_tree[i]->children_) {
+    while (!flat_tree.empty()) {
+      std::unique_ptr<TrieNode> node = std::move(flat_tree.top());
+      flat_tree.pop();
+      for (std::unique_ptr<TrieNode>& child : node->children_) {
         if (child != nullptr) {
-          flat_tree.push_back(std::move(child));
+          flat_tree.push(std::move(child));
         }
       }
     }
