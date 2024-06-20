@@ -147,26 +147,5 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
   ASSERT_TRUE(codec->waitForDisconnect());
 }
 
-// Test Config:
-//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
-//   trust ca certificate chain: level-2 intermediate -> level-1 intermediate
-// With verify-depth set, certificate validation is expected to fail since we disallow partial chain
-// by setting runtime flag.
-TEST_P(SslCertValidatorIntegrationTest,
-       CertValidationFailedWithVerifyDepthAndPaitialChainDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_intermediate_ca", "false"}});
-  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
-                                  .setRsaCert(true)
-                                  .setTlsV13(true)
-                                  .setClientWithIntermediateCert(true)
-                                  .setVerifyDepth(1));
-  initialize();
-  auto conn = makeSslClientConnection({});
-  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
-  ASSERT_TRUE(codec->waitForDisconnect());
-}
-
 } // namespace Ssl
 } // namespace Envoy

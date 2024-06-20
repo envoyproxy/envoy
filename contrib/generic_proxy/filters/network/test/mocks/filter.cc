@@ -36,16 +36,31 @@ MockFilterChainManager::MockFilterChainManager() {
 }
 
 MockDecoderFilter::MockDecoderFilter() {
-  ON_CALL(*this, onStreamDecoded(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setDecoderFilterCallbacks(_))
+      .WillByDefault(Invoke([this](DecoderFilterCallback& cb) { decoder_callbacks_ = &cb; }));
+
+  ON_CALL(*this, decodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
+  ON_CALL(*this, decodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));
 }
 
 MockEncoderFilter::MockEncoderFilter() {
-  ON_CALL(*this, onStreamEncoded(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setEncoderFilterCallbacks(_))
+      .WillByDefault(Invoke([this](EncoderFilterCallback& cb) { encoder_callbacks_ = &cb; }));
+
+  ON_CALL(*this, encodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
+  ON_CALL(*this, encodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));
 }
 
 MockStreamFilter::MockStreamFilter() {
-  ON_CALL(*this, onStreamEncoded(_)).WillByDefault(Return(FilterStatus::Continue));
-  ON_CALL(*this, onStreamDecoded(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setDecoderFilterCallbacks(_))
+      .WillByDefault(Invoke([this](DecoderFilterCallback& cb) { decoder_callbacks_ = &cb; }));
+  ON_CALL(*this, setEncoderFilterCallbacks(_))
+      .WillByDefault(Invoke([this](EncoderFilterCallback& cb) { encoder_callbacks_ = &cb; }));
+
+  ON_CALL(*this, decodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
+  ON_CALL(*this, decodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));
+  ON_CALL(*this, encodeHeaderFrame(_)).WillByDefault(Return(HeaderFilterStatus::Continue));
+  ON_CALL(*this, encodeCommonFrame(_)).WillByDefault(Return(CommonFilterStatus::Continue));
 }
 
 MockDecoderFilterCallback::MockDecoderFilterCallback() = default;

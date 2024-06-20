@@ -759,7 +759,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(AnyNumber());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -812,7 +812,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -865,7 +865,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -917,7 +917,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "", TestUtility::makeDnsResponse({}));
 
   // parse the result
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1003,7 +1003,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // Execute resolve callback. This should harmlessly return and not alter
   // the response received by the client. Even though we are returning a successful
   // response, the client does not get an answer
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({"130.207.244.251"}));
 
   // parse the result
@@ -1910,6 +1910,12 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
 }
 
 TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
+#if defined(__linux__) && defined(__s390x__)
+  // Skip on s390x because this test incorrectly depends on the ordering of
+  // addresses that happens to work on other platforms.
+  // See https://github.com/envoyproxy/envoy/pull/24330
+  GTEST_SKIP() << "Skipping RandomizeFirstAnswerTest on s390x";
+#endif
   InSequence s;
 
   setup(forward_query_off_config);

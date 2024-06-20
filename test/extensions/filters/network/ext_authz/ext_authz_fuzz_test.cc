@@ -74,7 +74,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
   static Network::Address::InstanceConstSharedPtr addr =
-      std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+      *Network::Address::PipeInstance::create("/test/test.sock");
 
   filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       addr);
