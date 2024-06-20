@@ -118,10 +118,10 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
-/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @lizan @UNOWNED
+/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @alyssar
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
-/*/extensions/filters/http/grpc_web @fengli79 @lizan @UNOWNED
+/*/extensions/filters/http/grpc_web @fengli79 @lizan @alyssawilk
 /*/extensions/filters/http/grpc_stats @kyessenov @botengyao
 /*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
@@ -365,9 +365,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
-/*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
-/*/source/extensions/listener_managers/validation_listener_manager @UNOWNED @UNOWNED
-/*/source/extensions/config_subscription/ @UNOWNED @UNOWNED
+/*/source/extensions/listener_managers/listener_manager @alyssawilk @ggreenway
+/*/source/extensions/listener_managers/validation_listener_manager @alyssawilk @ggreenway
+/*/source/extensions/config_subscription/ @adisuissa @UNOWNED
 /*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
 # URL Pattern Match and Rewrite Library
@@ -378,7 +378,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /mobile/ @RyanTheOptimist @alyssawilk @abeyad @fredyw
 
 # Contrib
-/contrib/exe/ @mattklein123 @UNOWNED
+/contrib/exe/ @mattklein123 @alyssawilk
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/checksum/ @ravenblackx @phlax
 /contrib/common/sqlutils/ @cpakulski @cpakulski
