@@ -18,7 +18,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/common/memory/memory_test_utility.h"
-#include "test/common/stats/stats_test_utility.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
