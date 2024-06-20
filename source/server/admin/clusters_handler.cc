@@ -1,11 +1,16 @@
 #include "source/server/admin/clusters_handler.h"
 
 #include "envoy/admin/v3/clusters.pb.h"
+#include "envoy/server/admin.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/host_utility.h"
+#include "source/server/admin/clusters_params.h"
+#include "source/server/admin/clusters_request.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
@@ -40,6 +45,25 @@ void addCircuitBreakerSettingsAsJson(const envoy::config::core::v3::RoutingPrior
 
 } // namespace
 
+Admin::UrlHandler ClustersHandler::urlHandler() {
+  return {
+      /* prefix =*/"/clusters",
+      /* help_text =*/"upstream clusters status",
+      /* handler =*/MAKE_STREAMING_HANDLER(makeRequest),
+      /* removable =*/false,
+      /* mutates_server_state =*/false,
+      /* params =*/
+      {
+          {
+              /* type =*/Admin::ParamDescriptor::Type::Enum,
+              /* id =*/"format",
+              /* help =*/"The output format",
+              /* enum_choices =*/{"text", "json"},
+          },
+      },
+  };
+}
+
 ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
 Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_headers,
@@ -54,6 +78,28 @@ Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_he
   }
 
   return Http::Code::OK;
+}
+
+Admin::RequestPtr ClustersHandler::makeRequest(AdminStream& admin_stream) {
+  Buffer::OwnedImpl response;
+  ClustersParams params;
+  Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
+  if (code != Http::Code::OK) {
+    return Admin::makeStaticTextRequest(response, code);
+  }
+  Admin::RequestPtr request{nullptr};
+  switch (params.format_) {
+  case ClustersParams::Format::Text:
+    request =
+        std::make_unique<TextClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);
+    break;
+  case ClustersParams::Format::Json:
+    request =
+        std::make_unique<JsonClustersRequest>(ClustersRequest::DefaultChunkLimit, server_, params);
+    break;
+  }
+  ASSERT(request != nullptr);
+  return request;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the

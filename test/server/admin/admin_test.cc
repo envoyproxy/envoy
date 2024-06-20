@@ -143,7 +143,8 @@ TEST_P(AdminInstanceTest, Help) {
   const std::string expected = R"EOF(admin commands are:
   /: Admin home page
   /certs: print certs on machine
-  /clusters: upstream cluster status
+  /clusters: upstream clusters status
+      format: The output format; One of (text, json)
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
       mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask

@@ -31,6 +31,10 @@ public:
 
   Http::Code handlerClusters(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                              AdminStream&);
+  // Returns a RequestPtr implementation suitable for streaming its response.
+  Admin::RequestPtr makeRequest(AdminStream& admin_stream);
+  // Returns a UrlHandler suitable for AdminImpl.
+  Admin::UrlHandler urlHandler();
 
 private:
   void addOutlierInfo(const std::string& cluster_name,

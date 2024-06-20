@@ -78,6 +78,16 @@ public:
   }
 
 /**
+ * This macro is used to add streaming handlers to the Admin HTTP Endpoint. It builds
+ * a callback that executes X when the specified admin handler is hit. Member
+ * functions must be called when referenced, so this macro DRYs up the process of
+ * passing member functions to route-handling configuration within
+ * Envoy::Server::AdminImpl.
+ */
+#define MAKE_STREAMING_HANDLER(X)                                                                  \
+  [this](AdminStream& admin_stream) -> Admin::RequestPtr { return X(admin_stream); }
+
+/**
  * Global admin HTTP endpoint for the server, holding a map from URL prefixes to
  * handlers. When an HTTP request arrives at the admin port, the URL is linearly
  * prefixed-matched against an ordered list of handlers. When a match is found,

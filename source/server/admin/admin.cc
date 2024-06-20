@@ -9,6 +9,7 @@
 
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/header_validator_factory.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -123,12 +124,13 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       runtime_handler_(server), listeners_handler_(server), server_cmd_handler_(server),
       server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
+      // TODO(demitriswan) When C++20 is supported we might want to use designated initialization
+      // for readability.
       handlers_{
           makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
           makeHandler("/certs", "print certs on machine",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
-          makeHandler("/clusters", "upstream cluster status",
-                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
+          clusters_handler_.urlHandler(),
           makeHandler(
               "/config_dump", "dump current Envoy configs (experimental)",
               MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,

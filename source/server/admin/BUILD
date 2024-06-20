@@ -336,6 +336,7 @@ envoy_cc_library(
     deps = [
         ":handler_ctx_lib",
         ":utils_lib",
+        "//envoy/buffer:buffer_interface",
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",
@@ -343,6 +344,8 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/upstream:host_utility_lib",
+        "//source/server/admin:clusters_params_lib",
+        "//source/server/admin:clusters_request_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
@@ -408,5 +411,40 @@ envoy_cc_library(
         "//envoy/server:config_tracker_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "clusters_request_lib",
+    srcs = ["clusters_request.cc"],
+    hdrs = ["clusters_request.h"],
+    deps = [
+        ":clusters_params_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/json:json_streamer_lib",
+        "//source/common/upstream:host_utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "clusters_params_lib",
+    srcs = ["clusters_params.cc"],
+    hdrs = ["clusters_params.h"],
+    external_deps = [
+        "abseil_optional",
+        "abseil_strings",
+    ],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:query_params_interface",
     ],
 )
