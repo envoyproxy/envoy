@@ -6,6 +6,7 @@
 #include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Http {
@@ -51,7 +52,7 @@ public:
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
                                        public LinkedObject<ConnectionAttemptCallbacks> {
     public:
-      ConnectionAttemptCallbacks(WrapperCallbacks& parent, ConnectionPool::Instance* pool);
+      ConnectionAttemptCallbacks(WrapperCallbacks& parent, ConnectionPool::Instance& pool);
       ~ConnectionAttemptCallbacks() override;
 
       StreamCreationResult newStream();
@@ -64,14 +65,14 @@ public:
                        StreamInfo::StreamInfo& info,
                        absl::optional<Http::Protocol> protocol) override;
 
-      ConnectionPool::Instance& pool() { return *pool_; }
+      ConnectionPool::Instance& pool() { return pool_; }
 
       void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy);
 
     private:
       // A pointer back up to the parent.
       WrapperCallbacks& parent_;
-      ConnectionPool::Instance* pool_;
+      ConnectionPool::Instance& pool_;
       // The handle to cancel this connection attempt.
       // This is owned by the pool which created it.
       Cancellable* cancellable_{nullptr};
@@ -82,7 +83,7 @@ public:
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
     // Attempt to create a new stream for pool.
-    StreamCreationResult newStream(ConnectionPool::Instance* pool);
+    StreamCreationResult newStream(ConnectionPool::Instance& pool);
 
     // Called on pool failure or timeout to kick off another connection attempt.
     // Returns the StreamCreationResult if there is a failover pool and a
@@ -206,6 +207,7 @@ private:
   bool shouldAttemptHttp3();
 
   // Creates the next pool in the priority list, or nullptr if all pools have been created.
+  // TODO(alyssawilk) replace this now we have explicit pools.
   virtual ConnectionPool::Instance* createNextPool();
 
   // This batch of member variables are latched objects required for pool creation.
@@ -225,8 +227,8 @@ private:
   // The connection pools to use to create new streams
   ConnectionPool::InstancePtr http3_pool_;
   ConnectionPool::InstancePtr http2_pool_;
-  // A convenience list to allow taking actions on all pools.
-  std::list<ConnectionPool::Instance*> pools_;
+  // A convenience vector to allow taking actions on all pools.
+  absl::InlinedVector<ConnectionPool::Instance*, 2> pools_;
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;

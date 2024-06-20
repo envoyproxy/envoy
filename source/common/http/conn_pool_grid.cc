@@ -44,7 +44,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
 }
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
-    WrapperCallbacks& parent, ConnectionPool::Instance* pool)
+    WrapperCallbacks& parent, ConnectionPool::Instance& pool)
     : parent_(parent), pool_(pool) {}
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttemptCallbacks() {
@@ -116,8 +116,8 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
 }
 
 ConnectivityGrid::StreamCreationResult
-ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance* pool) {
-  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(*pool),
+ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance& pool) {
+  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(pool),
             grid_.origin_.hostname_);
   auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
@@ -209,7 +209,7 @@ ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   // callbacks.
   grid_.createNextPool(); // Make sure the HTTP/2 pool exists
   has_attempted_http2_ = true;
-  return newStream(grid_.http2_pool_.get());
+  return newStream(*grid_.http2_pool_);
 }
 
 ConnectivityGrid::ConnectivityGrid(
@@ -287,7 +287,7 @@ ConnectionPool::Instance* ConnectivityGrid::createNextPool() {
   }
 
   setupPool(*pools_.back());
-  return (pools_.back());
+  return pools_.back();
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
@@ -323,15 +323,15 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       delay_tcp_attempt = false;
     }
   } else {
-    // Before skipping to the next pool, make sure it has been created.
+    // Make sure the HTTP/2 pool is created.
     createNextPool();
     pool = http2_pool_.get();
   }
   auto wrapped_callback =
       std::make_unique<WrapperCallbacks>(*this, decoder, callbacks, overriding_options);
-  ConnectionPool::Cancellable* ret = wrapped_callback.get();
+  WrapperCallbacks* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
-  if (wrapped_callbacks_.front()->newStream(pool) == StreamCreationResult::ImmediateResult) {
+  if (ret->newStream(*pool) == StreamCreationResult::ImmediateResult) {
     // If newStream succeeds, return nullptr as the caller has received their
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object has also been deleted.
@@ -339,8 +339,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
-    absl::optional<StreamCreationResult> result =
-        wrapped_callbacks_.front()->tryAnotherConnection();
+    absl::optional<StreamCreationResult> result = ret->tryAnotherConnection();
     if (result.has_value() && result.value() == StreamCreationResult::ImmediateResult) {
       // As above, if we have an immediate success, return nullptr.
       return nullptr;
