@@ -745,6 +745,10 @@ void CacheFilter::finalizeEncodingCachedResponse() {
     // continue encoding.
     encoder_callbacks_->continueEncoding();
   }
+  // Filter can potentially be destroyed during continueEncoding.
+  if (filter_state_ == FilterState::Destroyed) {
+    return;
+  }
   setFilterState(FilterState::ResponseServedFromCache);
 }
 
