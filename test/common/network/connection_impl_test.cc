@@ -24,6 +24,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -32,7 +33,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/memory_test_utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
