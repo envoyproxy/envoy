@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/header_mutation.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/header_mutation/query_params_evaluator.h"
 
 #include "absl/strings/string_view.h"
 
@@ -32,9 +33,12 @@ public:
             HeaderMutations::create(config.request_mutations()), std::unique_ptr<HeaderMutations>)),
         response_mutations_(
             THROW_OR_RETURN_VALUE(HeaderMutations::create(config.response_mutations()),
-                                  std::unique_ptr<HeaderMutations>)) {}
+                                  std::unique_ptr<HeaderMutations>)),
+        query_params_evaluator_(
+            std::make_unique<QueryParamsEvaluator>(config.query_parameter_mutations())) {}
 
-  void mutateRequestHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
+  void mutateRequestHeaders(Http::RequestHeaderMap& headers,
+                            const Formatter::HttpFormatterContext& ctx,
                             const StreamInfo::StreamInfo& stream_info) const;
   void mutateResponseHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                              const StreamInfo::StreamInfo& stream_info) const;
@@ -42,6 +46,7 @@ public:
 private:
   const std::unique_ptr<HeaderMutations> request_mutations_;
   const std::unique_ptr<HeaderMutations> response_mutations_;
+  QueryParamsEvaluatorPtr query_params_evaluator_;
 };
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {

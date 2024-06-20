@@ -353,6 +353,10 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: http
+  change: |
+    Add query parameter capabilities to :ref:` Header Mutation Filter
+    <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>` for adding/removing query parameters on a request.
 
 deprecated:
 - area: tracing
