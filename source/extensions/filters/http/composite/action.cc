@@ -10,8 +10,7 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
 }
 
 float ExecuteFilterActionFactory::getSampleRatio(
-    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-    Envoy::Runtime::Loader& runtime) {
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action) {
   // In default case, if sample_percent is not populated, sample_ratio is 100%, i.e, all sampled.
   if (!composite_action.has_sample_percent()) {
     // 1, i.e, 100%,  means all sampled.
@@ -44,7 +43,12 @@ float ExecuteFilterActionFactory::getSampleRatio(
         sample_ratio, sample_percent.numerator(), denominator));
   }
 
-  const std::string runtime_key = composite_action.sample_percent().runtime_key();
+  return sample_ratio;
+}
+
+float ExecuteFilterActionFactory::getSampleRatioRuntime(float sample_ratio,
+                                                        const std::string& runtime_key,
+                                                        Envoy::Runtime::Loader& runtime) {
   if (!runtime_key.empty()) {
     // If sample_percent runtime_key is configured, it has to be a number between
     // [0, 100]. Using 101 to indicate this runtime_key is either not configured or invalid.
@@ -56,16 +60,14 @@ float ExecuteFilterActionFactory::getSampleRatio(
       sample_ratio = static_cast<float>(sample_percent_runtime) / 100;
     }
   }
-
   return sample_ratio;
 }
 
-bool ExecuteFilterActionFactory::isSampled(
-    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-    Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime) {
-  float sample_ratio = getSampleRatio(composite_action, runtime);
-  UnitFloat sample_ratio_uf = UnitFloat(sample_ratio);
-
+bool ExecuteFilterActionFactory::isSampled(float sample_ratio, const std::string& runtime_key,
+                                           Random::RandomGenerator& random,
+                                           Envoy::Runtime::Loader& runtime) {
+  float sample_ratio_runtime = getSampleRatioRuntime(sample_ratio, runtime_key, runtime);
+  UnitFloat sample_ratio_uf = UnitFloat(sample_ratio_runtime);
   // Perform dice roll. If negative, then skip the action.
   if (random.bernoulli(sample_ratio_uf)) {
     return true;
@@ -145,11 +147,12 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
   ASSERT(context.server_factory_context_ != absl::nullopt);
   Random::RandomGenerator& random = context.server_factory_context_->api().randomGenerator();
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+  const std::string runtime_key = composite_action.sample_percent().runtime_key();
+  const float sample_ratio = getSampleRatio(composite_action);
 
-  return [cb = std::move(callback), n = std::move(name),
-          composite_action = std::move(composite_action), &random, &runtime,
-          this]() -> Matcher::ActionPtr {
-    if (isSampled(composite_action, random, runtime)) {
+  return [cb = std::move(callback), n = std::move(name), sample_ratio,
+          runtime_key = std::move(runtime_key), &random, &runtime, this]() -> Matcher::ActionPtr {
+    if (isSampled(sample_ratio, runtime_key, random, runtime)) {
       return std::make_unique<ExecuteFilterAction>(cb, n);
     }
     return nullptr;

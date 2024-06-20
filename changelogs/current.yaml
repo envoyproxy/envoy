@@ -36,7 +36,7 @@ behavior_changes:
   change: |
     Adding support for
     :ref:`sample_percent <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.sample_percent>`.
-    It specifies the percentage of traffic the action filter will be executed. If not specified, it is 100%.
+    It specifies the probability of the action execution. If not specified, it is 100%.
 - area: golang
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and

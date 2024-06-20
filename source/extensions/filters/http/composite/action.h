@@ -45,13 +45,20 @@ public:
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 
+  // Get the sample ratio from the default_value configuration.
+  // This routine is called in the control plane.
   float getSampleRatio(
-      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-      Envoy::Runtime::Loader& runtime);
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action);
 
-  bool isSampled(
-      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-      Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
+  // The the sample ratio from the runtime_key configuration. If it is a valid config, using it
+  // to override the default_value config. This routine is called in the data plane.
+  float getSampleRatioRuntime(float sample_ratio, const std::string& runtime_key,
+                              Envoy::Runtime::Loader& runtime);
+
+  // Rolling the dice to decide whether the action will be sampled.
+  // This routine is called in the data plane.
+  bool isSampled(float sample_ratio, const std::string& runtime_key,
+                 Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
 
 private:
   Matcher::ActionFactoryCb createAtionFactoryCbCommon(
@@ -76,10 +83,12 @@ private:
 
     Random::RandomGenerator& random = server_factory_context.api().randomGenerator();
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
-    return [provider = std::move(provider), n = std::move(name),
-            composite_action = std::move(composite_action), &random, &runtime,
-            this]() -> Matcher::ActionPtr {
-      if (!isSampled(composite_action, random, runtime)) {
+    const std::string runtime_key = composite_action.sample_percent().runtime_key();
+    const float sample_ratio = getSampleRatio(composite_action);
+
+    return [provider = std::move(provider), n = std::move(name), sample_ratio,
+            runtime_key = std::move(runtime_key), &random, &runtime, this]() -> Matcher::ActionPtr {
+      if (!isSampled(sample_ratio, runtime_key, random, runtime)) {
         return nullptr;
       }
 

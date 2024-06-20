@@ -59,14 +59,12 @@ message ExecuteFilterAction {
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
-  // Percentage of traffic the action filter will be executed. If not specified, this is 100%.
-  // This is to support sampling behavior for certain filters like ext_proc, access_logging ...
+  // Probability of the action execution. If not specified, this is 100%.
+  // This allows sampling behavior for the configured actions.
   // For example, if
   // :ref:`default_value <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.default_value>`
   // under the ``sample_percent`` is configured with 30%, a dice roll with that
-  // probability is done. The underline action filter will only be executed if the
-  // dice roll returns positive. Otherwise, the action filter is skipped.
-  // BTW, this ``default_value`` can be overridden by a runtime_key:
-  // :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>`
+  // probability is done. The underline action will only be executed if the
+  // dice roll returns positive. Otherwise, the action is skipped.
   config.core.v3.RuntimeFractionalPercent sample_percent = 3;
 }

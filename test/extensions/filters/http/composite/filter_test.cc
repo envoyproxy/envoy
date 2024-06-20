@@ -534,8 +534,7 @@ TEST(ConfigTest, TestSamplePercentConfigBadDenominator) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.getSampleRatio(config, server_factory_context.runtime()),
-                            EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.getSampleRatio(config), EnvoyException,
                             "ExecuteFilterAction sample_percent config denominator setting is "
                             "invalid : 5. Valid range 0~2.");
 }
@@ -560,7 +559,7 @@ TEST(ConfigTest, TestSamplePercentConfigBadNumerator) {
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.getSampleRatio(config, server_factory_context.runtime()), EnvoyException,
+      factory.getSampleRatio(config), EnvoyException,
       "ExecuteFilterAction sample_percent config is invalid. sample_ratio=2(Numerator 20000 / "
       "Denominator 10000). The valid range is 0~1.");
 }
@@ -584,7 +583,7 @@ TEST(ConfigTest, TestSamplePercentConfigMillion) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.02), factory.getSampleRatio(config, server_factory_context.runtime()));
+  EXPECT_EQ(float(0.02), factory.getSampleRatio(config));
 }
 
 // Config test to check TEN_THOUSAND
@@ -606,7 +605,7 @@ TEST(ConfigTest, TestSamplePercentConfigTenThousand) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.3), factory.getSampleRatio(config, server_factory_context.runtime()));
+  EXPECT_EQ(float(0.3), factory.getSampleRatio(config));
 }
 
 // Config test to check normal runtime_key override case
@@ -631,7 +630,10 @@ TEST(ConfigTest, TestRuntimeConfigOverrideNormal) {
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
   EXPECT_CALL(runtime.snapshot_, getInteger(_, _)).WillRepeatedly(testing::Return(70));
-  EXPECT_EQ(float(0.7), factory.getSampleRatio(config, runtime));
+  float sample_ratio = factory.getSampleRatio(config);
+  EXPECT_EQ(float(0.3), sample_ratio);
+  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
+  EXPECT_EQ(float(0.7), sample_ratio_runtime);
 }
 
 // Config test to check no sample_percent config
@@ -646,11 +648,12 @@ TEST(ConfigTest, TestNoRuntimeConfigOverride) {
   )EOF";
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
+  EXPECT_FALSE(config.has_sample_percent());
+  EXPECT_TRUE(config.sample_percent().runtime_key().empty());
   ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(1), factory.getSampleRatio(config, runtime));
+  EXPECT_EQ(float(1), factory.getSampleRatio(config));
 }
 
 // Config test to check no default_value config but with runtime_key override case
@@ -672,7 +675,10 @@ TEST(ConfigTest, TestRuntimeConfigOverrideNoDefaultValue) {
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
   EXPECT_CALL(runtime.snapshot_, getInteger(_, _)).WillRepeatedly(testing::Return(10));
-  EXPECT_EQ(float(0.1), factory.getSampleRatio(config, runtime));
+  float sample_ratio = factory.getSampleRatio(config);
+  EXPECT_EQ(float(0), sample_ratio);
+  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
+  EXPECT_EQ(float(0.1), sample_ratio_runtime);
 }
 
 // Config test to check invalid runtime_key number case
@@ -697,11 +703,14 @@ TEST(ConfigTest, TestRuntimeConfigOverrideInvalid) {
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
   EXPECT_CALL(runtime.snapshot_, getInteger(_, _)).WillRepeatedly(testing::Return(120));
-  EXPECT_EQ(float(0.3), factory.getSampleRatio(config, runtime));
+  float sample_ratio = factory.getSampleRatio(config);
+  EXPECT_EQ(float(0.3), sample_ratio);
+  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
+  EXPECT_EQ(float(0.3), sample_ratio_runtime);
 }
 
 // Config test to check runtime_key is empty
-TEST(ConfigTest, TestRuntimeConfigOverrideEmptry) {
+TEST(ConfigTest, TestRuntimeConfigOverrideEmpty) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: set-response-code
@@ -721,7 +730,10 @@ TEST(ConfigTest, TestRuntimeConfigOverrideEmptry) {
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.8), factory.getSampleRatio(config, runtime));
+  float sample_ratio = factory.getSampleRatio(config);
+  EXPECT_EQ(float(0.8), sample_ratio);
+  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
+  EXPECT_EQ(float(0.8), sample_ratio_runtime);
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
