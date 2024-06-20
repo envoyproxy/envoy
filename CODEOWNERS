@@ -50,13 +50,13 @@ extensions/filters/common/original_src @klarose @mattklein123
 # common transport socket
 /*/extensions/transport_sockets/common @alyssawilk @wez470
 # starttls transport socket
-/*/extensions/transport_sockets/starttls @cpakulski @botengyao @UNOWNED
+/*/extensions/transport_sockets/starttls @cpakulski @botengyao @ggreenway
 # proxy transport socket
 /*extensions/transport_sockets/http_11_proxy @alyssawilk @ryantheoptimist
 # internal upstream transport socket
 /*/extensions/transport_sockets/internal_upstream @kyessenov @alyssawilk
 # sni_cluster extension
-/*/extensions/filters/network/sni_cluster @rshriram @UNOWNED
+/*/extensions/filters/network/sni_cluster @rshriram @ggreenway
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
 # tracers.datadog extension
@@ -379,7 +379,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 
 # Contrib
 /contrib/exe/ @mattklein123 @alyssawilk
-/contrib/client_ssl_auth/ @UNOWNED @UNOWNED
+/contrib/client_ssl_auth/ @ggreenway @UNOWNED
 /contrib/checksum/ @ravenblackx @phlax
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
