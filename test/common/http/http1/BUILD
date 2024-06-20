@@ -30,7 +30,7 @@ envoy_cc_test(
         "//source/common/http/http1:codec_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//test/common/memory:memory_test_utility_lib",
-        "//test/common/stats:stats_test_utility_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/init:init_mocks",
