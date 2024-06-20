@@ -42,7 +42,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "memory_test_utility.h",
+    name = "memory_test_utility_lib",
     srcs = ["memory_test_utility.cc"],
     hdrs = ["memory_test_utility.h"],
 )
