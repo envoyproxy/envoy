@@ -66,11 +66,26 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     break;
   }
 
+  double hits_addend = 0;
+  const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = request_metadata.find("envoy.ratelimit");
+  if (filter_it != request_metadata.end()) {
+    const auto field_it = filter_it->second.fields().find("hits_addend");
+    if (field_it != filter_it->second.fields().end()) {
+      if (!field_it->second.has_number_value()) {
+        IS_ENVOY_BUG("Expected number value for envoy.ratelimit:hits_addend.")
+      } else if (field_it->second.number_value() < 0) {
+       IS_ENVOY_BUG(fmt::format("Expected value > 0, got %f", field_it->second.number_value()));
+      }
+      hits_addend = field_it->second.number_value();
+    }
+  }
+
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
-                   callbacks_->streamInfo(), 0);
+                   callbacks_->streamInfo(), hits_addend);
     initiating_call_ = false;
   }
 }

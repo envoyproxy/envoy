@@ -356,6 +356,10 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: ratelimit
+  change: |
+    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
+    by setting dynamic metadata with namespace ``envoy.ratelimit`` and metadata key ``hits_addend`` to the desired value.
 
 deprecated:
 - area: tracing
