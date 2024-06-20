@@ -168,6 +168,7 @@ envoy_cc_test(
     srcs = ["protocol_constraints_test.cc"],
     deps = [
         "//source/common/http/http2:protocol_constraints_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],

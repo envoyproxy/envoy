@@ -32,6 +32,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/memory_test_utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -2455,7 +2456,7 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   connection_socket->setRequestedServerName("envoyproxy.io");
 
   // Start measuring memory and dump state.
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   connection_socket->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 
@@ -2490,7 +2491,7 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
       std::move(mocks.transport_socket_), stream_info_);
 
   // Start measuring memory and dump state.
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   server_connection->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 

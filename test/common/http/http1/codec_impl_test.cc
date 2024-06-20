@@ -17,7 +17,8 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
+#include "test/common/stats/stats_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -2480,9 +2481,9 @@ TEST_P(Http1ServerConnectionImplTest,
   EXPECT_TRUE(status.ok());
 
   // Dumps the header map without allocating memory
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
 
   // Check dump contents for completed headers and partial headers.
   EXPECT_THAT(
@@ -2520,9 +2521,9 @@ TEST_P(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_CALL(decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
-        Stats::TestUtil::MemoryTest memory_test;
+        Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-        EXPECT_EQ(memory_test.consumedBytes(), 0);
+        EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
       }))
       .WillOnce(Invoke([]() {}));
 
@@ -3874,9 +3875,9 @@ TEST_P(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_CALL(response_decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
-        Stats::TestUtil::MemoryTest memory_test;
+        Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-        EXPECT_EQ(memory_test.consumedBytes(), 0);
+        EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
       }))
       .WillOnce(Invoke([]() {}));
 
@@ -3917,9 +3918,9 @@ TEST_P(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
 
   EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce(InvokeWithoutArgs([&]() {
     // dumpState here before buffers are drained. No memory should be allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 1);
-    EXPECT_EQ(memory_test.consumedBytes(), 0);
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   }));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");

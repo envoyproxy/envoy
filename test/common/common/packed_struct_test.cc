@@ -2,7 +2,7 @@
 
 #include "source/common/common/packed_struct.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,7 +28,7 @@ TEST_F(PackedStructTest, StringStruct) {
   enum class RedirectStringElement { SchemeRedirect, HostRedirect, PathRedirect };
   using RedirectStringsPackedStruct = PackedStruct<std::string, 3, RedirectStringElement>;
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   // Initialize capacity to 2.
   RedirectStringsPackedStruct redirect_strings(2);
   redirect_strings.set<RedirectStringElement::SchemeRedirect>("abc");
@@ -59,7 +59,7 @@ TEST_F(PackedStructTest, StringStructMove) {
   enum class RedirectStringElement { SchemeRedirect, HostRedirect, PathRedirect };
   using RedirectStringsPackedStruct = PackedStruct<std::string, 3, RedirectStringElement>;
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   // Initialize capacity to 2.
   RedirectStringsPackedStruct redirect_strings(2);
   redirect_strings.set<RedirectStringElement::SchemeRedirect>("abc");

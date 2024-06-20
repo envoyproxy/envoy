@@ -3,9 +3,9 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/memory/stats.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/memory/test_utility.h"
 #include "test/test_common/global.h"
 
 #include "absl/strings/str_join.h"
@@ -56,54 +56,6 @@ public:
  */
 void forEachSampleStat(int num_clusters, bool include_other_stats,
                        std::function<void(absl::string_view)> fn);
-
-// Tracks memory consumption over a span of time. Test classes instantiate a
-// MemoryTest object to start measuring heap memory, and call consumedBytes() to
-// determine how many bytes have been consumed since the class was instantiated.
-//
-// That value should then be passed to EXPECT_MEMORY_EQ and EXPECT_MEMORY_LE,
-// defined below, as the interpretation of this value can differ based on
-// platform and compilation mode.
-class MemoryTest {
-public:
-  // There are 3 cases:
-  //   1. Memory usage API is available, and is built using with a canonical
-  //      toolchain, enabling exact comparisons against an expected number of
-  //      bytes consumed. The canonical environment is Envoy CI release builds.
-  //   2. Memory usage API is available, but the current build may subtly differ
-  //      in memory consumption from #1. We'd still like to track memory usage
-  //      but it needs to be approximate.
-  //   3. Memory usage API is not available. In this case, the code is executed
-  //      but no testing occurs.
-  enum class Mode {
-    Disabled,    // No memory usage data available on platform.
-    Canonical,   // Memory usage is available, and current platform is canonical.
-    Approximate, // Memory usage is available, but variances form canonical expected.
-  };
-
-  MemoryTest() : memory_at_construction_(Memory::Stats::totalCurrentlyAllocated()) {}
-
-  /**
-   * @return the memory execution testability mode for the current compiler, architecture,
-   *         and compile flags.
-   */
-  static Mode mode();
-
-  size_t consumedBytes() const {
-    // Note that this subtraction of two unsigned numbers will yield a very
-    // large number if memory has actually shrunk since construction. In that
-    // case, the EXPECT_MEMORY_EQ and EXPECT_MEMORY_LE macros will both report
-    // failures, as desired, though the failure log may look confusing.
-    //
-    // Note also that tools like ubsan may report this as an unsigned integer
-    // underflow, if run with -fsanitize=unsigned-integer-overflow, though
-    // strictly speaking this is legal and well-defined for unsigned integers.
-    return Memory::Stats::totalCurrentlyAllocated() - memory_at_construction_;
-  }
-
-private:
-  const size_t memory_at_construction_;
-};
 
 class SymbolTableProvider {
 public:

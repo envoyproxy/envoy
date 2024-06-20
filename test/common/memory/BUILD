@@ -40,3 +40,9 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "memory_test_utility.h",
+    srcs = ["memory_test_utility.cc"],
+    hdrs = ["memory_test_utility.h"],
+)
