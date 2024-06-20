@@ -5,7 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/stats/isolated_store_impl.h"
 
-#include "test/common/memory/test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/global.h"
 
 #include "absl/strings/str_join.h"
@@ -160,41 +160,6 @@ private:
   TestStore& store_;
   const std::string prefix_str_;
 };
-
-// Compares the memory consumed against an exact expected value, but only on
-// canonical platforms, or when the expected value is zero. Canonical platforms
-// currently include only for 'release' tests in ci. On other platforms an info
-// log is emitted, indicating that the test is being skipped.
-#define EXPECT_MEMORY_EQ(consumed_bytes, expected_value)                                           \
-  do {                                                                                             \
-    if (expected_value == 0 ||                                                                     \
-        Stats::TestUtil::MemoryTest::mode() == Stats::TestUtil::MemoryTest::Mode::Canonical) {     \
-      EXPECT_EQ(consumed_bytes, expected_value);                                                   \
-    } else {                                                                                       \
-      ENVOY_LOG_MISC(info,                                                                         \
-                     "Skipping exact memory test of actual={} versus expected={} "                 \
-                     "bytes as platform is non-canonical",                                         \
-                     consumed_bytes, expected_value);                                              \
-    }                                                                                              \
-  } while (false)
-
-// Compares the memory consumed against an expected upper bound, but only
-// on platforms where memory consumption can be measured via API. This is
-// currently enabled only for builds with TCMALLOC. On other platforms, an info
-// log is emitted, indicating that the test is being skipped.
-#define EXPECT_MEMORY_LE(consumed_bytes, upper_bound)                                              \
-  do {                                                                                             \
-    if (Stats::TestUtil::MemoryTest::mode() != Stats::TestUtil::MemoryTest::Mode::Disabled) {      \
-      EXPECT_LE(consumed_bytes, upper_bound);                                                      \
-      if (upper_bound != 0) {                                                                      \
-        EXPECT_GT(consumed_bytes, 0);                                                              \
-      }                                                                                            \
-    } else {                                                                                       \
-      ENVOY_LOG_MISC(                                                                              \
-          info, "Skipping upper-bound memory test against {} bytes as platform lacks tcmalloc",    \
-          upper_bound);                                                                            \
-    }                                                                                              \
-  } while (false)
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to
 // the same number. The serialized number is also returned, which can be
