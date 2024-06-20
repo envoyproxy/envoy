@@ -156,9 +156,9 @@ struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
                                    const ExtProcFilterStats& stat)
       : stream_(std::move(stream)), parent(stream_manager), stats(stat) {}
 
-  void deferredClose(Envoy::Event::Dispatcher& dispatcher, Filter* filter);
+  void deferredClose(Envoy::Event::Dispatcher& dispatcher, uint64_t stream_id);
 
-  void closeStreamOnTimer(Filter* filter);
+  void closeStreamOnTimer(uint64_t stream_id);
   ExternalProcessorStreamPtr stream_;
   ThreadLocalStreamManager& parent;
   ExtProcFilterStats stats;
@@ -171,27 +171,27 @@ class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
-  ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream,
+  ExternalProcessorStream* store(uint64_t stream_id, ExternalProcessorStreamPtr stream,
                                  const ExtProcFilterStats& stat) {
-    stream_manager_[filter] =
+    stream_manager_[stream_id] =
         std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat);
-    return stream_manager_[filter]->stream_.get();
+    return stream_manager_[stream_id]->stream_.get();
   }
 
-  void erase(Filter* filter) { stream_manager_.erase(filter); }
+  void erase(uint64_t stream_id) { stream_manager_.erase(stream_id); }
 
-  void deferredErase(Filter* filter, Envoy::Event::Dispatcher& dispatcher) {
-    auto it = stream_manager_.find(filter);
+  void deferredErase(uint64_t stream_id, Envoy::Event::Dispatcher& dispatcher) {
+    auto it = stream_manager_.find(stream_id);
     if (it == stream_manager_.end()) {
       return;
     }
 
-    it->second->deferredClose(dispatcher, filter);
+    it->second->deferredClose(dispatcher, stream_id);
   }
 
 private:
-  // Map of DeferredDeletableStreamPtrs with filter pointer as key.
-  absl::flat_hash_map<Filter*, DeferredDeletableStreamPtr> stream_manager_;
+  // Map of DeferredDeletableStreamPtrs with stream id as key.
+  absl::flat_hash_map<uint64_t, DeferredDeletableStreamPtr> stream_manager_;
 };
 
 class FilterConfig {
