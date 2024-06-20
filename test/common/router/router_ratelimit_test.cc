@@ -82,14 +82,13 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::config::route::v3::RouteConfiguration route_config;
     TestUtility::loadFromYaml(yaml, route_config);
-    config_ =
-        std::make_unique<ConfigImpl>(route_config, factory_context_, any_validation_visitor_, true);
+    config_ = *ConfigImpl::create(route_config, factory_context_, any_validation_visitor_, true);
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   ProtobufMessage::NullValidationVisitorImpl any_validation_visitor_;
-  std::unique_ptr<ConfigImpl> config_;
+  std::shared_ptr<ConfigImpl> config_;
   Http::TestRequestHeaderMapImpl header_;
   Network::Address::InstanceConstSharedPtr default_remote_address_{
       new Network::Address::Ipv4Instance("10.0.0.1")};
