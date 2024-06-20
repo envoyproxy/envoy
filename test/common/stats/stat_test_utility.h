@@ -5,7 +5,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/stats/isolated_store_impl.h"
 
-#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/global.h"
 
 #include "absl/strings/str_join.h"
