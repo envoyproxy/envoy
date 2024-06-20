@@ -4807,28 +4807,20 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
 }
 
 TEST(SubstitutionFormatterTest, AccessLogIdFormatterTest) {
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
   auto providers1 = SubstitutionFormatParser::parse("%ACCESS_LOG_ID%");
 
   ASSERT_EQ(providers1.size(), 1);
-  auto id1 = providers1[0]->format(request_headers, response_headers, response_trailers,
-                                   stream_info, body, AccessLog::AccessLogType::NotSet);
+  auto id1 = providers1[0]->formatWithContext({}, stream_info);
   ASSERT_TRUE(id1.has_value());
 
   // Invoke parser again to check if the values generated will be unique
   auto providers2 = SubstitutionFormatParser::parse("%ACCESS_LOG_ID%");
 
   ASSERT_EQ(providers2.size(), 1);
-  auto id2 = providers2[0]->format(request_headers, response_headers, response_trailers,
-                                   stream_info, body, AccessLog::AccessLogType::NotSet);
+  auto id2 = providers2[0]->formatWithContext({}, stream_info);
   ASSERT_TRUE(id2.has_value());
+
   EXPECT_NE(id1, id2);
 }
 } // namespace
