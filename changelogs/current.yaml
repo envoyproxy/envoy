@@ -356,6 +356,19 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: ext_authz
+  change: |
+    The http ext_authz extension now emits filter state containing various metrics (check request
+    latency, bytes sent / received, upstream host, cluster info) for access logging. This filter
+    state's key is the ext_authz filter's configured name. Every field except latency is only
+    populated when using an Envoy GRPC client. The new config field
+    :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_metadata>`
+    allows for injecting arbitrary data to the filter state for logging.
+- area: rbac
+  change: |
+    The RBAC filter will now log the enforced rule to the dynamic metadata field
+    "enforced_effective_policy_id" and the result to the dynamic metadata field
+    "enforced_engine_result". These are only populated if a non-shadow engine exists.
 
 deprecated:
 - area: tracing
