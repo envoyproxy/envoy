@@ -283,7 +283,7 @@ message ExtAuthz {
   // Enable / disable ingestion of dynamic metadata from ext_authz service.
   //
   // If false, the filter will ignore the
-  // :ref:`dynamic_metadata field<envoy_v3_api_msg_service.auth.v3.CheckResponse.dynamic_metadata>`.
+  // :ref:`dynamic_metadata field<envoy_v3_api_msg_service.auth.v3.OkHttpResponse.dynamic_metadata>`.
   // If the field is non-empty, the filter will log, increment the ``ignored_dynamic_metadata``
   // stat, then continue handling the response.
   //
