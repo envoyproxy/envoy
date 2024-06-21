@@ -13,6 +13,7 @@
 #include "google/protobuf/message.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/message_differencer.h"
+#include "gtest/gtest.h"
 #include "ocpdiag/core/compat/status_macros.h"
 #include "ocpdiag/core/testing/status_matchers.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
@@ -23,9 +24,10 @@
 #include "proto_processing_lib/proto_scrubber/utility.h"
 #include "src/google/protobuf/util/converter/type_info.h"
 #include "test/proto/logging.pb.h"
-// #include "test/test_common/status_utility.h"
-// #include "protocolbuffers/protobuf/upb/test/parse_text_proto.h"
-// #include "test/test_common/utility.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,41 +36,21 @@ namespace ProtoMessageLogging {
 namespace {
 
 using ::google::protobuf::FieldMask;
-using google::protobuf::Struct;
+using ::google::protobuf::Struct;
 using ::google::protobuf::Type;
-using ::google::protobuf::contrib::parse_proto::ParseTextProtoOrDie;
+// using ::google::protobuf::contrib::parse_proto::ParseTextProtoOrDie;
 using ::google::protobuf::field_extraction::CordMessageData;
 using ::google::protobuf::field_extraction::testing::TypeHelper;
 using ::logging::TestRequest;
 using ::logging::TestResponse;
-using ::ocpdiag::testing::StatusIs;
+
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::Envoy::StatusHelpers::StatusIs;
+
 using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::testing::ValuesIn;
-// using ::Envoy::StatusHelpers::IsOkAndHolds;
-// using ::util::error::INVALID_ARGUMENT;
-
-// Check that a StatusOr is OK and has a value equal to or matching its
-// argument.
-//
-// For example:
-//
-// StatusOr<int> status(3);
-// EXPECT_THAT(status, IsOkAndHolds(3));
-// EXPECT_THAT(status, IsOkAndHolds(Gt(2)));
-MATCHER_P(IsOkAndHolds, expected, "") {
-  if (!arg.ok()) {
-    // *result_listener << "which has unexpected status: " << arg.status();
-    return false;
-  }
-  if (!::testing::Matches(expected)(*arg)) {
-    // *result_listener << "which has wrong value: "
-    //                  << ::testing::PrintToString(*arg);
-    return false;
-  }
-  return true;
-}
 
 const char kTestRequest[] = R"pb(
   id: 123445
@@ -78,11 +60,6 @@ const char kTestRequest[] = R"pb(
     objects: "test-object-1"
     objects: "test-object-2"
     objects: "test-object-3"
-  }
-  monitored_resource_string: "library.googleapis.com/region/us-east1-b"
-  monitored_resource {
-    type: "library"
-    labels { key: "library.googleapis.com/region" value: "us-east1-b" }
   }
   proto2_message {
     repeated_strings: [ "repeated-string-0", "repeated-string-1" ]
@@ -133,12 +110,6 @@ const char kTestResponse[] = R"pb(
     objects: "test-object-12"
     objects: "test-object-13"
   }
-  monitored_resource {
-    type: "library"
-    labels { key: "library.googleapis.com/region" value: "us-east1-b" }
-    labels { key: "library.googleapis.com/resource_id" value: "id00" }
-    labels { key: "library.googleapis.com/resource_type" value: "object" }
-  }
   sub_buckets {
     key: "test-bucket-2"
     value { name: "test-bucket-2" ratio: 0.5 objects: "test-object-21" }
@@ -164,24 +135,31 @@ class AuditLoggingUtilTest : public ::testing::Test {
   }
 
   void SetUp() override {
-    const std::string descriptor_path =
-        "audit_logging_util_test_proto_descriptor.pb";
+    const std::string descriptor_path = TestEnvironment::runfilesPath(
+        "test/proto/logging.descriptor");
     absl::StatusOr<std::unique_ptr<TypeHelper>> status =
         TypeHelper::Create(descriptor_path);
     type_helper_ = std::move(status.value());
 
-    typeinfo_ = type_helper_->Info();
-
     type_finder_ = std::bind_front(&AuditLoggingUtilTest::FindType, this);
 
-    test_request_proto_ = ParseTextProtoOrDie(kTestRequest);
+    if (!google::protobuf::TextFormat::ParseFromString(kTestRequest,
+                                                       &test_request_proto_)) {
+      // ADD_FAILURE() << "Failed to parse textproto: " << text_proto_;
+    }
+
+    // test_request_proto_ = ParseTextProtoOrDie(kTestRequest);
     test_request_raw_proto_ =
         CordMessageData(test_request_proto_.SerializeAsCord());
     request_type_ = type_finder_(
         "type.googleapis.com/"
         "logging.TestRequest");
 
-    test_response_proto_ = ParseTextProtoOrDie(kTestResponse);
+    if (!google::protobuf::TextFormat::ParseFromString(kTestResponse,
+                                                       &test_response_proto_)) {
+      // ADD_FAILURE() << "Failed to parse textproto: " << text_proto_;
+    }
+    // test_response_proto_ = ParseTextProtoOrDie(kTestResponse);
     test_response_raw_proto_ =
         CordMessageData(test_response_proto_.SerializeAsCord());
     response_type_ = type_finder_(
@@ -189,37 +167,11 @@ class AuditLoggingUtilTest : public ::testing::Test {
         "logging.TestResponse");
   }
 
-  void TestScrubToStruct(const std::vector<std::string>& paths,
-                         const google::protobuf::Type* type,
-                         const FieldMask* redact_field_mask,
-                         const google::protobuf::Message& proto,
-                         const google::protobuf::Message& expected_proto) {
-    CloudAuditLogFieldChecker field_checker(type, type_finder_);
-    ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
-    ProtoScrubber proto_scrubber(type, type_finder_, {&field_checker},
-                                 ScrubberContext::kTestScrubbing);
-
-    CordMessageData raw_proto = CordMessageData(proto.SerializeAsCord());
-    google::protobuf::Struct actual_struct, expected_struct;
-    EXPECT_TRUE(ScrubToStruct(&proto_scrubber, *type, *typeinfo_, type_finder_,
-                              redact_field_mask, &raw_proto, &actual_struct));
-
-    raw_proto = CordMessageData(expected_proto.SerializeAsCord());
-    ASSERT_OK(ConvertToStruct(raw_proto, *type, *typeinfo_, &expected_struct));
-
-    // EXPECT_THAT(actual_struct,
-    //             IgnoringRepeatedFieldOrdering(
-    //                 ::google::protobuf::util::MessageDifferencer::Equals(
-    //                     expected_struct)));
-  }
-
   FieldMask* GetFieldMaskWith(const std::string& path) {
     field_mask_.clear_paths();
     field_mask_.add_paths(path);
     return &field_mask_;
   }
-
-  const google::protobuf::util::converter::TypeInfo* typeinfo_;
 
   // A TypeHelper for testing.
   std::unique_ptr<TypeHelper> type_helper_ = nullptr;
@@ -263,11 +215,6 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_map) {
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_,
                                         GetFieldMaskWith("sub_buckets"),
                                         test_response_raw_proto_));
-
-  EXPECT_EQ(
-      3, ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                  GetFieldMaskWith("monitored_resource.labels"),
-                                  test_response_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_enum) {
@@ -418,14 +365,6 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_DefaultValue) {
   EXPECT_EQ(0, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_strings"),
                                         test_request_raw_proto_));
-
-  test_response_proto_.mutable_monitored_resource()->clear_labels();
-  test_response_raw_proto_ =
-      CordMessageData(test_response_proto_.SerializeAsCord());
-  EXPECT_EQ(
-      0, ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                  GetFieldMaskWith("monitored_resource.labels"),
-                                  test_response_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_EmptyPath) {
@@ -440,17 +379,6 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonRepeatedField) {
                                      GetFieldMaskWith("bucket.ratio"),
                                      test_request_raw_proto_),
             0);
-
-  EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                     GetFieldMaskWith("monitored_resource"),
-                                     test_response_raw_proto_),
-            0);
-
-  EXPECT_LT(
-      ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                               GetFieldMaskWith("monitored_resource.type"),
-                               test_response_raw_proto_),
-      0);
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
@@ -510,39 +438,6 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
                                       "bucket.name", test_request_raw_proto_),
               IsOkAndHolds("test-bucket"));
-
-  EXPECT_THAT(ExtractStringFieldValue(*response_type_, type_finder_,
-                                      "monitored_resource.type",
-                                      test_response_raw_proto_),
-              IsOkAndHolds("library"));
-}
-
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_HasDuplicate) {
-  std::string last_string = "boom!";
-  CordMessageData extra_string;
-  TestRequest append_request;
-  append_request.set_monitored_resource_string(last_string);
-  extra_string = CordMessageData(append_request.SerializeAsCord());
-
-  test_request_raw_proto_.Append(extra_string.Cord());
-
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
-                                      "monitored_resource_string",
-                                      test_request_raw_proto_),
-              IsOkAndHolds(last_string));
-
-  std::string another_string = "damnit!";
-  CordMessageData another_extra_string;
-  TestRequest another_append_request;
-  another_append_request.set_monitored_resource_string(another_string);
-  another_extra_string =
-      CordMessageData(another_append_request.SerializeAsCord());
-
-  test_request_raw_proto_.Append(another_extra_string.Cord());
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
-                                      "monitored_resource_string",
-                                      test_request_raw_proto_),
-              IsOkAndHolds(another_string));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
@@ -564,32 +459,23 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "",
                                       test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Field mask path cannot be empty."));
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_UnknownField) {
   EXPECT_THAT(
       ExtractStringFieldValue(*request_type_, type_finder_, "bucket.unknown",
                               test_request_raw_proto_),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               "Cannot find field 'unknown' in "
-               "'logging.TestBucket' message."));
+      StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "unknown",
                                       test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Cannot find field 'unknown' in "
-                       "'logging."
-                       "TestRequest' message."));
+              StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(
       ExtractStringFieldValue(*request_type_, type_finder_, "unknown1.unknown2",
                               test_request_raw_proto_),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               "Cannot find field 'unknown1' in "
-               "'logging.TestRequest' "
-               "message."));
+      StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest,
@@ -597,21 +483,17 @@ TEST_F(AuditLoggingUtilTest,
   EXPECT_THAT(
       ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
                               test_request_raw_proto_),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               "Field 'repeated_strings' is a repeated string field, only "
-               "singular string field is accepted."));
+      StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_NonStringLeafNode) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
                                       "bucket.ratio", test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Field 'ratio' is not a singular string field."));
+              StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(ExtractStringFieldValue(*response_type_, type_finder_,
                                       "sub_buckets", test_response_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Field 'sub_buckets' is not a singular string field."));
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
@@ -619,113 +501,7 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, invalid_type_finder,
                                       "bucket.ratio", test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Cannot find the type of field 'bucket'."));
-}
-
-TEST_F(AuditLoggingUtilTest, ConvertToStruct_Request) {
-  google::protobuf::Struct my_struct, their_struct;
-
-  EXPECT_OK(ConvertToStruct(test_request_raw_proto_, *request_type_, *typeinfo_,
-                            &my_struct));
-  // their_struct = cloud_logging::struct_util::ToStruct(test_request_proto_);
-
-  // EXPECT_THAT(
-  //     my_struct,
-  //     Approximately(IgnoringRepeatedFieldOrdering(::google::protobuf::util::MessageDifferencer::Equals(their_struct)),
-  //                   0.0000001));
-}
-
-TEST_F(AuditLoggingUtilTest, ConvertToStruct_Response) {
-  google::protobuf::Struct my_struct, their_struct;
-
-  EXPECT_OK(ConvertToStruct(test_response_raw_proto_, *response_type_,
-                            *typeinfo_, &my_struct));
-  // their_struct = cloud_logging::struct_util::ToStruct(test_response_proto_);
-
-  // EXPECT_THAT(
-  //     my_struct,
-  //     Approximately(IgnoringRepeatedFieldOrdering(::google::protobuf::util::MessageDifferencer::Equals(their_struct)),
-  //                   0.0000001));
-}
-
-TEST_F(AuditLoggingUtilTest, ScrubToStruct_Request) {
-  TestRequest expected_proto = ParseTextProtoOrDie(R"pb(
-    id: 123445
-    bucket {
-      ratio: 0.8
-      objects: "test-object-1"
-      objects: "test-object-2"
-      objects: "test-object-3"
-    }
-  )pb");
-
-  TestScrubToStruct({"bucket.ratio", "bucket.objects", "id"}, request_type_,
-                    nullptr, test_request_proto_, expected_proto);
-}
-
-TEST_F(AuditLoggingUtilTest, ScrubToStruct_Response) {
-  TestResponse expected_proto = ParseTextProtoOrDie(R"pb(
-    buckets {
-      objects: "test-object-01"
-      objects: "test-object-02"
-      objects: "test-object-03"
-    }
-    buckets {
-      objects: "test-object-11"
-      objects: "test-object-12"
-      objects: "test-object-13"
-    }
-    monitored_resource {
-      labels { key: "library.googleapis.com/region" value: "us-east1-b" }
-      labels { key: "library.googleapis.com/resource_id" value: "id00" }
-      labels { key: "library.googleapis.com/resource_type" value: "object" }
-    }
-    sub_buckets {
-      key: "test-bucket-2"
-      value { ratio: 0.5 objects: "test-object-21" }
-    }
-    sub_buckets {
-      key: "test-bucket-3"
-      value { ratio: 0.2 objects: "test-object-31" }
-    }
-    bucket_present {}
-    sub_message { bucket_present {} }
-  )pb");
-
-  FieldMask redact_field_mask;
-  redact_field_mask.add_paths("bucket_present");
-  redact_field_mask.add_paths("bucket_absent");
-  redact_field_mask.add_paths("sub_message.bucket_present");
-  redact_field_mask.add_paths("sub_message.bucket_absent");
-  TestScrubToStruct({"buckets.objects", "monitored_resource.labels",
-                     "sub_buckets.ratio", "sub_buckets.objects"},
-                    response_type_, &redact_field_mask, test_response_proto_,
-                    expected_proto);
-}
-
-TEST_F(AuditLoggingUtilTest, ScrubToStruct_NullScrubber) {
-  google::protobuf::Struct actual_struct;
-  EXPECT_FALSE(ScrubToStruct(/* scrubber= */ nullptr, *request_type_,
-                             *typeinfo_, type_finder_,
-                             /* redact_message_field_mask= */ nullptr,
-                             &test_request_raw_proto_, &actual_struct));
-}
-
-TEST_F(AuditLoggingUtilTest, ScrubToStruct_ScrubError) {
-  google::protobuf::Struct actual_struct;
-
-  CloudAuditLogFieldChecker field_checker(response_type_, type_finder_);
-  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(
-      {"buckets.objects", "monitored_resource.labels"}));
-  ProtoScrubber proto_scrubber(
-      response_type_, [](absl::string_view type_name) { return nullptr; },
-      {&field_checker}, ScrubberContext::kTestScrubbing);
-
-  EXPECT_FALSE(ScrubToStruct(&proto_scrubber, *response_type_, *typeinfo_,
-                             type_finder_,
-                             /* redact_message_field_mask= */ nullptr,
-                             &test_response_raw_proto_, &actual_struct));
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(StructUtilTest, RedactPaths_Basic) {

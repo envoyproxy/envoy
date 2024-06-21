@@ -133,29 +133,6 @@ absl::StatusOr<bool> IsMessageFieldPathPresent(
     const std::string& path,
     const google::protobuf::field_extraction::MessageData& message);
 
-absl::Status ConvertToStruct(
-    const google::protobuf::field_extraction::MessageData& message,
-    const google::protobuf::Type& type,
-    google::protobuf::util::TypeResolver& type_resolver,
-    google::protobuf::Struct* message_struct);
-
-bool ScrubToStruct(
-    const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
-    const google::protobuf::Type& type,
-    google::protobuf::util::TypeResolver& type_info,
-    google::protobuf::field_extraction::MessageData* message,
-    google::protobuf::Struct* message_struct);
-
-bool ScrubToStruct(
-    const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
-    const google::protobuf::Type& type,
-    google::protobuf::util::TypeResolver& type_info,
-    const std::function<const google::protobuf::Type*(const std::string&)>&
-        type_finder,
-    const google::protobuf::FieldMask* redact_message_field_mask,
-    google::protobuf::field_extraction::MessageData* message,
-    google::protobuf::Struct* message_struct);
-
 }  // namespace ProtoMessageLogging
 }  // namespace HttpFilters
 }  // namespace Extensions
