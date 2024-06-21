@@ -95,12 +95,14 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      Ssl::ContextAdditionalInitFunc additional_init,
                                      absl::Status& creation_status)
     : ContextImpl(scope, config, factory_context, additional_init, creation_status),
-      tls_certificate_selector_(config.createTlsCertificateSelector()(config, *this)),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (!creation_status.ok()) {
     return;
   }
+  // After checked creation_status, so that the cert selector doesn't need to handle it.
+  tls_certificate_selector_ = config.createTlsCertificateSelector()(config, *this);
+
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
@@ -485,12 +487,12 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
          "invalid selection result");
 
   switch (result.status) {
-  case Ssl::SelectionResult::SelectionStatus::Continue:
+  case Ssl::SelectionResult::SelectionStatus::Success:
     extended_socket_info->onCertSelectionCompleted(*result.selected_ctx, result.staple, false);
     return ssl_select_cert_success;
-  case Ssl::SelectionResult::SelectionStatus::Stop:
+  case Ssl::SelectionResult::SelectionStatus::Pending:
     return ssl_select_cert_retry;
-  case Ssl::SelectionResult::SelectionStatus::AbortHandshake:
+  case Ssl::SelectionResult::SelectionStatus::Failed:
     extended_socket_info->onCertSelectionCompleted(OptRef<const Ssl::TlsContext>(), false, false);
     return ssl_select_cert_error;
   }

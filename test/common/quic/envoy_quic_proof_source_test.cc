@@ -192,7 +192,7 @@ public:
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
     auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
-        "envoy.ssl.certificate_selector_factory.default");
+        "envoy.tls.certificate_selectors.default");
     ASSERT_TRUE(factory);
     const ProtobufWkt::Any any;
     auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorCb(

@@ -21,11 +21,11 @@ class ServerContextImpl;
 /**
  * The default TLS context provider, selecting certificate based on SNI.
  */
-class DefaultTlsCertificateSelectorImpl : public Ssl::TlsCertificateSelector,
-                                          protected Logger::Loggable<Logger::Id::connection> {
+class DefaultTlsCertificateSelector : public Ssl::TlsCertificateSelector,
+                                      protected Logger::Loggable<Logger::Id::connection> {
 public:
-  DefaultTlsCertificateSelectorImpl(const Ssl::ServerContextConfig& config,
-                                    Ssl::ContextSelectionCallback& cb);
+  DefaultTlsCertificateSelector(const Ssl::ServerContextConfig& config,
+                                Ssl::TlsCertificateSelectorCallback& cb);
 
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
                                         Ssl::CertSelectionCallbackPtr cb) override;
@@ -62,13 +62,13 @@ private:
 
 class TlsCertificateSelectorFactoryImpl : public Ssl::TlsCertificateSelectorFactory {
 public:
-  std::string name() const override { return "envoy.ssl.certificate_selector_factory.default"; }
+  std::string name() const override { return "envoy.tls.certificate_selectors.default"; }
   Ssl::TlsCertificateSelectorFactoryCb
   createTlsCertificateSelectorCb(const Protobuf::Message&,
                                  Server::Configuration::CommonFactoryContext&,
                                  ProtobufMessage::ValidationVisitor&) override {
-    return [](const Ssl::ServerContextConfig& config, Ssl::ContextSelectionCallback& ctx) {
-      return std::make_unique<DefaultTlsCertificateSelectorImpl>(config, ctx);
+    return [](const Ssl::ServerContextConfig& config, Ssl::TlsCertificateSelectorCallback& ctx) {
+      return std::make_unique<DefaultTlsCertificateSelector>(config, ctx);
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

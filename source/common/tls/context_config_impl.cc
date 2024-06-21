@@ -457,16 +457,17 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     tls_certificate_selector_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
         provider_config.typed_config(), factory_context.serverFactoryContext(),
         factory_context.messageValidationVisitor());
+    return;
+  }
+
+  auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
+      "envoy.tls.certificate_selectors.default");
+  if (!factory) {
+    IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
   } else {
-    auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
-        "envoy.ssl.certificate_selector_factory.default");
-    if (!factory) {
-      IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
-    } else {
-      const ProtobufWkt::Any any;
-      tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
-          any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
-    }
+    const ProtobufWkt::Any any;
+    tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
+        any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
   }
 }
 
@@ -539,7 +540,7 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
 
 Ssl::TlsCertificateSelectorFactoryCb ServerContextConfigImpl::createTlsCertificateSelector() const {
   if (!tls_certificate_selector_factory_cb_) {
-    IS_ENVOY_BUG("No envoy.ssl.certificate_selector_factory registered");
+    IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
   }
   return tls_certificate_selector_factory_cb_;
 }

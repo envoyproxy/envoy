@@ -24,7 +24,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
-#include "source/common/tls/tls_certificate_selector_impl.h"
+#include "source/common/tls/default_tls_certificate_selector.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -41,7 +41,7 @@ namespace Tls {
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
-                          public Envoy::Ssl::ContextSelectionCallback {
+                          public Envoy::Ssl::TlsCertificateSelectorCallback {
 public:
   static absl::StatusOr<std::unique_ptr<ServerContextImpl>>
   create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
@@ -49,8 +49,8 @@ public:
          Server::Configuration::CommonFactoryContext& factory_context,
          Ssl::ContextAdditionalInitFunc additional_init);
 
-  // Ssl::ContextSelectionCallback
-  // The returned vector has the same life-time as the Ssl::ContextSelectionCallback.
+  // Ssl::TlsCertificateSelectorCallback
+  // The returned vector has the same life-time as the Ssl::TlsCertificateSelectorCallback.
   const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with

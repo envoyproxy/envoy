@@ -80,12 +80,12 @@ Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCa
 
 void SslExtendedSocketInfoImpl::onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx,
                                                          bool staple, bool async) {
-  auto succeeded = selected_ctx.has_value();
   RELEASE_ASSERT(cert_selection_result_ == Ssl::CertSelectionStatus::Pending,
                  "onCertSelectionCompleted twice");
-  cert_selection_result_ =
-      succeeded ? Ssl::CertSelectionStatus::Successful : Ssl::CertSelectionStatus::Failed;
-  if (succeeded) {
+  if (!selected_ctx.has_value()) {
+    cert_selection_result_ = Ssl::CertSelectionStatus::Failed;
+  } else {
+    cert_selection_result_ = Ssl::CertSelectionStatus::Successful;
     // Apply the selected context. This must be done before OCSP stapling below
     // since applying the context can remove the previously-set OCSP response.
     // This will only return NULL if memory allocation fails.
@@ -96,7 +96,7 @@ void SslExtendedSocketInfoImpl::onCertSelectionCompleted(OptRef<const Ssl::TlsCo
       // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
       RELEASE_ASSERT(selected_ctx->ocsp_response_,
                      "OCSP response must be present under OcspStapleAction::Staple");
-      auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
+      const std::vector<uint8_t>& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
       const int rc =
           SSL_set_ocsp_response(ssl_handshaker_.ssl(), resp_bytes.data(), resp_bytes.size());
       RELEASE_ASSERT(rc != 0, "");

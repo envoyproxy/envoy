@@ -24,7 +24,6 @@ namespace Ssl {
 // Opaque type defined and used by the ``ServerContext``.
 struct TlsContext;
 
-// It's defined in context_config.h
 class ServerContextConfig;
 
 class HandshakeCallbacks {
@@ -177,18 +176,17 @@ public:
 
 struct SelectionResult {
   enum class SelectionStatus {
-    // Continue the TLS handshake.
-    Continue,
-    // Block the TLS handshake.
-    Stop,
-    // Abort the TLS handshake.
-    AbortHandshake,
+    // TLS handshake should continue.
+    Success,
+    // TLS handshake should wait for the selection to happen asynchronously.
+    Pending,
+    // TLS handshake should be aborted.
+    Failed,
   };
-  // If the value is Pending, the selection is asynchronous.
-  SelectionStatus status;
-  // It will be nullptr when status is Stop or AbortHandshake.
+  SelectionStatus status; // Status of the certificate selection.
+  // Selected TLS context which it only be non-null when status is Success.
   const Ssl::TlsContext* selected_ctx;
-  // Enable OCSP stapling response when it is true.
+  // True if OCSP stapling should be enabled.
   bool staple;
 };
 
@@ -232,9 +230,9 @@ public:
 
 using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;
 
-class ContextSelectionCallback {
+class TlsCertificateSelectorCallback {
 public:
-  virtual ~ContextSelectionCallback() = default;
+  virtual ~TlsCertificateSelectorCallback() = default;
 
   /**
    * @return reference to the initialized Tls Contexts.
@@ -242,8 +240,8 @@ public:
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using TlsCertificateSelectorFactoryCb =
-    std::function<TlsCertificateSelectorPtr(const ServerContextConfig&, ContextSelectionCallback&)>;
+using TlsCertificateSelectorFactoryCb = std::function<TlsCertificateSelectorPtr(
+    const ServerContextConfig&, TlsCertificateSelectorCallback&)>;
 
 class TlsCertificateSelectorFactory : public Config::TypedFactory {
 public:
@@ -257,7 +255,7 @@ public:
                                  Server::Configuration::CommonFactoryContext& factory_context,
                                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
-  std::string category() const override { return "envoy.ssl.certificate_selector_factory"; }
+  std::string category() const override { return "envoy.tls.certificate_selectors"; }
 };
 
 } // namespace Ssl

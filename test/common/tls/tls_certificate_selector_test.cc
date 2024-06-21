@@ -80,7 +80,7 @@ namespace Tls {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
-  TestTlsCertificateSelector(Ssl::ContextSelectionCallback& ctx, const Protobuf::Message&)
+  TestTlsCertificateSelector(Ssl::TlsCertificateSelectorCallback& ctx, const Protobuf::Message&)
       : ctx_(ctx) {}
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
@@ -90,11 +90,11 @@ public:
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
-    case Ssl::SelectionResult::SelectionStatus::Continue:
+    case Ssl::SelectionResult::SelectionStatus::Success:
       ENVOY_LOG_MISC(info, "debug: select cert done");
       return {mod_, &getTlsContext(), false};
       break;
-    case Ssl::SelectionResult::SelectionStatus::Stop:
+    case Ssl::SelectionResult::SelectionStatus::Pending:
       ENVOY_LOG_MISC(info, "debug: select cert async");
       cb_ = std::move(cb);
       cb_->dispatcher().post([this] { selectTlsContextAsync(); });
@@ -120,7 +120,7 @@ public:
   Ssl::SelectionResult::SelectionStatus mod_;
 
 private:
-  Ssl::ContextSelectionCallback& ctx_;
+  Ssl::TlsCertificateSelectorCallback& ctx_;
   Ssl::CertSelectionCallbackPtr cb_;
 };
 
@@ -137,12 +137,13 @@ public:
     if (selector_cb_) {
       selector_cb_(config, factory_context, validation_visitor);
     }
-    return [&config, this](const Ssl::ServerContextConfig&, Ssl::ContextSelectionCallback& ctx) {
-      ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider = std::make_unique<TestTlsCertificateSelector>(ctx, config);
-      provider->mod_ = mod_;
-      return provider;
-    };
+    return
+        [&config, this](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorCallback& ctx) {
+          ENVOY_LOG_MISC(info, "debug: init provider");
+          auto provider = std::make_unique<TestTlsCertificateSelector>(ctx, config);
+          provider->mod_ = mod_;
+          return provider;
+        };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<xds::type::v3::TypedStruct>();
@@ -315,7 +316,7 @@ protected:
             connect_second_time();
           }));
     } else {
-      if (mod == Ssl::SelectionResult::SelectionStatus::AbortHandshake) {
+      if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
         EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
             .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
         EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
@@ -340,16 +341,16 @@ protected:
   Network::Address::IpVersion version_;
 };
 
-TEST_P(TlsCertificateSelectorFactoryTest, Continue) {
-  testUtil(Ssl::SelectionResult::SelectionStatus::Continue);
+TEST_P(TlsCertificateSelectorFactoryTest, Success) {
+  testUtil(Ssl::SelectionResult::SelectionStatus::Success);
 }
 
-TEST_P(TlsCertificateSelectorFactoryTest, Terminate) {
-  testUtil(Ssl::SelectionResult::SelectionStatus::AbortHandshake);
+TEST_P(TlsCertificateSelectorFactoryTest, Failed) {
+  testUtil(Ssl::SelectionResult::SelectionStatus::Failed);
 }
 
-TEST_P(TlsCertificateSelectorFactoryTest, Stop) {
-  testUtil(Ssl::SelectionResult::SelectionStatus::Stop);
+TEST_P(TlsCertificateSelectorFactoryTest, Pending) {
+  testUtil(Ssl::SelectionResult::SelectionStatus::Pending);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
