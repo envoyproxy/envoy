@@ -34,7 +34,7 @@ service Authorization {
 }
 
 message CheckRequest {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.service.auth.v3.CheckRequest";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.service.auth.v2.CheckRequest";
 
   // The request attributes.
   AttributeContext attributes = 1;
