@@ -55,13 +55,13 @@ public:
   float getSampleRatioRuntime(float sample_ratio, const std::string& runtime_key,
                               Envoy::Runtime::Loader& runtime);
 
+private:
   // Rolling the dice to decide whether the action will be sampled.
   // This routine is called in the data plane.
   bool isSampled(float sample_ratio, const std::string& runtime_key,
                  Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
 
-private:
-  Matcher::ActionFactoryCb createAtionFactoryCbCommon(
+  Matcher::ActionFactoryCb createActionFactoryCbCommon(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
       bool is_downstream);
