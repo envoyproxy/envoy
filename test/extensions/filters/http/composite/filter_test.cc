@@ -319,7 +319,6 @@ TEST(ConfigTest, TestConfig) {
         name: set-response-code
         config_discovery:
           config_source:
-              resource_api_version: V3
               path_config_source:
                 path: "{{ test_tmpdir }}/set_response_code.yaml"
           type_urls:
@@ -353,7 +352,6 @@ TEST(ConfigTest, TestDynamicConfigInDownstream) {
         name: set-response-code
         config_discovery:
           config_source:
-              resource_api_version: V3
               path_config_source:
                 path: "{{ test_tmpdir }}/set_response_code.yaml"
           type_urls:
@@ -384,7 +382,6 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
         name: set-response-code
         config_discovery:
           config_source:
-              resource_api_version: V3
               path_config_source:
                 path: "{{ test_tmpdir }}/set_response_code.yaml"
           type_urls:
@@ -524,7 +521,6 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
         name: actionName
         config_discovery:
           config_source:
-              resource_api_version: V3
               path_config_source:
                 path: "{{ test_tmpdir }}/set_response_code.yaml"
           type_urls:

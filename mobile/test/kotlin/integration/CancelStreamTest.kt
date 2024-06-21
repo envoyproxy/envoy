@@ -24,7 +24,10 @@ import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class CancelStreamTest {
   init {
     JniLibrary.loadTestLibrary()

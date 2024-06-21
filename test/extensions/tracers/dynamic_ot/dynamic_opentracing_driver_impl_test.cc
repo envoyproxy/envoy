@@ -55,6 +55,8 @@ TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
             DynamicOpenTracingDriver::formatErrorMessage(error_code, "abc"));
 }
 
+// TODO(https://github.com/envoyproxy/envoy/issues/34321)
+#if !__has_feature(address_sanitizer)
 TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   {
     std::string invalid_library = "abc123";
@@ -93,7 +95,8 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   EXPECT_NE(spans_json, nullptr);
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
-#endif
+#endif // GCC
+#endif // ASAN
 
 } // namespace
 } // namespace DynamicOt

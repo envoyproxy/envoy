@@ -19,9 +19,6 @@ routing PRs, questions, etc. to the right place.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
-  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
-    issues, and CI in general.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
@@ -52,6 +49,8 @@ routing PRs, questions, etc. to the right place.
   * Listeners, iouring, data plane.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
   * Load balancing, GeoIP, overload manager, security.
+* Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
+  * ext_proc, data plane, flow control, CEL.
 
 # Envoy mobile maintainers
 
@@ -72,6 +71,8 @@ without further review.
   * Wasm
 * doujiang24 ([doujiang24] https://github.com/doujiang24) (doujiang24@gmail.com)
   * Golang
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
+  * Wasm, JWT, gRPC-JSON transcoder
 
 # Envoy security team
 
@@ -84,6 +85,7 @@ without further review.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
+* Kirtimaan Rajshiva ([krajshiva](https://github.com/krajshiva))
 
 # Emeritus maintainers
 
@@ -104,6 +106,7 @@ without further review.
 * JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
 
 # Friends of Envoy
 

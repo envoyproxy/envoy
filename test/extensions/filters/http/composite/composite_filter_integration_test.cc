@@ -206,7 +206,6 @@ public:
                           name: set-response-code
                           config_discovery:
                             config_source:
-                                resource_api_version: V3
                                 path_config_source:
                                   path: "{{ test_tmpdir }}/%s"
                             type_urls:
@@ -254,10 +253,8 @@ resources:
                           name: missing-config
                           config_discovery:
                             config_source:
-                                resource_api_version: V3
                                 api_config_source:
                                   api_type: GRPC
-                                  transport_api_version: V3
                                   grpc_services:
                                     envoy_grpc:
                                       cluster_name: "ecds_cluster"

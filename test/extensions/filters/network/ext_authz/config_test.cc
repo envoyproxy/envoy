@@ -28,7 +28,6 @@ void expectCorrectProto() {
       stat_prefix: google
   failure_mode_allow: false
   stat_prefix: name
-  transport_api_version: V3
 )EOF";
 
   ExtAuthzConfigFactory factory;

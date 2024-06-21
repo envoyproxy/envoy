@@ -40,7 +40,6 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailFormatString = ";path=/;Max-Age={};secure";
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
@@ -174,11 +173,7 @@ std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_vi
 std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
                        absl::string_view expires, absl::string_view token = "",
                        absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_base64_encoding_only")) {
-    return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
-  } else {
-    return encodeHmacHexBase64(secret, host, expires, token, id_token, refresh_token);
-  }
+  return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
 }
 
 } // namespace
@@ -198,6 +193,7 @@ FilterConfig::FilterConfig(
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
+      preserve_authorization_header_(proto_config.preserve_authorization_header()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
@@ -289,10 +285,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
   }
 
-  // Sanitize the Authorization header, since we have no way to validate its content. Also,
-  // if token forwarding is enabled, this header will be set based on what is on the HMAC cookie
-  // before forwarding the request upstream.
-  headers.removeInline(authorization_handle.handle());
+  // Only sanitize the Authorization header if preserveAuthorizationHeader is false
+  if (!config_->preserveAuthorizationHeader()) {
+    // Sanitize the Authorization header, since we have no way to validate its content. Also,
+    // if token forwarding is enabled, this header will be set based on what is on the HMAC cookie
+    // before forwarding the request upstream.
+    headers.removeInline(authorization_handle.handle());
+  }
 
   // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
   // writing test code to not forget these important variables in mock requests
@@ -697,16 +696,9 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
-  std::string max_age;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.oauth_use_standard_max_age_value")) {
-    max_age = expires_in_;
-  } else {
-    max_age = new_expires_;
-  }
-
   // We use HTTP Only cookies.
-  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
+  const std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(
@@ -719,30 +711,24 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    const auto cookie_tail_format_string = fmt::runtime(
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
-            ? CookieTailHttpOnlyFormatString
-            : CookieTailFormatString);
-
-    std::string access_token_cookie_tail = fmt::format(cookie_tail_format_string, max_age);
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, access_token_cookie_tail));
+        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
 
     if (!id_token_.empty()) {
-      std::string id_token_cookie_tail =
-          fmt::format(cookie_tail_format_string, expires_id_token_in_);
+      const std::string id_token_cookie_tail_http_only =
+          fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
       headers.addReferenceKey(
           Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail));
+          absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
     }
 
     if (!refresh_token_.empty()) {
-      std::string refresh_token_cookie_tail =
-          fmt::format(cookie_tail_format_string, expires_refresh_token_in_);
+      const std::string refresh_token_cookie_tail_http_only =
+          fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
       headers.addReferenceKey(Http::Headers::get().SetCookie,
                               absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                           refresh_token_cookie_tail));
+                                           refresh_token_cookie_tail_http_only));
     }
   }
 }

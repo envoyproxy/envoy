@@ -16,15 +16,42 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http2
+  change: |
+    Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
+    feature ``envoy.reloadable_features.http2_use_visitor_for_data`` to false.
+- area: runtime
+  change: |
+    Rejecting invalid yaml. This has been an ENVOY_BUG linked to https://github.com/envoyproxy/envoy/issues/27434
+    for over a year with no hard-blockers so should be Ok. This behavior can be temporarily disabled by setting
+    the runtime feature ``envoy.reloadable_features.reject_invalid_yaml`` to false but the runtime guard must be
+    parsed before any invalid yaml.
 - area: proxy_protocol
   change: |
     Populate typed metadata by default in proxy protocol listener. Typed metadata can be consumed as
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: golang
+  change: |
+    Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
+    ``EncoderFilterCallbacks``, to support full-duplex processing.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: dfp
+  change: |
+    Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
+    disabled by setting the runtime feature ``envoy.reloadable_features.dns_details`` to false.
+- area: grpc
+  change: |
+    Changes in ``AsyncStreamImpl`` and ``GoogleAsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
+    :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>` or
+    :ref:`Google C++ gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>`. Previously, tracing context headers
+    were not being set when calling external services such as ``ext_proc``.
+- area: http
+  change: |
+    Fixed host header changes for shadow requests to properly handle ipv6 addresses.
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).
@@ -58,18 +85,58 @@ minor_behavior_changes:
     ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
+- area: access_log
+  change: |
+    The ``%CEL%`` formatter support call functions.
+- area: http
+  change: |
+    Changing header validation checks in the substitution format utility and CEL code to do RCF complaint header validation.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.consistent_header_validation`` to false.
+- area: quic
+  change: |
+    When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: config
+  change: |
+    In xDS configuration, the :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>` value now means
+    :ref:`V3 <envoy_v3_api_enum_value_config.core.v3.ApiVersion.V3>`. :ref:`AUTO <envoy_v3_api_enum_value_config.core.v3.ApiVersion.AUTO>`
+    is the default value of the enum, so this field may be omitted from all configurations now.
+- area: filters
+  change: |
+    Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
+- area: http
+  change: |
+    Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
+    guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: admission control
+  change: |
+    Fixed the thread-local controller's average RPS calculation to be calculated over the full
+    lookback window. Previously, the controller would calculate the average RPS over the amount of
+    time elapsed since the oldest valid request sample. This change brings the behavior in line with
+    the documentation.
 - area: outlier detection
   change: |
     Fixed :ref:`successful_active_health_check_uneject_host
     <envoy_v3_api_field_config.cluster.v3.OutlierDetection.successful_active_health_check_uneject_host>`.
     Before, a failed health check could uneject the host if the ``FAILED_ACTIVE_HC`` health flag had not been set.
+- area: quic
+  change: |
+    Applied 2 QUICHE patches for crash bugs in ``QuicSpdyStream`` ``OnDataAvailable()`` and ``OnInitialHeaderComplete()``.
+- area: quic
+  change: |
+    Fixed crash bug when QUIC downstream stream was read closed and then timed out.
 - area: tls
   change: |
     Fix a RELEASE_ASSERT when using :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>`
     if the downstream request ``:authority`` was longer than 255 characters.
+- area: tracing
+  change: |
+    Fix an issue where span id is missing from opentelemetry access log entries.
 - area: ext_authz
   change: |
     Added field
@@ -93,6 +160,10 @@ bug_fixes:
   change: |
     Handle ``append_action`` from :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>`
     that was ignored.
+- area: oauth2
+  change: |
+    Fixed a bug that would cause Envoy to crash when recieving an Oauth callback while the Oauth upstream is unhealthy
+    (e.g. due to DNS issues).
 - area: http
   change: |
     Fix BalsaParser resetting state too early, guarded by default-true
@@ -105,12 +176,45 @@ bug_fixes:
 - area: oauth
   change: |
     The id token cookie now expires at the same time the id token itself expires, instead of when the access token expires.
+- area: decompression
+  change: |
+    Fixed a bug where Envoy will go into an endless loop when using the brotli decompressor. If the input stream has
+    redundant data, the decompressor will loop forever.
+- area: websocket
+  change: |
+    Only 101 is considered a successful response for websocket handshake for HTTP/1.1, and Envoy as a proxy will proxy the response
+    header from upstream to downstream and then close the request if other status is received. This behavior can be
+    reverted by ``envoy_reloadable_features_check_switch_protocol_websocket_handshake``.
+- area: async http client
+  change: |
+    Added one option to disable the response body buffering for mirror request. Also introduced a 32MB cap for the response
+    buffer, which can be changed by the runtime flag ``http.async_response_buffer_limit`` based on the product needs.
+- area: ext_authz
+  change: |
+    Validate http service path_prefix
+    :ref:`path_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_prefix>`,
+    Validate http service path_prefix configuration must start with ``/``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tls
+  change: |
+    Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.oauth_use_standard_max_age_value`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.restart_features.send_goaway_for_premature_rst_streams`` runtime flag and legacy code paths.
+- area: load_balancing
+  change: |
+    Removed ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` runtime flag and legacy code paths.
+- area: load_balancing
+  change: |
+    Removed ``envoy.reloadable_features.locality_routing_use_new_routing_logic`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.proxy_status_upstream_request_timeout`` runtime flag and lagacy code paths.
@@ -120,15 +224,45 @@ removed_config_or_runtime:
 - area: tcp
   change: |
     Removed ``envoy.reloadable_features.detect_and_raise_rst_tcp_connection`` runtime flag and legacy code paths.
+- area: tls
+  change: |
+    Removed ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` runtime flag and lagacy code paths.
 - area: http
   change: |
-    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.http_allow_partial_urls_in_referer`` runtime flag and legacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.oauth_make_token_cookie_httponly`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.lowercase_scheme`` runtime flag and legacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.hmac_base64_encoding_only`` runtime flag and legacy code paths.
 - area: upstream
   change: |
-    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and lagacy code paths.
+    Removed ``envoy.reloadable_features.convert_legacy_lb_config`` runtime flag and legacy code paths.
+- area: thrift
+  change: |
+    Removed ``envoy.reloadable_features.thrift_connection_draining`` runtime flag and legacy code paths.
+- area: thrift
+  change: |
+    Removed ``envoy.reloadable_features.thrift_allow_negative_field_ids`` runtime flag and legacy code paths.
 - area: router
   change: |
     Removed ``envoy.reloadable_features.copy_response_code_to_downstream_stream_info`` runtime flag and legacy code paths.
+- area: http2
+  change: |
+    Removed ``envoy.reloadable_features.http2_decode_metadata_with_quiche`` runtime flag and legacy code paths.
+- area: ext_authz
+  change: |
+    Removed ``envoy.reloadable_features.ext_authz_http_send_original_xff`` runtime flag and legacy code paths.
+- area: jwt
+  change: |
+    Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart
@@ -159,17 +293,83 @@ new_features:
     <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
     in :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>`
     for disabling appending of the ``-shadow`` suffix to the shadowed host/authority header.
+- area: http
+  change: |
+    Added field :ref:`match_upstream <envoy_v3_api_field_config.core.v3.SchemeHeaderTransformation.match_upstream>`,
+    which, when set to true, will set the downstream request ``:scheme`` to match the upstream transport protocol.
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
+- area: proxy_protocol
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.stat_prefix>`
+    to the proxy protocol listener filter configuration, allowing for differentiating statistics when multiple proxy
+    protocol listener filters are configured.
+- area: aws_lambda
+  change: |
+    The ``aws_lambda`` filter now supports the
+    :ref:`credentials <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.credentials>` parameter.
+    This enables setting AWS credentials from the filter configuration.
 - area: access_log
   change: |
     added support for :ref:`%UPSTREAM_HOST_NAME% <config_access_log_format_upstream_host_name>` for the upstream host
     identifier.
+- area: access_loggers
+  change: |
+    Added ``TRACE_ID`` :ref:`access log formatter <config_access_log_format>`.
 - area: healthcheck
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: local_rate_limit
+  change: |
+    Added support for :ref:`local cluster rate limit
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`.
+    If set, the token buckets of the local rate limit will be shared across all the Envoy instances in the local
+    cluster.
+- area: ext_authz
+  change: |
+    added
+    :ref:`decoder_header_mutation_rules <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
+    which allows you to configure what decoder header mutations are allowed from the ext_authz
+    service as well as whether to fail the downstream request if disallowed mutations are requested.
+- area: access_log
+  change: |
+    added new ``access_log`` command operators to retrieve upstream connection information change: ``%UPSTREAM_PEER_URI_SAN%``,
+    ``%UPSTREAM_PEER_IP_SAN%``, ``%UPSTREAM_PEER_DNS_SAN%``, ``%UPSTREAM_LOCAL_URI_SAN%``, ``%UPSTREAM_LOCAL_DNS_SAN%``,
+    ``%UPSTREAM_LOCAL_IP_SAN%``.
+- area: wasm
+  change: |
+    Update ``wasm`` filter to support use as an upstream filter.
+- area: open_telemetry
+  change: |
+    added :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.stat_prefix>`
+    configuration to support additional stat prefix for the OpenTelemetry logger.
+- area: thrift
+  change: |
+    added implementation of :ref:`thrift to metadata <envoy_v3_api_msg_extensions.filters.http.thrift_to_metadata.v3.ThriftToMetadata>`
+    http filter.
+- area: open_telemetry
+  change: |
+    added :ref:`formatters
+    <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.formatters>`
+    configuration to support extension formatter for the OpenTelemetry logger.
+- area: routing
+  change: |
+    added support in :ref:`file datasource <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` implementation
+    to listen to file changes and dynamically update the response when :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>`
+    is configured in :ref:`DataSource <envoy_v3_api_msg_config.core.v3.datasource>`.
+- area: listener
+  change: |
+    Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
+    to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: rbac
+  change: |
+    The RBAC filter will now log the enforced rule to the dynamic metadata field
+    "enforced_effective_policy_id" and the result to the dynamic metadata field
+    "enforced_engine_result". These are only populated if a non-shadow engine exists.
 
 deprecated:
 - area: tracing

@@ -651,6 +651,13 @@ message Http3ProtocolOptions {
 message SchemeHeaderTransformation {
   oneof transformation {
     // Overwrite any Scheme header with the contents of this string.
+    // If set, takes precedence over match_upstream.
     string scheme_to_overwrite = 1 [(validate.rules).string = {in: "http" in: "https"}];
   }
+
+  // Set the Scheme header to match the upstream transport protocol. For example, should a
+  // request be sent to the upstream over TLS, the scheme header will be set to "https". Should the
+  // request be sent over plaintext, the scheme header will be set to "http".
+  // If scheme_to_overwrite is set, this field is not used.
+  bool match_upstream = 2;
 }

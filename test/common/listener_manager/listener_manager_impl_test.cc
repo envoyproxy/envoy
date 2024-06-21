@@ -2787,7 +2787,7 @@ filter_chains:
 TEST_P(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
-                                std::make_shared<Network::Address::PipeInstance>("/foo"),
+                                *Network::Address::PipeInstance::create("/foo"),
                                 Network::Socket::Type::Datagram, nullptr, default_bind_type, {}, 0),
                             EnvoyException,
                             "socket type SocketType::Datagram not supported for pipes");
@@ -6519,7 +6519,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
   NiceMock<Network::MockAddressResolver> mock_resolver;
   EXPECT_CALL(mock_resolver, resolve(_))
       .Times(2)
-      .WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
+      .WillRepeatedly(
+          Return(Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 1111, false)));
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));

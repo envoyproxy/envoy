@@ -6,9 +6,9 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStatus
 
 /** An implementation of {@link Engine}. */
 class EngineImpl(
-  internal val envoyEngine: EnvoyEngine,
-  internal val envoyConfiguration: EnvoyConfiguration,
-  internal val logLevel: LogLevel
+  val envoyEngine: EnvoyEngine,
+  val envoyConfiguration: EnvoyConfiguration,
+  val logLevel: LogLevel
 ) : Engine {
 
   private val streamClient: StreamClient

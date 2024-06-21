@@ -58,7 +58,6 @@ admin:
       port_value: 0
 dynamic_resources:
   lds_config:
-    resource_api_version: V3
     path_config_source:
       path: {}
 static_resources:
@@ -376,10 +375,8 @@ admin:
       port_value: 0
 dynamic_resources:
   cds_config:
-    resource_api_version: V3
     api_config_source:
       api_type: {}
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
@@ -451,13 +448,10 @@ std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
-    resource_api_version: V3
     ads: {{}}
   cds_config:
-    resource_api_version: V3
     ads: {{}}
   ads_config:
-    transport_api_version: V3
     api_type: {0}
     set_node_on_first_message_only: true
 static_resources:
@@ -664,7 +658,6 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
             rds:
               route_config_name: {}
               config_source:
-                resource_api_version: V3
                 ads: {{}}
             http_filters:
             - name: envoy.filters.http.router

@@ -113,7 +113,7 @@ template <class T> static void initializeMockConnection(T& connection) {
 
 MockConnection::MockConnection() {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Utility::resolveUrl("tcp://10.0.0.3:50000"));
+      *Utility::resolveUrl("tcp://10.0.0.3:50000"));
   stream_info_.filter_state_ =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
 
@@ -123,9 +123,9 @@ MockConnection::~MockConnection() = default;
 
 MockServerConnection::MockServerConnection() {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Utility::resolveUrl("tcp://10.0.0.1:443"));
+      *Utility::resolveUrl("tcp://10.0.0.1:443"));
   stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      Utility::resolveUrl("tcp://10.0.0.2:40000"));
+      *Utility::resolveUrl("tcp://10.0.0.2:40000"));
   initializeMockConnection(*this);
 }
 
@@ -133,9 +133,9 @@ MockServerConnection::~MockServerConnection() = default;
 
 MockClientConnection::MockClientConnection() {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Utility::resolveUrl("tcp://10.0.0.1:443"));
+      *Utility::resolveUrl("tcp://10.0.0.1:443"));
   stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      Utility::resolveUrl("tcp://10.0.0.2:40000"));
+      *Utility::resolveUrl("tcp://10.0.0.2:40000"));
   initializeMockConnection(*this);
 }
 
@@ -143,7 +143,7 @@ MockClientConnection::~MockClientConnection() = default;
 
 MockFilterManagerConnection::MockFilterManagerConnection() {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Utility::resolveUrl("tcp://10.0.0.3:50000"));
+      *Utility::resolveUrl("tcp://10.0.0.3:50000"));
   initializeMockConnection(*this);
 
   // The real implementation will move the buffer data into the socket.

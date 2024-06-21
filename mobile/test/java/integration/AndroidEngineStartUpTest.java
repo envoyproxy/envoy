@@ -5,7 +5,8 @@ import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.LogLevel;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -16,7 +17,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 @RunWith(RobolectricTestRunner.class)
 public class AndroidEngineStartUpTest {
-  static { AndroidJniLibrary.loadTestLibrary(); }
+  static { JniLibrary.loadTestLibrary(); }
 
   private final Context appContext = ApplicationProvider.getApplicationContext();
 

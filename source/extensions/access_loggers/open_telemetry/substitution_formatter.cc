@@ -21,8 +21,9 @@ namespace AccessLoggers {
 namespace OpenTelemetry {
 
 OpenTelemetryFormatter::OpenTelemetryFormatter(
-    const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping)
-    : kv_list_output_format_(FormatBuilder().toFormatMapValue(format_mapping)) {}
+    const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping,
+    const std::vector<Formatter::CommandParserPtr>& commands)
+    : kv_list_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
 
 OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper
 OpenTelemetryFormatter::FormatBuilder::toFormatMapValue(
@@ -77,7 +78,7 @@ OpenTelemetryFormatter::FormatBuilder::toFormatListValue(
 
 std::vector<Formatter::FormatterProviderPtr>
 OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
-  return Formatter::SubstitutionFormatParser::parse(string_format, {});
+  return Formatter::SubstitutionFormatParser::parse(string_format, commands_);
 }
 
 ::opentelemetry::proto::common::v1::AnyValue OpenTelemetryFormatter::providersCallback(

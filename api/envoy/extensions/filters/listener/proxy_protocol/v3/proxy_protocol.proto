@@ -18,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // PROXY protocol listener filter.
 // [#extension: envoy.filters.listener.proxy_protocol]
 
+// [#next-free-field: 6]
 message ProxyProtocol {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.proxy_protocol.v2.ProxyProtocol";
@@ -85,4 +86,10 @@ message ProxyProtocol {
   //   and an incoming request matches the V2 signature, the filter will allow the request through without any modification.
   //   The filter treats this request as if it did not have any PROXY protocol information.
   repeated config.core.v3.ProxyProtocolConfig.Version disallowed_versions = 4;
+
+  // The human readable prefix to use when emitting statistics for the filter.
+  // If not configured, statistics will be emitted without the prefix segment.
+  // See the :ref:`filter's statistics documentation <config_listener_filters_proxy_protocol>` for
+  // more information.
+  string stat_prefix = 5;
 }
