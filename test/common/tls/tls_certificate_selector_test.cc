@@ -124,16 +124,15 @@ private:
   Ssl::CertSelectionCallbackPtr cb_;
 };
 
-class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
+class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   using CreateProviderHook =
       std::function<void(const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
                          ProtobufMessage::ValidationVisitor&)>;
 
-  Ssl::TlsCertificateSelectorFactoryCb
-  createTlsCertificateSelectorCb(const Protobuf::Message& config,
-                                 Server::Configuration::CommonFactoryContext& factory_context,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
+      const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validation_visitor) override {
     if (selector_cb_) {
       selector_cb_(config, factory_context, validation_visitor);
     }
@@ -335,7 +334,7 @@ protected:
   }
 
   TestTlsCertificateSelectorFactory provider_factory_;
-  Registry::InjectFactory<Ssl::TlsCertificateSelectorFactory> registered_factory_;
+  Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory_;
   TestScopedRuntime scoped_runtime_;
 
   Network::Address::IpVersion version_;

@@ -60,13 +60,13 @@ private:
   bool full_scan_certs_on_sni_mismatch_;
 };
 
-class TlsCertificateSelectorFactoryImpl : public Ssl::TlsCertificateSelectorFactory {
+class TlsCertificateSelectorConfigFactoryImpl : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   std::string name() const override { return "envoy.tls.certificate_selectors.default"; }
-  Ssl::TlsCertificateSelectorFactoryCb
-  createTlsCertificateSelectorCb(const Protobuf::Message&,
-                                 Server::Configuration::CommonFactoryContext&,
-                                 ProtobufMessage::ValidationVisitor&) override {
+  Ssl::TlsCertificateSelectorFactory
+  createTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                      Server::Configuration::CommonFactoryContext&,
+                                      ProtobufMessage::ValidationVisitor&) override {
     return [](const Ssl::ServerContextConfig& config, Ssl::TlsCertificateSelectorCallback& ctx) {
       return std::make_unique<DefaultTlsCertificateSelector>(config, ctx);
     };
@@ -76,7 +76,7 @@ public:
   }
 };
 
-DECLARE_FACTORY(TlsCertificateSelectorFactoryImpl);
+DECLARE_FACTORY(TlsCertificateSelectorConfigFactoryImpl);
 
 } // namespace Tls
 } // namespace TransportSockets

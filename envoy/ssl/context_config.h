@@ -203,7 +203,7 @@ public:
   /**
    * @return a callback which can be used to create TLS context provider instances.
    */
-  virtual TlsCertificateSelectorFactoryCb createTlsCertificateSelector() const PURE;
+  virtual TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

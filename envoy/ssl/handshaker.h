@@ -240,20 +240,20 @@ public:
   virtual const std::vector<TlsContext>& getTlsContexts() const PURE;
 };
 
-using TlsCertificateSelectorFactoryCb = std::function<TlsCertificateSelectorPtr(
+using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
     const ServerContextConfig&, TlsCertificateSelectorCallback&)>;
 
-class TlsCertificateSelectorFactory : public Config::TypedFactory {
+class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
   /**
    * @returns a callback to create a TlsCertificateSelector. Accepts the |config| and
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual TlsCertificateSelectorFactoryCb
-  createTlsCertificateSelectorCb(const Protobuf::Message& config,
-                                 Server::Configuration::CommonFactoryContext& factory_context,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual TlsCertificateSelectorFactory
+  createTlsCertificateSelectorFactory(const Protobuf::Message& config,
+                                      Server::Configuration::CommonFactoryContext& factory_context,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
 };

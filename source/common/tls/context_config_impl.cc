@@ -452,21 +452,22 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   if (config.common_tls_context().has_custom_tls_certificate_selector()) {
     // If a custom tls context provider is configured, derive the factory from the config.
     const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
-    Ssl::TlsCertificateSelectorFactory* provider_factory =
-        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorFactory>(provider_config);
-    tls_certificate_selector_factory_cb_ = provider_factory->createTlsCertificateSelectorCb(
+    Ssl::TlsCertificateSelectorConfigFactory* provider_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
+            provider_config);
+    tls_certificate_selector_factory_ = provider_factory->createTlsCertificateSelectorFactory(
         provider_config.typed_config(), factory_context.serverFactoryContext(),
         factory_context.messageValidationVisitor());
     return;
   }
 
-  auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorFactory>(
+  auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorConfigFactory>(
       "envoy.tls.certificate_selectors.default");
   if (!factory) {
     IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
   } else {
     const ProtobufWkt::Any any;
-    tls_certificate_selector_factory_cb_ = factory->createTlsCertificateSelectorCb(
+    tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
         any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
   }
 }
@@ -538,11 +539,11 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Ssl::TlsCertificateSelectorFactoryCb ServerContextConfigImpl::createTlsCertificateSelector() const {
-  if (!tls_certificate_selector_factory_cb_) {
+Ssl::TlsCertificateSelectorFactory ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
+  if (!tls_certificate_selector_factory_) {
     IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
   }
-  return tls_certificate_selector_factory_cb_;
+  return tls_certificate_selector_factory_;
 }
 
 } // namespace Tls

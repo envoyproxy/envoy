@@ -101,7 +101,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     return;
   }
   // After checked creation_status, so that the cert selector doesn't need to handle it.
-  tls_certificate_selector_ = config.createTlsCertificateSelector()(config, *this);
+  tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(config, *this);
 
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");

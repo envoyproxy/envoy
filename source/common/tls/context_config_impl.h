@@ -172,7 +172,7 @@ public:
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
-  Ssl::TlsCertificateSelectorFactoryCb createTlsCertificateSelector() const override;
+  Ssl::TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const override;
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -194,7 +194,7 @@ private:
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
           policy);
 
-  Ssl::TlsCertificateSelectorFactoryCb tls_certificate_selector_factory_cb_;
+  Ssl::TlsCertificateSelectorFactory tls_certificate_selector_factory_;
   absl::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
