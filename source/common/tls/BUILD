@@ -146,6 +146,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":ssl_handshaker_lib",
+        ":server_context_lib",
         "//envoy/secret:secret_callbacks_interface",
         "//envoy/secret:secret_provider_interface",
         "//envoy/server:transport_socket_config_interface",
