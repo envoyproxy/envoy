@@ -63,10 +63,10 @@ AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& ti
       time_source_(time_source) {}
 
 uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
-  bool expect_could_fill = true;
-  // Only one thread could fill the bucket at same time. No loop is needed here because one
-  // thread fills the bucket is enough.
-  if (could_fill_.compare_exchange_weak(expect_could_fill, false)) {
+  // No loop is needed here because one thread fills the bucket is enough.
+  if (could_fill_.exchange(false)) {
+    // Only one thread that get the true value from could_fill_ could reach here.
+
     const MonotonicTime time_now = time_source_.monotonicTime();
 
     // Fill the bucket by the CAS loop. Note double type number is used to store the total tokens
@@ -81,7 +81,9 @@ uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
     // Update the last fill time and set could_fill_ to true to allow other threads to fill the
     // bucket if needed.
     last_fill_ = time_now;
-    could_fill_ = true;
+
+    // Set could_fill_ to true value to allow other threads to fill the bucket now.
+    could_fill_.store(true);
   }
 
   // Try to consume tokens.
@@ -132,16 +134,14 @@ std::chrono::milliseconds AtomicTokenBucketImpl::nextTokenAvailable() {
 
 void AtomicTokenBucketImpl::maybeReset(uint64_t num_tokens) {
   const double new_total_tokens = std::min(static_cast<double>(num_tokens), max_tokens_);
-
-  bool expect_could_fill = true;
   while (true) {
-    if (could_fill_.compare_exchange_weak(expect_could_fill, false)) {
+    if (could_fill_.exchange(false)) {
       // The CAS is used in other cases because we need to make sure related operations are applied
       // on the latest value or we need to check and change the value atomically.
       // Bu we can set new value directly here because we don't care about the previous value.
-      total_tokens_ = new_total_tokens;
+      total_tokens_.store(new_total_tokens);
       last_fill_ = time_source_.monotonicTime();
-      could_fill_ = true;
+      could_fill_.store(true);
       break;
     }
   }
