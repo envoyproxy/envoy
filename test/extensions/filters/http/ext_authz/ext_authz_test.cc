@@ -278,6 +278,8 @@ TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
   // Send response. Dynamic metadata should be ignored.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   (*response.dynamic_metadata.mutable_fields())["key"] = ValueUtil::stringValue("value");
