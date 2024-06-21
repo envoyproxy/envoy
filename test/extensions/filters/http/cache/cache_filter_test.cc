@@ -1000,6 +1000,90 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
   }
 }
 
+TEST_F(CacheFilterTest, SuccessfulValidationWithFilterDestroyedDuringContinueEncoding) {
+  request_headers_.setHost("SuccessfulValidation");
+  const std::string body = "abc";
+  const std::string etag = "abc123";
+  const std::string last_modified_date = formatter_.now(time_source_);
+  {
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+  }
+  waitBeforeSecondRequest();
+  {
+    // Create filter for request 2
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_, /*auto_destroy=*/false);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Decoding the request should find a cached response that requires validation.
+    // As far as decoding the request is concerned, this is the same as a cache miss with the
+    // exception of injecting validation precondition headers.
+    testDecodeRequestMiss(filter);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    // Encode 304 response
+    // Advance time to make sure the cached date is updated with the 304 date
+    const std::string not_modified_date = formatter_.now(time_source_);
+    Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
+                                                                     {"date", not_modified_date}};
+
+    // The filter should stop encoding iteration when encodeHeaders is called as a cached response
+    // is being fetched and added to the encoding stream. StopIteration does not stop encodeData of
+    // the same filter from being called
+    EXPECT_EQ(filter->encodeHeaders(not_modified_response_headers, true),
+              Http::FilterHeadersStatus::StopIteration);
+
+    // Check for the cached response headers with updated date
+    Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
+    updated_response_headers.setDate(not_modified_date);
+    EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
+
+    // A 304 response should not have a body, so encodeData should not be called
+    // However, if a body is present by mistake, encodeData should stop iteration until
+    // encoding the cached response is done
+    Buffer::OwnedImpl not_modified_body;
+    EXPECT_EQ(filter->encodeData(not_modified_body, true),
+              Http::FilterDataStatus::StopIterationAndBuffer);
+
+    // The filter should add the cached response body to encoded data.
+    Buffer::OwnedImpl buffer(body);
+    EXPECT_CALL(
+        encoder_callbacks_,
+        addEncodedData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    EXPECT_CALL(encoder_callbacks_, continueEncoding()).WillOnce([&]() { filter->onDestroy(); });
+
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+  }
+}
+
 TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   request_headers_.setHost("UnsuccessfulValidation");
   const std::string body = "abc";
