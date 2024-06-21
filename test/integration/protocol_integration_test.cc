@@ -4884,7 +4884,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
   }
 }
 
-TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Dowstream) {
+TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
   // This test is only for H/1 downstream and H/2 or H/3 upstream
   // Other cases are covered by the ServerHalfCloseBeforeClientWithBufferedResponseData
   // It verifies that H/1 downstream request is not reset when H/2 upstream completes the stream

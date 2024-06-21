@@ -107,9 +107,11 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   //
   // Save the indicator to close the stream before calling the decodeData since when the
   // allow_multiplexed_upstream_half_close is false the call to decodeHeader with end_stream==true
-  // will delete the TcpUpstream object. NOTE: it this point Envoy can not support half closed TCP
-  // upstream as there is currently no detection of half closed vs fully closed TCP connections.
-  bool force_reset = force_reset_on_upstream_half_close_ && end_stream && !downstream_complete_;
+  // will delete the TcpUpstream object.
+  // NOTE: it this point Envoy can not support half closed TCP upstream as there is currently no
+  // distinction between half closed vs fully closed TCP peers.
+  const bool force_reset =
+      force_reset_on_upstream_half_close_ && end_stream && !downstream_complete_;
   bytes_meter_->addWireBytesReceived(data.length());
   upstream_request_->decodeData(data, end_stream);
   // force_reset is true only when allow_multiplexed_upstream_half_close is true and in this case

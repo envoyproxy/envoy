@@ -659,7 +659,10 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_) << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
+       << DUMP_MEMBER(state_.remote_decode_complete_) << DUMP_MEMBER(state_.remote_encode_complete_)
+       << DUMP_MEMBER(state_.encoder_end_stream_) << DUMP_MEMBER(state_.stream_closed_)
+       << DUMP_MEMBER(state_.should_force_close_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -750,9 +753,7 @@ public:
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
     state_.remote_decode_complete_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
-    if (allow_upstream_half_close_) {
-      maybeCloseStream();
-    }
+    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -763,9 +764,7 @@ public:
   void decodeData(Buffer::Instance& data, bool end_stream) {
     state_.remote_decode_complete_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-    if (allow_upstream_half_close_) {
-      maybeCloseStream();
-    }
+    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -775,9 +774,7 @@ public:
   void decodeTrailers(RequestTrailerMap& trailers) {
     state_.remote_decode_complete_ = true;
     decodeTrailers(nullptr, trailers);
-    if (allow_upstream_half_close_) {
-      maybeCloseStream();
-    }
+    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -794,7 +791,7 @@ public:
    */
   void maybeEndEncode(bool end_stream);
 
-  void maybeCloseStream();
+  void checkAndCloseStreamIfFullyClosed();
 
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -884,7 +881,7 @@ protected:
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false), under_on_local_reply_(false),
           decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false), stream_closed_(false), force_close_stream_(false) {}
+          saw_downstream_reset_(false), stream_closed_(false), should_force_close_stream_(false) {}
     uint32_t filter_call_state_{0};
 
     bool remote_decode_complete_ : 1; // Set when decoder filter chain iteration has completed.
@@ -914,8 +911,8 @@ protected:
     bool stream_closed_ : 1; // Set when both remote_decode_complete_ and remote_encode_complete_ is
                              // true observed for the first time and prevents ending the stream
                              // multiple times. Only set when allow_upstream_half_close is enabled.
-    bool force_close_stream_ : 1; // Set to indicate that stream should be closed due to either
-                                  // local reply or error response from the server.
+    bool should_force_close_stream_ : 1; // Set to indicate that stream should be fully closed due
+                                         // to either local reply or error response from the server.
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

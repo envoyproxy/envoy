@@ -571,7 +571,10 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, DISABLED_IntermediateBufferingEarlyResponse) {
+TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   setup(false, "");
 
   setupFilterChain(2, 0);
