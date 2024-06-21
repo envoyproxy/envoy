@@ -2,6 +2,7 @@
 
 #include <regex>
 
+#include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -1602,6 +1603,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     }
                     return result;
                   });
+            }}},
+          {"UNIQUE_ID",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, const absl::optional<size_t>&) {
+              return std::make_unique<StreamInfoStringFieldExtractor>(
+                  [](const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
+                    static Random::RandomGeneratorImpl random_generator;
+                    return absl::make_optional<std::string>(random_generator.uuid());
+                });
             }}},
           {"STREAM_ID",
            {CommandSyntaxChecker::COMMAND_ONLY,

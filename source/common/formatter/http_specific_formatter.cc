@@ -3,7 +3,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/random_generator.h"
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
@@ -374,13 +373,6 @@ HttpBuiltInCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::COMMAND_ONLY,
          [](const std::string&, absl::optional<size_t>&) {
            return std::make_unique<AccessLogTypeFormatter>();
-         }}},
-       {"ACCESS_LOG_ID",
-        {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, absl::optional<size_t>&) {
-           static thread_local Random::RandomGeneratorImpl random_generator;
-           const std::string uuid = random_generator.uuid();
-           return std::make_unique<PlainStringFormatter>(uuid);
          }}},
        {"GRPC_STATUS",
         {CommandSyntaxChecker::PARAMS_OPTIONAL,

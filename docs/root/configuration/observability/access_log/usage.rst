@@ -1249,9 +1249,8 @@ UDP
   * UdpPeriodic - On any UDP Proxy filter periodic log record.
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
 
-%ACCESS_LOG_ID%
-  An identifier for the access log record which is a uuid. This will ensure a uuid is provided for access log
-  emitted from any filter where access log is plugged in.
+%UNIQUE_ID%
+   A unique identifier (UUID) that can be used in header mutation, logging, and other scenarios.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
