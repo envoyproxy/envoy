@@ -123,8 +123,6 @@ TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {
   testDirectResponseBodySize(1);
 }
 
-TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFile) {
-  testDirectResponseFile();
-}
+TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFile) { testDirectResponseFile(); }
 
 } // namespace Envoy
