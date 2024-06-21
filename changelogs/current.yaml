@@ -318,6 +318,12 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: local_rate_limit
+  change: |
+    Added support for :ref:`local cluster rate limit
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`.
+    If set, the token buckets of the local rate limit will be shared across all the Envoy instances in the local
+    cluster.
 - area: ext_authz
   change: |
     added
