@@ -145,8 +145,8 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
-        ":ssl_handshaker_lib",
         ":server_context_lib",
+        ":ssl_handshaker_lib",
         "//envoy/secret:secret_callbacks_interface",
         "//envoy/secret:secret_provider_interface",
         "//envoy/server:transport_socket_config_interface",
@@ -215,12 +215,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "server_context_lib",
     srcs = [
-        "server_context_impl.cc",
         "default_tls_certificate_selector.cc",
+        "server_context_impl.cc",
     ],
     hdrs = [
-        "server_context_impl.h",
         "default_tls_certificate_selector.h",
+        "server_context_impl.h",
     ],
     deps = [
         ":context_lib",
