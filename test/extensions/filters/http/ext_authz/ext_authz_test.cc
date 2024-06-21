@@ -257,7 +257,8 @@ TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
       grpc_service:
         envoy_grpc:
           cluster_name: "ext_authz_server"
-      disable_dynamic_metadata_ingestion: true
+      enable_dynamic_metadata_ingestion:
+        value: false
   )");
 
   // Simulate a downstream request.

@@ -282,12 +282,15 @@ message ExtAuthz {
 
   // Disables ingestion of dynamic metadata from ext_authz service.
   //
-  // If set to true, the filter will ignore the dynamic_metadata field in the ext_authz response. If
-  // it is non-empty, the filter will log, increment the ``ignored_dynamic_metadata`` stat, then
-  // continue handling the response.
+  // If false, the filter will ignore the
+  // :ref:`dynamic_metadata field<envoy_v3_api_msg_service.auth.v3.CheckResponse.dynamic_metadata>`.
+  // If the field is non-empty, the filter will log, increment the ``ignored_dynamic_metadata``
+  // stat, then continue handling the response.
   //
-  // If set to false (the default value), the filter will ingest dynamic metadata entries as normal.
-  bool disable_dynamic_metadata_ingestion = 27;
+  // If true, the filter will ingest dynamic metadata entries as normal.
+  //
+  // If unset, defaults to true.
+  google.protobuf.BoolValue enable_dynamic_metadata_ingestion = 27;
 }
 
 // Configuration for buffering the request data.

@@ -84,7 +84,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
                     Filters::Common::MutationRules::Checker(config.decoder_header_mutation_rules(),
                                                             factory_context.regexEngine()))
               : absl::nullopt),
-      disable_dynamic_metadata_ingestion_(config.disable_dynamic_metadata_ingestion()),
+      enable_dynamic_metadata_ingestion_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
@@ -405,7 +406,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
-    if (config_->disableDynamicMetadataIngestion()) {
+    if (!config_->enableDynamicMetadataIngestion()) {
       ENVOY_STREAM_LOG(trace,
                        "Response is trying to inject dynamic metadata, but dynamic metadata "
                        "ingestion is disabled. Ignoring...",
