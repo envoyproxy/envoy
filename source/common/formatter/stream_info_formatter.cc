@@ -1611,7 +1611,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
                     static Random::RandomGeneratorImpl random_generator;
                     return absl::make_optional<std::string>(random_generator.uuid());
-                });
+                  });
             }}},
           {"STREAM_ID",
            {CommandSyntaxChecker::COMMAND_ONLY,
