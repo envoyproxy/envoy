@@ -535,8 +535,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
 
-  return config_factory.createTransportSocketFactory(quic_config, factory_context, server_names)
-      .value();
+  return *config_factory.createTransportSocketFactory(quic_config, factory_context, server_names);
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
@@ -555,7 +554,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
       std::vector<std::string>{});
 }

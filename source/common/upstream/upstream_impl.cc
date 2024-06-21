@@ -572,6 +572,9 @@ Host::CreateConnectionData HostImplBase::createConnection(
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  if (auto upstream_info = connection->streamInfo().upstreamInfo(); upstream_info) {
+    upstream_info->setUpstreamHost(host);
+  }
   cluster.createNetworkFilterChain(*connection);
   return {std::move(connection), std::move(host)};
 }
@@ -1790,7 +1793,7 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
   absl::Status resolve_status;
   TRY_ASSERT_MAIN_THREAD {
     auto address_or_error = Network::Address::resolveProtoAddress(address);
-    if (address_or_error.value()) {
+    if (address_or_error.status().ok()) {
       return address_or_error.value();
     }
     resolve_status = address_or_error.status();

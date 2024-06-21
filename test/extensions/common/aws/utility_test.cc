@@ -488,6 +488,24 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
+// Test edge case where a SigV4a region set is provided and also web identity provider is in use
+TEST(UtilityTest, CorrectlyConvertRegionSet) {
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*"));
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com",
+            Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+#else
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*"));
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+#endif
+  EXPECT_EQ("sts.ap-southeast-2.amazonaws.com",
+            Utility::getSTSEndpoint("ap-southeast-2,us-east-2"));
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com",
+            Utility::getSTSEndpoint("ca-central-1,ap-southeast-2,eu-central-1"));
+}
+
 TEST(UtilityTest, JsonStringFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
   EXPECT_TRUE(test_json.ok());
@@ -495,6 +513,7 @@ TEST(UtilityTest, JsonStringFound) {
       Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
   EXPECT_EQ(expiration, "testvalue");
 }
+
 TEST(UtilityTest, JsonStringNotFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
   EXPECT_TRUE(test_json.ok());
@@ -502,12 +521,14 @@ TEST(UtilityTest, JsonStringNotFound) {
       Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
   EXPECT_EQ(expiration, "notfound");
 }
+
 TEST(UtilityTest, JsonIntegerFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
   EXPECT_TRUE(test_json.ok());
   const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
   EXPECT_EQ(expiration, 5);
 }
+
 TEST(UtilityTest, JsonIntegerNotFound) {
   auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
   EXPECT_TRUE(test_json.ok());
@@ -515,6 +536,34 @@ TEST(UtilityTest, JsonIntegerNotFound) {
   // Should return default value
   EXPECT_EQ(expiration, 0);
 }
+
+// Check we handle double formatted integer > 0
+TEST(UtilityTest, JsonIntegerExponent) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":1.714449238E9}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 1714449238);
+}
+
+// Check we handle double formatted integer < 0
+TEST(UtilityTest, JsonIntegerExponentInvalid) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":-0.17144492389}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration =
+      Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 9999);
+  // Should return default value
+  EXPECT_EQ(expiration, 9999);
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

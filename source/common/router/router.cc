@@ -124,7 +124,17 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
+                                      bool upstream_ssl, bool use_upstream) {
+  if (use_upstream) {
+    if (upstream_ssl) {
+      headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
+    } else {
+      headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
+    }
+    return;
+  }
+
   if (Http::Utility::schemeIsValid(headers.getSchemeValue())) {
     return;
   }
@@ -137,7 +147,7 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     return;
   }
 
-  if (downstream_secure) {
+  if (downstream_ssl) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -713,7 +723,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
-      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
+      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
+      host->transportSocketFactory().sslCtx() != nullptr,
+      callbacks_->streamInfo().shouldSchemeMatchUpstream());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -777,7 +789,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setBufferAccount(callbacks_->account())
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
+              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
+              .setDiscardResponseBody(true);
       options.setFilterConfig(config_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
@@ -1402,7 +1415,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
   const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
+      transport_failure_reason.empty() ? "" : absl::StrCat("|", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 

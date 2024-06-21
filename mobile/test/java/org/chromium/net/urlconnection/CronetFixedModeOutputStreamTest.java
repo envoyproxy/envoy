@@ -7,7 +7,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,6 +30,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests {@code getOutputStream} when {@code setFixedLengthStreamingMode} is
@@ -41,7 +41,7 @@ import org.junit.runner.RunWith;
  * {@code OnlyRunCronetHttpURLConnection} only run Cronet's implementation.
  * See {@link CronetTestRule#runBase()} ()} for details.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetFixedModeOutputStreamTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 

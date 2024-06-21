@@ -700,10 +700,10 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  Network::Address::PipeInstance unixAddress{"/foo"};
+  auto unix_address = *Network::Address::PipeInstance::create("/foo");
   Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0, nullptr};
   Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0, nullptr};
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(*unix_address));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
@@ -738,12 +738,12 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   Network::Address::Ipv4Instance external_ip_address{"90.60.0.10", 0, nullptr};
   // This test validates that unix address is not treated as internal since unix_sockets is set to
   // false.
-  Network::Address::PipeInstance unix_address{"/foo"};
+  auto unix_address = *Network::Address::PipeInstance::create("/foo");
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(first_internal_ip_address));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(second_internal_ip_address));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(external_ip_address));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unix_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(*unix_address));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
@@ -1095,6 +1095,113 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(config.schemeToSet(), "http");
+}
+
+// Validated that by default we don't use the upstream transport when determining the scheme.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+}
+
+// Validated that when configured, we use the transport when determining the scheme.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpsreamTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    match_upstream: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.shouldSchemeMatchUpstream());
+}
+
+// Validated that when explicitly set false, we don't use the transport when determining the scheme.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    match_upstream: false
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+}
+
+// Validated that when configured and scheme_to_overwrite is set, we use scheme_to_overwrite.
+TEST_F(HttpConnectionManagerConfigTest, SchemeMatchUpstreamAndSchemeToOverwriteIsSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    scheme_to_overwrite: https
+    match_upstream: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.server_factory_context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(config.schemeToSet(), "https");
+  ASSERT_FALSE(config.shouldSchemeMatchUpstream());
+  EXPECT_LOG_CONTAINS("warn",
+                      "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite",
+                      createHttpConnectionManagerConfig(yaml_string));
 }
 
 // Validated that by default we don't normalize paths
@@ -2611,7 +2718,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     apply_default_config_without_warming: true
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2639,7 +2746,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/google.protobuf.Value
     type_urls:
@@ -2669,7 +2776,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false
@@ -2700,7 +2807,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
@@ -2732,7 +2839,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/xds.type.v3.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2766,7 +2873,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/udpa.type.v1.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -2800,7 +2907,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     type_urls:
     - type.googleapis.com/google.protobuf.Value
   )EOF";
@@ -2827,7 +2934,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { resource_api_version: V3, ads: {} }
+    config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false

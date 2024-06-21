@@ -16,7 +16,6 @@ option java_outer_classname = "ThriftToMetadataProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/thrift_to_metadata/v3;thrift_to_metadatav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Thrift-To-Metadata Filter]
 //
@@ -162,6 +161,9 @@ message ThriftToMetadata {
 
   // Supplies the type of protocol that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`.
+  // Note that :ref:`LAX_BINARY<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.LAX_BINARY>`
+  // is not distinguished by :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`,
+  // which is the same with :ref:`thrift_proxy network filter <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`.
   // Note that :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>` is
   // not supported due to deprecation in envoy.
   network.thrift_proxy.v3.ProtocolType protocol = 4 [(validate.rules).enum = {defined_only: true}];
@@ -182,6 +184,8 @@ message ThriftToMetadata {
 // Thrift to metadata configuration on a per-route basis, which overrides the global configuration for
 // request rules and responses rules.
 message ThriftToMetadataPerRoute {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
   // The list of rules to apply to http request body to extract thrift metadata.
   repeated Rule request_rules = 1;
 

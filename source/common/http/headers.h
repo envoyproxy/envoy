@@ -267,6 +267,7 @@ public:
     const std::string Json{"application/json"};
     const std::string Protobuf{"application/x-protobuf"};
     const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
+    const std::string Thrift{"application/x-thrift"};
   } ContentTypeValues;
 
   struct {

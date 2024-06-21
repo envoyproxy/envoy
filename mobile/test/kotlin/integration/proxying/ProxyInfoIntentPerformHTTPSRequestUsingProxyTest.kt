@@ -39,7 +39,6 @@ import org.robolectric.RobolectricTestRunner
 class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
   init {
     JniLibrary.loadTestLibrary()
-    JniLibrary.load()
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer

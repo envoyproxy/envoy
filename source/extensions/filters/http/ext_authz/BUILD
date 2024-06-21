@@ -31,6 +31,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
+        "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",

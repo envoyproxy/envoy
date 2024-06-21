@@ -24,9 +24,9 @@ public:
   MockContextManager();
   ~MockContextManager() override;
 
-  MOCK_METHOD(ClientContextSharedPtr, createSslClientContext,
+  MOCK_METHOD(absl::StatusOr<ClientContextSharedPtr>, createSslClientContext,
               (Stats::Scope & scope, const ClientContextConfig& config));
-  MOCK_METHOD(ServerContextSharedPtr, createSslServerContext,
+  MOCK_METHOD(absl::StatusOr<ServerContextSharedPtr>, createSslServerContext,
               (Stats::Scope & stats, const ServerContextConfig& config,
                const std::vector<std::string>& server_names,
                ContextAdditionalInitFunc additional_init));

@@ -269,6 +269,129 @@ TEST_F(AsyncClientImplTest, Basic) {
                      .value());
 }
 
+TEST_F(AsyncClientImplTest, NoResponseBodyBuffering) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+
+  auto* request = client_.send(std::move(message_), callbacks_,
+                               AsyncClient::RequestOptions().setDiscardResponseBody(true));
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks_, onSuccess_(_, _))
+      .WillOnce(Invoke([](const AsyncClient::Request&, ResponseMessage* response) -> void {
+        // Verify that there is zero response body.
+        EXPECT_EQ(response->body().length(), 0);
+      }));
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+}
+
+TEST_F(AsyncClientImplTest, LargeResponseBody) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          getInteger(AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse))
+      .WillByDefault(Return(100));
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks_, onFailure(_, AsyncClient::FailureReason::ExceedResponseBufferLimit));
+
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(std::string(100 + 1, 'a'))};
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(*large_body, true);
+  EXPECT_EQ(large_body->length(), 0);
+}
+
+TEST_F(AsyncClientImplTest, LargeResponseBodyMultipleRead) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          getInteger(AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse))
+      .WillByDefault(Return(100));
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks_, onFailure(_, AsyncClient::FailureReason::ExceedResponseBufferLimit));
+
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(std::string(50, 'a'))};
+  Buffer::InstancePtr large_body_second{new Buffer::OwnedImpl(std::string(50, 'a'))};
+  Buffer::InstancePtr large_body_third{new Buffer::OwnedImpl(std::string(2, 'a'))};
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(*large_body, false);
+  response_decoder_->decodeData(*large_body_second, false);
+  response_decoder_->decodeData(*large_body_third, true);
+}
+
 TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);

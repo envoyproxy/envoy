@@ -1121,8 +1121,6 @@ TEST_P(MultiplexedIntegrationTest, GoAway) {
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
@@ -1162,8 +1160,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
@@ -1190,8 +1186,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyRes
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResetsForLongStreams) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   const int stream_lifetime_seconds = 2;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",

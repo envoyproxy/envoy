@@ -429,7 +429,7 @@ public:
                                                       int port) {
     std::string url =
         "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
-    return Network::Utility::resolveUrl(url);
+    return *Network::Utility::resolveUrl(url);
   }
 
   bool tsiPeerIdentitySet() {
