@@ -133,7 +133,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryC
       provider_manager);
 }
 
-Matcher::ActionFactoryCb ExecuteFilterActionFactory::createAtionFactoryCbCommon(
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbCommon(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
     bool is_downstream) {
@@ -186,7 +186,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
         *message, context.stat_prefix_, context.server_factory_context_.value());
   }
 
-  return createAtionFactoryCbCommon(composite_action, context, callback, true);
+  return createActionFactoryCbCommon(composite_action, context, callback, true);
 }
 
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbUpstream(
@@ -210,7 +210,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
     callback = callback_or_status.value();
   }
 
-  return createAtionFactoryCbCommon(composite_action, context, callback, false);
+  return createActionFactoryCbCommon(composite_action, context, callback, false);
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,
