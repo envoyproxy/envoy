@@ -244,6 +244,25 @@ TEST_F(ThunderingHerdHandlerTest, NotCacheableResponseMakesSubsequentRequestsNot
                                   request_headers_);
 }
 
+TEST_F(ThunderingHerdHandlerTest, PostedTimeoutDoesNothingIfQueueClearedWhileInDispatcherQueue) {
+  constexpr uint32_t period_ms = 1000;
+  envoy::extensions::filters::http::cache::v3::CacheConfig::ThunderingHerdHandler config;
+  *config.mutable_block_until_completion()->mutable_unblock_additional_request_period() =
+      ProtobufUtil::TimeUtil::MillisecondsToDuration(period_ms);
+  initHandler(config);
+  EXPECT_CALL(mock_decoder_callbacks_, continueDecoding());
+  handler_->handleUpstreamRequest(mock_filter_, &mock_decoder_callbacks_, key_, request_headers_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_decoder_callbacks_);
+  // Nothing should happen if we run the dispatcher now.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // When time advances, an event is posted to the dispatcher.
+  simTime().advanceTimeAsyncImpl(std::chrono::milliseconds(period_ms));
+  // Beat the posted event to the bunch with the behavior of a filter onDestroy.
+  handler_->handleInsertFinished(key_, ThunderingHerdHandler::InsertResult::Failed);
+  // Then nothing should happen when we run the dispatcher because the queue is already empty.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

@@ -614,6 +614,87 @@ MATCHER_P2(RangeMatcher, begin, end, "") {
          testing::ExplainMatchResult(end, arg.end(), result_listener);
 }
 
+TEST_F(CacheFilterTest, OnDestroyBeforeOnHeadersAbortsAction) {
+  request_headers_.setHost("CacheHitWithBody");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt});
+  });
+  auto filter = makeFilter(mock_http_cache, false);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  filter->onDestroy();
+  // Nothing extra should happen when the posted lookup completion resolves, because
+  // the filter was destroyed.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(CacheFilterTest, OnDestroyBeforeOnBodyAbortsAction) {
+  request_headers_.setHost("CacheHitWithBody");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt});
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>("abcde"));
+      });
+  auto filter = makeFilter(mock_http_cache, false);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  filter->onDestroy();
+  // onBody should do nothing because the filter was destroyed.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(CacheFilterTest, OnDestroyBeforeOnTrailersAbortsAction) {
+  request_headers_.setHost("CacheHitWithTrailers");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt, true});
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>("abcde"));
+      });
+  EXPECT_CALL(*mock_lookup_context, getTrailers(_)).WillOnce([&](LookupTrailersCallback&& cb) {
+    cb(std::make_unique<Http::TestResponseTrailerMapImpl>());
+  });
+  auto filter = makeFilter(mock_http_cache, false);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  filter->onDestroy();
+  // onTrailers should do nothing because the filter was destroyed.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
 TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   request_headers_.setHost("CacheHitWithBody");
   // Set the buffer limit to 5 bytes, and we will have the file be of size
