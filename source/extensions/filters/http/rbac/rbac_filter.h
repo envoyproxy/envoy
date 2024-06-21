@@ -66,6 +66,15 @@ public:
            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
   }
 
+  std::string enforcedEffectivePolicyIdField() const {
+    return rules_stat_prefix_ + Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
+                                    .EnforcedEffectivePolicyIdField;
+  }
+  std::string enforcedEngineResultField() const {
+    return rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EnforcedEngineResultField;
+  }
+
   const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(const Http::StreamFilterCallbacks* callbacks,
          Filters::Common::RBAC::EnforcementMode mode) const;
@@ -80,6 +89,7 @@ private:
   }
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
+  const std::string rules_stat_prefix_;
   const std::string shadow_rules_stat_prefix_;
   const bool per_rule_stats_;
 

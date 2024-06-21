@@ -39,6 +39,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: dfp
+  change: |
+    Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
+    disabled by setting the runtime feature ``envoy.reloadable_features.dns_details`` to false.
 - area: grpc
   change: |
     Changes in ``AsyncStreamImpl`` and ``GoogleAsyncStreamImpl`` now propagate tracing context headers in bidirectional streams when using
@@ -81,6 +85,9 @@ minor_behavior_changes:
     ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
+- area: access_log
+  change: |
+    The ``%CEL%`` formatter support call functions.
 - area: http
   change: |
     Changing header validation checks in the substitution format utility and CEL code to do RCF complaint header validation.
@@ -99,6 +106,10 @@ minor_behavior_changes:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
+- area: http
+  change: |
+    Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
+    guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -186,9 +197,15 @@ removed_config_or_runtime:
 - area: tls
   change: |
     Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
+- area: oauth
+  change: |
+    Removed ``envoy.reloadable_features.oauth_use_standard_max_age_value`` runtime flag and lagacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_cluster_cache_for_alt_protocols_filter`` runtime flag and lagacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.restart_features.send_goaway_for_premature_rst_streams`` runtime flag and legacy code paths.
 - area: load_balancing
   change: |
     Removed ``envoy.reloadable_features.enable_zone_routing_different_zone_counts`` runtime flag and legacy code paths.
@@ -301,6 +318,12 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: local_rate_limit
+  change: |
+    Added support for :ref:`local cluster rate limit
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`.
+    If set, the token buckets of the local rate limit will be shared across all the Envoy instances in the local
+    cluster.
 - area: ext_authz
   change: |
     added
@@ -342,9 +365,14 @@ new_features:
 - area: ext_authz
   change: |
     Added
-    :ref:`disable_dynamic_metadata_ingestion
-    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.disable_dynamic_metadata_ingestion>`,
+    :ref:`enable_dynamic_metadata_ingestion
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.enable_dynamic_metadata_ingestion>`,
     which allows ext_authz to be configured to ignore dynamic metadata in ext_authz responses.
+- area: rbac
+  change: |
+    The RBAC filter will now log the enforced rule to the dynamic metadata field
+    "enforced_effective_policy_id" and the result to the dynamic metadata field
+    "enforced_engine_result". These are only populated if a non-shadow engine exists.
 
 deprecated:
 - area: tracing

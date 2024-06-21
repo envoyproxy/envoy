@@ -262,7 +262,7 @@ CacheConfig varyAllowListConfig() {
 
 class MockSingletonManager : public Singleton::ManagerImpl {
 public:
-  MockSingletonManager() : Singleton::ManagerImpl(Thread::threadFactoryForTest()) {
+  MockSingletonManager() {
     // By default just act like a real SingletonManager, but allow overrides.
     ON_CALL(*this, get(_, _, _))
         .WillByDefault(std::bind(&MockSingletonManager::realGet, this, std::placeholders::_1,
