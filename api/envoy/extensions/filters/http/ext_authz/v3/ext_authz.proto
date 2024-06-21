@@ -280,7 +280,7 @@ message ExtAuthz {
   // This field allows the filter to reject mutations to specific headers.
   config.common.mutation_rules.v3.HeaderMutationRules decoder_header_mutation_rules = 26;
 
-  // Disables ingestion of dynamic metadata from ext_authz service.
+  // Enable / disable ingestion of dynamic metadata from ext_authz service.
   //
   // If false, the filter will ignore the
   // :ref:`dynamic_metadata field<envoy_v3_api_msg_service.auth.v3.CheckResponse.dynamic_metadata>`.
