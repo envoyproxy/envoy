@@ -65,7 +65,7 @@ public:
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/std::get<0>(GetParam())) {
     // For server TLS
     Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
-    Extensions::TransportSockets::Tls::forceRegisterTlsCertificateSelectorFactoryImpl();
+    Extensions::TransportSockets::Tls::forceRegisterTlsCertificateSelectorConfigFactoryImpl();
     // For H3 tests.
     Network::forceRegisterUdpDefaultWriterFactoryFactory();
     Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();

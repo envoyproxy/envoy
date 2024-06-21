@@ -53,7 +53,7 @@ XdsTestServer::XdsTestServer()
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
   Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
-  Extensions::TransportSockets::Tls::forceRegisterTlsCertificateSelectorFactoryImpl();
+  Extensions::TransportSockets::Tls::forceRegisterTlsCertificateSelectorConfigFactoryImpl();
   Config::forceRegisterAdsConfigSubscriptionFactory();
   Config::forceRegisterGrpcConfigSubscriptionFactory();
   Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
