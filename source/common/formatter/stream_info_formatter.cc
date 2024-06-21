@@ -1607,7 +1607,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
           {"UNIQUE_ID",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, const absl::optional<size_t>&) {
-              return std::make_unique<StreamInfoStringFieldExtractor>(
+              return std::make_unique<StreamInfoStringFormatterProvider>(
                   [](const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
                     static Random::RandomGeneratorImpl random_generator;
                     return absl::make_optional<std::string>(random_generator.uuid());
