@@ -2,14 +2,13 @@ package io.envoyproxy.envoymobile.engine;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 import java.nio.ByteBuffer;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class ByteBuffersTest {
   @Test
   public void testCopy() {

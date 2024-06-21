@@ -31,7 +31,7 @@ MockHealthCheckHostMonitor::MockHealthCheckHostMonitor() = default;
 MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() = default;
 
 MockHostDescription::MockHostDescription()
-    : address_(Network::Utility::resolveUrl("tcp://10.0.0.1:443")),
+    : address_(*Network::Utility::resolveUrl("tcp://10.0.0.1:443")),
       socket_factory_(new testing::NiceMock<Network::MockTransportSocketFactory>) {
   ON_CALL(*this, hostname()).WillByDefault(ReturnRef(hostname_));
   ON_CALL(*this, address()).WillByDefault(Return(address_));

@@ -392,6 +392,23 @@ envoy_benchmark_test(
     benchmark_binary = "utility_speed_test",
 )
 
+envoy_cc_benchmark_binary(
+    name = "utility_trie_speed_test",
+    srcs = ["utility_trie_speed_test.cc"],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "utility_trie_speed_test_benchmark_test",
+    benchmark_binary = "utility_trie_speed_test",
+)
+
 envoy_cc_test(
     name = "lock_guard_test",
     srcs = ["lock_guard_test.cc"],

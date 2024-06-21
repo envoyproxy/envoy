@@ -70,8 +70,8 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
   }
 
   std::list<DnsResponse> final_results;
-  switch (query.dns_lookup_family_)
-  case DnsLookupFamily::All: {
+  switch (query.dns_lookup_family_) {
+  case DnsLookupFamily::All:
     final_results = std::move(v4_results);
     final_results.splice(final_results.begin(), v6_results);
     break;
@@ -98,10 +98,10 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
     break;
   }
 
-    ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
-              accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
-                return dns_response.addrInfo().address_->asString();
-              }));
+  ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
+            accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
+              return dns_response.addrInfo().address_->asString();
+            }));
 
   return std::make_pair(ResolutionStatus::Success, final_results);
 }
@@ -137,6 +137,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
+    std::string details;
     {
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
@@ -172,16 +173,17 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       }
+      details = gai_strerror(rc.return_value_);
     }
 
-    dispatcher_.post(
-        [finished_query = std::move(next_query), response = std::move(response)]() mutable {
-          if (finished_query->cancelled_) {
-            ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
-          } else {
-            finished_query->callback_(response.first, std::move(response.second));
-          }
-        });
+    dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
+                      details = std::string(details)]() mutable {
+      if (finished_query->cancelled_) {
+        ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
+      } else {
+        finished_query->callback_(response.first, std::move(details), std::move(response.second));
+      }
+    });
   }
 
   ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");

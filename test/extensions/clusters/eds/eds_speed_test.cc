@@ -54,6 +54,7 @@ public:
         Config::SubscriptionFactory::RetryMaxDelayMs, random_);
     Config::GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
         /*dispatcher_=*/server_context_.dispatcher_,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

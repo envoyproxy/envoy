@@ -3982,8 +3982,10 @@ envoy_quic_cc_library(
         "quiche/quic/core/quic_stream_sequencer.cc",
         "quiche/quic/core/tls_handshaker.cc",
         "quiche/quic/core/uber_quic_stream_id_manager.cc",
+        "quiche/quic/core/web_transport_write_blocked_list.cc",
     ],
     hdrs = [
+        "quiche/common/btree_scheduler.h",
         "quiche/quic/core/handshaker_delegate_interface.h",
         "quiche/quic/core/legacy_quic_stream_id_manager.h",
         "quiche/quic/core/quic_control_frame_manager.h",
@@ -4000,6 +4002,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/tls_client_handshaker.h",  # required by tls_handshaker.cc
         "quiche/quic/core/tls_handshaker.h",
         "quiche/quic/core/uber_quic_stream_id_manager.h",
+        "quiche/quic/core/web_transport_write_blocked_list.h",
     ],
     external_deps = ["ssl"],
     deps = [
@@ -4025,7 +4028,6 @@ envoy_quic_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform",
-        ":quic_server_crypto_crypto_handshake_lib",
         ":quic_stream_priority_lib",
         ":quiche_common_callbacks",
         ":quiche_common_structured_headers_lib",

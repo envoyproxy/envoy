@@ -29,9 +29,9 @@ public:
 class HotRestartingParentTest : public testing::Test {
 public:
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_1_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:12345");
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_2_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:54321");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54321");
   NiceMock<MockInstance> server_;
   MockHotRestartMessageSender message_sender_;
   HotRestartingParent::Internal hot_restarting_parent_{&server_, message_sender_};
@@ -186,7 +186,7 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildUnixDomainSocket) {
   Network::MockListenerConfig listener_config;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   Network::Address::InstanceConstSharedPtr local_address =
-      std::make_shared<Network::Address::PipeInstance>("domain.socket");
+      *Network::Address::PipeInstance::create("domain.socket");
   MockOptions options;
   InSequence s;
 

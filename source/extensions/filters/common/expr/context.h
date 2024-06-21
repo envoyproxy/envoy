@@ -6,6 +6,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "eval/public/cel_value.h"
@@ -52,6 +53,7 @@ constexpr absl::string_view Metadata = "metadata";
 
 // Per-request or per-connection filter state
 constexpr absl::string_view FilterState = "filter_state";
+constexpr absl::string_view UpstreamFilterState = "upstream_filter_state";
 
 // Connection properties
 constexpr absl::string_view Connection = "connection";
@@ -116,9 +118,16 @@ public:
       return {};
     }
     auto str = std::string(key.StringOrDie().value());
-    if (!::Envoy::Http::validHeaderString(str)) {
-      // Reject key if it is an invalid header string
-      return {};
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
+      if (!Http::HeaderUtility::headerNameIsValid(str)) {
+        // Reject key if it is an invalid header string
+        return {};
+      }
+    } else {
+      if (!::Envoy::Http::validHeaderString(str)) {
+        // Reject key if it is an invalid header string
+        return {};
+      }
     }
     return convertHeaderEntry(arena_, ::Envoy::Http::HeaderUtility::getAllOfHeaderAsString(
                                           *value_, ::Envoy::Http::LowerCaseString(str)));

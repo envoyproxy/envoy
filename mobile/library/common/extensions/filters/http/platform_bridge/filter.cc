@@ -299,8 +299,6 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   default:
     PANIC("invalid filter state: unsupported status for platform filters");
   }
-
-  PANIC("not reached");
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance& data,
@@ -407,8 +405,6 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
   default:
     PANIC("invalid filter state: unsupported status for platform filters");
   }
-
-  PANIC("not reached");
 }
 
 Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::HeaderMap& trailers) {
@@ -484,8 +480,6 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
   default:
     PANIC("invalid filter state: unsupported status for platform filters");
   }
-
-  PANIC("not reached");
 }
 
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,

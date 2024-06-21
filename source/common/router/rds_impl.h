@@ -37,6 +37,7 @@
 #include "source/common/rds/route_config_provider_manager.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
+#include "source/common/router/route_provider_manager.h"
 #include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
@@ -131,6 +132,18 @@ private:
 };
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
+
+class RdsFactoryImpl : public RdsFactory {
+public:
+  std::string name() const override { return "envoy.rds_factory.default"; }
+  virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
+      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Init::Manager& init_manager, ProtoTraitsImpl& proto_traits,
+      Rds::RouteConfigProviderManager& manager) override;
+};
+
+DECLARE_FACTORY(RdsFactoryImpl);
 
 } // namespace Router
 } // namespace Envoy
