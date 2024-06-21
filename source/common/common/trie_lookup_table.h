@@ -146,18 +146,18 @@ public:
    */
   Value findLongestPrefix(absl::string_view key) const {
     int32_t current = 0;
-    int32_t result = -1;
+    int32_t result = 0;
 
     for (uint8_t c : key) {
       current = getChildIndex(current, c);
 
       if (current == -1) {
-        return (result != -1) ? nodes_[result].value_ : nullptr;
+        return nodes_[result].value_;
       } else if (nodes_[current].value_) {
         result = current;
       }
     }
-    return (result != -1) ? nodes_[result].value_ : nullptr;
+    return nodes_[result].value_;
   }
 
 private:
