@@ -5,6 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/global.h"
 
 #include "absl/strings/str_join.h"
@@ -18,6 +19,9 @@ bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket&
 std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket);
 
 namespace TestUtil {
+
+// TODO(#34847): This alias is deprecated. Remove this, and the #include, and the build dep.
+using MemoryTest = Memory::TestUtil::MemoryTest;
 
 class TestSymbolTableHelper {
 public:

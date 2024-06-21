@@ -124,6 +124,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:global_lib",
     ],
 )
