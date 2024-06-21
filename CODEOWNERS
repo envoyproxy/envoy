@@ -32,7 +32,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch @yanavlasov
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @htuch @yanavlasov
 # jwt_authn http filter extension
-/*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia
+/*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
@@ -58,7 +58,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @ggreenway
 # sni_dynamic_forward_proxy extension
-/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
+/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @soulxu
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
@@ -184,7 +184,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # CEL data input
 /*/extensions/matching/http/cel_input @tyxia @yanavlasov
 # user space socket pair, event, connection and listener
-/*/extensions/io_socket/user_space @kyessenov @lambdai
+/*/extensions/io_socket/user_space @kyessenov @lambdai @soulxu
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
