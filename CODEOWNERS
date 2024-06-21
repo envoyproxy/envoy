@@ -59,6 +59,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @lizan
+# mtls_failure_response extension
+/*/extensions/filters/network/mtls_failure_response @ggreenway @UNOWNED
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension

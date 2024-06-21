@@ -26,7 +26,6 @@ Network::FilterFactoryCb MtlsFailureResponseConfigFactory::createFilterFactoryFr
   if (config.failure_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::
                                    MtlsFailureResponse::KEEP_CONNECTION_OPEN &&
       config.has_token_bucket()) {
-    std::cout << "Creating token bucket" << std::endl;
     token_bucket_ = std::make_shared<SharedTokenBucketImpl>(
         config.token_bucket().max_tokens(), context.serverFactoryContext().timeSource(),
         static_cast<double>(config.token_bucket().tokens_per_fill().value()) /

@@ -2,25 +2,31 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.mtls_failure_response.v3;
 
+import "envoy/type/v3/token_bucket.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
-import "envoy/type/v3/token_bucket.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.mtls_failure_response.v3";
 option java_outer_classname = "MtlsFailureResponseProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/mtls_failure_response/v3;mtls_failure_responsev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: MtlsFailureResponse]
+// [#protodoc-title: MTLS Failure Response]
 // [#extension: envoy.filters.network.mtls_failure_response]
 
 // Configuration for the mTLS Failure Response filter. As opposed to returning a SSL failure to a client after failed
 // client cert validation, this filter allows for customization of the response.
 message MtlsFailureResponse {
-
   enum ValidationMode {
     PRESENTED = 0;
     VALIDATED = 1;
+  }
+
+  enum FailureMode {
+    CLOSE_CONNECTION = 0;
+    KEEP_CONNECTION_OPEN = 1;
   }
 
   // Specify whether client cert is expected to be only presented
@@ -37,11 +43,6 @@ message MtlsFailureResponse {
   //    and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
   ValidationMode validation_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
-  enum FailureMode {
-    CLOSE_CONNECTION = 0;
-    KEEP_CONNECTION_OPEN = 1;
-  }
-
   // Specify whether the connection should be closed without SSL failure response
   // or keep the connection open (Tarpitting) to drain ill intentioned client's resources.
   //
@@ -55,5 +56,4 @@ message MtlsFailureResponse {
   // If the token is available, the connection will be allowed.
   // If no tokens are available, the connection will be immediately closed.
   type.v3.TokenBucket token_bucket = 3;
-
 }
