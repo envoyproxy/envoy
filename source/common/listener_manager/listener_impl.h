@@ -316,6 +316,7 @@ public:
   }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+  bool shouldBypassOverloadManager() const override { return bypass_overload_manager_; }
   const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
     ASSERT(listener_factory_context_ != nullptr);
     return listener_factory_context_->listener_factory_context_base_->listener_info_;
@@ -430,6 +431,7 @@ private:
   const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
+  const bool bypass_overload_manager_;
 
   // A target is added to Server's InitManager if workers_started_ is false.
   Init::TargetImpl listener_init_target_;

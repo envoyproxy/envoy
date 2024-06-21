@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -7,6 +8,7 @@
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/filters/add_header_filter.pb.h"
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/tcp_tunneling_integration.h"
@@ -167,6 +169,48 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
+}
+
+TEST_P(ConnectTerminationIntegrationTest, ManyStreams) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    // Resetting an individual stream requires HTTP/2 or later.
+    return;
+  }
+  autonomous_upstream_ = true; // Sending raw HTTP/1.1
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  initialize();
+
+  auto upstream = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get());
+  upstream->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+  upstream->setResponseBody("");
+  std::string response_body = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::vector<Http::RequestEncoder*> encoders;
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  const int num_loops = 50;
+
+  // Do 2x loops and reset half the streams to fuzz lifetime issues
+  for (int i = 0; i < num_loops * 2; ++i) {
+    auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+    if (i % 2 == 0) {
+      codec_client_->sendReset(encoder_decoder.first);
+    } else {
+      encoders.push_back(&encoder_decoder.first);
+      responses.push_back(std::move(encoder_decoder.second));
+    }
+  }
+
+  // Finish up the non-reset streams. The autonomous upstream will send the response.
+  for (int i = 0; i < num_loops; ++i) {
+    // Send some data upstream.
+    codec_client_->sendData(*encoders[i], "GET / HTTP/1.1\r\nHost: www.google.com\r\n\r\n", false);
+    responses[i]->waitForBodyData(response_body.length());
+    EXPECT_EQ(response_body, responses[i]->body());
+  }
+
+  codec_client_->close();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, LogOnSuccessfulTunnel) {
@@ -734,6 +778,11 @@ public:
 
           auto* listener = bootstrap.mutable_static_resources()->add_listeners();
           listener->set_name("tcp_proxy");
+
+          if (downstream_buffer_limit_ != 0) {
+            listener->mutable_per_connection_buffer_limit_bytes()->set_value(
+                downstream_buffer_limit_);
+          }
           auto* socket_address = listener->mutable_address()->mutable_socket_address();
           socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
           socket_address->set_port_value(0);
@@ -767,6 +816,15 @@ public:
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
+    filter_config.mutable_typed_config()->PackFrom(configuration);
+    return filter_config;
+  }
+
+  const HttpFilterProto getStopAndContinueFilterConfig() {
+    HttpFilterProto filter_config;
+    filter_config.set_name("stop-iteration-and-continue-filter");
+    auto configuration = test::integration::filters::StopAndContinueConfig();
+    configuration.set_stop_and_buffer(true);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
@@ -821,6 +879,31 @@ public:
     }
   }
 
+  void testGiantRequestAndResponse(uint64_t request_size, uint64_t response_size) {
+    // Start a connection, and verify the upgrade headers are received upstream.
+    tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+    // Send response headers downstream, fully establishing the connection.
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+
+    ASSERT_TRUE(tcp_client_->write(std::string(request_size, 'a'), false));
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_size));
+
+    upstream_request_->encodeData(response_size, false);
+    ASSERT_TRUE(tcp_client_->waitForData(response_size));
+    //  Finally close and clean up.
+
+    tcp_client_->close();
+    if (upstreamProtocol() == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    }
+  }
+  int downstream_buffer_limit_{0};
   IntegrationTcpClientPtr tcp_client_;
 };
 
@@ -846,6 +929,46 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFilters) {
       "bar",
       upstream_request_->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
   closeConnection(fake_upstream_connection_);
+}
+
+TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
+  if (!(GetParam().tunneling_with_upstream_filters)) {
+    return;
+  }
+  addHttpUpstreamFilterToCluster(getStopAndContinueFilterConfig());
+  addHttpUpstreamFilterToCluster(getCodecFilterConfig());
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // send some data to pause the filter
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+  // send end stream to resume the filter
+  ASSERT_TRUE(tcp_client_->write("hello", true));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+
+  // Finally close and clean up.
+  tcp_client_->close();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  }
+}
+
+TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
+  downstream_buffer_limit_ = 1024;
+  config_helper_.setBufferLimits(1024, 2024);
+  initialize();
+
+  testGiantRequestAndResponse(10 * 1024 * 1024, 10 * 1024 * 1024);
 }
 
 TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamClose) {

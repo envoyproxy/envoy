@@ -64,7 +64,7 @@ TEST_P(OriginalDstIntegrationTest, OriginalDstHttpManyConnections) {
   for (int i = 0; i < kMaxConnections; ++i) {
     std::string address_str = fmt::format("127.0.0.{}", i + 1);
     Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-        Network::Utility::resolveUrl(fmt::format("tcp://{}:{}", address_str, lookupPort("http"))),
+        *Network::Utility::resolveUrl(fmt::format("tcp://{}:{}", address_str, lookupPort("http"))),
         Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
         nullptr));
 

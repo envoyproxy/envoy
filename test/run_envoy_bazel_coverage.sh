@@ -163,6 +163,7 @@ if [[ -e ./test/per_file_coverage.sh ]]; then
             exit 1
         fi
         echo Per-extension coverage passed.
+        echo "$output"
     fi
 else
     echo "No per-file-coverage file found"

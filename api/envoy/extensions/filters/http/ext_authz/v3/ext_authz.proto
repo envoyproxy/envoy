@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_authz.v3;
 
+import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
@@ -28,10 +29,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
+      "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
 
   reserved 4;
 
@@ -261,6 +262,23 @@ message ExtAuthz {
   // It's recommended you set this to true unless you already rely on the old behavior. False is the
   // default only for backwards compatibility.
   bool encode_raw_headers = 23;
+
+  // Rules for what modifications an ext_authz server may make to the request headers before
+  // continuing decoding / forwarding upstream.
+  //
+  // If set to anything, enables header mutation checking against configured rules. Note that
+  // :ref:`HeaderMutationRules <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutationRules>`
+  // has defaults that change ext_authz behavior. Also note that if this field is set to anything,
+  // ext_authz can no longer append to :-prefixed headers.
+  //
+  // If empty, header mutation rule checking is completely disabled.
+  //
+  // Regardless of what is configured here, ext_authz cannot remove :-prefixed headers.
+  //
+  // This field and ``validate_mutations`` have different use cases. ``validate_mutations`` enables
+  // correctness checks for all header / query parameter mutations (e.g. for invalid characters).
+  // This field allows the filter to reject mutations to specific headers.
+  config.common.mutation_rules.v3.HeaderMutationRules decoder_header_mutation_rules = 26;
 }
 
 // Configuration for buffering the request data.

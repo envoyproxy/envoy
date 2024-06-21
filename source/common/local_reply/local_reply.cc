@@ -70,7 +70,8 @@ public:
       body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override(), context);
     }
 
-    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
+    header_parser_ = THROW_OR_RETURN_VALUE(
+        Envoy::Router::HeaderParser::configure(config.headers_to_add()), HeaderParserPtr);
   }
 
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,

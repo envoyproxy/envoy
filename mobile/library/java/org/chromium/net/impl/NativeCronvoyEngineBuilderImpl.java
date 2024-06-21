@@ -6,7 +6,6 @@ import android.content.Context;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
@@ -159,16 +158,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
-   * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
+   * Adds the boolean value for the reloadable runtime feature flag value. For example, to set the
    * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
-   * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
-   *
-   * TODO(abeyad): Change the name to setRuntimeFeature here and in the C++ APIs.
+   * call `addRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
    *
    * @param feature The reloadable runtime feature flag name.
    * @param value The Boolean value to set the runtime feature flag to.
    */
-  public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
+  public NativeCronvoyEngineBuilderImpl addRuntimeGuard(String feature, boolean value) {
     mRuntimeGuards.put(feature, value);
     return this;
   }
@@ -219,7 +216,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
                            String logLevel) {
     AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
-    AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;

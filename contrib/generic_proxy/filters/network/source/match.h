@@ -8,6 +8,7 @@
 #include "contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.pb.validate.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,15 +36,15 @@ using StringMatcherProto = envoy::type::matcher::v3::StringMatcher;
 inline constexpr absl::string_view GenericRequestMatcheInputType =
     "Envoy::Extensions::NetworkFilters::GenericProxy::RequestMatchData";
 
-class ServiceMatchDataInput : public Matcher::DataInput<Request> {
+class ServiceMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
-  Matcher::DataInputGetResult get(const Request& data) const override {
+  Matcher::DataInputGetResult get(const MatchInput& data) const override {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.host())};
+            std::string(data.requestHeader().host())};
   }
 };
 
-class ServiceMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+class ServiceMatchDataInputFactory : public Matcher::DataInputFactory<MatchInput> {
 public:
   ServiceMatchDataInputFactory() = default;
 
@@ -51,7 +52,7 @@ public:
     return std::make_unique<ServiceDataInputProto>();
   }
 
-  Matcher::DataInputFactoryCb<Request>
+  Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<ServiceMatchDataInput>(); };
   }
@@ -59,15 +60,15 @@ public:
   std::string name() const override { return "envoy.matching.generic_proxy.input.service"; }
 };
 
-class HostMatchDataInput : public Matcher::DataInput<Request> {
+class HostMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
-  Matcher::DataInputGetResult get(const Request& data) const override {
+  Matcher::DataInputGetResult get(const MatchInput& data) const override {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.host())};
+            std::string(data.requestHeader().host())};
   }
 };
 
-class HostMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+class HostMatchDataInputFactory : public Matcher::DataInputFactory<MatchInput> {
 public:
   HostMatchDataInputFactory() = default;
 
@@ -75,7 +76,7 @@ public:
     return std::make_unique<HostDataInputProto>();
   }
 
-  Matcher::DataInputFactoryCb<Request>
+  Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<HostMatchDataInput>(); };
   }
@@ -83,15 +84,15 @@ public:
   std::string name() const override { return "envoy.matching.generic_proxy.input.host"; }
 };
 
-class PathMatchDataInput : public Matcher::DataInput<Request> {
+class PathMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
-  Matcher::DataInputGetResult get(const Request& data) const override {
+  Matcher::DataInputGetResult get(const MatchInput& data) const override {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.path())};
+            std::string(data.requestHeader().path())};
   }
 };
 
-class PathMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+class PathMatchDataInputFactory : public Matcher::DataInputFactory<MatchInput> {
 public:
   PathMatchDataInputFactory() = default;
 
@@ -99,7 +100,7 @@ public:
     return std::make_unique<PathDataInputProto>();
   }
 
-  Matcher::DataInputFactoryCb<Request>
+  Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<PathMatchDataInput>(); };
   }
@@ -107,15 +108,15 @@ public:
   std::string name() const override { return "envoy.matching.generic_proxy.input.path"; }
 };
 
-class MethodMatchDataInput : public Matcher::DataInput<Request> {
+class MethodMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
-  Matcher::DataInputGetResult get(const Request& data) const override {
+  Matcher::DataInputGetResult get(const MatchInput& data) const override {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.method())};
+            std::string(data.requestHeader().method())};
   }
 };
 
-class MethodMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+class MethodMatchDataInputFactory : public Matcher::DataInputFactory<MatchInput> {
 public:
   MethodMatchDataInputFactory() = default;
 
@@ -123,7 +124,7 @@ public:
     return std::make_unique<MethodDataInputProto>();
   }
 
-  Matcher::DataInputFactoryCb<Request>
+  Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<MethodMatchDataInput>(); };
   }
@@ -131,12 +132,12 @@ public:
   std::string name() const override { return "envoy.matching.generic_proxy.input.method"; }
 };
 
-class PropertyMatchDataInput : public Matcher::DataInput<Request> {
+class PropertyMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
   PropertyMatchDataInput(const std::string& property_name) : name_(property_name) {}
 
-  Matcher::DataInputGetResult get(const Request& data) const override {
-    const auto value = data.get(name_);
+  Matcher::DataInputGetResult get(const MatchInput& data) const override {
+    const auto value = data.requestHeader().get(name_);
     Matcher::MatchingDataType matching_data =
         value.has_value() ? Matcher::MatchingDataType(std::string(value.value()))
                           : absl::monostate();
@@ -147,7 +148,7 @@ private:
   const std::string name_;
 };
 
-class PropertyMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+class PropertyMatchDataInputFactory : public Matcher::DataInputFactory<MatchInput> {
 public:
   PropertyMatchDataInputFactory() = default;
 
@@ -155,7 +156,7 @@ public:
     return std::make_unique<PropertyDataInputProto>();
   }
 
-  Matcher::DataInputFactoryCb<Request>
+  Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& visitor) override {
     const auto& config =
@@ -171,19 +172,19 @@ public:
 // RequestMatchData is a wrapper of Request to be used as the matching data type.
 class RequestMatchData : public Matcher::CustomMatchData {
 public:
-  RequestMatchData(const Request& data) : data_(data) {}
+  RequestMatchData(const MatchInput& data) : data_(data) {}
 
-  const Request& request() const { return data_; }
+  const MatchInput& data() const { return data_; }
 
 private:
-  const Request& data_;
+  const MatchInput& data_;
 };
 
-class RequestMatchDataInput : public Matcher::DataInput<Request> {
+class RequestMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
   RequestMatchDataInput() = default;
 
-  Matcher::DataInputGetResult get(const Request& data) const override {
+  Matcher::DataInputGetResult get(const MatchInput& data) const override {
     auto request = std::make_shared<RequestMatchData>(data);
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             Matcher::MatchingDataType{std::move(request)}};
@@ -192,7 +193,7 @@ public:
   absl::string_view dataInputType() const override { return GenericRequestMatcheInputType; }
 };
 
-class RequestMatchDataInputFactory : public Matcher::DataInputFactory<Request> {
+class RequestMatchDataInputFactory : public Matcher::DataInputFactory<MatchInput> {
 public:
   RequestMatchDataInputFactory() = default;
 
@@ -200,7 +201,7 @@ public:
     return std::make_unique<RequestInputProto>();
   }
 
-  Matcher::DataInputFactoryCb<Request>
+  Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<RequestMatchDataInput>(); };
   }
@@ -214,8 +215,7 @@ public:
                            Server::Configuration::CommonFactoryContext& context);
 
   bool match(const Matcher::MatchingDataType& input) override;
-
-  bool match(const Request& request);
+  bool match(const RequestHeaderFrame& request);
 
   absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
     return absl::flat_hash_set<std::string>{std::string(GenericRequestMatcheInputType)};

@@ -106,10 +106,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
-        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
@@ -196,10 +196,12 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                            ClusterFactoryContext& context) {
-  auto selected_dns_resolver = selectDnsResolver(cluster, context);
+  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
+  THROW_IF_NOT_OK(dns_resolver_or_error.status());
 
-  return std::make_pair(
-      std::make_shared<StrictDnsClusterImpl>(cluster, context, selected_dns_resolver), nullptr);
+  return std::make_pair(std::make_shared<StrictDnsClusterImpl>(
+                            cluster, context, std::move(dns_resolver_or_error.value())),
+                        nullptr);
 }
 
 /**

@@ -80,7 +80,8 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override{};
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; };
 
-  std::string getTraceIdAsHex() const override;
+  std::string getTraceId() const override;
+  std::string getSpanId() const override;
 
 private:
   ::opencensus::trace::Span span_;
@@ -236,7 +237,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
   }
 }
 
-std::string Span::getTraceIdAsHex() const {
+std::string Span::getSpanId() const { return EMPTY_STRING; }
+
+std::string Span::getTraceId() const {
   const auto& ctx = span_.context();
   return ctx.trace_id().ToHex();
 }

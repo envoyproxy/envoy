@@ -60,7 +60,7 @@ public:
   HttpRequestFrame(Http::RequestHeaderMapPtr request, bool end_stream)
       : request_(std::move(request)) {
     ASSERT(request_ != nullptr);
-    frame_flags_ = {StreamFlags{}, end_stream};
+    frame_flags_ = {0, end_stream ? FrameFlags::FLAG_END_STREAM : FrameFlags::FLAG_EMPTY};
   }
 
   absl::string_view host() const override { return request_->getHostValue(); }
@@ -80,7 +80,15 @@ public:
     const bool drain_close = Envoy::StringUtil::caseFindToken(
         response_->getConnectionValue(), ",", Http::Headers::get().ConnectionValues.Close);
 
-    frame_flags_ = {StreamFlags{0, false, drain_close, false}, end_stream};
+    uint32_t flags = 0;
+    if (end_stream) {
+      flags |= FrameFlags::FLAG_END_STREAM;
+    }
+    if (drain_close) {
+      flags |= FrameFlags::FLAG_DRAIN_CLOSE;
+    }
+
+    frame_flags_ = {0, flags};
   }
 
   StreamStatus status() const override {
@@ -101,7 +109,7 @@ public:
 class HttpRawBodyFrame : public CommonFrame {
 public:
   HttpRawBodyFrame(Envoy::Buffer::Instance& buffer, bool end_stream)
-      : frame_flags_({StreamFlags{}, end_stream}) {
+      : frame_flags_(0, end_stream ? FrameFlags::FLAG_END_STREAM : FrameFlags::FLAG_EMPTY) {
     buffer_.move(buffer);
   }
   FrameFlags frameFlags() const override { return frame_flags_; }
@@ -291,7 +299,7 @@ public:
       callbacks_->onDecodingFailure();
     }
   }
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
+  EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
   ResponsePtr respond(absl::Status status, absl::string_view data, const Request&) override {
     auto response = Http::ResponseHeaderMapImpl::create();
     response->setStatus(std::to_string(Utility::statusToHttpStatus(status.code())));
@@ -352,7 +360,7 @@ public:
       callbacks_->onDecodingFailure();
     }
   }
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
+  EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
 
   void onDecodingSuccess(RequestHeaderFramePtr, absl::optional<StartTime>) override {}
   void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,

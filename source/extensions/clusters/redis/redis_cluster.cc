@@ -182,7 +182,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
@@ -340,9 +340,9 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
                 slot.primary_hostname_, slot_idx);
       parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
-          [this, slot_idx, slots,
-           hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
-                                             std::list<Network::DnsResponse>&& response) -> void {
+          [this, slot_idx, slots, hostname_resolution_required_cnt](
+              Network::DnsResolver::ResolutionStatus status, absl::string_view,
+              std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(
                 debug,
@@ -396,9 +396,9 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
     ENVOY_LOG(debug, "starting async DNS resolution for replica address {}", replica.first);
     parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
-        [this, index, slots, replica_idx,
-         hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
-                                           std::list<Network::DnsResponse>&& response) -> void {
+        [this, index, slots, replica_idx, hostname_resolution_required_cnt](
+            Network::DnsResolver::ResolutionStatus status, absl::string_view,
+            std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);
@@ -581,13 +581,15 @@ RedisClusterFactory::createClusterWithConfig(
   if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
     return absl::InvalidArgumentError("Redis cluster can only created with redis cluster type.");
   }
+  auto resolver =
+      THROW_OR_RETURN_VALUE(selectDnsResolver(cluster, context), Network::DnsResolverSharedPtr);
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return std::make_pair(std::make_shared<RedisCluster>(
                               cluster, proto_config, context,
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-                              selectDnsResolver(cluster, context), nullptr),
+                              resolver, nullptr),
                           nullptr);
   }
   auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(
@@ -595,7 +597,7 @@ RedisClusterFactory::createClusterWithConfig(
   return std::make_pair(std::make_shared<RedisCluster>(
                             cluster, proto_config, context,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-                            selectDnsResolver(cluster, context), lb_factory),
+                            resolver, lb_factory),
                         std::make_unique<RedisClusterThreadAwareLoadBalancer>(lb_factory));
 }
 

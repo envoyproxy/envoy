@@ -81,6 +81,7 @@ ETB
 ETX
 FS
 FIXME
+gperf
 HEXDIG
 HEXDIGIT
 HPE
@@ -1348,6 +1349,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars

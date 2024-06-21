@@ -63,6 +63,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, proto_config.rules_stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
+      rules_stat_prefix_(proto_config.rules_stat_prefix()),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       per_rule_stats_(proto_config.track_per_rule_stats()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
@@ -135,6 +136,9 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
   const auto per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
 
+  ProtobufWkt::Struct metrics;
+  auto& fields = *metrics.mutable_fields();
+
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
@@ -157,15 +161,11 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
 
-    ProtobufWkt::Struct metrics;
-
-    auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
       *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = effective_policy_id;
     }
 
     *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_resp_code;
-    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
   }
 
   const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
@@ -174,12 +174,21 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     bool allowed = engine->handleAction(*callbacks_->connection(), headers,
                                         callbacks_->streamInfo(), &effective_policy_id);
     const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    if (!effective_policy_id.empty()) {
+      *fields[config_->enforcedEffectivePolicyIdField()].mutable_string_value() =
+          effective_policy_id;
+    }
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
       if (!effective_policy_id.empty() && per_rule_stats_enabled) {
         config_->stats().incPolicyAllowed(effective_policy_id);
       }
+
+      *fields[config_->enforcedEngineResultField()].mutable_string_value() =
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
+      callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
+
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
@@ -190,8 +199,18 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       if (!effective_policy_id.empty() && per_rule_stats_enabled) {
         config_->stats().incPolicyDenied(effective_policy_id);
       }
+
+      *fields[config_->enforcedEngineResultField()].mutable_string_value() =
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
+      callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
+
       return Http::FilterHeadersStatus::StopIteration;
     }
+  }
+  // engine == nullptr, but if shadow_engine != nullptr, there are metrics to put in dynamic
+  // metadata.
+  if (shadow_engine != nullptr) {
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
   }
 
   ENVOY_LOG(debug, "no engine, allowed by default");

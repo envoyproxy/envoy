@@ -140,7 +140,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicForwardProxyIntegrationTest,
 TEST_P(DynamicForwardProxyIntegrationTest, BasicFlow) {
   setup();
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
 
@@ -174,7 +174,7 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlow) {
 TEST_P(DynamicForwardProxyIntegrationTest, BasicFlowWithBuffering) {
   setup("localhost", BufferConfig{1, 1024});
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
 
@@ -192,7 +192,7 @@ TEST_P(DynamicForwardProxyIntegrationTest, BasicFlowWithBuffering) {
 TEST_P(DynamicForwardProxyIntegrationTest, BufferOverflowDueToDatagramSize) {
   setup("localhost", BufferConfig{1, 2});
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
 
@@ -214,7 +214,7 @@ TEST_P(DynamicForwardProxyIntegrationTest, BufferOverflowDueToDatagramSize) {
 TEST_P(DynamicForwardProxyIntegrationTest, EmptyDnsResponseDueToDummyHost) {
   setup("dummyhost");
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
 
