@@ -477,9 +477,8 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code_, ENVOY_CONNECTION_FAILURE);
-    EXPECT_THAT(
-        error.message_,
-        Eq("RESPONSE_CODE: 503|ERROR_CODE: 2|RESPONSE_FLAGS: 4,26|DETAILS: failed miserably"));
+    EXPECT_THAT(error.message_, Eq("rc: 503|ec: 2|rsp_flags: "
+                                   "4,26|http: 3|det: failed miserably"));
     EXPECT_EQ(error.attempt_count_, 123);
     callbacks_called.on_error_calls_++;
   };
@@ -503,6 +502,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::UpstreamRemoteReset));
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag(StreamInfo::DnsResolutionFailed));
   stream_info_.setAttemptCount(123);
+  EXPECT_CALL(stream_info_, protocol()).WillRepeatedly(Return(Http::Protocol::Http3));
   response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalConnectionFailure);
   ASSERT_EQ(callbacks_called.on_headers_calls_, 0);
   // Ensure that the callbacks on the EnvoyStreamCallbacks were called.
@@ -556,7 +556,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code_, ENVOY_STREAM_RESET);
-    EXPECT_THAT(error.message_, ContainsRegex("ERROR_CODE: 1"));
+    EXPECT_THAT(error.message_, ContainsRegex("ec: 1"));
     EXPECT_EQ(error.attempt_count_, 0);
     callbacks_called.on_error_calls_++;
   };
@@ -658,7 +658,8 @@ TEST_P(ClientTest, Encode100Continue) {
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 // Death tests are not supported on iOS.
 #ifndef TARGET_OS_IOS
-  EXPECT_DEATH(response_encoder_->encode1xxHeaders(response_headers), "panic: not implemented");
+  EXPECT_ENVOY_BUG(response_encoder_->encode1xxHeaders(response_headers),
+                   "Unexpected 100 continue");
 #endif
 }
 
@@ -688,7 +689,7 @@ TEST_P(ClientTest, EncodeMetadata) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
 // Death tests are not supported on iOS.
 #ifndef TARGET_OS_IOS
-  EXPECT_DEATH(response_encoder_->encodeMetadata(metadata_map_vector), "panic: not implemented");
+  EXPECT_ENVOY_BUG(response_encoder_->encodeMetadata(metadata_map_vector), "Unexpected metadata");
 #endif
 }
 

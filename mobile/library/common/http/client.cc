@@ -442,29 +442,33 @@ void Client::DirectStreamCallbacks::latchError() {
   if (info.responseCode().has_value()) {
     error_->error_code_ = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
-    error_msg_details.push_back(absl::StrCat("RESPONSE_CODE: ", info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("rc: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code_ = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code_ = ENVOY_STREAM_RESET;
   }
 
-  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code_));
+  error_msg_details.push_back(absl::StrCat("ec: ", error_->error_code_));
   std::vector<std::string> response_flags(info.responseFlags().size());
   std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
                  [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
-  error_msg_details.push_back(absl::StrCat("RESPONSE_FLAGS: ", absl::StrJoin(response_flags, ",")));
+  error_msg_details.push_back(absl::StrCat("rsp_flags: ", absl::StrJoin(response_flags, ",")));
+  if (info.protocol().has_value()) {
+    // https://github.com/envoyproxy/envoy/blob/fbce85914421145b5ae3210c9313eced63e535b0/envoy/http/protocol.h#L13
+    error_msg_details.push_back(absl::StrCat("http: ", *info.protocol()));
+  }
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
-    error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
+    error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|DETAILS: {value}
+  // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
   //
-  // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
-  // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
-  // RESPONSE_FLAGS comes from StreamInfo::responseFlags().
-  // DETAILS is the contents of StreamInfo::responseCodeDetails().
+  // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
+  // envoy_ec is of the envoy_error_code_t enum type, and gets mapped from envoy_rc.
+  // rsp_flags comes from StreamInfo::responseFlags().
+  // det is the contents of StreamInfo::responseCodeDetails().
   error_->message_ = absl::StrJoin(std::move(error_msg_details), "|");
   error_->attempt_count_ = info.attemptCount().value_or(0);
 }
@@ -656,7 +660,7 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
   }
 }
 
-void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
+void Client::sendMetadata(envoy_stream_t, envoy_headers) { IS_ENVOY_BUG("not implemented"); }
 
 void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());

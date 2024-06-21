@@ -60,7 +60,7 @@ absl::StatusOr<Address::InstanceConstSharedPtr> Utility::resolveUrl(const std::s
   } else if (urlIsUdpScheme(url)) {
     address = parseInternetAddressAndPortNoThrow(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
-    return std::make_shared<Address::PipeInstance>(url.substr(UNIX_SCHEME.size()));
+    return Address::PipeInstance::create(url.substr(UNIX_SCHEME.size()));
   } else {
     return absl::InvalidArgumentError(absl::StrCat("unknown protocol scheme: ", url));
   }
@@ -158,16 +158,6 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::
         Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sa6, v6only));
   }
   return nullptr;
-}
-
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
-                                                              uint16_t port, bool v6only) {
-  const Address::InstanceConstSharedPtr address =
-      parseInternetAddressNoThrow(ip_address, port, v6only);
-  if (address == nullptr) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("malformed IP address: ", ip_address));
-  }
-  return address;
 }
 
 Address::InstanceConstSharedPtr
@@ -446,15 +436,20 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
+Utility::protobufAddressToAddressNoThrow(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
-    return Utility::parseInternetAddress(proto_address.socket_address().address(),
-                                         proto_address.socket_address().port_value(),
-                                         !proto_address.socket_address().ipv4_compat());
-  case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
-                                                   proto_address.pipe().mode());
+    return Utility::parseInternetAddressNoThrow(proto_address.socket_address().address(),
+                                                proto_address.socket_address().port_value(),
+                                                !proto_address.socket_address().ipv4_compat());
+  case envoy::config::core::v3::Address::AddressCase::kPipe: {
+    auto ret_or_error =
+        Address::PipeInstance::create(proto_address.pipe().path(), proto_address.pipe().mode());
+    if (ret_or_error.status().ok()) {
+      return std::move(*ret_or_error);
+    }
+    return nullptr;
+  }
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
     return std::make_shared<Address::EnvoyInternalInstance>(
         proto_address.envoy_internal_address().server_listener_name(),

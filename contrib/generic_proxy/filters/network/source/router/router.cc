@@ -40,12 +40,13 @@ ReasonViewAndFlag resetReasonToViewAndFlag(StreamResetReason reason) {
 
 } // namespace
 
-UpstreamRequest::UpstreamRequest(RouterFilter& parent, StreamFlags stream_flags,
+UpstreamRequest::UpstreamRequest(RouterFilter& parent, FrameFlags header_frame_flags,
                                  GenericUpstreamSharedPtr generic_upstream)
     : parent_(parent), generic_upstream_(std::move(generic_upstream)),
       stream_info_(parent.time_source_, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
       upstream_info_(std::make_shared<StreamInfo::UpstreamInfoImpl>()),
-      stream_id_(stream_flags.streamId()), expects_response_(!stream_flags.oneWayStream()) {
+      stream_id_(header_frame_flags.streamId()),
+      expects_response_(!header_frame_flags.oneWayStream()) {
 
   // Host is known at this point and set the initial upstream host.
   onUpstreamHostSelected(generic_upstream_->upstreamHost());
@@ -106,7 +107,7 @@ void UpstreamRequest::clearStream(bool close_connection) {
   // connection close event will not be handled.
   reset_or_response_complete_ = true;
 
-  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request ()",
+  ENVOY_LOG(debug, "generic proxy upstream request: complete upstream request {}",
             close_connection);
 
   if (span_ != nullptr) {
@@ -244,7 +245,7 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
   }
 
   if (response_header_frame->frameFlags().endStream()) {
-    onUpstreamResponseComplete(response_header_frame->frameFlags().streamFlags().drainClose());
+    onUpstreamResponseComplete(response_header_frame->frameFlags().drainClose());
   }
 
   parent_.onResponseHeaderFrame(std::move(response_header_frame));
@@ -258,7 +259,7 @@ void UpstreamRequest::onDecodingSuccess(ResponseCommonFramePtr response_common_f
   }
 
   if (response_common_frame->frameFlags().endStream()) {
-    onUpstreamResponseComplete(response_common_frame->frameFlags().streamFlags().drainClose());
+    onUpstreamResponseComplete(response_common_frame->frameFlags().drainClose());
   }
 
   parent_.onResponseCommonFrame(std::move(response_common_frame));
@@ -421,6 +422,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   num_retries_++;
 
   const auto& cluster_name = route_entry_->clusterName();
+  ENVOY_LOG(debug, "generic proxy: route to cluster: {}", cluster_name);
 
   auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
@@ -447,8 +449,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     return;
   }
 
-  auto upstream_request = std::make_unique<UpstreamRequest>(
-      *this, request_stream_->frameFlags().streamFlags(), std::move(generic_upstream));
+  auto upstream_request = std::make_unique<UpstreamRequest>(*this, request_stream_->frameFlags(),
+                                                            std::move(generic_upstream));
   auto raw_upstream_request = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   raw_upstream_request->startStream();
@@ -466,7 +468,7 @@ void RouterFilter::onRequestCommonFrame(RequestCommonFramePtr frame) {
   upstream_requests_.front()->sendCommonFrameToUpstream();
 }
 
-FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
+HeaderFilterStatus RouterFilter::decodeHeaderFrame(StreamRequest& request) {
   ENVOY_LOG(debug, "Try route request to the upstream based on the route entry");
 
   setRouteEntry(callbacks_->routeEntry());
@@ -476,12 +478,12 @@ FilterStatus RouterFilter::onStreamDecoded(StreamRequest& request) {
     ENVOY_LOG(debug, "No route for current request and send local reply");
     completeAndSendLocalReply(Status(StatusCode::kNotFound, "route_not_found"), {},
                               StreamInfo::CoreResponseFlag::NoRouteFound);
-    return FilterStatus::StopIteration;
+    return HeaderFilterStatus::StopIteration;
   }
 
   mayRequestStreamEnd(request.frameFlags().endStream());
   kickOffNewUpstreamRequest();
-  return FilterStatus::StopIteration;
+  return HeaderFilterStatus::StopIteration;
 }
 
 const Envoy::Router::MetadataMatchCriteria* RouterFilter::metadataMatchCriteria() {

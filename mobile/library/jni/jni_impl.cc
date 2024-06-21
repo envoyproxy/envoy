@@ -1205,7 +1205,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
-    builder.setRuntimeGuard(entry.first, entry.second == "true");
+    builder.addRuntimeGuard(entry.first, entry.second == "true");
   }
 
   auto filters = javaObjectArrayToStringPairVector(jni_helper, filter_chain);

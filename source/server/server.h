@@ -38,6 +38,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
@@ -282,7 +283,7 @@ public:
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
   void shutdownAdmin() override;
-  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   bool healthCheckFailed() override;
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
@@ -383,7 +384,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::shared_ptr<Admin> admin_;
-  Singleton::ManagerPtr singleton_manager_;
+  Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
