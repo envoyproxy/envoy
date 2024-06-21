@@ -669,11 +669,9 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
-  std::string max_age;
-  max_age = expires_in_;
-
   // We use HTTP Only cookies.
-  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
+  const std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(

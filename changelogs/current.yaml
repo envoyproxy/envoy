@@ -85,6 +85,9 @@ minor_behavior_changes:
     ``%UPSTREAM_REMOTE_PORT%`` and ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` access log format specifiers.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.upstream_remote_address_use_connection`` to false.
+- area: access_log
+  change: |
+    The ``%CEL%`` formatter support call functions.
 - area: http
   change: |
     Changing header validation checks in the substitution format utility and CEL code to do RCF complaint header validation.
@@ -315,6 +318,12 @@ new_features:
   change: |
     Added support to healthcheck with ProxyProtocol in TCP Healthcheck by setting
     :ref:`health_check_config <envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config>`.
+- area: local_rate_limit
+  change: |
+    Added support for :ref:`local cluster rate limit
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`.
+    If set, the token buckets of the local rate limit will be shared across all the Envoy instances in the local
+    cluster.
 - area: ext_authz
   change: |
     added
@@ -353,6 +362,11 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: rbac
+  change: |
+    The RBAC filter will now log the enforced rule to the dynamic metadata field
+    "enforced_effective_policy_id" and the result to the dynamic metadata field
+    "enforced_engine_result". These are only populated if a non-shadow engine exists.
 
 deprecated:
 - area: tracing
