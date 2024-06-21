@@ -1250,7 +1250,7 @@ UDP
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
 
 %UNIQUE_ID%
-   A unique identifier (UUID) that can be used in header mutation, logging, and other scenarios.
+   A unique identifier (UUID) that is generated dynamically.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
