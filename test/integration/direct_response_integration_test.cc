@@ -123,8 +123,7 @@ TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {
   testDirectResponseBodySize(1);
 }
 
-// TODO(https://github.com/envoyproxy/envoy/issues/34626) fix
-TEST_P(DirectResponseIntegrationTest, DISABLED_DefaultDirectResponseFile) {
+TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFile) {
   testDirectResponseFile();
 }
 
