@@ -35,18 +35,15 @@ namespace HttpFilters {
 namespace ProtoMessageLogging {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::Envoy::StatusHelpers::StatusIs;
 using ::google::protobuf::FieldMask;
 using ::google::protobuf::Struct;
 using ::google::protobuf::Type;
-// using ::google::protobuf::contrib::parse_proto::ParseTextProtoOrDie;
 using ::google::protobuf::field_extraction::CordMessageData;
 using ::google::protobuf::field_extraction::testing::TypeHelper;
 using ::logging::TestRequest;
 using ::logging::TestResponse;
-
-using ::Envoy::StatusHelpers::IsOkAndHolds;
-using ::Envoy::StatusHelpers::StatusIs;
-
 using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
@@ -135,8 +132,8 @@ class AuditLoggingUtilTest : public ::testing::Test {
   }
 
   void SetUp() override {
-    const std::string descriptor_path = TestEnvironment::runfilesPath(
-        "test/proto/logging.descriptor");
+    const std::string descriptor_path =
+        TestEnvironment::runfilesPath("test/proto/logging.descriptor");
     absl::StatusOr<std::unique_ptr<TypeHelper>> status =
         TypeHelper::Create(descriptor_path);
     type_helper_ = std::move(status.value());
@@ -145,10 +142,8 @@ class AuditLoggingUtilTest : public ::testing::Test {
 
     if (!google::protobuf::TextFormat::ParseFromString(kTestRequest,
                                                        &test_request_proto_)) {
-      // ADD_FAILURE() << "Failed to parse textproto: " << text_proto_;
+      LOG(ERROR) << "Failed to parse textproto: " << kTestRequest;
     }
-
-    // test_request_proto_ = ParseTextProtoOrDie(kTestRequest);
     test_request_raw_proto_ =
         CordMessageData(test_request_proto_.SerializeAsCord());
     request_type_ = type_finder_(
@@ -157,9 +152,8 @@ class AuditLoggingUtilTest : public ::testing::Test {
 
     if (!google::protobuf::TextFormat::ParseFromString(kTestResponse,
                                                        &test_response_proto_)) {
-      // ADD_FAILURE() << "Failed to parse textproto: " << text_proto_;
+      LOG(ERROR) << "Failed to parse textproto: " << kTestResponse;
     }
-    // test_response_proto_ = ParseTextProtoOrDie(kTestResponse);
     test_response_raw_proto_ =
         CordMessageData(test_response_proto_.SerializeAsCord());
     response_type_ = type_finder_(
@@ -497,7 +491,9 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_NonStringLeafNode) {
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
-  auto invalid_type_finder = [](absl::string_view type_url) { return nullptr; };
+  auto invalid_type_finder = [](absl::string_view /*type_url*/) {
+    return nullptr;
+  };
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, invalid_type_finder,
                                       "bucket.ratio", test_request_raw_proto_),

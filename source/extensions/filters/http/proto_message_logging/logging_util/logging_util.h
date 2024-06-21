@@ -41,9 +41,6 @@ constexpr int kMaxRedactedPathDepth = 10;
 
 constexpr int kProtoTranslationMaxRecursionDepth = 64;
 
-constexpr LazyRE2 kLocationRegionExtractorPattern = {
-    R"((?:^|/)(?:locations|regions)/([^/]+))"};
-
 ABSL_CONST_INIT const char* const kStructTypeUrl =
     "type.googleapis.com/google.protobuf.Struct";
 
