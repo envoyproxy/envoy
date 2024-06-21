@@ -261,37 +261,37 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_BIT_STRING: {
-      ASN1_BIT_STRING* str = value->value.bit_string;
+      ASN1_BIT_STRING* tmp_str = value->value.bit_string;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_OCTET_STRING: {
-      ASN1_OCTET_STRING* str = value->value.octet_string;
+      ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_PRINTABLESTRING: {
-      ASN1_PRINTABLESTRING* str = value->value.printablestring;
+      ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_T61STRING: {
-      ASN1_T61STRING* str = value->value.t61string;
+      ASN1_T61STRING* tmp_str = value->value.t61string;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_IA5STRING: {
-      ASN1_IA5STRING* str = value->value.ia5string;
+      ASN1_IA5STRING* tmp_str = value->value.ia5string;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_GENERALSTRING: {
-      ASN1_GENERALSTRING* str = value->value.generalstring;
+      ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_BMPSTRING: {
-      ASN1_BMPSTRING* str = value->value.bmpstring;
+      ASN1_BMPSTRING* tmp_str = value->value.bmpstring;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
@@ -306,32 +306,32 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_UTCTIME: {
-      ASN1_UTCTIME* str = value->value.utctime;
+      ASN1_UTCTIME* tmp_str = value->value.utctime;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_GENERALIZEDTIME: {
-      ASN1_GENERALIZEDTIME* str = value->value.generalizedtime;
+      ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_VISIBLESTRING: {
-      ASN1_VISIBLESTRING* str = value->value.visiblestring;
+      ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_UTF8STRING: {
-      ASN1_UTF8STRING* str = value->value.utf8string;
+      ASN1_UTF8STRING* tmp_str = value->value.utf8string;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_SET: {
-      ASN1_STRING* str = value->value.set;
+      ASN1_STRING* tmp_str = value->value.set;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
     case V_ASN1_SEQUENCE: {
-      ASN1_STRING* str = value->value.sequence;
+      ASN1_STRING* tmp_str = value->value.sequence;
       san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
       break;
     }
