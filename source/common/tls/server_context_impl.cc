@@ -454,17 +454,17 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl_client_hello->ssl, ContextImpl::sslExtendedSocketInfoIndex()));
 
-  auto selection_result = extended_socket_info->certSelectionResult();
+  auto selection_result = extended_socket_info->certificateSelectionResult();
   switch (selection_result) {
-  case Ssl::CertSelectionStatus::NotStarted:
+  case Ssl::CertificateSelectionStatus::NotStarted:
     // continue
     break;
 
-  case Ssl::CertSelectionStatus::Pending:
+  case Ssl::CertificateSelectionStatus::Pending:
     ENVOY_LOG(trace, "already waiting certificate");
     return ssl_select_cert_retry;
 
-  case Ssl::CertSelectionStatus::Successful:
+  case Ssl::CertificateSelectionStatus::Successful:
     ENVOY_LOG(trace, "wait certificate success");
     return ssl_select_cert_success;
 
@@ -477,23 +477,26 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
             static_cast<int>(selection_result));
 
   const auto result = tls_certificate_selector_->selectTlsContext(
-      ssl_client_hello, extended_socket_info->createCertSelectionCallback());
+      ssl_client_hello, extended_socket_info->createCertificateSelectionCallback());
 
   ENVOY_LOG(trace,
             "TLS context selection result: {}, after selectTlsContext, selection result status: {}",
-            static_cast<int>(extended_socket_info->certSelectionResult()),
+            static_cast<int>(extended_socket_info->certificateSelectionResult()),
             static_cast<int>(result.status));
-  ASSERT(extended_socket_info->certSelectionResult() == Ssl::CertSelectionStatus::Pending,
+  ASSERT(extended_socket_info->certificateSelectionResult() ==
+             Ssl::CertificateSelectionStatus::Pending,
          "invalid selection result");
 
   switch (result.status) {
   case Ssl::SelectionResult::SelectionStatus::Success:
-    extended_socket_info->onCertSelectionCompleted(*result.selected_ctx, result.staple, false);
+    extended_socket_info->onCertificateSelectionCompleted(*result.selected_ctx, result.staple,
+                                                          false);
     return ssl_select_cert_success;
   case Ssl::SelectionResult::SelectionStatus::Pending:
     return ssl_select_cert_retry;
   case Ssl::SelectionResult::SelectionStatus::Failed:
-    extended_socket_info->onCertSelectionCompleted(OptRef<const Ssl::TlsContext>(), false, false);
+    extended_socket_info->onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext>(), false,
+                                                          false);
     return ssl_select_cert_error;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;

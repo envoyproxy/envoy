@@ -86,7 +86,7 @@ public:
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
   }
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*,
-                                        Ssl::CertSelectionCallbackPtr cb) override {
+                                        Ssl::CertificateSelectionCallbackPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
@@ -112,7 +112,7 @@ public:
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
-    cb_->onCertSelectionResult(getTlsContext(), false);
+    cb_->onCertificateSelectionResult(getTlsContext(), false);
   }
 
   const Ssl::TlsContext& getTlsContext() { return ctx_.getTlsContexts()[0]; }
@@ -121,7 +121,7 @@ public:
 
 private:
   Ssl::TlsCertificateSelectorCallback& ctx_;
-  Ssl::CertSelectionCallbackPtr cb_;
+  Ssl::CertificateSelectionCallbackPtr cb_;
 };
 
 class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {

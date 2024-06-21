@@ -377,7 +377,7 @@ void SslSocket::onAsynchronousCertValidationComplete() {
   }
 }
 
-void SslSocket::onAsynchronousCertSelectionComplete() {
+void SslSocket::onAsynchronousCertificateSelectionComplete() {
   ENVOY_CONN_LOG(debug, "Async cert selection completed", callbacks_->connection());
   if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
     resumeHandshake();

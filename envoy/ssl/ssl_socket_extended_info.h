@@ -23,7 +23,7 @@ enum class ValidateStatus {
   Failed,
 };
 
-enum class CertSelectionStatus {
+enum class CertificateSelectionStatus {
   NotStarted,
   Pending,
   Successful,
@@ -94,22 +94,22 @@ public:
   virtual uint8_t certificateValidationAlert() const PURE;
 
   /**
-   * @return CertSelectionCallbackPtr a callback used to return the cert selection result.
+   * @return CertificateSelectionCallbackPtr a callback used to return the cert selection result.
    */
-  virtual CertSelectionCallbackPtr createCertSelectionCallback() PURE;
+  virtual CertificateSelectionCallbackPtr createCertificateSelectionCallback() PURE;
 
   /**
    * Called after the cert selection completes either synchronously or asynchronously.
    * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
    * @param async true if the validation is completed asynchronously.
    */
-  virtual void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
-                                        bool async) PURE;
+  virtual void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx,
+                                               bool staple, bool async) PURE;
 
   /**
-   * @return CertSelectionStatus the cert selection status.
+   * @return CertificateSelectionStatus the cert selection status.
    */
-  virtual CertSelectionStatus certSelectionResult() const PURE;
+  virtual CertificateSelectionStatus certificateSelectionResult() const PURE;
 };
 
 } // namespace Ssl

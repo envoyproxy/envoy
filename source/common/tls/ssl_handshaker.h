@@ -50,16 +50,17 @@ private:
   OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
 };
 
-class CertSelectionCallbackImpl : public Ssl::CertSelectionCallback,
-                                  protected Logger::Loggable<Logger::Id::connection> {
+class CertificateSelectionCallbackImpl : public Ssl::CertificateSelectionCallback,
+                                         protected Logger::Loggable<Logger::Id::connection> {
 public:
-  CertSelectionCallbackImpl(Event::Dispatcher& dispatcher,
-                            SslExtendedSocketInfoImpl& extended_socket_info)
+  CertificateSelectionCallbackImpl(Event::Dispatcher& dispatcher,
+                                   SslExtendedSocketInfoImpl& extended_socket_info)
       : dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx, bool staple) override;
+  void onCertificateSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx,
+                                    bool staple) override;
 
   void onSslHandshakeCancelled();
 
@@ -85,10 +86,12 @@ public:
 
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
-  Ssl::CertSelectionCallbackPtr createCertSelectionCallback() override;
-  void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
-                                bool async) override;
-  Ssl::CertSelectionStatus certSelectionResult() const override { return cert_selection_result_; }
+  Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override;
+  void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
+                                       bool async) override;
+  Ssl::CertificateSelectionStatus certificateSelectionResult() const override {
+    return cert_selection_result_;
+  }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
@@ -104,10 +107,11 @@ private:
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
   // Latch the in-flight cert selection callback.
   // nullopt if there is none.
-  OptRef<CertSelectionCallbackImpl> cert_selection_callback_{absl::nullopt};
+  OptRef<CertificateSelectionCallbackImpl> cert_selection_callback_{absl::nullopt};
   // Stores the cert selection result if there is any.
   // NotStarted if no cert selection has ever been kicked off.
-  Ssl::CertSelectionStatus cert_selection_result_{Ssl::CertSelectionStatus::NotStarted};
+  Ssl::CertificateSelectionStatus cert_selection_result_{
+      Ssl::CertificateSelectionStatus::NotStarted};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

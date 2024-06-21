@@ -73,7 +73,7 @@ public:
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
   void onAsynchronousCertValidationComplete() override;
-  void onAsynchronousCertSelectionComplete() override;
+  void onAsynchronousCertificateSelectionComplete() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 

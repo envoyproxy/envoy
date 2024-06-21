@@ -35,17 +35,23 @@ public:
   Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
   uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
-  Ssl::CertSelectionCallbackPtr createCertSelectionCallback() override { return nullptr; }
-  void onCertSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool, bool) override {
-    cert_selection_result_ = selected_ctx.has_value() ? Ssl::CertSelectionStatus::Successful
-                                                      : Ssl::CertSelectionStatus::Failed;
+  Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override {
+    return nullptr;
   }
-  Ssl::CertSelectionStatus certSelectionResult() const override { return cert_selection_result_; }
+  void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool,
+                                       bool) override {
+    cert_selection_result_ = selected_ctx.has_value() ? Ssl::CertificateSelectionStatus::Successful
+                                                      : Ssl::CertificateSelectionStatus::Failed;
+  }
+  Ssl::CertificateSelectionStatus certificateSelectionResult() const override {
+    return cert_selection_result_;
+  }
 
 private:
   Envoy::Ssl::ClientValidationStatus status_;
   Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};
-  Ssl::CertSelectionStatus cert_selection_result_{Ssl::CertSelectionStatus::NotStarted};
+  Ssl::CertificateSelectionStatus cert_selection_result_{
+      Ssl::CertificateSelectionStatus::NotStarted};
 };
 
 class TestCertificateValidationContextConfig

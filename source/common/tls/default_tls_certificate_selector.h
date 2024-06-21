@@ -28,7 +28,7 @@ public:
                                 Ssl::TlsCertificateSelectorCallback& cb);
 
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                        Ssl::CertSelectionCallbackPtr cb) override;
+                                        Ssl::CertificateSelectionCallbackPtr cb) override;
 
   // Finds the best matching context. The returned context will have the same lifetime as
   // ``ServerContextImpl``.

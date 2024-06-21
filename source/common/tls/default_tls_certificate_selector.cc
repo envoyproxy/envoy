@@ -86,7 +86,7 @@ void DefaultTlsCertificateSelector::populateServerNamesMap(const Ssl::TlsContext
 
 Ssl::SelectionResult
 DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                                Ssl::CertSelectionCallbackPtr) {
+                                                Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni = absl::NullSafeStringView(
       SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
   const bool client_ecdsa_capable = server_ctx_.isClientEcdsaCapable(ssl_client_hello);

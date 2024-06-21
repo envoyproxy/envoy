@@ -62,7 +62,7 @@ public:
    * A callback to be called upon certificate selection completion if the selection is
    * asynchronous.
    */
-  virtual void onAsynchronousCertSelectionComplete() PURE;
+  virtual void onAsynchronousCertificateSelectionComplete() PURE;
 };
 
 /**
@@ -193,9 +193,9 @@ struct SelectionResult {
 /**
  * Used to return the result from an synchronous/asynchronous cert selection.
  */
-class CertSelectionCallback {
+class CertificateSelectionCallback {
 public:
-  virtual ~CertSelectionCallback() = default;
+  virtual ~CertificateSelectionCallback() = default;
 
   virtual Event::Dispatcher& dispatcher() PURE;
 
@@ -204,10 +204,11 @@ public:
    * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
    * @param staple true when need to set OCSP response.
    */
-  virtual void onCertSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx, bool staple) PURE;
+  virtual void onCertificateSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx,
+                                            bool staple) PURE;
 };
 
-using CertSelectionCallbackPtr = std::unique_ptr<CertSelectionCallback>;
+using CertificateSelectionCallbackPtr = std::unique_ptr<CertificateSelectionCallback>;
 
 enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
@@ -219,7 +220,7 @@ public:
    * select TLS context based on the client hello.
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                           CertSelectionCallbackPtr cb) PURE;
+                                           CertificateSelectionCallbackPtr cb) PURE;
 
   // Finds the best matching context. The returned context will have the same lifetime as
   // ``ServerContextImpl``.
