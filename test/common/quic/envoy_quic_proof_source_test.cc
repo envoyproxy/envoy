@@ -7,7 +7,6 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/default_tls_certificate_selector.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
@@ -192,8 +191,9 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
-    auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
-        getDefaultTlsCertificateSelectorConfigFactory();
+    auto factory =
+        Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorConfigFactory>(
+            "envoy.tls.certificate_selectors.default");
     ASSERT_TRUE(factory);
     const ProtobufWkt::Any any;
     auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorFactory(

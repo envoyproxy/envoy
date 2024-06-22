@@ -74,12 +74,9 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }
-
-  static Ssl::TlsCertificateSelectorConfigFactory* getDefaultTlsCertificateSelectorConfigFactory() {
-    static TlsCertificateSelectorConfigFactoryImpl default_tls_certificate_selector_config_factory;
-    return &default_tls_certificate_selector_config_factory;
-  }
 };
+
+DECLARE_FACTORY(TlsCertificateSelectorConfigFactoryImpl);
 
 } // namespace Tls
 } // namespace TransportSockets
