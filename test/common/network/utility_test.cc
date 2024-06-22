@@ -141,19 +141,19 @@ TEST(NetworkUtility, socketTypeFromUrl) {
 }
 
 TEST(NetworkUtility, ParseInternetAddress) {
-  EXPECT_THROW(Utility::parseInternetAddress(""), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("1.2.3"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("1.2.3.4.5"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("1.2.3.256"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("foo"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("0:0:0:0"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("fffff::"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("/foo"), EnvoyException);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow(""), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("1.2.3"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("1.2.3.4.5"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("1.2.3.256"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("foo"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("0:0:0:0"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("fffff::"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("/foo"), nullptr);
 
   // TODO(#24326): make windows getaddrinfo more strict. See below example.
 #ifndef WIN32
-  EXPECT_THROW(Utility::parseInternetAddress("[::]"), EnvoyException);
-  EXPECT_THROW(Utility::parseInternetAddress("[::1]:1"), EnvoyException);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("[::]"), nullptr);
+  EXPECT_EQ(Utility::parseInternetAddressNoThrow("[::1]:1"), nullptr);
 #endif
 
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow(""));
@@ -175,19 +175,19 @@ TEST(NetworkUtility, ParseInternetAddress) {
 #endif
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fe80::1%"));
 
-  EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddress("1.2.3.4")->asString());
-  EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddress("0.0.0.0")->asString());
-  EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddress("127.0.0.1")->asString());
+  EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddressNoThrow("1.2.3.4")->asString());
+  EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressNoThrow("0.0.0.0")->asString());
+  EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressNoThrow("127.0.0.1")->asString());
 
   EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddressNoThrow("1.2.3.4")->asString());
   EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressNoThrow("0.0.0.0")->asString());
   EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressNoThrow("127.0.0.1")->asString());
 
-  EXPECT_EQ("[::1]:0", Utility::parseInternetAddress("::1")->asString());
-  EXPECT_EQ("[::]:0", Utility::parseInternetAddress("::")->asString());
-  EXPECT_EQ("[1::2:3]:0", Utility::parseInternetAddress("1::2:3")->asString());
-  EXPECT_EQ("[a::1]:0", Utility::parseInternetAddress("a::1")->asString());
-  EXPECT_EQ("[a:b:c:d::]:0", Utility::parseInternetAddress("a:b:c:d::")->asString());
+  EXPECT_EQ("[::1]:0", Utility::parseInternetAddressNoThrow("::1")->asString());
+  EXPECT_EQ("[::]:0", Utility::parseInternetAddressNoThrow("::")->asString());
+  EXPECT_EQ("[1::2:3]:0", Utility::parseInternetAddressNoThrow("1::2:3")->asString());
+  EXPECT_EQ("[a::1]:0", Utility::parseInternetAddressNoThrow("a::1")->asString());
+  EXPECT_EQ("[a:b:c:d::]:0", Utility::parseInternetAddressNoThrow("a:b:c:d::")->asString());
 
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressNoThrow("::1")->asString());
   EXPECT_EQ("[::]:0", Utility::parseInternetAddressNoThrow("::")->asString());
@@ -402,13 +402,13 @@ TEST(NetworkUtility, LocalConnection) {
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   socket.connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+      *Network::Address::PipeInstance::create("/pipe/path"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+      *Network::Address::PipeInstance::create("/pipe/path"));
   socket.connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+      *Network::Address::PipeInstance::create("/pipe/path"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
@@ -491,7 +491,7 @@ TEST(NetworkUtility, InternalAddress) {
   EXPECT_FALSE(Utility::isInternalAddress(Address::Ipv6Instance("fc00::")));
   EXPECT_FALSE(Utility::isInternalAddress(Address::Ipv6Instance("fe00::")));
 
-  EXPECT_FALSE(Utility::isInternalAddress(Address::PipeInstance("/hello")));
+  EXPECT_FALSE(Utility::isInternalAddress(**Address::PipeInstance::create("/hello")));
 }
 
 TEST(NetworkUtility, LoopbackAddress) {
@@ -504,8 +504,8 @@ TEST(NetworkUtility, LoopbackAddress) {
     EXPECT_FALSE(Utility::isLoopbackAddress(address));
   }
   {
-    Address::PipeInstance address("/foo");
-    EXPECT_FALSE(Utility::isLoopbackAddress(address));
+    auto address = *Address::PipeInstance::create("/foo");
+    EXPECT_FALSE(Utility::isLoopbackAddress(*address));
   }
   {
     Address::Ipv6Instance address("::1");
@@ -543,32 +543,34 @@ TEST(NetworkUtility, ParseProtobufAddress) {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address()->set_address("127.0.0.1");
     proto_address.mutable_socket_address()->set_port_value(1234);
-    EXPECT_EQ("127.0.0.1:1234", Utility::protobufAddressToAddress(proto_address)->asString());
+    EXPECT_EQ("127.0.0.1:1234",
+              Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
   }
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_socket_address()->set_address("::1");
     proto_address.mutable_socket_address()->set_port_value(1234);
-    EXPECT_EQ("[::1]:1234", Utility::protobufAddressToAddress(proto_address)->asString());
+    EXPECT_EQ("[::1]:1234", Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
   }
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
-    EXPECT_EQ("/tmp/unix-socket", Utility::protobufAddressToAddress(proto_address)->asString());
+    EXPECT_EQ("/tmp/unix-socket",
+              Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
   }
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_envoy_internal_address()->set_server_listener_name("internal_listener");
     proto_address.mutable_envoy_internal_address()->set_endpoint_id("12345");
     EXPECT_EQ("envoy://internal_listener/12345",
-              Utility::protobufAddressToAddress(proto_address)->asString());
+              Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
   }
 #if defined(__linux__)
   {
     envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("@/tmp/abstract-unix-socket");
     EXPECT_EQ("@/tmp/abstract-unix-socket",
-              Utility::protobufAddressToAddress(proto_address)->asString());
+              Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
   }
 #endif
 }
@@ -584,8 +586,8 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
   {
     envoy::config::core::v3::Address proto_address;
-    Address::PipeInstance address("/hello");
-    Utility::addressToProtobufAddress(address, proto_address);
+    auto address = *Address::PipeInstance::create("/hello");
+    Utility::addressToProtobufAddress(*address, proto_address);
     EXPECT_EQ(true, proto_address.has_pipe());
     EXPECT_EQ("/hello", proto_address.pipe().path());
   }

@@ -1,0 +1,13 @@
+syntax = "proto3";
+package envoy.extensions.filters.http.rbac;
+
+import "envoy/extensions/filters/http/rbac/v3/rbac.proto";
+import "test/fuzz/common.proto";
+import "validate/validate.proto";
+
+// We only fuzz a single request per iteration.
+message RbacTestCase {
+  envoy.extensions.filters.http.rbac.v3.RBAC config = 1
+      [(validate.rules).message = {required: true}];
+  test.fuzz.HttpData request_data = 2 [(validate.rules).message = {required: true}];
+}

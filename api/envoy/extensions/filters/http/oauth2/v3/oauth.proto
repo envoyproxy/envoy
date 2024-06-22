@@ -74,7 +74,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -110,6 +110,12 @@ message OAuth2Config {
 
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 7;
+
+  // If set to true, preserve the existing authorization header.
+  // By default Envoy strips the existing authorization header before forwarding upstream.
+  // Can not be set to true if forward_bearer_token is already set to true.
+  // Default value is false.
+  bool preserve_authorization_header = 16;
 
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
   repeated config.route.v3.HeaderMatcher pass_through_matcher = 8;

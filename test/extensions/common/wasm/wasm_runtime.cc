@@ -45,9 +45,25 @@ std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nu
   return values;
 }
 
+std::vector<std::tuple<std::string, std::string, bool>>
+wasmDualFilterTestMatrix(bool include_nullvm, bool cpp_only) {
+  std::vector<std::tuple<std::string, std::string, bool>> values;
+  for (const auto& p : Envoy::Extensions::Common::Wasm::wasmTestMatrix(include_nullvm, cpp_only)) {
+    values.push_back(std::make_tuple(std::get<0>(p), std::get<1>(p), true));
+    values.push_back(std::make_tuple(std::get<0>(p), std::get<1>(p), false));
+  }
+  return values;
+}
+
 std::string
 wasmTestParamsToString(const ::testing::TestParamInfo<std::tuple<std::string, std::string>>& p) {
   return std::get<0>(p.param) + "_" + std::get<1>(p.param);
+}
+
+std::string wasmDualFilterTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<std::string, std::string, bool>>& p) {
+  return (std::get<2>(p.param) ? "downstream_" : "upstream_") + std::get<0>(p.param) + "_" +
+         std::get<1>(p.param);
 }
 
 } // namespace Wasm

@@ -145,7 +145,7 @@ Step 4: Browse to the dev app and login
 
 The development app should now be available at http://localhost:10001 and provide a login button:
 
-.. image:: /start/sandboxes/_static/spa-login.png
+.. image:: /start/sandboxes/_include/single-page-app/_static/spa-login.png
    :align: center
 
 .. note::
@@ -212,7 +212,7 @@ Envoy then uses this authorization code with its client secret to confirm author
 
 Once logged in, you should be able to make queries to the API using the OAuth credentials:
 
-.. image:: /start/sandboxes/_static/spa-resources.png
+.. image:: /start/sandboxes/_include/single-page-app/_static/spa-resources.png
    :align: center
 
 .. warning::
@@ -252,7 +252,7 @@ For the sandbox app,
 :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
 is set, and so Envoy also passes the acquired access token back to the user as a cookie:
 
-.. image:: /start/sandboxes/_static/spa-cookies.png
+.. image:: /start/sandboxes/_include/single-page-app/_static/spa-cookies.png
    :align: center
 
 This cookie is then passed through Envoy in any subsequent requests to the proxied Myhub API:
@@ -476,7 +476,7 @@ more control and is generally preferable.
 
 This can be done either at the `user <github-user-settings_>`_ or organization levels:
 
-.. image:: /start/sandboxes/_static/spa-github-oauth.png
+.. image:: /start/sandboxes/_include/single-page-app/_static/spa-github-oauth.png
    :align: center
 
 .. note::
@@ -605,7 +605,7 @@ Browse to the production server https://localhost:10000
 
 You can now log in and use the `Github APIs <github-api_>`__.:
 
-.. image:: /start/sandboxes/_static/spa-login-github.png
+.. image:: /start/sandboxes/_include/single-page-app/_static/spa-login-github.png
    :align: center
 
 .. seealso::

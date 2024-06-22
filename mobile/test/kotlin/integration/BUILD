@@ -332,8 +332,6 @@ envoy_mobile_android_test(
         "FilterThrowingExceptionTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [

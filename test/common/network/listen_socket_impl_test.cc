@@ -207,7 +207,8 @@ TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
     address_str = "1::2";
   }
 
-  Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
+  Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressNoThrow(address_str);
 
   TestListenSocket socket(Utility::getIpv4AnyAddress());
 
