@@ -19,6 +19,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
     deps = [
         "//source/extensions/http/early_header_mutation/header_mutation:header_mutation_lib",
+        "//source/extensions/string_matcher/lua:config",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],

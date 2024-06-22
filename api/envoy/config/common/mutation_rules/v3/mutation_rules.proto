@@ -4,6 +4,7 @@ package envoy.config.common.mutation_rules.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -96,6 +97,9 @@ message HeaderMutation {
     // Remove the specified header if it exists.
     string remove = 1
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Remove the header if it matches.
+    type.matcher.v3.StringMatcher remove_match = 3;
 
     // Append new header by the specified HeaderValueOption.
     core.v3.HeaderValueOption append = 2;

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/header_mutation/header_mutation.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -48,6 +49,21 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    - remove_match:
+        exact: "flag-header-7"
+    - remove_match:
+        safe_regex:
+          regex: "flag-[a-z]+-8"
+    - remove_match:
+        custom:
+          name: envoy.string_matcher.lua
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.string_matcher.lua.v3.Lua
+            source_code:
+              inline_string: |
+                function envoy_match(str)
+                    return str == "flag-header-9"
+                end
     response_mutations:
     - remove: "flag-header"
     - append:
@@ -80,6 +96,21 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    - remove_match:
+        exact: "flag-header-7"
+    - remove_match:
+        safe_regex:
+          regex: "flag-[a-z]+-8"
+    - remove_match:
+        custom:
+          name: envoy.string_matcher.lua
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.string_matcher.lua.v3.Lua
+            source_code:
+              inline_string: |
+                function envoy_match(str)
+                    return str == "flag-header-9"
+                end
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -96,14 +127,15 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
 
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, factory_context);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config);
+      std::make_shared<HeaderMutationConfig>(proto_config, factory_context);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -127,6 +159,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {"flag-header-3", "flag-header-3-value-old"},
           {"flag-header-4", "flag-header-4-value-old"},
           {"flag-header-6", "flag-header-6-value-old"},
+          {"flag-header-7", "flag-header-value"},
+          {"flag-header-8", "flag-header-value"},
+          {"flag-header-9", "flag-header-value"},
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
@@ -148,6 +183,12 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
       EXPECT_FALSE(headers.has("flag-header-5"));
       // 'flag-header-6' was present and should be overwritten.
       EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+      // 'flag-header-7' is removed.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-7")));
+      // 'flag-header-8' is removed by regex match.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-8")));
+      // 'flag-header-9' is removed by lua match.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-9")));
     }
 
     // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
@@ -159,6 +200,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {"flag-header-3", "flag-header-3-value-old"},
           {"flag-header-4", "flag-header-4-value-old"},
           {"flag-header-6", "flag-header-6-value-old"},
+          {"flag-header-7", "flag-header-value"},
+          {"flag-header-8", "flag-header-value"},
+          {"flag-header-9", "flag-header-value"},
           {":status", "200"},
       };
 
@@ -183,6 +227,12 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
       EXPECT_FALSE(headers.has("flag-header-5"));
       // 'flag-header-6' was present and should be overwritten.
       EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+      // 'flag-header-7' is removed.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-7")));
+      // 'flag-header-8' is removed by regex match.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-8")));
+      // 'flag-header-9' is removed by lua match.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-9")));
     }
 
     // Case where the request headers map is nullptr.
@@ -194,6 +244,9 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
           {"flag-header-3", "flag-header-3-value-old"},
           {"flag-header-4", "flag-header-4-value-old"},
           {"flag-header-6", "flag-header-6-value-old"},
+          {"flag-header-7", "flag-header-value"},
+          {"flag-header-8", "flag-header-value"},
+          {"flag-header-9", "flag-header-value"},
           {":status", "200"},
       };
 
@@ -216,6 +269,12 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
       EXPECT_FALSE(headers.has("flag-header-5"));
       // 'flag-header-6' was present and should be overwritten.
       EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+      // 'flag-header-7' is removed.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-7")));
+      // 'flag-header-8' is removed by regex match.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-8")));
+      // 'flag-header-9' is removed by lua match.
+      EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-9")));
     }
   }
 
@@ -260,6 +319,12 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
     EXPECT_FALSE(headers.has("flag-header-5"));
     // 'flag-header-6' was present and should be overwritten.
     EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+    // 'flag-header-7' is removed.
+    EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-7")));
+    // 'flag-header-8' is removed by regex match.
+    EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-8")));
+    // 'flag-header-9' is removed by lua match.
+    EXPECT_FALSE(headers.has(Envoy::Http::LowerCaseString("flag-header-9")));
   }
 
   {

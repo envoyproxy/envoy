@@ -12,8 +12,8 @@ namespace HeaderMutation {
 absl::StatusOr<Http::FilterFactoryCb>
 HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& config, const std::string&, DualInfo,
-    Server::Configuration::ServerFactoryContext&) {
-  auto filter_config = std::make_shared<HeaderMutationConfig>(config);
+    Server::Configuration::ServerFactoryContext& factory_context) {
+  auto filter_config = std::make_shared<HeaderMutationConfig>(config, factory_context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));
   };
@@ -21,9 +21,10 @@ HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 HeaderMutationFactoryConfig::createRouteSpecificFilterConfigTyped(
-    const PerRouteProtoConfig& proto_config, Server::Configuration::ServerFactoryContext&,
+    const PerRouteProtoConfig& proto_config,
+    Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<PerRouteHeaderMutation>(proto_config);
+  return std::make_shared<PerRouteHeaderMutation>(proto_config, factory_context);
 }
 
 using UpstreamHeaderMutationFactoryConfig = HeaderMutationFactoryConfig;
