@@ -4729,6 +4729,8 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseData) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  useAccessLog("%DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% %RESPONSE_DURATION% "
+               "%RESPONSE_TX_DURATION%");
   constexpr uint32_t kStreamWindowSize = 64 * 1024;
   // Set buffer limit large enough to accommodate H/2 stream window, so we can cause downstream
   // codec to buffer data without pushing back on upstream.
@@ -4801,6 +4803,17 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
       ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 128));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
     }
+  }
+
+  std::string timing = waitForAccessLog(access_log_name_);
+  if (fake_upstreams_[0]->httpType() != Http::CodecType::HTTP1 &&
+      downstreamProtocol() != Http::CodecType::HTTP1) {
+    // All duration values should be present (no '-' in the access log) when neither upstream nor
+    // downstream is H/1
+    ASSERT_FALSE(absl::StrContains(timing, '-'));
+  } else {
+    // When one the peers is H/1 the stream is reset and request duration values will be unset
+    ASSERT_TRUE(absl::StrContains(timing, " - - "));
   }
 }
 
@@ -4923,6 +4936,8 @@ TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
 
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  useAccessLog("%DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% %RESPONSE_DURATION% "
+               "%RESPONSE_TX_DURATION%");
   constexpr uint32_t kStreamChunkSize = 64 * 1024;
   config_helper_.setBufferLimits(kStreamChunkSize * 2, kStreamChunkSize * 2);
   initialize();
@@ -4951,6 +4966,9 @@ TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 0x80));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   tcp_client->close();
+  std::string timing = waitForAccessLog(access_log_name_);
+  // All duration values should be present (no '-' in the access log)
+  ASSERT_FALSE(absl::StrContains(timing, '-'));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
