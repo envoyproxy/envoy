@@ -1,13 +1,23 @@
 #include "source/common/buffer/buffer_impl.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
+
+#include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
 
-#include "absl/container/fixed_array.h"
-#include "event2/buffer.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Buffer {

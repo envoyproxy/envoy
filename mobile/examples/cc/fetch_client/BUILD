@@ -24,6 +24,7 @@ envoy_cc_library(
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/http:header_map_interface",
+        "@envoy//source/common/event:libevent_lib",
         "@envoy//source/common/http:header_map_lib",
     ],
 )

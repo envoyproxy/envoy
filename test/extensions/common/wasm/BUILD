@@ -82,6 +82,7 @@ envoy_cc_test_binary(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/event:libevent_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/extensions/common/wasm:wasm_runtime",
         "//test/mocks/server:server_mocks",
