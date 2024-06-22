@@ -13,6 +13,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/common/tls/ssl_handshaker.h"
 
 #include "openssl/ssl.h"
@@ -458,16 +459,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         factory_context.messageValidationVisitor());
     return;
   }
-
-  auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorConfigFactory>(
-      "envoy.tls.certificate_selectors.default");
-  if (!factory) {
-    IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
-  } else {
-    const ProtobufWkt::Any any;
-    tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
-        any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
-  }
+  auto factory =
+      TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
+  const ProtobufWkt::Any any;
+  tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
+      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {

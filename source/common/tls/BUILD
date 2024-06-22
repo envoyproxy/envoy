@@ -145,6 +145,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":server_context_lib",
         ":ssl_handshaker_lib",
         "//envoy/secret:secret_callbacks_interface",
         "//envoy/secret:secret_provider_interface",
