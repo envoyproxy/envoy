@@ -4,11 +4,11 @@ Using the Envoy Docker Image
 ============================
 
 .. note::
-  Envoy OCI images are built using Docker and have been extensively battle-tested in large scale 
+  Envoy OCI images are built using Docker and have been extensively battle-tested in large scale
   deployments running with Docker. Use of other container technologies such as Podman might
   function correctly but have not been extensively tested and are not expressly supported.
 
-The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
+The following examples use the :ref:`official Envoy OCI image <start_install_docker>`.
 
 These instructions are known to work for the ``x86_64`` and ``arm64`` architectures.
 
@@ -34,13 +34,13 @@ either by ensuring the correct permissions on the file, or making it world-reada
 below.
 
 
-Build and run a Docker image
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Build and run an Envoy image with Docker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create a simple Dockerfile to execute Envoy.
+Create a simple ``Dockerfile`` to execute Envoy.
 
 If you create a custom ``envoy.yaml`` you can create your own Docker image with it using the following
-Dockerfile recipe:
+``Dockerfile`` recipe:
 
 .. substitution-code-block:: dockerfile
 
@@ -78,7 +78,7 @@ With Nomad, this means setting ``readonly_rootfs = true`` in the task's ``config
 Permissions for running Envoy in containers as a non-root user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, the Envoy Docker image will start as the root user but will switch to the ``envoy``
+By default, the Envoy OCI image will start as the root user but will switch to the ``envoy``
 user created at build time, in the Docker ``ENTRYPOINT``.
 
 Alternatively, you can start the container specifying the Docker ``user``.
