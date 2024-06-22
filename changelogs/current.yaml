@@ -191,6 +191,10 @@ bug_fixes:
     Validate http service path_prefix
     :ref:`path_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_prefix>`,
     Validate http service path_prefix configuration must start with ``/``.
+- area: admin
+  change: |
+    Fixed missing :ref:`additional addresses <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`
+    for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
