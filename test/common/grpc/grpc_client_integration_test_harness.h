@@ -390,6 +390,8 @@ public:
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
+    EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+    EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
     for (const auto& value : initial_metadata) {
       EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }

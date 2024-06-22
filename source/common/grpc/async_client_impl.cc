@@ -85,6 +85,9 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   if (!options.retry_policy.has_value() && parent_.retryPolicy().has_value()) {
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
+
+  options_.setSendInternal(false);
+  options_.setSendXff(false);
   // Configure the maximum frame length
   decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
 
