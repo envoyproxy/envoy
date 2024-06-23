@@ -1,0 +1,25 @@
+name: Arm64 testing
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+concurrency:
+  group: |
+    ${{ github.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-request
+  cancel-in-progress: true
+
+
+jobs:
+  arm64:
+    permissions:
+      contents: read
+    runs-on: envoy-ubuntu-arm64
+    steps:
+    - run: |
+        apt-get install docker-ce=5:24.0.9-1~ubuntu.22.04~jammy docker-ce-cli=5:24.0.9-1~ubuntu.22.04~jammy
+        docker --version
