@@ -86,8 +86,14 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
 
-  options_.setSendInternal(false);
-  options_.setSendXff(false);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_disable_internal_headers")) {
+    options_.setSendInternal(false);
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_disable_xff_headers")) {
+    options_.setSendXff(false);
+  }
+
   // Configure the maximum frame length
   decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
 

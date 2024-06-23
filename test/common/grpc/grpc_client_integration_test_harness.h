@@ -390,8 +390,16 @@ public:
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
-    EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
-    EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
+    if (expect_internal_header_) {
+      EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
+    } else {
+      EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+    }
+    if (expect_xff_header_) {
+      EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
+    } else {
+      EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
+    }
     for (const auto& value : initial_metadata) {
       EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
@@ -531,6 +539,8 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
+  bool expect_internal_header_{false};
+  bool expect_xff_header_{false};
 };
 
 // SSL connection credential validation tests.
