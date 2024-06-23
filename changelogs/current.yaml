@@ -197,7 +197,7 @@ bug_fixes:
     for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
 - area: grpc
   change: |
-    Remove "x-envoy-internal" and `x-forward-for` headers from Envoy gRPC path, both of which are not applicable to
+    Remove ``x-envoy-internal`` and ``x-forward-for`` headers from Envoy gRPC path, both of which are not applicable to
     Envoy gRPC side stream calls. This behavior can be reverted by setting the runtime flag
     ``envoy.reloadable_features.grpc_remove_internal_headers`` and ``envoy.reloadable_features.grpc_remove_xff_headers`` to false.
 
