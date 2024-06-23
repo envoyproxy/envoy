@@ -24,6 +24,6 @@ jobs:
         echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
         $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo  tee /etc/apt/sources.list.d/docker.list > /dev/null
         sudo apt-get update
-        sudo apt show docker-ce -a
-        sudo apt-get install docker-ce=5:24.0.9-1~ubuntu.22.04~jammy docker-ce-cli=5:24.0.9-1~ubuntu.22.04~jammy
+        # sudo apt show docker-ce -a
+        sudo apt-get install -y --allow-downgrades docker-ce=5:24.0.9-1~ubuntu.22.04~jammy docker-ce-cli=5:24.0.9-1~ubuntu.22.04~jammy
         sudo docker --version
