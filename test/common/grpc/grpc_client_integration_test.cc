@@ -30,7 +30,8 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that a simple request-reply stream works.
+// Validate that a simple request-reply stream works, "x-envoy-internal" and `x-forward-for` headers
+// are enabled.
 TEST_P(GrpcClientIntegrationTest, BasicStreamEnableInternalHeaders) {
   // "x-envoy-internal" and `x-forward-for` headers are only enabled on Envoy gRPC path.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
