@@ -72,7 +72,9 @@ Root filesystem permissions for running Envoy in containers
 
 The Envoy container image can be run with the container's root filesystem mounted read-only.
 For example, using Docker and Podman, you can use the ``--read-only`` option of the ``run`` command.
+
 With Kubernetes, this means setting ``podSpec.containers.securityContext.readOnlyFilesystem`` to ``true``.
+
 With Nomad, this means setting ``readonly_rootfs = true`` in the task's ``config`` block when using the ``docker`` or ``podman`` driver.
 
 Permissions for running Envoy in containers as a non-root user
