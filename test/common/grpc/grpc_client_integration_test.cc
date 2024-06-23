@@ -36,9 +36,8 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamEnableInternalHeaders) {
   // "x-envoy-internal" and `x-forward-for` headers are only enabled on Envoy gRPC path.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.grpc_disable_internal_headers", "false"}});
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.grpc_disable_xff_headers", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.grpc_remove_internal_headers", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.grpc_remove_xff_headers", "false"}});
   expect_internal_header_ = true;
   expect_xff_header_ = true;
   initialize();

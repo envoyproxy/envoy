@@ -86,11 +86,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_disable_internal_headers")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_remove_internal_headers")) {
     options_.setSendInternal(false);
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_disable_xff_headers")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_remove_xff_headers")) {
     options_.setSendXff(false);
   }
 
