@@ -4,7 +4,7 @@ Using the Envoy Docker Image
 ============================
 
 .. note::
-  Envoy OCI images are built using Docker and have been extensively battle-tested in large scale
+  Envoy OCI images are built using Docker and have been extensively tested in large scale
   deployments running with Docker. Use of other container technologies such as Podman might
   function correctly but have not been extensively tested and are not expressly supported.
 
@@ -71,7 +71,7 @@ Root filesystem permissions for running Envoy in containers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Envoy container image can be run with the container's root filesystem mounted read-only.
-With Docker and Podman, this means using the ``--read-only`` option of the ``run`` command.
+For example, using Docker and Podman, you can use the ``--read-only`` option of the ``run`` command.
 With Kubernetes, this means setting ``podSpec.containers.securityContext.readOnlyFilesystem`` to ``true``.
 With Nomad, this means setting ``readonly_rootfs = true`` in the task's ``config`` block when using the ``docker`` or ``podman`` driver.
 
