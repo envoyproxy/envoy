@@ -21,6 +21,6 @@ jobs:
     runs-on: envoy-x64-small
     steps:
     - run: |
-        sudo apt-show docker-ce -a
+        sudo apt show docker-ce -a
         sudo apt-get install docker-ce=5:24.0.9-1~ubuntu.22.04~jammy docker-ce-cli=5:24.0.9-1~ubuntu.22.04~jammy
         sudo docker --version
