@@ -18,7 +18,7 @@ jobs:
   arm64:
     permissions:
       contents: read
-    runs-on: envoy-ubuntu-arm64
+    runs-on: envoy-x64-small
     steps:
     - run: |
         apt-get install docker-ce=5:24.0.9-1~ubuntu.22.04~jammy docker-ce-cli=5:24.0.9-1~ubuntu.22.04~jammy
