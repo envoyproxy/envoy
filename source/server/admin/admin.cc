@@ -185,9 +185,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       {{Admin::ParamDescriptor::Type::String, "paths",
                         "Change multiple logging levels by setting to "
                         "<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>. "
-                        "If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. "
+                        "If fine grain logging is enabled, use __FILE__ or a glob experision as "
+                        "the logger name. "
                         "For example, source/common*:warning"},
-                       {Admin::ParamDescriptor::Type::Enum, "level", "desired logging level, this will change all loggers's level",
+                       {Admin::ParamDescriptor::Type::Enum, "level",
+                        "desired logging level, this will change all loggers's level",
                         prepend("", LogsHandler::levelStrings())}}),
           makeHandler("/memory", "print current allocation/heap usage",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
