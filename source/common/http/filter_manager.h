@@ -884,14 +884,23 @@ protected:
           saw_downstream_reset_(false), stream_closed_(false), should_force_close_stream_(false) {}
     uint32_t filter_call_state_{0};
 
-    bool remote_decode_complete_ : 1; // Set when decoder filter chain iteration has completed.
-    bool remote_encode_complete_ : 1; // Set when encoder filter chain iteration has completed.
+    bool remote_decode_complete_ : 1; // Set when decoder filter chain iteration has completed. All
+                                      // decoder filters have completed and end_stream was observed.
+    bool remote_encode_complete_ : 1; // Set when encoder filter chain iteration has completed. All
+                                      // decoder filters have completed and end_stream was observed.
+    // TODO(yanavlasov): always use encoder_end_stream_ for tracking end_stream state during encoder
+    // filter iteration.
     bool encoder_end_stream_ : 1; // This is set the first time the end_stream is observed during
-                                  // encoder filter chain iteration and used to set the end_stream
-                                  // flag when resuming encoder filter chain iteration.
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
+                                  // encoder filter chain iteration and used only to set the
+                                  // end_stream flag when resuming encoder filter chain iteration.
+                                  // It is only used when the
+                                  // `allow_multiplexed_upstream_half_close` runtime flag is true.
+    bool local_complete_ : 1; // This indicates that request is complete prior to filter processing.
+                              // This flag terminates decoder filter chain iteration.
+                              // It is also used to track the `end_stream` state during encoder
+                              // filter chain iteration when `allow_multiplexed_upstream_half_close`
+                              // runtime flag is false. A filter can still stop the stream from
+                              // being complete as seen by the codec.
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
     bool has_1xx_headers_ : 1;
