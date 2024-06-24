@@ -648,9 +648,7 @@ public:
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
         filter_chain_factory_(filter_chain_factory),
         no_downgrade_to_canonical_name_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.no_downgrade_to_canonical_name")),
-        allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {}
+            "envoy.reloadable_features.no_downgrade_to_canonical_name")) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -871,7 +869,8 @@ public:
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
   virtual bool shouldLoadShed() { return false; };
-  bool allowUpstreamHalfClose() const { return allow_upstream_half_close_; }
+
+  void stopDecoding() { state_.should_force_close_stream_ = true; }
 
 protected:
   struct State {
@@ -1115,7 +1114,6 @@ private:
   State state_;
 
   const bool no_downgrade_to_canonical_name_{};
-  const bool allow_upstream_half_close_{};
 };
 
 // The DownstreamFilterManager has explicit handling to send local replies.

@@ -283,7 +283,7 @@ private:
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
-    bool isHalfCloseEnabled() override { return filter_manager_.allowUpstreamHalfClose(); }
+    bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
@@ -638,6 +638,7 @@ private:
   uint32_t requests_during_dispatch_count_{0};
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
+  const bool allow_upstream_half_close_{};
 };
 
 } // namespace Http
