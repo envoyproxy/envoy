@@ -65,7 +65,7 @@ TEST(Logger, StreamFineGrainLoggerRegistration) {
                                   lock, false};
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
-  getFineGrainLogContext().removeFineGrainLogEntry(__FILE__);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
 
   // Make sure fine-grain logger is initialized even the log level is trace.
   filter.logStreamTraceMessage();
@@ -82,7 +82,7 @@ TEST(Logger, EventFineGrainLoggerRegistration) {
                                   lock, false};
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
-  getFineGrainLogContext().removeFineGrainLogEntry(__FILE__);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
 
   // Make sure fine-grain logger is initialized even the log level is trace.
   filter.logEventTraceMessage();
@@ -99,7 +99,7 @@ TEST(Logger, ConnFineGrainLoggerRegistration) {
                                   lock, false};
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
-  getFineGrainLogContext().removeFineGrainLogEntry(__FILE__);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
 
   // Make sure fine-grain logger is initialized even the log level is trace.
   filter.logConnTraceMessage();
