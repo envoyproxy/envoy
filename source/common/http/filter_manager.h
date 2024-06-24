@@ -660,7 +660,7 @@ public:
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
        << DUMP_MEMBER(state_.remote_decode_complete_) << DUMP_MEMBER(state_.remote_encode_complete_)
        << DUMP_MEMBER(state_.encoder_end_stream_) << DUMP_MEMBER(state_.stream_closed_)
-       << DUMP_MEMBER(state_.should_force_close_stream_) << "\n";
+       << DUMP_MEMBER(state_.should_stop_decoding_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -870,7 +870,7 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
-  void stopDecoding() { state_.should_force_close_stream_ = true; }
+  void stopDecoding() { state_.should_stop_decoding_ = true; }
 
 protected:
   struct State {
@@ -880,7 +880,7 @@ protected:
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false), under_on_local_reply_(false),
           decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false), stream_closed_(false), should_force_close_stream_(false) {}
+          saw_downstream_reset_(false), stream_closed_(false), should_stop_decoding_(false) {}
     uint32_t filter_call_state_{0};
 
     bool remote_decode_complete_ : 1; // Set when decoder filter chain iteration has completed. All
@@ -919,8 +919,8 @@ protected:
     bool stream_closed_ : 1; // Set when both remote_decode_complete_ and remote_encode_complete_ is
                              // true observed for the first time and prevents ending the stream
                              // multiple times. Only set when allow_upstream_half_close is enabled.
-    bool should_force_close_stream_ : 1; // Set to indicate that stream should be fully closed due
-                                         // to either local reply or error response from the server.
+    bool should_stop_decoding_ : 1; // Set to indicate that decoding on the stream should be stopped
+                                    // due to either local reply or error response from the server.
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
