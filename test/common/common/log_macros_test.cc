@@ -43,6 +43,14 @@ public:
                             "fake message {}", "val");
   }
 
+  void logConnTraceMessage() { ENVOY_CONN_LOG(trace, "fake trace message", connection_); }
+
+  void logStreamTraceMessage() { ENVOY_STREAM_LOG(trace, "fake trace message", stream_); }
+
+  void logEventTraceMessage() {
+    ENVOY_CONN_LOG_EVENT(trace, "fake_event", "fake message", connection_);
+  }
+
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
 
 private:
@@ -50,6 +58,57 @@ private:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
 };
+
+TEST(Logger, StreamFineGrainLoggerRegistration) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
+  Logger::Context::enableFineGrainLogger();
+  TestFilterLog filter;
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+
+  // Make sure fine-grain logger is initialized even the log level is trace.
+  filter.logStreamTraceMessage();
+  filter.logStreamTraceMessage();
+  filter.logStreamTraceMessage();
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
+
+TEST(Logger, EventFineGrainLoggerRegistration) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
+  Logger::Context::enableFineGrainLogger();
+  TestFilterLog filter;
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+
+  // Make sure fine-grain logger is initialized even the log level is trace.
+  filter.logEventTraceMessage();
+  filter.logEventTraceMessage();
+  filter.logEventTraceMessage();
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
+
+TEST(Logger, ConnFineGrainLoggerRegistration) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
+  Logger::Context::enableFineGrainLogger();
+  TestFilterLog filter;
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+
+  // Make sure fine-grain logger is initialized even the log level is trace.
+  filter.logConnTraceMessage();
+  filter.logConnTraceMessage();
+  filter.logConnTraceMessage();
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
 
 TEST(Logger, All) {
   // This test exists just to ensure all macros compile and run with the expected arguments provided
