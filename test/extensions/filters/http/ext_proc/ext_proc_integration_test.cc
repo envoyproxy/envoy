@@ -640,9 +640,6 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
-  if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
-  }
   initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     test::integration::filters::ExpectSpan ext_proc_span;
@@ -651,9 +648,13 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
     ext_proc_span.set_context_injected(true);
     ext_proc_span.set_sampled(true);
     ext_proc_span.mutable_tags()->insert({"grpc.status_code", "0"});
-    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
-
+    if (IsEnvoyGrpc()) {
+      ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    } else {
+      ext_proc_span.mutable_tags()->insert(
+          {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
+    }
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
@@ -669,6 +670,9 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
 
   processor_stream_->startGrpcStream();
+  EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
+      << "expected traceparent header";
+
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -707,9 +711,6 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
-  if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
-  }
   initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     test::integration::filters::ExpectSpan ext_proc_span;
@@ -719,8 +720,13 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
     ext_proc_span.set_sampled(true);
     ext_proc_span.mutable_tags()->insert({"grpc.status_code", "2"});
     ext_proc_span.mutable_tags()->insert({"error", "true"});
-    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
+    if (IsEnvoyGrpc()) {
+      ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    } else {
+      ext_proc_span.mutable_tags()->insert(
+          {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
+    }
 
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
@@ -735,6 +741,9 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
+      << "expected traceparent header";
+
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
   verifyDownstreamResponse(*response, 500);
@@ -1167,7 +1176,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(!header.value().empty());
           EXPECT_TRUE(header.raw_value().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -1225,7 +1233,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(header.value().empty());
           EXPECT_TRUE(!header.raw_value().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.raw_value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -2365,10 +2372,6 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
-  if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
-  }
-
   // ensure 200 ms timeout
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
   initializeConfig();
@@ -2381,9 +2384,13 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
     ext_proc_span.set_sampled(true);
     ext_proc_span.mutable_tags()->insert({"status", "canceled"});
     ext_proc_span.mutable_tags()->insert({"error", ""}); // not an error
-    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
-
+    if (IsEnvoyGrpc()) {
+      ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    } else {
+      ext_proc_span.mutable_tags()->insert(
+          {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
+    }
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
@@ -2400,6 +2407,9 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
                                });
+
+  EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
+      << "expected traceparent header";
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 500);

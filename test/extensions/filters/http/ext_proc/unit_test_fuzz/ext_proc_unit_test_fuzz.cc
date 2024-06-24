@@ -20,7 +20,7 @@ namespace UnitTestFuzz {
 class FuzzerMocks {
 public:
   FuzzerMocks()
-      : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")), buffer_("foo") {
+      : addr_(*Network::Address::PipeInstance::create("/test/test.sock")), buffer_("foo") {
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
