@@ -515,8 +515,8 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
-// Validate sample_percent config bad denominator.
-TEST(ConfigTest, TestSamplePercentConfigBadDenominator) {
+// Config test to check if sample_percent config is not specified.
+TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
   const std::string yaml_string = R"EOF(
       typed_config:
         name: set-response-code
@@ -524,216 +524,14 @@ TEST(ConfigTest, TestSamplePercentConfigBadDenominator) {
           "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
           abort:
             http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 20
-          denominator: 5
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.getSampleRatio(config), EnvoyException,
-                            "ExecuteFilterAction sample_percent config denominator setting is "
-                            "invalid : 5. Valid range 0~2.");
-}
-
-// Validate sample_percent config bad numerator.
-TEST(ConfigTest, TestSamplePercentConfigBadNumerator) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 20000
-          denominator: TEN_THOUSAND
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.getSampleRatio(config), EnvoyException,
-      "ExecuteFilterAction sample_percent config is invalid. sample_ratio=2(Numerator 20000 / "
-      "Denominator 10000). The valid range is 0~1.");
-}
-
-// Config test to check MILLION
-TEST(ConfigTest, TestSamplePercentConfigMillion) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 20000
-          denominator: Million
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.02), factory.getSampleRatio(config));
-}
-
-// Config test to check TEN_THOUSAND
-TEST(ConfigTest, TestSamplePercentConfigTenThousand) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 3000
-          denominator: TEN_THOUSAND
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(0.3), factory.getSampleRatio(config));
-}
-
-// Config test to check normal runtime_key override case
-TEST(ConfigTest, TestRuntimeConfigOverrideNormal) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 30
-          denominator: HUNDRED
-        runtime_key: foo
-  )EOF";
+   )EOF";
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
   ExecuteFilterActionFactory factory;
-  EXPECT_CALL(runtime.snapshot_, getInteger(_, _)).WillRepeatedly(testing::Return(70));
-  float sample_ratio = factory.getSampleRatio(config);
-  EXPECT_EQ(float(0.3), sample_ratio);
-  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
-  EXPECT_EQ(float(0.7), sample_ratio_runtime);
-}
-
-// Config test to check no sample_percent config
-TEST(ConfigTest, TestNoRuntimeConfigOverride) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  EXPECT_FALSE(config.has_sample_percent());
-  EXPECT_TRUE(config.sample_percent().runtime_key().empty());
-  ExecuteFilterActionFactory factory;
-  EXPECT_EQ(float(1), factory.getSampleRatio(config));
-}
-
-// Config test to check no default_value config but with runtime_key override case
-TEST(ConfigTest, TestRuntimeConfigOverrideNoDefaultValue) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        runtime_key: bar
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  EXPECT_CALL(runtime.snapshot_, getInteger(_, _)).WillRepeatedly(testing::Return(10));
-  float sample_ratio = factory.getSampleRatio(config);
-  EXPECT_EQ(float(0), sample_ratio);
-  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
-  EXPECT_EQ(float(0.1), sample_ratio_runtime);
-}
-
-// Config test to check invalid runtime_key number case
-TEST(ConfigTest, TestRuntimeConfigOverrideInvalid) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 30
-          denominator: HUNDRED
-        runtime_key: foo
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  EXPECT_CALL(runtime.snapshot_, getInteger(_, _)).WillRepeatedly(testing::Return(120));
-  float sample_ratio = factory.getSampleRatio(config);
-  EXPECT_EQ(float(0.3), sample_ratio);
-  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
-  EXPECT_EQ(float(0.3), sample_ratio_runtime);
-}
-
-// Config test to check runtime_key is empty
-TEST(ConfigTest, TestRuntimeConfigOverrideEmpty) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-      sample_percent:
-        default_value:
-          numerator: 80
-          denominator: HUNDRED
-        runtime_key:
-  )EOF";
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-  ExecuteFilterActionFactory factory;
-  float sample_ratio = factory.getSampleRatio(config);
-  EXPECT_EQ(float(0.8), sample_ratio);
-  float sample_ratio_runtime = factory.getSampleRatioRuntime(sample_ratio, "foo", runtime);
-  EXPECT_EQ(float(0.8), sample_ratio_runtime);
+  EXPECT_TRUE(factory.isSampled(config, runtime));
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {

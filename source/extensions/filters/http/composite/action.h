@@ -45,22 +45,13 @@ public:
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 
-  // Get the sample ratio from the default_value configuration.
-  // This routine is called in the control plane.
-  float getSampleRatio(
-      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action);
-
-  // The the sample ratio from the runtime_key configuration. If it is a valid config, using it
-  // to override the default_value config. This routine is called in the data plane.
-  float getSampleRatioRuntime(float sample_ratio, const std::string& runtime_key,
-                              Envoy::Runtime::Loader& runtime);
+  // Rolling the dice to decide whether the action will be sampled.
+  // By default, if sample_percent is not specified, then it is sampled.
+  bool isSampled(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Envoy::Runtime::Loader& runtime);
 
 private:
-  // Rolling the dice to decide whether the action will be sampled.
-  // This routine is called in the data plane.
-  bool isSampled(float sample_ratio, const std::string& runtime_key,
-                 Random::RandomGenerator& random, Envoy::Runtime::Loader& runtime);
-
   Matcher::ActionFactoryCb createActionFactoryCbCommon(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
@@ -81,26 +72,23 @@ private:
             config_discovery, name, server_factory_context, factory_context,
             server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
 
-    Random::RandomGenerator& random = server_factory_context.api().randomGenerator();
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
-    const std::string runtime_key = composite_action.sample_percent().runtime_key();
-    const float sample_ratio = getSampleRatio(composite_action);
+    return
+        [provider = std::move(provider), n = std::move(name),
+         composite_action = std::move(composite_action), &runtime, this]() -> Matcher::ActionPtr {
+          if (!isSampled(composite_action, runtime)) {
+            return nullptr;
+          }
 
-    return [provider = std::move(provider), n = std::move(name), sample_ratio,
-            runtime_key = std::move(runtime_key), &random, &runtime, this]() -> Matcher::ActionPtr {
-      if (!isSampled(sample_ratio, runtime_key, random, runtime)) {
-        return nullptr;
-      }
-
-      auto config_value = provider->config();
-      if (config_value.has_value()) {
-        auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-      }
-      // There is no dynamic config available. Apply missing config filter.
-      auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
-      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-    };
+          auto config_value = provider->config();
+          if (config_value.has_value()) {
+            auto factory_cb = config_value.value().get().factory_cb;
+            return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+          }
+          // There is no dynamic config available. Apply missing config filter.
+          auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
+          return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+        };
   }
 
   Matcher::ActionFactoryCb createDynamicActionFactoryCbDownstream(
