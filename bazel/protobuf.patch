@@ -110,6 +110,18 @@ diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.b
      }),
  )
 
+diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
+--- a/src/google/protobuf/port_def.inc	2023-06-27 01:17:34.917105764 +0000
++++ b/src/google/protobuf/port_def.inc	2023-06-27 01:18:12.069060142 +0000
+@@ -1004,7 +1004,7 @@
+ #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+ // Turn on -Wdeprecated-enum-enum-conversion. This deprecation comes in C++20
+ // via http://wg21.link/p1120r0.
+-#pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
++// #pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
+ // This error has been generally flaky, but we need to disable it specifically
+ // to fix https://github.com/protocolbuffers/protobuf/issues/12313
+ #pragma clang diagnostic ignored "-Wunused-parameter"
 diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
 --- a/src/google/protobuf/compiler/BUILD.bazel
 +++ b/src/google/protobuf/compiler/BUILD.bazel
