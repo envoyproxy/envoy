@@ -1920,7 +1920,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectionPercentageOverride) {
   // One host represents 33% which isn't allowed by max_ejection_percent, which is 30.
   const std::string yaml = R"EOF(
 max_ejection_percent: 30
-may_always_eject_one: true
+always_eject_one_host: true
 max_ejection_time_jitter: 13s
   )EOF";
   envoy::config::cluster::v3::OutlierDetection outlier_detection_;
