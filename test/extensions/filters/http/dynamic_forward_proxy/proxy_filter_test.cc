@@ -656,7 +656,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   InSequence s;
 
   // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  auto host_info =
+      std::make_shared<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>();
   host_info->address_ = nullptr;
 
   EXPECT_CALL(callbacks_, route());
@@ -674,7 +675,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_CALL(*host_info, address());
   EXPECT_CALL(callbacks_,
               sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
-                             Eq("dns_resolution_failure")));
+                             Eq("dns_resolution_failure{}")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

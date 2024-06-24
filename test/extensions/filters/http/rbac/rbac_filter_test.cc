@@ -348,6 +348,137 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, AllowedDynamicMetadataStats) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "rules_stat_prefix_");
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "foo",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY, "rules_stat_prefix_");
+
+  setDestinationPort(123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("denied",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "foo",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+}
+
+// Make sure dynamic metadata is written in the case that there's a shadow engine but no enforced
+// engine.
+TEST_F(RoleBasedAccessControlFilterTest, ShadowOnlyDynamicMetadataStats) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+  envoy::config::rbac::v3::Policy shadow_policy;
+  auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
+  shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
+  shadow_policy_rules->add_rules()->set_destination_port(123);
+  shadow_policy.add_principals()->set_any(true);
+  config.mutable_shadow_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
+  (*config.mutable_shadow_rules()->mutable_policies())["shadow_rule"] = shadow_policy;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor());
+  setupConfig(std::move(config_ptr));
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Defaults to allow when there's no engine to enforce.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_engine_result"));
+  EXPECT_EQ("denied",
+            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_effective_policy_id"));
+  EXPECT_EQ(
+      "shadow_rule",
+      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+}
+
+// Make sure dynamic metadata is written in the case that there's an enforced engine but no shadow
+// engine.
+TEST_F(RoleBasedAccessControlFilterTest, EnforcedOnlyDynamicMetadataStats) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+      TestUtility::createRegexMatcher(".*cncf.io"));
+  policy_rules->add_rules()->set_destination_port(123);
+  policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
+  policy.add_principals()->set_any(true);
+  config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
+  (*config.mutable_rules()->mutable_policies())["enforced_policy"] = policy;
+  config.set_rules_stat_prefix("rules_stat_prefix_");
+
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor());
+  setupConfig(std::move(config_ptr));
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Defaults to allow when there's no engine to enforce.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("denied",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "enforced_policy",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+}
+
+// Dynamic metadata metrics should only be written if there's a shadow engine and / or there's an
+// enforced engine.
+TEST_F(RoleBasedAccessControlFilterTest, NoEnginesNoDynamicMetadataStats) {
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "test", *stats_store_.rootScope(),
+      context_, ProtobufMessage::getStrictValidationVisitor());
+  setupConfig(std::move(config_ptr));
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Defaults to allow when there's no engine to enforce.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+
+  ASSERT_FALSE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
 
