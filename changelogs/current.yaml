@@ -173,6 +173,9 @@ bug_fixes:
     Set the SNI value from the requested server name if it isn't available on the connection/socket. This applies when
     ``include_tls_session`` is true. The requested server name is set on a connection when filters such as the TLS
     inspector are used.
+- area: oauth
+  change: |
+    The id token cookie now expires at the same time the id token itself expires, instead of when the access token expires.
 - area: decompression
   change: |
     Fixed a bug where Envoy will go into an endless loop when using the brotli decompressor. If the input stream has
