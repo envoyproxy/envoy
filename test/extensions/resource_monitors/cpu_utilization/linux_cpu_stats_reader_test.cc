@@ -15,7 +15,7 @@ namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
 
-TEST(CpuStatsReader, ReadsCpuStatsEc2) {
+TEST(LinuxCpuStatsReader, ReadsCpuStats) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats");
   AtomicFileUpdater file_updater(temp_path);
   const std::string contents = R"EOF(
@@ -45,7 +45,7 @@ softirq 1714610175 0 8718679 72686 1588388544 32 0 293214 77920941 12627 3920345
   EXPECT_EQ(cpu_times.total_time, 29590585);
 }
 
-TEST(CpuStatsReader, CannotReadFileEc2) {
+TEST(LinuxCpuStatsReader, CannotReadFile) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_not_exists");
   LinuxCpuStatsReader cpu_stats_reader(temp_path);
   CpuTimes cpu_times = cpu_stats_reader.getCpuTimes();

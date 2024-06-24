@@ -11,9 +11,6 @@ namespace CpuUtilizationMonitor {
 
 static const std::string LINUX_CPU_STATS_FILE = "/proc/stat";
 
-constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE = 4;
-constexpr uint64_t MICROSECONDS = 1000 * 1000;
-
 class LinuxCpuStatsReader : public CpuStatsReader {
 public:
   LinuxCpuStatsReader(const std::string& cpu_stats_filename = LINUX_CPU_STATS_FILE);

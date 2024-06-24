@@ -353,6 +353,37 @@ It's expected that the first few gradations shouldn't trigger anything, unless
 there's something seriously wrong e.g. in this example streams using ``>=
 128MiB`` in buffers.
 
+CPU Intensive Workload Brownout Protection
+------------------------------------------
+
+The ``envoy.overload_actions.stop_accepting_requests`` overload action can be used 
+to protect workloads from browning-out when an unexpected spike in the number of 
+requests the workload receives that causes the CPU to become saturated. This overload
+action when used in conjunction with the ``envoy.resource_monitors.cpu_utilization``
+resource monitor can reduce the pressure on the CPU by cheaply rejecting new requests.
+While the real mitigation for such request spikes are horizantally scaling the workload,
+this overload action can be used to ensure the fleet does not get into a cascading failure
+mode. 
+Some platform owners may choose to install this overload action by default to protect the fleet,
+since it is easier to configure a target CPU utilization percentage than to configure a request rate per
+workload.
+
+.. code-block:: yaml
+
+   refresh_interval:
+     seconds: 0
+     nanos: 250000000
+   resource_monitors:
+     - name: "envoy.resource_monitors.cpu_utilization"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
+   actions:
+     - name: "envoy.overload_actions.stop_accepting_requests"
+       triggers:
+         - name: "envoy.resource_monitors.cpu_utilization"
+           scaled:
+             scaling_threshold: 0.80
+             saturation_threshold: 0.95
 
 Statistics
 ----------

@@ -5,6 +5,10 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 
+constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
+    4; // we are interested in user, nice, system and idle times.
+constexpr uint64_t MICROSECONDS = 1000 * 1000;
+
 LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
     : cpu_stats_filename_(cpu_stats_filename) {}
 
@@ -12,7 +16,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   std::ifstream cpu_stats_file;
   cpu_stats_file.open(cpu_stats_filename_);
   if (!cpu_stats_file.is_open()) {
-    ENVOY_LOG_MISC(error, "Can't open ec2 cpu stats file {}", cpu_stats_filename_);
+    ENVOY_LOG_MISC(error, "Can't open linux cpu stats file {}", cpu_stats_filename_);
     return {false, 0, 0};
   }
 

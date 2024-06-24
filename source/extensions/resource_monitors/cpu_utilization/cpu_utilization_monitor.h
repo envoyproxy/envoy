@@ -13,8 +13,6 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 
-constexpr double DAMPENING_ALPHA = 0.05;
-
 class CpuUtilizationMonitor : public Server::ResourceMonitor {
 public:
   CpuUtilizationMonitor(
