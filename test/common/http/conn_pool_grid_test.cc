@@ -35,6 +35,8 @@ namespace Http {
 class ConnectivityGridForTest : public ConnectivityGrid {
 public:
   using ConnectivityGrid::ConnectivityGrid;
+  using ConnectivityGrid::getOrCreateHttp2Pool;
+  using ConnectivityGrid::getOrCreateHttp3Pool;
 
   static bool hasHttp3FailedRecently(const ConnectivityGrid& grid) {
     return grid.getHttp3StatusTracker().hasHttp3FailedRecently();
@@ -47,22 +49,10 @@ public:
     return grid.getOrCreateHttp2Pool();
   }
 
-  ConnectionPool::Instance* getOrCreateHttp3Pool() override {
-    if (!http3_pool_) {
-      http3_pool_.reset(createMockPool("http3"));
-    }
-    return http3_pool_.get();
-  }
-  ConnectionPool::Instance* getOrCreateHttp2Pool() override {
-    if (!http2_pool_) {
-      http2_pool_.reset(createMockPool("http2"));
-    }
-    return http2_pool_.get();
-  }
-  ConnectionPool::Instance* createMockPool(absl::string_view type) {
+  ConnectionPool::InstancePtr createHttp3Pool() override { return createMockPool("http3"); }
+  ConnectionPool::InstancePtr createHttp2Pool() override { return createMockPool("http2"); }
+  ConnectionPool::InstancePtr createMockPool(absl::string_view type) {
     ConnectionPool::MockInstance* instance = new NiceMock<ConnectionPool::MockInstance>();
-    setupPool(*instance);
-    pools_.push_back(instance);
     ON_CALL(*instance, newStream(_, _, _))
         .WillByDefault(
             Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
@@ -88,7 +78,7 @@ public:
               return cancel_;
             }));
     EXPECT_CALL(*instance, protocolDescription()).Times(AnyNumber()).WillRepeatedly(Return(type));
-    return instance;
+    return absl::WrapUnique(instance);
   }
 
   ConnectionPool::MockInstance* http3Pool() {

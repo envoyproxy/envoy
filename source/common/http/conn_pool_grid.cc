@@ -266,10 +266,7 @@ ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp3Pool() {
   ASSERT(!deferred_deleting_);
   ASSERT(!draining_);
   if (http3_pool_ == nullptr) {
-    http3_pool_ = Http3::allocateConnPool(
-        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
-        state_, quic_stat_names_, *alternate_protocols_, scope_,
-        makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
+    http3_pool_ = createHttp3Pool();
     pools_.push_back(http3_pool_.get());
     setupPool(*http3_pool_.get());
   }
@@ -280,14 +277,25 @@ ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp2Pool() {
   ASSERT(!deferred_deleting_);
   ASSERT(!draining_);
   if (http2_pool_ == nullptr) {
-    http2_pool_ = std::make_unique<HttpConnPoolImplMixed>(
-        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
-        state_, origin_, alternate_protocols_);
+    http2_pool_ = createHttp2Pool();
     pools_.push_back(http2_pool_.get());
     setupPool(*http2_pool_.get());
   }
 
   return http2_pool_.get();
+}
+
+ConnectionPool::InstancePtr ConnectivityGrid::createHttp2Pool() {
+  return std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
+                                                 options_, transport_socket_options_, state_,
+                                                 origin_, alternate_protocols_);
+}
+
+ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool() {
+  return Http3::allocateConnPool(
+      dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_, state_,
+      quic_stat_names_, *alternate_protocols_, scope_,
+      makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
@@ -320,7 +328,6 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       delay_tcp_attempt = false;
     }
   } else {
-    // Make sure the HTTP/2 pool is created.
     pool = getOrCreateHttp2Pool();
   }
   auto wrapped_callback =
@@ -339,7 +346,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
 
   // Return a handle if the caller hasn't yet been notified of success/failure.
-  // Note there may still be connection attempts, if we'e waiting on a slow H3 connection.
+  // There may still be connection attempts, if the wrapper is waiting on a slow H3 connection.
   return ret->hasNotifiedCaller() ? nullptr : ret;
 }
 
