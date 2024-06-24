@@ -535,8 +535,8 @@ public:
   Network::ClientConnectionPtr client_connection_;
 };
 
+// The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest,
-                                  // The integration test uses `TestRealTimeSystem`
                                   public GrpcClientIntegrationTestBase<Event::TestRealTimeSystem> {
 public:
   virtual Network::Address::IpVersion getIpVersion() const override {
@@ -547,9 +547,9 @@ public:
   };
 };
 
+// The integration test for Envoy gRPC flow control. It uses `SimulatedTime`.
 class EnvoyGrpcFlowControlTest
     : public EnvoyGrpcClientIntegrationParamTest,
-      // The integration test uses `SimulatedTimeSystemHelper`
       public GrpcClientIntegrationTestBase<Event::SimulatedTimeSystemHelper> {
 public:
   virtual Network::Address::IpVersion getIpVersion() const override {
