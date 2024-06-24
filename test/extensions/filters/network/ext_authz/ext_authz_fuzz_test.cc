@@ -65,6 +65,11 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
+  // Create a mock client and immediately pack it into a unique_ptr. This way if the ConfigSharedPtr
+  // constructor fails the client will not get leaked.
+  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
+  auto client_ptr = Filters::Common::ExtAuthz::ClientPtr{client};
+
   ConfigSharedPtr config;
   try {
     config = std::make_shared<Config>(proto_config, *stats_store.rootScope(), context);
@@ -73,21 +78,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
     return;
   }
 
-  auto client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
-  for (const auto& action : input.actions()) {
-    if (action.action_selector_case() ==
-            envoy::extensions::filters::network::ext_authz::Action::kOnData &&
-        action.on_data().has_result()) {
-      // Optional input field to set default authorization check result for the following "onData()"
-      ON_CALL(*client, check(_, _, _, _))
-          .WillByDefault(WithArgs<0>(
-              Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-                callbacks.onComplete(makeAuthzResponse(
-                    resultCaseToCheckStatus(action.on_data().result().result_selector_case())));
-              })));
-    }
-  }
-  auto filter = std::make_unique<Filter>(config, std::move(client));
+  auto filter = std::make_unique<Filter>(config, std::move(client_ptr));
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
@@ -102,6 +93,15 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   for (const auto& action : input.actions()) {
     switch (action.action_selector_case()) {
     case envoy::extensions::filters::network::ext_authz::Action::kOnData: {
+      // Optional input field to set default authorization check result for the following "onData()"
+      if (action.on_data().has_result()) {
+        ON_CALL(*client, check(_, _, _, _))
+            .WillByDefault(WithArgs<0>(
+                Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+                  callbacks.onComplete(makeAuthzResponse(
+                      resultCaseToCheckStatus(action.on_data().result().result_selector_case())));
+                })));
+      }
       Buffer::OwnedImpl buffer(action.on_data().data());
       filter->onData(buffer, action.on_data().end_stream());
       break;
