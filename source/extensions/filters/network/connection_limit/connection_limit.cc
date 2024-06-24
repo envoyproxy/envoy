@@ -81,12 +81,12 @@ Network::FilterStatus Filter::onNewConnection() {
     if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
       delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                            "connection_limit_close_over_limit");
+                                            "over_connection_limit");
       });
       delay_timer_->enableTimer(duration.value());
     } else {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                          "connection_limit_close_over_limit");
+                                          "over_connection_limit");
     }
     return Network::FilterStatus::StopIteration;
   }
