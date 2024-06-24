@@ -4486,9 +4486,9 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 
   ASSERT_TRUE(response->waitForEndStream());
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_THAT(
-        waitForAccessLog(access_log_name_),
-        HasSubstr("upstream_reset_before_response_started{connection_termination|QUIC_NO_ERROR}"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_),
+                HasSubstr("upstream_reset_before_response_started{connection_termination|QUIC_"
+                          "PACKET_WRITE_ERROR}"));
   } else {
     EXPECT_THAT(waitForAccessLog(access_log_name_),
                 HasSubstr("upstream_reset_before_response_started{connection_termination}"));
@@ -4725,13 +4725,9 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_EQ(waitForAccessLog(access_log_name_),
-              "upstream_reset_before_response_started{protocol_error|QUIC_HTTP_FRAME_ERROR}");
-  } else {
-    EXPECT_EQ(waitForAccessLog(access_log_name_),
-              "upstream_reset_before_response_started{protocol_error}");
-  }
+
+  EXPECT_EQ(waitForAccessLog(access_log_name_),
+            "upstream_reset_before_response_started{protocol_error}");
   // Upstream connection should stay up
   ASSERT_TRUE(fake_upstream_connection_->connected());
 }
