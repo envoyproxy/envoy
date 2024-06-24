@@ -149,7 +149,7 @@ TEST_F(CELFormatterTest, TestContains) {
 TEST_F(CELFormatterTest, TestComplexCelExpression) {
   const std::string yaml = R"EOF(
   text_format_source:
-    inline_string: "%CEL(request.url_path.contains('request'))% %PROTOCOL%"
+    inline_string: "%CEL(request.url_path.contains('request'))% %CEL(request.headers['x-envoy-original-path']):9%"
   formatters:
     - name: envoy.formatter.cel
       typed_config:
@@ -159,7 +159,7 @@ TEST_F(CELFormatterTest, TestComplexCelExpression) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("true -", formatter->formatWithContext(formatter_context_, stream_info_));
+  EXPECT_EQ("true /original", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestInvalidExpression) {
