@@ -50,6 +50,8 @@ public:
                      ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     bool hasNotifiedCaller() { return inner_callbacks_ == nullptr; }
+
+    // Event::DeferredDeletable
     // The wrapper is being deleted - cancel all alarms.
     void deleteIsPending() override { next_attempt_timer_.reset(); }
 
