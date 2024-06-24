@@ -63,7 +63,6 @@ body_format:
   })";
   }
 
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(
@@ -101,12 +100,13 @@ body_format:
   EXPECT_EQ("550", response->headers().Status()->value().getStringView());
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_terminated; "
-            "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_ERROR}; UC\"");
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
+              "ERROR}; UC\"");
   } else {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_terminated; "
-            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
   }
   EXPECT_EQ("bar",
             response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
@@ -249,11 +249,14 @@ body_format:
   // Note: there should be an %0A at the end.
   std::string expected_grpc_message;
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    expected_grpc_message = "upstream connect error or disconnect/reset before headers. reset reason:"
-      " connection termination, transport failure reason: QUIC_NO_ERROR:503:path=/package.service/method%0A";
+    expected_grpc_message =
+        "upstream connect error or disconnect/reset before headers. reset reason:"
+        " connection termination, transport failure reason: "
+        "QUIC_NO_ERROR:503:path=/package.service/method%0A";
   } else {
-    expected_grpc_message = "upstream connect error or disconnect/reset before headers. reset reason:"
-      " connection termination:503:path=/package.service/method%0A";
+    expected_grpc_message =
+        "upstream connect error or disconnect/reset before headers. reset reason:"
+        " connection termination:503:path=/package.service/method%0A";
   }
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -525,16 +528,16 @@ mappers:
   } else {
     EXPECT_EQ("95", response->headers().ContentLength()->value().getStringView());
   }
-  
 
   EXPECT_EQ("551", response->headers().Status()->value().getStringView());
 
   if (GetParam().upstream_protocol == Http::CodecType::HTTP3) {
-    EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
-                              "reason: connection termination, transport failure reason: QUIC_NO_ERROR");
+    EXPECT_EQ(response->body(),
+              "upstream connect error or disconnect/reset before headers. reset "
+              "reason: connection termination, transport failure reason: QUIC_NO_ERROR");
   } else {
     EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. reset "
-                              "reason: connection termination");
+                                "reason: connection termination");
   }
 }
 
