@@ -24,7 +24,7 @@ namespace LocalRateLimitFilter {
 
 class LocalRateLimitTestBase : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  LocalRateLimitTestBase() : singleton_manager_(Thread::threadFactoryForTest()) {}
+  LocalRateLimitTestBase() = default;
 
   uint64_t initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;

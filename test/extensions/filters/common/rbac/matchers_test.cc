@@ -293,7 +293,7 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
   // Only IP address is valid for the permission rule.
   NiceMock<StreamInfo::MockStreamInfo> info2;
   Envoy::Network::Address::InstanceConstSharedPtr addr2 =
-      std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
+      *Envoy::Network::Address::PipeInstance::create("test");
   info2.downstream_connection_info_provider_->setLocalAddress(addr2);
   checkMatcher(PortRangeMatcher(range), false, conn, headers, info2);
 
