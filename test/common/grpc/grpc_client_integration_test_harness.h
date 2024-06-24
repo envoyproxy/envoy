@@ -271,6 +271,7 @@ public:
 
 using HelloworldRequestPtr = std::unique_ptr<HelloworldRequest>;
 
+// Integration test base that can be used with time system varaints.
 template <class TimeSystemVariant> class GrpcClientIntegrationTestBase {
 public:
   GrpcClientIntegrationTestBase()
