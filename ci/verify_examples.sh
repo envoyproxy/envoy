@@ -11,8 +11,6 @@ WARNINGS=()
 # Sandboxes listed here should be regarded as broken(/untested) until whatever
 # is causing them to flake is resolved!!!
 FLAKY_SANDBOXES=(
-    # no device available in CI
-    dlb
     # https://github.com/envoyproxy/envoy/issues/28542
     double-proxy
     # https://github.com/envoyproxy/envoy/issues/31347

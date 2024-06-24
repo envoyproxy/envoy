@@ -22,8 +22,9 @@ filegroup(
             "jaeger-native-tracing/*",
             "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
-            # Contrib extensions tested over in contrib.
+            # no available devices in the CI env
             "dlb/*.yaml",
+            # Contrib extensions tested over in contrib.
             "golang-http/*.yaml",
             "golang-network/*.yaml",
             "mysql/*",
