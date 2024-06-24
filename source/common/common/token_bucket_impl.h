@@ -37,41 +37,33 @@ private:
 
 /**
  * Atomic token bucket. This class is thread-safe.
- * TODO(wbpcode): this could be used to replace the SharedTokenBucketImpl once this
- * implementation is proven to be robust.
  */
-class AtomicTokenBucketImpl : public TokenBucket {
+class AtomicTokenBucketImpl {
 public:
   /**
    * @param max_tokens supplies the maximum number of tokens in the bucket.
    * @param time_source supplies the time source.
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
+   * @param init_fill supplies whether the bucket should be initialized with max_tokens.
    */
   explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
-                                 double fill_rate = 1);
+                                 double fill_rate = 1.0, bool init_fill = true);
 
-  uint64_t consume(uint64_t tokens, bool allow_partial) override;
-  uint64_t consume(uint64_t tokens, bool allow_partial,
-                   std::chrono::milliseconds& time_to_next_token) override;
-  // The next token available time is calculated based on the fill rate and the number of tokens
-  // available in the bucket. But in the multi-threaded environment, the number of tokens available
-  // can change between the calculation and the actual consumption. So, the next token available
-  // time may not be accurate.
-  std::chrono::milliseconds nextTokenAvailable() override;
-  // Reset the number of tokens in the bucket to the specified number. But in the multi-threaded
-  // environment, the number of tokens available in the bucket can change by other mayReset calls.
-  // So, the final number of tokens in the bucket may not be the same as the specified number.
-  void maybeReset(uint64_t num_tokens) override;
+  /**
+   * Consume tokens from the bucket.
+   * @param tokens supplies the number of tokens to consume.
+   * @param allow_partial supplies whether partial consumption is allowed.
+   * @param factor supplies the factor to multiply the fill rate by. This is used to change the fill
+   * rate based on the requirement of the caller.
+   * @return the number of tokens consumed.
+   */
+  uint64_t consume(uint64_t tokens, bool allow_partial, double factor = 1.0);
 
 private:
   const double max_tokens_{};
   const double fill_rate_{};
-  std::atomic<double> total_tokens_{};
-  std::atomic<bool> could_fill_{true};
-  // The last time the bucket was filled or reset. It is that ensured only one thread could fill the
-  // bucket and update the last_fill_ at the same time by the could_fill_ flag.
-  MonotonicTime last_fill_;
+  std::atomic<double> last_time_in_second_{};
   TimeSource& time_source_;
 };
 
