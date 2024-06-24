@@ -12,7 +12,7 @@ namespace Envoy {
  * Type of Value must be empty-constructible and moveable, e.g. smart pointers and POD types.
  */
 template <class Value> class TrieLookupTable {
-  static constexpr int32_t NO_NODE = -1;
+  static constexpr int32_t NoNode = -1;
   // A TrieNode aims to be a good balance of performant and
   // space-efficient, by allocating a vector the size of the range of children
   // the node contains. This should be good for most use-cases.
@@ -39,7 +39,7 @@ template <class Value> class TrieLookupTable {
   struct TrieNode {
     Value value_{};
     // Vector of indices into nodes_, where [0] maps to min_child_key_.
-    // NO_NODE will be in any index where there is not a child.
+    // NoNode will be in any index where there is not a child.
     std::vector<int32_t> children_;
     uint8_t min_child_key_{0};
   };
@@ -53,7 +53,7 @@ template <class Value> class TrieLookupTable {
   int32_t getChildIndex(int32_t current, uint8_t char_key) const {
     const TrieNode& node = nodes_[current];
     if (node.min_child_key_ > char_key || node.min_child_key_ + node.children_.size() <= char_key) {
-      return NO_NODE;
+      return NoNode;
     }
     return node.children_[char_key - node.min_child_key_];
   }
@@ -79,7 +79,7 @@ template <class Value> class TrieLookupTable {
     if (char_key < node.min_child_key_) {
       std::vector<int32_t> new_children;
       new_children.reserve(node.min_child_key_ - char_key + node.children_.size());
-      new_children.resize(node.min_child_key_ - char_key, NO_NODE);
+      new_children.resize(node.min_child_key_ - char_key, NoNode);
       std::move(node.children_.begin(), node.children_.end(), std::back_inserter(new_children));
       new_children[0] = child_index;
       node.min_child_key_ = char_key;
@@ -88,7 +88,7 @@ template <class Value> class TrieLookupTable {
     }
     if (char_key >= (node.min_child_key_ + node.children_.size())) {
       // Expand the vector forwards.
-      node.children_.resize(char_key - node.min_child_key_ + 1, NO_NODE);
+      node.children_.resize(char_key - node.min_child_key_ + 1, NoNode);
       // Fall through to "insert" behavior.
     }
     node.children_[char_key - node.min_child_key_] = child_index;
@@ -107,7 +107,7 @@ public:
     int32_t current = 0;
     for (uint8_t c : key) {
       int32_t next = getChildIndex(current, c);
-      if (next == NO_NODE) {
+      if (next == NoNode) {
         next = nodes_.size();
         nodes_.emplace_back();
         setChildIndex(current, c, next);
@@ -131,7 +131,7 @@ public:
     int32_t current = 0;
     for (uint8_t c : key) {
       current = getChildIndex(current, c);
-      if (current == NO_NODE) {
+      if (current == NoNode) {
         return {};
       }
     }
@@ -153,7 +153,7 @@ public:
     for (uint8_t c : key) {
       current = getChildIndex(current, c);
 
-      if (current == NO_NODE) {
+      if (current == NoNode) {
         return nodes_[result].value_;
       } else if (nodes_[current].value_) {
         result = current;
