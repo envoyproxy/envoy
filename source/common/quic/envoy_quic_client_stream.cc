@@ -370,16 +370,16 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   }
 }
 
-void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
+void EnvoyQuicClientStream::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
     runResetCallbacks(
         source == quic::ConnectionCloseSource::FROM_SELF
-            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
-            : quicErrorCodeToEnvoyRemoteResetReason(error),
-        quic::QuicErrorCodeToString(error));
+            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code, session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+        quic::QuicErrorCodeToString(frame.quic_error_code));
   }
-  quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
+  quic::QuicSpdyClientStream::OnConnectionClosed(frame, source);
 }
 
 void EnvoyQuicClientStream::OnClose() {

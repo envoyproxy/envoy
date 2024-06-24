@@ -81,7 +81,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   }
   maybeMarkHttp3Broken();
 
-  auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
+  grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
@@ -111,8 +111,8 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
 }
 
 void ConnectivityGrid::WrapperCallbacks::deleteThis() {
-  // By removing the entry from the list, it will be deleted.
-  removeFromList(grid_.wrapped_callbacks_);
+  // Set this to delete on the next dispatcher loop.
+  grid_.dispatcher_.deferredDelete(removeFromList(grid_.wrapped_callbacks_));
 }
 
 ConnectivityGrid::StreamCreationResult
@@ -139,7 +139,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     maybeMarkHttp3Broken();
   }
 
-  auto delete_this_on_return = attempt->removeFromList(connection_attempts_);
+  grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   // If an HTTP/3 connection attempts is in progress, let it complete so that if it succeeds
@@ -207,9 +207,8 @@ ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
   // return true regardless of if newStream resulted in an immediate result or
   // an async call, as either way the attempt will result in success/failure
   // callbacks.
-  grid_.createNextPool(); // Make sure the HTTP/2 pool exists
   has_attempted_http2_ = true;
-  return newStream(*grid_.http2_pool_);
+  return newStream(*grid_.getOrCreateHttp2Pool());
 }
 
 ConnectivityGrid::ConnectivityGrid(
@@ -263,31 +262,40 @@ void ConnectivityGrid::deleteIsPending() {
   }
 }
 
-ConnectionPool::Instance* ConnectivityGrid::createNextPool() {
+ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp3Pool() {
   ASSERT(!deferred_deleting_);
-  // Pools are created by newStream, which should not be called during draining.
   ASSERT(!draining_);
-  // If both pools exist we're done.
-  if ((http2_pool_ && http3_pool_) || draining_) {
-    return nullptr;
-  }
-
-  // HTTP/3 is hard-coded as higher priority, H2 as secondary.
-  if (!http3_pool_) {
-    http3_pool_ = Http3::allocateConnPool(
-        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
-        state_, quic_stat_names_, *alternate_protocols_, scope_,
-        makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
+  if (http3_pool_ == nullptr) {
+    http3_pool_ = createHttp3Pool();
     pools_.push_back(http3_pool_.get());
-  } else {
-    http2_pool_ = std::make_unique<HttpConnPoolImplMixed>(
-        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
-        state_, origin_, alternate_protocols_);
+    setupPool(*http3_pool_.get());
+  }
+  return http3_pool_.get();
+}
+
+ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp2Pool() {
+  ASSERT(!deferred_deleting_);
+  ASSERT(!draining_);
+  if (http2_pool_ == nullptr) {
+    http2_pool_ = createHttp2Pool();
     pools_.push_back(http2_pool_.get());
+    setupPool(*http2_pool_.get());
   }
 
-  setupPool(*pools_.back());
-  return pools_.back();
+  return http2_pool_.get();
+}
+
+ConnectionPool::InstancePtr ConnectivityGrid::createHttp2Pool() {
+  return std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
+                                                 options_, transport_socket_options_, state_,
+                                                 origin_, alternate_protocols_);
+}
+
+ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool() {
+  return Http3::allocateConnPool(
+      dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_, state_,
+      quic_stat_names_, *alternate_protocols_, scope_,
+      makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
@@ -311,10 +319,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   ASSERT(!draining_);
 
   // Always start with the HTTP/3 pool if it exists.
-  ConnectionPool::Instance* pool = http3_pool_ ? http3_pool_.get() : http2_pool_.get();
-  if (!pool) {
-    pool = createNextPool();
-  }
+  ConnectionPool::Instance* pool = getOrCreateHttp3Pool();
   Instance::StreamOptions overriding_options = options;
   bool delay_tcp_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
@@ -323,9 +328,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       delay_tcp_attempt = false;
     }
   } else {
-    // Make sure the HTTP/2 pool is created.
-    createNextPool();
-    pool = http2_pool_.get();
+    pool = getOrCreateHttp2Pool();
   }
   auto wrapped_callback =
       std::make_unique<WrapperCallbacks>(*this, decoder, callbacks, overriding_options);
@@ -334,18 +337,17 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   if (ret->newStream(*pool) == StreamCreationResult::ImmediateResult) {
     // If newStream succeeds, return nullptr as the caller has received their
     // callback and does not need a cancellable handle. At this point the
-    // WrappedCallbacks object has also been deleted.
+    // WrappedCallbacks object is queued to be deleted.
     return nullptr;
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
-    absl::optional<StreamCreationResult> result = ret->tryAnotherConnection();
-    if (result.has_value() && result.value() == StreamCreationResult::ImmediateResult) {
-      // As above, if we have an immediate success, return nullptr.
-      return nullptr;
-    }
+    ret->tryAnotherConnection();
   }
-  return ret;
+
+  // Return a handle if the caller hasn't yet been notified of success/failure.
+  // There may still be connection attempts, if the wrapper is waiting on a slow H3 connection.
+  return ret->hasNotifiedCaller() ? nullptr : ret;
 }
 
 void ConnectivityGrid::addIdleCallback(IdleCb cb) {
@@ -356,8 +358,7 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
 
 void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
-    // Note that no new pools can be created from this point on
-    // as createNextPool fast-fails if `draining_` is true.
+    // Note that no new pools should be created from this point on.
     draining_ = true;
   }
   for (auto& pool : pools_) {

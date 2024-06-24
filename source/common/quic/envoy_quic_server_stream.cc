@@ -360,18 +360,18 @@ void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
 }
 
-void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
+void EnvoyQuicServerStream::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                quic::ConnectionCloseSource source) {
   // Run reset callback before closing the stream so that the watermark change will not trigger
   // callbacks.
   if (!local_end_stream_) {
     runResetCallbacks(
         source == quic::ConnectionCloseSource::FROM_SELF
-            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
-            : quicErrorCodeToEnvoyRemoteResetReason(error),
-        quic::QuicErrorCodeToString(error));
+            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code, session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+        quic::QuicErrorCodeToString(frame.quic_error_code));
   }
-  quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
+  quic::QuicSpdyServerStreamBase::OnConnectionClosed(frame, source);
 }
 
 void EnvoyQuicServerStream::CloseWriteSide() {
