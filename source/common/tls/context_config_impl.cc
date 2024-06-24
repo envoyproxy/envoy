@@ -380,7 +380,7 @@ absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ClientContextConfigImpl>(
+  std::unique_ptr<ClientContextConfigImpl> ret = absl::WrapUnique(
       new ClientContextConfigImpl(config, secret_provider_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
@@ -434,7 +434,7 @@ absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ServerContextConfigImpl>(
+  std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(
       new ServerContextConfigImpl(config, secret_provider_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
