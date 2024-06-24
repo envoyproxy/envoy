@@ -10070,7 +10070,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true, creation_status_),
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                            creation_status_),
       EnvoyException,
       "path_match_policy.path_template /rest/{one/{two} is invalid: Invalid variable name: "
       "\"one/{two\"");
@@ -10169,7 +10170,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true, creation_status_),
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                            creation_status_),
       EnvoyException,
       "path_match_policy.path_template /rest/{middlewildcard=**}/{two} is invalid: Implicit "
       "variable path glob after text glob.");
@@ -10374,7 +10376,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true, creation_status_),
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                            creation_status_),
       EnvoyException,
       "path_match_policy.path_template /rest/{one}/{two}/{three}/{four}/{five}/{six} is invalid: "
       "Exceeded variable count limit (5)");
