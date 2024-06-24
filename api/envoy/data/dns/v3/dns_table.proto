@@ -128,7 +128,10 @@ message DnsTable {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v2alpha.DnsTable.DnsVirtualDomain";
 
-    // A domain name for which Envoy will respond to query requests
+    // A domain name for which Envoy will respond to query requests.
+    // Wildcard records are supported on the first label only, e.g. `*.example.com` or `*.subdomain.example.com`.
+    // Names such as `*example.com`, `subdomain.*.example.com`, `*subdomain.example.com`, etc
+    // are not valid wildcard names and asterisk will be interpreted as a literal `*` character.
     string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
 
     // The configuration containing the method to determine the address of this endpoint
