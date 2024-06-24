@@ -16,6 +16,11 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http3
+  change: |
+    Added a "happy eyeballs" feature to HTTP/3 upstream, where it assuming happy eyeballs sorting results in alternating address
+    families will attempt the first v4 and v6 address before giving up on HTTP/3.  This change can be reverted by setting
+    ``envoy.reloadable_features.http3_happy_eyeballs`` to false.
 - area: http2
   change: |
     Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime

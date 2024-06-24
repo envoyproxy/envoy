@@ -99,6 +99,8 @@ public:
     // connection has been attempted, an empty optional otherwise.
     absl::optional<StreamCreationResult> tryAnotherConnection();
 
+    void onNextAttemptTimer();
+
     // Called by a ConnectionAttempt when the underlying pool fails.
     void onConnectionAttemptFailed(ConnectionAttemptCallbacks* attempt,
                                    ConnectionPool::PoolFailureReason reason,
@@ -118,6 +120,9 @@ public:
                                     Upstream::HostDescriptionConstSharedPtr host);
 
   private:
+    bool shouldAttemptHttp3HappyEyeballs();
+    void attemptHttp3HappyEyeballs();
+
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
@@ -143,6 +148,8 @@ public:
     Event::TimerPtr next_attempt_timer_;
     // Checks if http2 has been attempted.
     bool has_attempted_http2_ = false;
+    // Checks if "happy eyeballs" has been done for HTTP/3
+    bool has_tried_http3_alternate_address_ = false;
     // True if the HTTP/3 attempt failed.
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
@@ -219,7 +226,7 @@ private:
   ConnectionPool::Instance* getOrCreateHttp3Pool();
   ConnectionPool::Instance* getOrCreateHttp2Pool();
 
-  virtual ConnectionPool::InstancePtr createHttp3Pool();
+  virtual ConnectionPool::InstancePtr createHttp3Pool(bool happy_eyeballs_attempt);
   virtual ConnectionPool::InstancePtr createHttp2Pool();
 
   // This batch of member variables are latched objects required for pool creation.
@@ -238,6 +245,7 @@ private:
 
   // The connection pools to use to create new streams
   ConnectionPool::InstancePtr http3_pool_;
+  ConnectionPool::InstancePtr http3_alternate_pool_;
   ConnectionPool::InstancePtr http2_pool_;
   // A convenience vector to allow taking actions on all pools.
   absl::InlinedVector<ConnectionPool::Instance*, 2> pools_;
