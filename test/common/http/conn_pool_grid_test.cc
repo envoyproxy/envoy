@@ -42,9 +42,13 @@ public:
     return grid.getHttp3StatusTracker().hasHttp3FailedRecently();
   }
 
+  // Allow force-creation of a ConnectivityGrid's actual HTTP/3 pool as opposed
+  // to using ConnectivityGridForTest's mock pools
   static ConnectionPool::Instance* forceGetOrCreateHttp3Pool(ConnectivityGrid& grid) {
     return grid.getOrCreateHttp3Pool();
   }
+  // Allow force-creation of a ConnectivityGrid's actual HTTP/2 pool as opposed
+  // to using ConnectivityGridForTest's mock pools
   static ConnectionPool::Instance* forceGetOrCreateHttp2Pool(ConnectivityGrid& grid) {
     return grid.getOrCreateHttp2Pool();
   }
