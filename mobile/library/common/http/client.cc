@@ -9,6 +9,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/stream_info/extra_stream_info.h"
@@ -502,7 +503,7 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
   saveFinalStreamIntel();   // Take a snapshot now in case the stream gets destroyed.
   callbacks_->latchError(); // Latch the error in case the stream gets destroyed.
-  runResetCallbacks(reason);
+  runResetCallbacks(reason, absl::string_view());
   if (!parent_.getStream(stream_handle_, GetStreamFilters::AllowForAllStreams)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely
     // while still open locally. In this case the stream will already have been removed from
@@ -717,7 +718,7 @@ void Client::cancelStream(envoy_stream_t stream) {
       // assertions checking stream presence, this is a likely potential culprit. However, it's
       // plausible that upstream guards will protect us here, given that Envoy allows streams to be
       // reset from a wide variety of contexts without apparent issue.
-      direct_stream->runResetCallbacks(StreamResetReason::RemoteReset);
+      direct_stream->runResetCallbacks(StreamResetReason::RemoteReset, absl::string_view());
     }
   }
 }
