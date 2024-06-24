@@ -85,7 +85,9 @@ public:
     TestEnvironment::writeStringToFileForTest("file_direct_updated.txt", "dummy-updated");
     TestEnvironment::renameFile(TestEnvironment::temporaryPath("file_direct_updated.txt"),
                                 TestEnvironment::temporaryPath("file_direct.txt"));
-
+    // This is needed to avoid a race between file rename, and the file being reloaded by data
+    // source provider.
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder_updated = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
         {":method", "POST"},
@@ -121,9 +123,6 @@ TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {
   testDirectResponseBodySize(1);
 }
 
-// TODO(https://github.com/envoyproxy/envoy/issues/34626) fix
-TEST_P(DirectResponseIntegrationTest, DISABLED_DefaultDirectResponseFile) {
-  testDirectResponseFile();
-}
+TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseFile) { testDirectResponseFile(); }
 
 } // namespace Envoy
