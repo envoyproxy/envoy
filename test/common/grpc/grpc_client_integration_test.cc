@@ -42,7 +42,6 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
   RequestArgs request_args;
   request_args.request = &request_msg;
   stream->sendRequest(request_args);
-  ;
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
