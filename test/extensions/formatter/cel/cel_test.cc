@@ -159,7 +159,7 @@ TEST_F(CELFormatterTest, TestComplexCelExpression) {
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-  EXPECT_EQ("true http", formatter->formatWithContext(formatter_context_, stream_info_));
+  EXPECT_EQ("true -", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestInvalidExpression) {
