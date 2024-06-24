@@ -146,6 +146,22 @@ TEST_F(CELFormatterTest, TestContains) {
   EXPECT_EQ("true", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
+TEST_F(CELFormatterTest, TestComplexCelExpression) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.url_path.contains('request'))% %PROTOCOL%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("true http", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
 TEST_F(CELFormatterTest, TestInvalidExpression) {
   const std::string yaml = R"EOF(
   text_format_source:
