@@ -108,7 +108,6 @@ envoy_cc_test(
     srcs = ["dns_utils_test.cc"],
     deps = [
         "//source/common/common:dns_utils_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -212,6 +211,8 @@ envoy_cc_test(
     srcs = ["logger_test.cc"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
@@ -232,6 +233,7 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -277,6 +279,11 @@ envoy_cc_test(
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "compiled_string_map_test",
+    srcs = ["compiled_string_map_test.cc"],
 )
 
 envoy_cc_test(
@@ -385,6 +392,23 @@ envoy_benchmark_test(
     benchmark_binary = "utility_speed_test",
 )
 
+envoy_cc_benchmark_binary(
+    name = "utility_trie_speed_test",
+    srcs = ["utility_trie_speed_test.cc"],
+    external_deps = [
+        "abseil_strings",
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "utility_trie_speed_test_benchmark_test",
+    benchmark_binary = "utility_trie_speed_test",
+)
+
 envoy_cc_test(
     name = "lock_guard_test",
     srcs = ["lock_guard_test.cc"],
@@ -490,5 +514,31 @@ envoy_cc_test(
     deps = [
         "//source/common/common:bit_array_lib",
         "//source/common/common:random_generator_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "inline_map_test",
+    srcs = ["inline_map_test.cc"],
+    deps = ["//source/common/common:inline_map"],
+)
+
+envoy_cc_benchmark_binary(
+    name = "inline_map_speed_test",
+    srcs = ["inline_map_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = ["//source/common/common:inline_map"],
+)
+
+envoy_benchmark_test(
+    name = "inline_map_speed_test_benchmark_test",
+    benchmark_binary = "inline_map_speed_test",
+)
+
+envoy_cc_test(
+    name = "execution_context_test",
+    srcs = ["execution_context_test.cc"],
+    deps = [
+        "//envoy/common:execution_context",
     ],
 )

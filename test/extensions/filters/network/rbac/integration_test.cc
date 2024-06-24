@@ -25,11 +25,7 @@ class RoleBasedAccessControlNetworkFilterIntegrationTest
       public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), rbac_config) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'tcp.shadow_denied' and stat_prefix 'tcp.'.
-    skip_tag_extraction_rule_check_ = true;
-  }
+      : BaseIntegrationTest(GetParam(), rbac_config) {}
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     rbac_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
@@ -48,6 +44,8 @@ public:
                     - not_id:
                         any: true
        -  name: envoy.filters.network.echo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
 )EOF");
   }
 

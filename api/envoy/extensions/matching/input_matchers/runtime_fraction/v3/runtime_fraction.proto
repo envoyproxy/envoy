@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.input_matchers.runtime_fraction.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.runtime_fraction.v3";
+option java_outer_classname = "RuntimeFractionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/input_matchers/runtime_fraction/v3;runtime_fractionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Runtime matcher]
+// [#extension: envoy.matching.matchers.runtime_fraction]
+
+// The runtime fraction matchers computes a hash from the input and matches if runtime feature is enabled
+// for the the resulting hash. Every time the input is considered for a match, its hash must fall within
+// the percentage of matches indicated by this field. For a fraction N/D, a number is computed as a hash
+// of the input on a field in the range [0,D). If the number is less than or equal to the value of the
+// numerator N, the matcher evaluates to true. A runtime_fraction input matcher can be used to gradually
+// roll out matcher changes without requiring full code or configuration deployments.
+// Note that distribution of matching results is only as good as one of the input.
+message RuntimeFraction {
+  // Match the input against the given runtime key. The specified default value is used if key is not
+  // present in the runtime configuration.
+  config.core.v3.RuntimeFractionalPercent runtime_fraction = 1
+      [(validate.rules).message = {required: true}];
+
+  // Optional seed passed through the hash function. This allows using additional information when computing
+  // the hash value: by changing the seed value, a potentially different outcome can be achieved for the same input.
+  uint64 seed = 2;
+}

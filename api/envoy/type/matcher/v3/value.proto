@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Specifies the way to match a ProtobufWkt::Value. Primitive values and ListValue are supported.
 // StructValue is not supported and is always not matched.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ValueMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.ValueMatcher";
 
@@ -56,6 +56,9 @@ message ValueMatcher {
     // If specified, a match occurs if and only if the target value is a list value and
     // is matched to this field.
     ListMatcher list_match = 6;
+
+    // If specified, a match occurs if and only if any of the alternatives in the match accept the value.
+    OrMatcher or_match = 7;
   }
 }
 
@@ -69,4 +72,9 @@ message ListMatcher {
     // If specified, at least one of the values in the list must match the value specified.
     ValueMatcher one_of = 1;
   }
+}
+
+// Specifies a list of alternatives for the match.
+message OrMatcher {
+  repeated ValueMatcher value_matchers = 1 [(validate.rules).repeated = {min_items: 2}];
 }

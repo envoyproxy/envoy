@@ -50,7 +50,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -90,14 +90,11 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(Server::Configuration::ServerFactoryContext& server_context,
-               const envoy::config::cluster::v3::Cluster& cluster,
+  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
                const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+               Upstream::ClusterFactoryContext& context,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
-               Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-               Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
@@ -201,7 +198,8 @@ private:
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks {
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
+        public std::enable_shared_from_this<RedisDiscoverySession> {
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -224,6 +222,8 @@ private:
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return true; }
+    bool connectionRateLimitEnabled() const override { return false; }
+    uint32_t connectionRateLimitPerSec() const override { return 0; }
     // For any readPolicy other than Primary, the RedisClientFactory will send a READONLY command
     // when establishing a new connection. Since we're only using this for making the "cluster
     // slots" commands, the READONLY command is not relevant in this context. We're setting it to
@@ -278,7 +278,7 @@ private:
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Random::RandomGenerator& random_;
-  RedisDiscoverySession redis_discovery_session_;
+  std::shared_ptr<RedisDiscoverySession> redis_discovery_session_;
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;
@@ -298,14 +298,12 @@ public:
 private:
   friend class RedisClusterTest;
 
-  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
-      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override;
+      Upstream::ClusterFactoryContext& context) override;
 };
 } // namespace Redis
 } // namespace Clusters

@@ -21,28 +21,11 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // traffic.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-    const auto factories = Registry::FactoryRegistry<
-        Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-    const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
-        // A dedicated http_connection_manager fuzzer can be found in
-        // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
-        // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
-        // NetworkFilterNames::get().TcpProxy,
-    };
-    // Check whether each filter is loaded into Envoy.
-    // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
-    // that does not exist will cause fatal errors.
-    for (auto& filter_name : supported_filter_names) {
-      if (factories.contains(filter_name)) {
-        filter_names.push_back(filter_name);
-      } else {
-        ENVOY_LOG_MISC(debug, "Filter name not found in the factory: {}", filter_name);
-      }
-    }
+    // Only use the names of the filters that are compiled into envoy. The build system takes care
+    // about reducing these to the allowed set.
+    // See test/extensions/filters/network/common/fuzz/BUILD for more information.
+    filter_names = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
   }
   return filter_names;
 }
@@ -71,7 +54,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClient(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return async_client_; }));
@@ -101,7 +84,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClient(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return async_client_; }));
@@ -120,8 +103,8 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
   // HttpConnectionManager} on which we have constraints.
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
-        dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
-            *config_message);
+        *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::direct_response::v3::Config>(config_message);
     if (config.response().specifier_case() ==
         envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
       throw EnvoyException(
@@ -129,8 +112,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
-        dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
-            *config_message);
+        *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit>(
+            config_message);
     if (config.token_bucket().fill_interval().seconds() > SecondsPerDay) {
       // Too large fill_interval may cause "c++/v1/chrono" overflow when simulated_time_system_ is
       // converting it to a smaller unit. Constraining fill_interval to no greater than one day is
@@ -141,8 +125,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        config = dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
-                                  HttpConnectionManager&>(*config_message);
+        config = *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager>(config_message);
     if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
                                    HttpConnectionManager::HTTP3) {
       // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
@@ -156,7 +141,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       // Sanity check on connection_keepalive interval and timeout.
       try {
         PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), interval);
-      } catch (const DurationUtil::OutOfRangeException& e) {
+      } catch (const EnvoyException& e) {
         throw EnvoyException(
             absl::StrCat("In http2_protocol_options.connection_keepalive interval shall not be "
                          "negative. Exception {}",
@@ -164,7 +149,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       }
       try {
         PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), timeout);
-      } catch (const DurationUtil::OutOfRangeException& e) {
+      } catch (const EnvoyException& e) {
         throw EnvoyException(
             absl::StrCat("In http2_protocol_options.connection_keepalive timeout shall not be "
                          "negative. Exception {}",
@@ -173,9 +158,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::
-        EnvoyMobileHttpConnectionManager& config =
-            dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
-                             EnvoyMobileHttpConnectionManager&>(*config_message);
+        EnvoyMobileHttpConnectionManager& config = *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                EnvoyMobileHttpConnectionManager>(config_message);
     if (config.config().codec_type() ==
         envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
             HTTP3) {

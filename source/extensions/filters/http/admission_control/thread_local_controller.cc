@@ -22,7 +22,8 @@ uint32_t ThreadLocalControllerImpl::averageRps() const {
     return 0;
   }
   using std::chrono::seconds;
-  seconds secs = std::max(seconds(1), std::chrono::duration_cast<seconds>(ageOfOldestSample()));
+  seconds secs =
+      std::max(sampling_window_, std::chrono::duration_cast<seconds>(ageOfOldestSample()));
   return global_data_.requests / secs.count();
 }
 

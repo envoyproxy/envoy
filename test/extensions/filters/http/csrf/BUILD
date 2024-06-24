@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/csrf:csrf_filter_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/extensions/filters/http/csrf/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -29,11 +30,9 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "csrf_filter_integration_test",
+    size = "large",
     srcs = ["csrf_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
-    # TODO(kbaichoo): remove when deferred processing is enabled by default and the
-    # test is no longer parameterized by it.
-    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

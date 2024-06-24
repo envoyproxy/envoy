@@ -6,7 +6,6 @@
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/http/cache/simple_http_cache/simple_http_cache.h"
 
-#include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"

@@ -245,7 +245,8 @@ message Metadata {
   // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
   // fields are present in the metadata with same keys,
   // only ``typed_filter_metadata`` field will be parsed.
-  map<string, google.protobuf.Struct> filter_metadata = 1;
+  map<string, google.protobuf.Struct> filter_metadata = 1
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The ``envoy.*``
   // namespace is reserved for Envoy's built-in filters.
@@ -253,7 +254,8 @@ message Metadata {
   // If both :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
   // and ``typed_filter_metadata`` fields are present in the metadata with same keys,
   // only ``typed_filter_metadata`` field will be parsed.
-  map<string, google.protobuf.Any> typed_filter_metadata = 2;
+  map<string, google.protobuf.Any> typed_filter_metadata = 2
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
 }
 
 // Runtime derived uint32 with a default when not specified.
@@ -301,6 +303,59 @@ message RuntimeFeatureFlag {
   string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
+message KeyValue {
+  // The key of the key/value pair.
+  string key = 1 [(validate.rules).string = {min_len: 1 max_bytes: 16384}];
+
+  // The value of the key/value pair.
+  bytes value = 2;
+}
+
+// Key/value pair plus option to control append behavior. This is used to specify
+// key/value pairs that should be appended to a set of existing key/value pairs.
+message KeyValueAppend {
+  // Describes the supported actions types for key/value pair append action.
+  enum KeyValueAppendAction {
+    // If the key already exists, this action will result in the following behavior:
+    //
+    // - Comma-concatenated value if multiple values are not allowed.
+    // - New value added to the list of values if multiple values are allowed.
+    //
+    // If the key doesn't exist then this will add pair with specified key and value.
+    APPEND_IF_EXISTS_OR_ADD = 0;
+
+    // This action will add the key/value pair if it doesn't already exist. If the
+    // key already exists then this will be a no-op.
+    ADD_IF_ABSENT = 1;
+
+    // This action will overwrite the specified value by discarding any existing
+    // values if the key already exists. If the key doesn't exist then this will add
+    // the pair with specified key and value.
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing
+    // values if the key already exists. If the key doesn't exist then this will
+    // be no-op.
+    OVERWRITE_IF_EXISTS = 3;
+  }
+
+  // Key/value pair entry that this option to append or overwrite.
+  KeyValue entry = 1 [(validate.rules).message = {required: true}];
+
+  // Describes the action taken to append/overwrite the given value for an existing
+  // key or to only add this key if it's absent.
+  KeyValueAppendAction action = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Key/value pair to append or remove.
+message KeyValueMutation {
+  // Key/value pair to append or overwrite. Only one of ``append`` or ``remove`` can be set.
+  KeyValueAppend append = 1;
+
+  // Key to remove. Only one of ``append`` or ``remove`` can be set.
+  string remove = 2 [(validate.rules).string = {max_bytes: 16384}];
+}
+
 // Query parameter name/value pair.
 message QueryParameter {
   // The key of the query parameter. Case sensitive.
@@ -324,8 +379,18 @@ message HeaderValue {
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of ``-``.
+  // Header value is encoded as string. This does not work for non-utf8 characters.
+  // Only one of ``value`` or ``raw_value`` can be set.
   string value = 2 [
-    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
+  ];
+
+  // Header value is encoded as bytes which can support non-utf8 characters.
+  // Only one of ``value`` or ``raw_value`` can be set.
+  bytes raw_value = 3 [
+    (validate.rules).bytes = {min_len: 0 max_len: 16384},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
   ];
 }
 
@@ -336,9 +401,12 @@ message HeaderValueOption {
 
   // Describes the supported actions types for header append action.
   enum HeaderAppendAction {
-    // This action will append the specified value to the existing values if the header
-    // already exists. If the header doesn't exist then this will add the header with
-    // specified key and value.
+    // If the header already exists, this action will result in:
+    //
+    // - Comma-concatenated for predefined inline headers.
+    // - Duplicate header added in the ``HeaderMap`` for other headers.
+    //
+    // If the header doesn't exist then this will add new header with specified key and value.
     APPEND_IF_EXISTS_OR_ADD = 0;
 
     // This action will add the header if it doesn't already exist. If the header
@@ -349,6 +417,10 @@ message HeaderValueOption {
     // the header already exists. If the header doesn't exist then this will add the header
     // with specified key and value.
     OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will be no-op.
+    OVERWRITE_IF_EXISTS = 3;
   }
 
   // Header name/value pair that this option applies to.
@@ -392,6 +464,7 @@ message WatchedDirectory {
 }
 
 // Data source consisting of a file, an inline value, or an environment variable.
+// [#next-free-field: 6]
 message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
 
@@ -410,11 +483,46 @@ message DataSource {
     // Environment variable data source.
     string environment_variable = 4 [(validate.rules).string = {min_len: 1}];
   }
+
+  // Watched directory that is watched for file changes. If this is set explicitly, the file
+  // specified in the ``filename`` field will be reloaded when relevant file move events occur.
+  //
+  // .. note::
+  //   This field only makes sense when the ``filename`` field is set.
+  //
+  // .. note::
+  //   Envoy only updates when the file is replaced by a file move, and not when the file is
+  //   edited in place.
+  //
+  // .. note::
+  //   Not all use cases of ``DataSource`` support watching directories. It depends on the
+  //   specific usage of the ``DataSource``. See the documentation of the parent message for
+  //   details.
+  WatchedDirectory watched_directory = 5;
 }
 
 // The message specifies the retry policy of remote data source when fetching fails.
+// [#next-free-field: 7]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
+
+  // See :ref:`RetryPriority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`.
+  message RetryPriority {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    oneof config_type {
+      google.protobuf.Any typed_config = 2;
+    }
+  }
+
+  // See :ref:`RetryHostPredicate <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`.
+  message RetryHostPredicate {
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    oneof config_type {
+      google.protobuf.Any typed_config = 2;
+    }
+  }
 
   // Specifies parameters that control :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
   // This parameter is optional, in which case the default base interval is 1000 milliseconds. The
@@ -425,6 +533,18 @@ message RetryPolicy {
   // defaults to 1.
   google.protobuf.UInt32Value num_retries = 2
       [(udpa.annotations.field_migrate).rename = "max_retries"];
+
+  // For details, see :ref:`retry_on <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_on>`.
+  string retry_on = 3;
+
+  // For details, see :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`.
+  RetryPriority retry_priority = 4;
+
+  // For details, see :ref:`RetryHostPredicate <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`.
+  repeated RetryHostPredicate retry_host_predicate = 5;
+
+  // For details, see :ref:`host_selection_retry_max_attempts <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>`.
+  int64 host_selection_retry_max_attempts = 6;
 }
 
 // The message specifies how to fetch data from remote and how to verify it.

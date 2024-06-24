@@ -202,8 +202,7 @@ message RateLimitQuotaBucketSettings {
     //    <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`
     //    message.
     //
-    // If the field is not set, the ``ExpiredAssignmentBehavior`` time is **not limited**:
-    // it applies to the bucket until replaced by an ``active`` assignment.
+    // If not set, defaults to zero, and the bucket is abandoned immediately.
     google.protobuf.Duration expired_assignment_behavior_timeout = 1
         [(validate.rules).duration = {gt {}}];
 
@@ -389,6 +388,12 @@ message RateLimitQuotaBucketSettings {
   //
   // After sending the initial report, the data plane is to continue reporting the bucket usage with
   // the internal specified in this field.
+  //
+  // If for any reason RLQS client doesn't receive the initial assignment for the reported bucket,
+  // the data plane will eventually consider the bucket abandoned and stop sending the usage
+  // reports. This is explained in more details at :ref:`Rate Limit Quota Service (RLQS)
+  // <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
+  //
   // [#comment: 100000000 nanoseconds = 0.1 seconds]
   google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
     required: true

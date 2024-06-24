@@ -1,9 +1,11 @@
 #include "source/extensions/upstreams/tcp/generic/config.h"
 
 #include "envoy/stream_info/bool_accessor.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/codec_client.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
 
 namespace Envoy {
@@ -16,6 +18,7 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster,
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+    Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
     StreamInfo::StreamInfo& downstream_info) const {
   if (config.has_value() && !disableTunnelingByFilterState(downstream_info)) {
     Http::CodecType pool_type;
@@ -28,11 +31,12 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
       pool_type = Http::CodecType::HTTP1;
     }
     auto ret = std::make_unique<TcpProxy::HttpConnPool>(
-        thread_local_cluster, context, *config, upstream_callbacks, pool_type, downstream_info);
+        thread_local_cluster, context, *config, upstream_callbacks, stream_decoder_callbacks,
+        pool_type, downstream_info);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
-  auto ret =
-      std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context, upstream_callbacks);
+  auto ret = std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context,
+                                                     upstream_callbacks, downstream_info);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
@@ -46,6 +50,19 @@ bool GenericConnPoolFactory::disableTunnelingByFilterState(
 }
 
 REGISTER_FACTORY(GenericConnPoolFactory, TcpProxy::GenericConnPoolFactory);
+
+class DisableTunnelingObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override {
+    return std::string(TcpProxy::DisableTunnelingFilterStateKey);
+  }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<StreamInfo::BoolAccessorImpl>(data == "true");
+  }
+};
+
+REGISTER_FACTORY(DisableTunnelingObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace Generic
 } // namespace Tcp

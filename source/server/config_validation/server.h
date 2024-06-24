@@ -10,7 +10,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
@@ -23,11 +23,12 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
-#include "source/server/config_validation/dns.h"
+#include "source/server/hot_restart_nop_impl.h"
 #include "source/server/server.h"
 
 #include "absl/types/optional.h"
@@ -42,7 +43,8 @@ namespace Server {
 bool validateConfig(const Options& options,
                     const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
-                    Filesystem::Instance& file_system);
+                    Filesystem::Instance& file_system,
+                    const ProcessContextOptRef& process_context = absl::nullopt);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -65,9 +67,11 @@ public:
                      const Network::Address::InstanceConstSharedPtr& local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
-                     Filesystem::Instance& file_system);
+                     Filesystem::Instance& file_system,
+                     const ProcessContextOptRef& process_context = absl::nullopt);
 
   // Server::Instance
+  void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
     return makeOptRefFromPtr(static_cast<Envoy::Server::Admin*>(admin_.get()));
   }
@@ -78,32 +82,23 @@ public:
   }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
-  Network::DnsResolverSharedPtr dnsResolver() override {
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::DnsResolverFactory& dns_resolver_factory =
-        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
-  }
-  void drainListeners() override {}
-  DrainManager& drainManager() override { PANIC("not implemented"); }
+  Network::DnsResolverSharedPtr dnsResolver() override;
+  void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
+  DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override {}
-  HotRestart& hotRestart() override { PANIC("not implemented"); }
+  HotRestart& hotRestart() override { return nop_hot_restart_; }
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::Loader& runtime() override {
-    if (runtime_singleton_) {
-      return runtime_singleton_->instance();
-    }
-    return *runtime_;
-  }
+  Runtime::Loader& runtime() override { return *runtime_; }
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
-  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
@@ -112,7 +107,7 @@ public:
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   Router::Context& routerContext() override { return router_context_; }
-  ProcessContextOptRef processContext() override { return absl::nullopt; }
+  ProcessContextOptRef processContext() override { return api_->processContext(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
@@ -124,6 +119,7 @@ public:
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
@@ -135,7 +131,8 @@ public:
   void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
+  WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&,
+                         const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -171,20 +168,22 @@ private:
   ThreadLocal::InstanceImpl thread_local_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
+  // ssl_context_manager_ must come before dispatcher_, since ClusterInfo
+  // references SslSocketFactory and is deleted on the main thread via the dispatcher.
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
-  Singleton::ManagerPtr singleton_manager_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  Singleton::ManagerImpl singleton_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;
   Random::RandomGeneratorImpl random_generator_;
-  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
-  MutexTracer* mutex_tracer_;
+  std::unique_ptr<OverloadManager> null_overload_manager_;
+  MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
@@ -192,6 +191,9 @@ private:
   ServerFactoryContextImpl server_contexts_;
   Quic::QuicStatNames quic_stat_names_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Server::DrainManagerPtr drain_manager_;
+  HotRestartNopImpl nop_hot_restart_;
+  Regex::EnginePtr regex_engine_;
 };
 
 } // namespace Server

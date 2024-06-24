@@ -87,7 +87,7 @@ no field will ever be removed nor will Envoy ever remove the implementation for 
 field.
 
 **NOTE**: Client implementations are free to output additional warnings about field usage beyond
-deprecation, if for example, the use of the continued use of the field is deemed a substantial
+deprecation, if for example, the continued use of the field is deemed a substantial
 security risk. Individual client versions are also free to stop supporting fields if they want to,
 though Envoy Proxy (as an xDS client) commits to never doing so.
 

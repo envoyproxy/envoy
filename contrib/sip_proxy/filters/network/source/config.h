@@ -49,7 +49,7 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsTyped(
       const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions&
           proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext&) override {

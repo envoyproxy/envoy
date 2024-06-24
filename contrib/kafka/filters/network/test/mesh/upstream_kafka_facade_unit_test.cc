@@ -1,6 +1,7 @@
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "test/mocks/thread/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -22,12 +23,6 @@ public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
-};
-
-class MockThreadFactory : public Thread::ThreadFactory {
-public:
-  MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
-  MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
 };
 
 TEST(UpstreamKafkaFacadeTest, shouldCreateProducerOnlyOnceForTheSameCluster) {

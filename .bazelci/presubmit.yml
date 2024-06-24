@@ -19,6 +19,8 @@ tasks:
     - "sudo apt -y update && sudo apt -y install automake autotools-dev cmake libtool m4 ninja-build"
     - "wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 14"
     - "bazel/setup_clang.sh /usr/lib/llvm-14"
+    # TODO(keith): Remove once we use clang 15+ on CI
+    - "sudo apt-get install -y libclang-rt-14-dev"
     test_targets:
     - "//test/common/common/..."
     - "//test/integration/..."

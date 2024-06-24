@@ -16,7 +16,6 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -65,7 +64,7 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -101,7 +100,7 @@ ip_tags:
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -139,7 +138,7 @@ ip_tags:
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -147,7 +146,7 @@ ip_tags:
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
   request_headers = Http::TestRequestHeaderMapImpl{};
-  remote_address = Network::Utility::parseInternetAddress("1.2.3.4");
+  remote_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -160,7 +159,7 @@ TEST_F(IpTaggingFilterTest, NoHits) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("10.2.3.5");
+      Network::Utility::parseInternetAddressNoThrow("10.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -181,7 +180,7 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
                                                  {"x-envoy-ip-tags", "test"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -210,7 +209,7 @@ ip_tags:
                                                  {"x-envoy-ip-tags", "test"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -242,7 +241,7 @@ ip_tags:
   Http::TestRequestHeaderMapImpl request_headers;
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("2001:abcd:ef01:2345::1");
+      Network::Utility::parseInternetAddressNoThrow("2001:abcd:ef01:2345::1");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
@@ -272,7 +271,7 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 

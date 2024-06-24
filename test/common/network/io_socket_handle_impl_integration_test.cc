@@ -2,6 +2,7 @@
 #include "source/common/network/listen_socket_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,6 +17,9 @@ namespace {
 // As such it is tagged with `requires-network` and is not executed in CI.
 #if defined(TCP_INFO) || defined(SIO_TCP_INFO)
 TEST(IoSocketHandleImplIntegration, LastRoundTripIntegrationTest) {
+  // See https://github.com/envoyproxy/envoy/issues/28504.
+  DISABLE_UNDER_WINDOWS;
+
   struct sockaddr_in server;
   // TCP info can not be calculated on loopback.
   // For that reason we connect to a public dns server.

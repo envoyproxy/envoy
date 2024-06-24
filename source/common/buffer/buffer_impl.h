@@ -14,6 +14,8 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/libevent.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -30,7 +32,7 @@ namespace Buffer {
  * +-----------------+----------------+----------------------+
  * ^                 ^                ^                      ^
  * |                 |                |                      |
- * base_             data()           base_ + reservable_    base_ + capacity_
+ * base_             base_ + data_    base_ + reservable_    base_ + capacity_
  */
 class Slice {
 public:
@@ -90,7 +92,7 @@ public:
       : capacity_(fragment.size()), storage_(nullptr),
         base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
         reservable_(fragment.size()) {
-    addDrainTracker([&fragment]() { fragment.done(); });
+    releasor_ = [&fragment]() { fragment.done(); };
   }
 
   Slice(Slice&& rhs) noexcept {
@@ -101,6 +103,7 @@ public:
     reservable_ = rhs.reservable_;
     drain_trackers_ = std::move(rhs.drain_trackers_);
     account_ = std::move(rhs.account_);
+    releasor_.swap(rhs.releasor_);
 
     rhs.capacity_ = 0;
     rhs.base_ = nullptr;
@@ -119,6 +122,11 @@ public:
       reservable_ = rhs.reservable_;
       drain_trackers_ = std::move(rhs.drain_trackers_);
       account_ = std::move(rhs.account_);
+      if (releasor_) {
+        releasor_();
+      }
+      releasor_ = rhs.releasor_;
+      rhs.releasor_ = nullptr;
 
       rhs.capacity_ = 0;
       rhs.base_ = nullptr;
@@ -129,7 +137,12 @@ public:
     return *this;
   }
 
-  ~Slice() { callAndClearDrainTrackersAndCharges(); }
+  ~Slice() {
+    callAndClearDrainTrackersAndCharges();
+    if (releasor_) {
+      releasor_();
+    }
+  }
 
   /**
    * @return true if the data in the slice is mutable
@@ -307,6 +320,9 @@ public:
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
+    // The releasor needn't to be transferred, and actually if there is releasor, this
+    // slice can't coalesce. Then there won't be a chance to calling this method.
+    ASSERT(releasor_ == nullptr);
   }
 
   /**
@@ -397,6 +413,9 @@ protected:
   /** Account associated with this slice. This may be null. When
    * coalescing with another slice, we do not transfer over their account. */
   BufferMemoryAccountSharedPtr account_;
+
+  /** The releasor for the BufferFragment */
+  std::function<void()> releasor_;
 };
 
 class OwnedImpl;
@@ -587,8 +606,8 @@ public:
    */
   BufferFragmentImpl(
       const void* data, size_t size,
-      const std::function<void(const void*, size_t, const BufferFragmentImpl*)>& releasor)
-      : data_(data), size_(size), releasor_(releasor) {}
+      absl::AnyInvocable<void(const void*, size_t, const BufferFragmentImpl*)> releasor)
+      : data_(data), size_(size), releasor_(std::move(releasor)) {}
 
   // Buffer::BufferFragment
   const void* data() const override { return data_; }
@@ -602,7 +621,7 @@ public:
 private:
   const void* const data_;
   const size_t size_;
-  const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
+  absl::AnyInvocable<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
 class LibEventInstance : public Instance {
@@ -669,6 +688,7 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
+  void move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) override;
   Reservation reserveForRead() override;
   ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;

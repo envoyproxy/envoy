@@ -41,7 +41,8 @@ static_resources:
                     # Note this additional indirection; this is a workaround for Protobuf oneof limitations.
                     map:
                       some_value_to_match_on:  # This is the header value we're trying to match against.
-                        # The OnMatch resulting on matching with this branch of the exact matcher is another matcher, allowing for recursive matching.
+                        # The OnMatch resulting on matching with this branch of the exact matcher is another matcher,
+                        # allowing for recursive matching.
                         matcher:
                           # The inner matcher is a matcher list, which attempts to match a list of predicates.
                           matcher_list:

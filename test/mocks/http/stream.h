@@ -17,6 +17,7 @@ public:
   // Http::Stream
   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
   MOCK_METHOD(void, removeCallbacks, (StreamCallbacks & callbacks));
+  MOCK_METHOD(CodecEventCallbacks*, registerCodecEventCallbacks, (CodecEventCallbacks * adapter));
   MOCK_METHOD(void, resetStream, (StreamResetReason reason));
   MOCK_METHOD(void, readDisable, (bool disable));
   MOCK_METHOD(void, setWriteBufferWatermarks, (uint32_t));
@@ -25,6 +26,8 @@ public:
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
+
+  absl::string_view responseDetails() override { return details_; }
 
   // Use the same underlying structure as StreamCallbackHelper to insure iteration stability
   // if we remove callbacks during iteration.
@@ -48,9 +51,13 @@ public:
     }
   }
 
+  void setDetails(absl::string_view details) { details_ = details; }
+
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  CodecEventCallbacks* codec_callbacks_{nullptr};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  std::string details_;
 };
 
 } // namespace Http

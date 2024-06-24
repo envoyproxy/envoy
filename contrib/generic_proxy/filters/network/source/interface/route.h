@@ -5,8 +5,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/rds/config.h"
+#include "envoy/router/router.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,14 +22,35 @@ public:
 using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
 
 /**
- * Interface of typed metadata factory.
+ * Interface of typed metadata factory. Reuse the same interface as the HTTP's router filter because
+ * part of these abstractions are protocol independent.
  */
-class RouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+using RouteTypedMetadataFactory = Envoy::Router::HttpRouteTypedMetadataFactory;
+
+/**
+ * The simplest retry implementation. It only contains the number of retries.
+ */
+class RetryPolicy {
+public:
+  RetryPolicy(uint32_t num_retries) : num_retries_(num_retries) {}
+  uint32_t numRetries() const { return num_retries_; }
+
+private:
+  const uint32_t num_retries_{};
+};
 
 class RouteEntry {
 public:
   virtual ~RouteEntry() = default;
 
+  /**
+   * @return absl::string_view the name of the route.
+   */
+  virtual absl::string_view name() const PURE;
+
+  /**
+   * @return const std::string& the name of the target cluster.
+   */
   virtual const std::string& clusterName() const PURE;
 
   /**
@@ -39,16 +62,33 @@ public:
   }
 
   /**
-   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
-   * this route.
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config
+   * for this route.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return route timeout for this route.
+   */
+  virtual const std::chrono::milliseconds timeout() const PURE;
+
+  /**
+   * @return const RetryPolicy& the retry policy for this route.
+   */
+  virtual const RetryPolicy& retryPolicy() const PURE;
 };
+
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
 class RouteMatcher : public Rds::Config {
 public:
-  virtual RouteEntryConstSharedPtr routeEntry(const Request& request) const PURE;
+  virtual RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const PURE;
 };
 using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
 

@@ -138,14 +138,14 @@ Api::IoCallUint64Result Win32SocketHandleImpl::drainToPeekBuffer(size_t length) 
       return result;
     }
   }
-  return {total_bytes_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  return {total_bytes_read, Api::IoError::none()};
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readFromPeekBuffer(void* buffer, size_t length) {
   uint64_t copy_size = std::min(peek_buffer_.length(), static_cast<uint64_t>(length));
   peek_buffer_.copyOut(0, copy_size, buffer);
   peek_buffer_.drain(copy_size);
-  return {copy_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  return {copy_size, Api::IoError::none()};
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readvFromPeekBuffer(uint64_t max_length,
@@ -153,20 +153,20 @@ Api::IoCallUint64Result Win32SocketHandleImpl::readvFromPeekBuffer(uint64_t max_
                                                                    uint64_t num_slice) {
   uint64_t bytes_read = peek_buffer_.copyOutToSlices(max_length, slices, num_slice);
   peek_buffer_.drain(bytes_read);
-  return {bytes_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  return {bytes_read, Api::IoError::none()};
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readFromPeekBuffer(Buffer::Instance& buffer,
                                                                   size_t length) {
   auto length_to_move = std::min(peek_buffer_.length(), static_cast<uint64_t>(length));
   buffer.move(peek_buffer_, length_to_move);
-  return {length_to_move, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  return {length_to_move, Api::IoError::none()};
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::peekFromPeekBuffer(void* buffer, size_t length) {
   uint64_t copy_size = std::min(peek_buffer_.length(), static_cast<uint64_t>(length));
   peek_buffer_.copyOut(0, copy_size, buffer);
-  return {copy_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+  return {copy_size, Api::IoError::none()};
 }
 
 void Win32SocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,

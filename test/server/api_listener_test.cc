@@ -53,11 +53,11 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, server_, config.name());
+  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
 
-  ASSERT_EQ("test_api_listener", http_api_listener.name());
-  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  ASSERT_TRUE(http_api_listener.http().has_value());
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  ASSERT_NE(http_api_listener->createHttpApiListener(server_.dispatcher()), nullptr);
 }
 
 TEST_F(ApiListenerTest, MobileApiListener) {
@@ -88,11 +88,11 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, server_, config.name());
+  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
 
-  ASSERT_EQ("test_api_listener", http_api_listener.name());
-  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  ASSERT_TRUE(http_api_listener.http().has_value());
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  ASSERT_NE(http_api_listener->createHttpApiListener(server_.dispatcher()), nullptr);
 }
 
 TEST_F(ApiListenerTest, HttpApiListenerThrowsWithBadConfig) {
@@ -125,7 +125,7 @@ api_listener:
       ->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener(config, server_, config.name()), EnvoyException,
+      HttpApiListener::create(config, server_, config.name()).IgnoreError(), EnvoyException,
       fmt::format("Unable to unpack as "
                   "envoy.extensions.filters.network.http_connection_manager.v3."
                   "HttpConnectionManager: {}",
@@ -159,25 +159,26 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener(config, server_, config.name());
+  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
 
-  ASSERT_EQ("test_api_listener", http_api_listener.name());
-  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  ASSERT_TRUE(http_api_listener.http().has_value());
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  auto api_listener = http_api_listener->createHttpApiListener(server_.dispatcher());
+  ASSERT_NE(api_listener, nullptr);
 
   Network::MockConnectionCallbacks network_connection_callbacks;
   // TODO(junr03): potentially figure out a way of unit testing this behavior without exposing a
   // ForTest function.
-  http_api_listener.readCallbacksForTest().connection().addConnectionCallbacks(
-      network_connection_callbacks);
-  EXPECT_FALSE(
-      http_api_listener.readCallbacksForTest().connection().lastRoundTripTime().has_value());
-  http_api_listener.readCallbacksForTest().connection().configureInitialCongestionWindow(
-      100, std::chrono::microseconds(123));
+  auto& connection = dynamic_cast<HttpApiListener::ApiListenerWrapper*>(api_listener.get())
+                         ->readCallbacks()
+                         .connection();
+  connection.addConnectionCallbacks(network_connection_callbacks);
+  EXPECT_FALSE(connection.lastRoundTripTime().has_value());
+  connection.configureInitialCongestionWindow(100, std::chrono::microseconds(123));
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.
-  http_api_listener.shutdown();
+  api_listener.reset();
 }
 
 } // namespace Server

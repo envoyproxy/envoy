@@ -85,11 +85,13 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
   {
     EXPECT_TRUE(span->spanEntity()->spanType() == skywalking::v3::SpanType::Entry);
+    EXPECT_TRUE(span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::Http);
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
     span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
+    ASSERT_EQ(span->getTraceId(), segment_context->traceId());
     // This method is unimplemented and a noop.
-    ASSERT_EQ(span->getTraceIdAsHex(), "");
+    ASSERT_EQ(span->getSpanId(), "");
     // Test whether the basic functions of Span are normal.
     EXPECT_FALSE(span->spanEntity()->skipAnalysis());
     span->setSampled(false);
@@ -152,17 +154,20 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // child span (EXIT span).
     EXPECT_EQ(span->spanEntity()->operationName(), first_child_span->spanEntity()->operationName());
 
-    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"},
-                                                       {":path", "/upstream/path"}};
+    Tracing::TestTraceContextImpl first_child_headers{{":authority", "test.com"},
+                                                      {":path", "/upstream/path"}};
     Upstream::HostDescriptionConstSharedPtr host{
         new testing::NiceMock<Upstream::MockHostDescription>()};
+    Upstream::ClusterInfoConstSharedPtr cluster{new testing::NiceMock<Upstream::MockClusterInfo>()};
+    Tracing::UpstreamContext upstream_context(host.get(), cluster.get(), Tracing::ServiceType::Http,
+                                              false);
 
-    first_child_span->injectContext(first_child_headers, host);
+    first_child_span->injectContext(first_child_headers, upstream_context);
     // Operation name of child span (EXIT span) will be override by the latest path of upstream
     // request.
     EXPECT_EQ("/upstream/path", first_child_span->spanEntity()->operationName());
 
-    auto sp = createSpanContext(first_child_headers.get_("sw8"));
+    auto sp = createSpanContext(std::string(first_child_headers.get("sw8").value()));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
     EXPECT_EQ("/downstream/path", sp->endpoint());
@@ -189,10 +194,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ(span->spanEntity()->operationName(),
               second_child_span->spanEntity()->operationName());
 
-    Http::TestRequestHeaderMapImpl second_child_headers{{":authority", "test.com"}};
+    Tracing::TestTraceContextImpl second_child_headers{{":authority", "test.com"}};
 
-    second_child_span->injectContext(second_child_headers, nullptr);
-    auto sp = createSpanContext(second_child_headers.get_("sw8"));
+    second_child_span->injectContext(second_child_headers, Tracing::UpstreamContext());
+    auto sp = createSpanContext(std::string(second_child_headers.get("sw8").value()));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
     EXPECT_EQ("/downstream/path", sp->endpoint());

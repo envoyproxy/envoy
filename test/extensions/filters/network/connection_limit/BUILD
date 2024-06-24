@@ -26,6 +26,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "connection_limit_integration_test",
+    size = "large",
     srcs = ["connection_limit_integration_test.cc"],
     extension_names = ["envoy.filters.network.connection_limit"],
     deps = [

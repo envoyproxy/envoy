@@ -37,8 +37,8 @@ public:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef, Runtime::Loader&,
-                                 Random::RandomGenerator&, Event::Dispatcher&, TimeSource&,
+                                 RouteStatsContextOptRef,
+                                 Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
@@ -71,40 +71,47 @@ public:
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
     config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
                                              ShadowWriterPtr(new MockShadowWriter()), router_proto);
-    router_ = std::make_shared<TestFilter>(*config_, config_->default_stats_);
+    router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, address())
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
+    ON_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        address())
         .WillByDefault(Return(host_address_));
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
+    ON_CALL(
+        *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
+        locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
   }
 
   Http::TestRequestHeaderMapImpl run() {
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-        .WillOnce(Invoke([&](Http::ResponseDecoder& decoder,
-                             Http::ConnectionPool::Callbacks& callbacks,
-                             const Http::ConnectionPool::Instance::StreamOptions&)
-                             -> Http::ConnectionPool::Cancellable* {
-          response_decoder = &decoder;
-          EXPECT_CALL(encoder.stream_, connectionInfoProvider())
-              .WillRepeatedly(ReturnRef(connection_info1_));
-          callbacks.onPoolReady(encoder,
-                                context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
-                                stream_info_, Http::Protocol::Http10);
-          return nullptr;
-        }));
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+                newStream(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                       const Http::ConnectionPool::Instance::StreamOptions&)
+                       -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+                  .WillRepeatedly(ReturnRef(connection_info1_));
+              callbacks.onPoolReady(encoder,
+                                    context_.server_factory_context_.cluster_manager_
+                                        .thread_local_cluster_.conn_pool_.host_,
+                                    stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
 
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
@@ -116,7 +123,8 @@ public:
     Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl());
     response_headers->setStatus(200);
 
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
+                    .host_->outlier_detector_,
                 putHttpResponseCode(200));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -127,9 +135,9 @@ public:
 
   envoy::config::core::v3::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
-      Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+      *Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   Network::Address::InstanceConstSharedPtr upstream_local_address1_{
-      Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
+      *Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
   Network::ConnectionInfoSetterImpl connection_info1_{upstream_local_address1_,
                                                       upstream_local_address1_};
 

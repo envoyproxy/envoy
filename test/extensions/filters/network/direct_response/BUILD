@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "direct_response_integration_test",
+    size = "large",
     srcs = [
         "direct_response_integration_test.cc",
     ],

@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/stats/primitive_stats.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -28,6 +29,14 @@ public:
   // A utility function to select override host from host map according to load balancer context.
   static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
                                                LoadBalancerContext* context);
+
+  // Iterate over all per-endpoint metrics, for clusters with `per_endpoint_stats` enabled.
+  static void
+  forEachHostMetric(const ClusterManager& cluster_manager,
+                    const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
+                    const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb);
+
+  static bool allowLBChooseHost(LoadBalancerContext* context);
 };
 
 } // namespace Upstream

@@ -93,14 +93,9 @@ std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine
 void FineGrainLogContext::setAllFineGrainLoggers(spdlog::level::level_enum level)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
-  if (verbosity_update_info_.empty()) {
-    for (const auto& it : *fine_grain_log_map_) {
-      it.second->set_level(level);
-    }
-  } else {
-    for (const auto& [key, logger] : *fine_grain_log_map_) {
-      logger->set_level(getLogLevel(key));
-    }
+  verbosity_update_info_.clear();
+  for (const auto& it : *fine_grain_log_map_) {
+    it.second->set_level(level);
   }
 }
 
@@ -174,9 +169,6 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
 void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
   {
     absl::WriterMutexLock wl(&fine_grain_log_lock_);
-    if (level == verbosity_default_level_) {
-      return;
-    }
     verbosity_default_level_ = level;
   }
 
@@ -229,18 +221,17 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
     }
   }
 
-  absl::string_view stem = file, stem_basename = basename;
+  absl::string_view stem_basename = basename;
   {
     const size_t sep = stem_basename.find('.');
     if (sep != stem_basename.npos) {
-      stem.remove_suffix(stem_basename.size() - sep);
       stem_basename.remove_suffix(stem_basename.size() - sep);
     }
   }
   for (const auto& info : verbosity_update_info_) {
     if (info.update_is_path) {
       // If there are any slashes in the pattern, try to match the full path name.
-      if (safeFileNameMatch(info.update_pattern, stem)) {
+      if (safeFileNameMatch(info.update_pattern, file)) {
         return info.log_level;
       }
     } else if (safeFileNameMatch(info.update_pattern, stem_basename)) {

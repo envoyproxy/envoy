@@ -48,6 +48,11 @@ void TraceSegmentReporter::report(TracingContextPtr tracing_context) {
   ENVOY_LOG(trace, "Try to report segment to SkyWalking Server:\n{}", request.DebugString());
 
   if (stream_ != nullptr) {
+    if (stream_->isAboveWriteBufferHighWatermark()) {
+      ENVOY_LOG(debug, "Failed to report segment to SkyWalking Server since buffer is over limit");
+      tracing_stats_->segments_dropped_.inc();
+      return;
+    }
     tracing_stats_->segments_sent_.inc();
     stream_->sendMessage(request, false);
     return;

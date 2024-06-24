@@ -97,10 +97,10 @@ struct OptionsLimits {
  * Validates settings/options already set in |options| and initializes any remaining fields with
  * defaults.
  */
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const ProtobufWkt::BoolValue& hcm_stream_error);
@@ -127,10 +127,22 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions
 namespace Http {
 namespace Utility {
 
+enum UrlComponents {
+  UcSchema = 0,
+  UcHost = 1,
+  UcPort = 2,
+  UcPath = 3,
+  UcQuery = 4,
+  UcFragment = 5,
+  UcUserinfo = 6,
+  UcMax = 7
+};
+
 /**
  * Given a fully qualified URL, splits the string_view provided into scheme,
  * host and path with query parameters components.
  */
+
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
@@ -145,10 +157,14 @@ public:
   /** Returns the fully qualified URL as a string. */
   std::string toString() const;
 
+  bool containsFragment();
+  bool containsUserinfo();
+
 private:
   absl::string_view scheme_;
   absl::string_view host_and_port_;
   absl::string_view path_and_query_params_;
+  uint8_t component_bitmap_;
 };
 
 class PercentEncoding {
@@ -186,6 +202,12 @@ public:
    * NOTE: the space character is encoded as %20, NOT as the + character
    */
   static std::string urlEncodeQueryParameter(absl::string_view value);
+
+  /**
+   * Exactly the same as above, but returns false when it finds a character that should be %-encoded
+   * but is not.
+   */
+  static bool queryParameterIsUrlEncoded(absl::string_view value);
 
   /**
    * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
@@ -243,37 +265,6 @@ void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool
 std::string createSslRedirectPath(const RequestHeaderMap& headers);
 
 /**
- * Parse a URL into query parameters.
- * @param url supplies the url to parse.
- * @return QueryParams the parsed parameters, if any.
- */
-QueryParams parseQueryString(absl::string_view url);
-
-/**
- * Parse a URL into query parameters.
- * @param url supplies the url to parse.
- * @return QueryParams the parsed and percent-decoded parameters, if any.
- */
-QueryParams parseAndDecodeQueryString(absl::string_view url);
-
-/**
- * Parse a a request body into query parameters.
- * @param body supplies the body to parse.
- * @return QueryParams the parsed parameters, if any.
- */
-QueryParams parseFromBody(absl::string_view body);
-
-/**
- * Parse query parameters from a URL or body.
- * @param data supplies the data to parse.
- * @param start supplies the offset within the data.
- * @param decode_params supplies the flag whether to percent-decode the parsed parameters (both name
- *        and value). Set to false to keep the parameters encoded.
- * @return QueryParams the parsed parameters, if any.
- */
-QueryParams parseParameters(absl::string_view data, size_t start, bool decode_params);
-
-/**
  * Finds the start of the query string in a path
  * @param path supplies a HeaderString& to search for the query string
  * @return absl::string_view starting at the beginning of the query string,
@@ -288,20 +279,6 @@ absl::string_view findQueryStringStart(const HeaderString& path);
  * @return std::string the path without query string.
  */
 std::string stripQueryString(const HeaderString& path);
-
-/**
- * Replace the query string portion of a given path with a new one.
- *
- * e.g. replaceQueryString("/foo?key=1", {key:2}) -> "/foo?key=2"
- *      replaceQueryString("/bar", {hello:there}) -> "/bar?hello=there"
- *
- * @param path the original path that may or may not contain an existing query string
- * @param params the new params whose string representation should be formatted onto
- *               the `path` above
- * @return std::string the new path whose query string has been replaced by `params` and whose path
- *         portion from `path` remains unchanged.
- */
-std::string replaceQueryString(const HeaderString& path, const QueryParams& params);
 
 /**
  * Parse a particular value out of a cookie
@@ -348,7 +325,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  */
 std::string makeSetCookieValue(const std::string& key, const std::string& value,
                                const std::string& path, const std::chrono::seconds max_age,
-                               bool httponly);
+                               bool httponly, const Http::CookieAttributeRefVector attributes);
 
 /**
  * Get the response status from the response headers.
@@ -376,6 +353,11 @@ bool isUpgrade(const RequestOrResponseHeaderMap& headers);
  * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
  */
 bool isH2UpgradeRequest(const RequestHeaderMap& headers);
+
+/**
+ * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
+ */
+bool isH3UpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * Determine whether this is a WebSocket Upgrade request.
@@ -522,11 +504,6 @@ std::string localPathFromFilePath(const absl::string_view& file_path);
 RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
 
 /**
- * Serialize query-params into a string.
- */
-std::string queryParamsToString(const QueryParams& query_params);
-
-/**
  * Returns string representation of StreamResetReason.
  */
 const std::string resetReasonToString(const Http::StreamResetReason reset_reason);
@@ -539,11 +516,25 @@ const std::string resetReasonToString(const Http::StreamResetReason reset_reason
 void transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers);
 
 /**
+ * Transforms the supplied headers from an HTTP/1 Upgrade request to an H3 style upgrade,
+ * which is the same as the H2 upgrade.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers);
+
+/**
  * Transforms the supplied headers from an HTTP/1 Upgrade response to an H2 style upgrade response.
  * Changes the 101 upgrade response to a 200 for the CONNECT response.
  * @param headers the headers to convert.
  */
 void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an HTTP/1 Upgrade response to an H3 style upgrade response,
+ * which is the same as the H2 style upgrade.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an H2 "CONNECT"-with-:protocol-header to an HTTP/1 style
@@ -553,11 +544,28 @@ void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
 void transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers);
 
 /**
+ * Transforms the supplied headers from an H3 "CONNECT"-with-:protocol-header to an HTTP/1 style
+ * Upgrade response. Same as H2 upgrade response transform
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers);
+
+/**
  * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
  * The caller is responsible for ensuring this only happens on upgraded streams.
  * @param headers the headers to convert.
+ * @param upgrade the HTTP Upgrade token.
  */
 void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
+
+/**
+ * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
+ * The caller is responsible for ensuring this only happens on upgraded streams.
+ * Same as H2 Upgrade response transform
+ * @param headers the headers to convert.
+ * @param upgrade the HTTP Upgrade token.
+ */
+void transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 
 /**
  * Retrieves the route specific config. Route specific config can be in a few
@@ -607,17 +615,48 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
 
   absl::optional<ConfigType> merged;
 
-  callbacks->traversePerFilterConfig(
-      [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
-        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-        if (!merged) {
-          merged.emplace(*typed_cfg);
-        } else {
-          reduce(merged.value(), *typed_cfg);
-        }
-      });
+  callbacks->traversePerFilterConfig([&reduce,
+                                      &merged](const Router::RouteSpecificFilterConfig& cfg) {
+    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+    if (!merged) {
+      merged.emplace(*typed_cfg);
+    } else {
+      reduce(merged.value(), *typed_cfg);
+    }
+  });
 
   return merged;
+}
+
+/**
+ * Return all the available per route filter configs.
+ *
+ * @param callbacks The stream filter callbacks to check for route configs.
+ *
+ * @return The all available per route config. The returned pointers are guaranteed to be non-null
+ * and their lifetime is the same as the matched route.
+ */
+template <class ConfigType>
+absl::InlinedVector<const ConfigType*, 3>
+getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
+  ASSERT(callbacks != nullptr);
+
+  absl::InlinedVector<const ConfigType*, 3> all_configs;
+  callbacks->traversePerFilterConfig([&all_configs](const Router::RouteSpecificFilterConfig& cfg) {
+    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+    if (typed_cfg == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      return;
+    }
+
+    all_configs.push_back(typed_cfg);
+  });
+
+  return all_configs;
 }
 
 struct AuthorityAttributes {
@@ -641,11 +680,10 @@ struct AuthorityAttributes {
 AuthorityAttributes parseAuthority(absl::string_view host);
 
 /**
- * It validates RetryPolicy defined in core api. It should be called at the main thread as
- * it may throw exception.
+ * It validates RetryPolicy defined in core api. It will return an error status if invalid.
  * @param retry_policy core retry policy
  */
-void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
+absl::Status validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
 
 /**
  * It returns RetryPolicy defined in core api to route api.
@@ -663,6 +701,13 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
  * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
  */
 bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
+
+/**
+ * @param value: the value of the referer header field
+ * @return true if the given value conforms to RFC specifications
+ * https://www.rfc-editor.org/rfc/rfc7231#section-5.5.2
+ */
+bool isValidRefererValue(absl::string_view value);
 
 /**
  * Return the GatewayTimeout HTTP code to indicate the request is full received.
@@ -685,6 +730,25 @@ struct RedirectConfig {
   const bool https_redirect_;
   const bool strip_query_;
 };
+
+/**
+ * Validates the provided scheme is valid (either http or https)
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is valid.
+ */
+bool schemeIsValid(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is http.
+ */
+bool schemeIsHttp(const absl::string_view scheme);
+
+/**
+ * @param scheme the scheme to validate
+ * @return bool true if the scheme is https.
+ */
+bool schemeIsHttps(const absl::string_view scheme);
 
 /*
  * Compute new path based on RedirectConfig.

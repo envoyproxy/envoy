@@ -1,10 +1,13 @@
 #ifndef HYPERSCAN_DISABLED
 #include "source/common/thread_local/thread_local_impl.h"
 
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
 #include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -48,6 +51,25 @@ TEST(ThreadLocalTest, RaceScratchCreation) {
   }
 }
 
+// Verify that even if thread local is not initialized, matcher can work and create thread local
+// afterwards.
+TEST(ThreadLocalTest, NotInitialized) {
+  std::vector<const char*> expressions{"^/asdf/.+"};
+  std::vector<unsigned int> flags{0};
+  std::vector<unsigned int> ids{0};
+
+  Event::MockDispatcher dispatcher;
+  ThreadLocal::MockInstance instance;
+  EXPECT_CALL(instance, allocateSlot())
+      .WillOnce(testing::Invoke(&instance, &ThreadLocal::MockInstance::allocateSlotMock));
+  Matcher matcher(expressions, flags, ids, dispatcher, instance, false);
+  // Simulate moving to another thread.
+  instance.data_[0].reset();
+
+  EXPECT_CALL(dispatcher, post(_));
+  EXPECT_TRUE(matcher.match("/asdf/1"));
+}
+
 // Verify that comparing works correctly for bounds.
 TEST(BoundTest, Compare) {
   EXPECT_LT(Bound(1, 1), Bound(2, 1));
@@ -61,8 +83,8 @@ protected:
     std::vector<const char*> expressions{expression};
     std::vector<unsigned int> flags{flag};
     std::vector<unsigned int> ids{0};
-    matcher_ =
-        std::make_unique<Matcher>(expressions, flags, ids, instance_, report_start_of_matching);
+    matcher_ = std::make_unique<Matcher>(expressions, flags, ids, dispatcher_, instance_,
+                                         report_start_of_matching);
   }
 
   void TearDown() override {
@@ -70,8 +92,9 @@ protected:
     ::testing::Test::TearDown();
   }
 
+  Event::MockDispatcher dispatcher_;
   ThreadLocal::InstanceImpl instance_;
-  std::shared_ptr<Matcher> matcher_;
+  std::unique_ptr<Matcher> matcher_;
 };
 
 // Verify that matching will be performed successfully.
@@ -88,7 +111,7 @@ TEST_F(MatcherTest, Regex) {
 TEST_F(MatcherTest, Nullopt) {
   setup("^/asdf/.+", 0, false);
 
-  EXPECT_FALSE(matcher_->match(absl::nullopt));
+  EXPECT_FALSE(matcher_->match(absl::monostate()));
 }
 
 // Verify that matching will be performed case-insensitively.
@@ -148,7 +171,7 @@ TEST_F(MatcherTest, RegexWithCombination) {
   std::vector<unsigned int> flags{HS_FLAG_QUIET, HS_FLAG_QUIET, HS_FLAG_COMBINATION};
   std::vector<unsigned int> ids{1, 2, 0};
 
-  matcher_ = std::make_unique<Matcher>(expressions, flags, ids, instance_, false);
+  matcher_ = std::make_unique<Matcher>(expressions, flags, ids, dispatcher_, instance_, false);
 
   EXPECT_TRUE(matcher_->match("a"));
 }

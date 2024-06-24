@@ -8,6 +8,7 @@ Filters
   listener/listener
   network/network
   udp/udp
+  udp/session
   http/http
   dubbo/dubbo
   thrift/thrift

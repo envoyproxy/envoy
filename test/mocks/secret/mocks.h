@@ -18,7 +18,7 @@ public:
   MockSecretManager();
   ~MockSecretManager() override;
 
-  MOCK_METHOD(void, addStaticSecret,
+  MOCK_METHOD(absl::Status, addStaticSecret,
               (const envoy::extensions::transport_sockets::tls::v3::Secret& secret));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findStaticTlsCertificateProvider,
               (const std::string& name), (const));
@@ -62,7 +62,7 @@ class MockSecretCallbacks : public SecretCallbacks {
 public:
   MockSecretCallbacks();
   ~MockSecretCallbacks() override;
-  MOCK_METHOD(void, onAddOrUpdateSecret, ());
+  MOCK_METHOD(absl::Status, onAddOrUpdateSecret, ());
 };
 
 } // namespace Secret

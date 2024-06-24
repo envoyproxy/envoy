@@ -37,6 +37,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "minimum_clusters_validator_integration_test",
+    size = "large",
     srcs = ["minimum_clusters_validator_integration_test.cc"],
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
     deps = [

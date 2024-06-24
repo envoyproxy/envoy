@@ -82,7 +82,7 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   auto filter_state_object = std::make_shared<TestObject>();
   filter_state_objects_.push_back(
       {filter_state_object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "test.object"});
+       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "test.object"});
   ProtobufWkt::Struct& map = (*metadata_->mutable_filter_metadata())["envoy.test"];
   ProtobufWkt::Value val;
   val.set_string_value("val");
@@ -196,7 +196,8 @@ TEST_F(ConfigTest, UnsupportedMetadata) {
       "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
   )EOF",
                             config_proto_);
-  EXPECT_THROW_WITH_REGEX(initialize(), EnvoyException, "metadata type is not supported: route");
+  EXPECT_THROW_WITH_REGEX(initialize(), EnvoyException,
+                          "metadata type is not supported:(.|\n)*route");
 }
 
 TEST_F(ConfigTest, MissingState) {

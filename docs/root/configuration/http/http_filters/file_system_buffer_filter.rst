@@ -23,7 +23,7 @@ Configuration
 
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig>`
-* This filter should not be active on the same stream as *envoy.filters.http.buffer*, or any other
+* This filter should not be active on the same stream as :ref:`Buffer filter <config_http_filters_buffer>`, or any other
   filter that changes the default buffering behavior, as stream watermarks will behave
   unpredictably with multiple buffer-altering filters. (There is also no need to have both together,
   as this filter offers the same features.)

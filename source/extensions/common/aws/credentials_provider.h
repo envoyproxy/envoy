@@ -68,6 +68,8 @@ public:
   virtual Credentials getCredentials() PURE;
 };
 
+using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;
+using CredentialsConstUniquePtr = std::unique_ptr<const Credentials>;
 using CredentialsProviderSharedPtr = std::shared_ptr<CredentialsProvider>;
 
 } // namespace Aws

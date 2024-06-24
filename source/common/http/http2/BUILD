@@ -59,20 +59,9 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:status_lib",
         "//source/common/http:utility_lib",
+        "//source/common/network:common_connection_filter_states_lib",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-# Separate library for some nghttp2 setup stuff to avoid having tests take a
-# dependency on everything in codec_lib.
-envoy_cc_library(
-    name = "nghttp2_lib",
-    srcs = ["nghttp2.cc"],
-    hdrs = ["nghttp2.h"],
-    external_deps = ["nghttp2"],
-    deps = [
-        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -108,7 +97,6 @@ envoy_cc_library(
     srcs = ["metadata_decoder.cc"],
     hdrs = ["metadata_decoder.h"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_hpack_decoder",
     ],
     deps = [

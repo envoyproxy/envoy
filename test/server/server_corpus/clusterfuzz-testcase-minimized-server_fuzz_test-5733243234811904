@@ -49,7 +49,6 @@ static_resources {
         seconds: 2299
         nanos: 16384
       }
-      event_log_path: "%"
       always_log_health_check_failures: true
     }
     typed_extension_protocol_options {

@@ -17,7 +17,8 @@ namespace AdmissionControl {
 
 static constexpr std::chrono::seconds defaultSamplingWindow{30};
 
-Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {

@@ -23,9 +23,7 @@ protected:
   AllocatorImplTest() : pool_(symbol_table_), alloc_(symbol_table_) {}
   ~AllocatorImplTest() override { clearStorage(); }
 
-  StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, symbol_table_);
-  }
+  StatNameStorage makeStatStorage(absl::string_view name) { return {name, symbol_table_}; }
 
   StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
@@ -137,6 +135,23 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
   thread->join();
   EXPECT_FALSE(alloc_.isMutexLockedForTest());
+}
+
+TEST_F(AllocatorImplTest, HiddenGauge) {
+  GaugeSharedPtr hidden_gauge =
+      alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_TRUE(hidden_gauge->hidden());
+
+  GaugeSharedPtr non_hidden_gauge =
+      alloc_.makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
+  EXPECT_NE(non_hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_FALSE(non_hidden_gauge->hidden());
+
+  GaugeSharedPtr never_import_hidden_gauge = alloc_.makeGauge(
+      makeStat("never_import_hidden"), StatName(), {}, Gauge::ImportMode::NeverImport);
+  EXPECT_NE(never_import_hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_FALSE(never_import_hidden_gauge->hidden());
 }
 
 TEST_F(AllocatorImplTest, ForEachCounter) {
@@ -505,6 +520,65 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
                             [&num_iterations](Gauge&) { ++num_iterations; });
   EXPECT_EQ(num_sinked_gauges, 0);
   EXPECT_EQ(num_iterations, 0);
+}
+
+TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
+  GaugeSharedPtr unhidden_gauge;
+  GaugeSharedPtr hidden_gauge;
+
+  auto unhidden_stat_name = makeStat(absl::StrCat("unhidden.gauge"));
+  auto hidden_stat_name = makeStat(absl::StrCat("hidden.gauge"));
+
+  size_t num_gauges = 0;
+  size_t num_iterations = 0;
+
+  unhidden_gauge =
+      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+
+  hidden_gauge =
+      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+
+  alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                            [&num_iterations, unhidden_stat_name](Gauge& gauge) {
+                              EXPECT_EQ(unhidden_stat_name, gauge.statName());
+                              num_iterations++;
+                            });
+  EXPECT_EQ(num_gauges, 2);
+  EXPECT_EQ(num_iterations, 1);
+}
+
+TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
+  std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestUtil::TestSinkPredicates>();
+  TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  GaugeSharedPtr unhidden_gauge;
+  GaugeSharedPtr hidden_gauge;
+
+  alloc_.setSinkPredicates(std::move(moved_sink_predicates));
+
+  auto unhidden_stat_name = makeStat(absl::StrCat("unhidden.gauge"));
+  auto hidden_stat_name = makeStat(absl::StrCat("hidden.gauge"));
+
+  sink_predicates->add(unhidden_stat_name);
+  sink_predicates->add(hidden_stat_name);
+
+  size_t num_gauges = 0;
+  size_t num_iterations = 0;
+
+  unhidden_gauge =
+      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+
+  hidden_gauge =
+      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+
+  alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                            [&num_iterations, &sink_predicates](Gauge& gauge) {
+                              ++num_iterations;
+                              EXPECT_TRUE(sink_predicates->has(gauge.statName()));
+                            });
+
+  EXPECT_EQ(num_gauges, 2);
+  EXPECT_EQ(num_iterations, 2);
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {

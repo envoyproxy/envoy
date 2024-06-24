@@ -2,11 +2,13 @@ package io.envoyproxy.envoymobile.engine
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class EnvoyNativeResourceRegistryTest {
-
   @Test
   fun `release callbacks are invoked when EnvoyNativeResourceWrappers are flagged as unreachable`() {
     val latch = CountDownLatch(1)

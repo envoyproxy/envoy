@@ -29,11 +29,11 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -46,6 +46,15 @@ envoy_cc_test(
     deps = [
         "//source/common/http:async_client_utility_lib",
         "//test/mocks/http:http_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "character_set_validation_test",
+    srcs = ["character_set_validation_test.cc"],
+    deps = [
+        "//source/common/http:character_set_validation_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -65,6 +74,7 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -96,13 +106,16 @@ envoy_proto_library(
             ":codec_impl_fuzz_proto_cc_proto",
             "//source/common/http:conn_manager_lib",
             "//source/common/http:header_map_lib",
+            "//source/common/http:rds_lib",
             "//source/common/http/http1:codec_lib",
             "//source/common/http/http2:codec_lib",
             "//test/common/http/http2:codec_impl_test_util",
             "//test/fuzz:utility_lib",
             "//test/mocks/http:http_mocks",
             "//test/mocks/network:network_mocks",
+            "//test/mocks/server:overload_manager_mocks",
             "//test/test_common:test_runtime_lib",
+            "@com_github_google_quiche//:quiche_common_platform_test",
         ],
     )
     for http_protocol in [
@@ -120,6 +133,8 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_reply:local_reply_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -198,6 +213,7 @@ envoy_cc_fuzz_test(
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:rds_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/server:drain_manager_lib",
@@ -225,8 +241,10 @@ envoy_cc_test_library(
         ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
+        "//source/common/http:rds_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -253,7 +271,6 @@ envoy_cc_test(
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
     ],
-    shard_count = 3,
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
@@ -358,6 +375,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_utility_lib",
         "//test/mocks/http:header_validator_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -569,5 +587,56 @@ envoy_cc_test(
         "//source/common/http:header_mutation_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "filter_chain_helper_test",
+    srcs = ["filter_chain_helper_test.cc"],
+    deps = [
+        "//source/common/http:filter_chain_helper_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "hcm_router_fuzz_proto",
+    srcs = ["hcm_router_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "hcm_router_fuzz_test",
+    srcs = ["hcm_router_fuzz_test.cc"],
+    corpus = "hcm_router_fuzz_corpus",
+    deps = [
+        ":conn_manager_impl_test_base_lib",
+        ":hcm_router_fuzz_proto_cc_proto",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/router:config_lib",
+        "//source/extensions/upstreams/http/generic:config",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
     ],
 )

@@ -702,7 +702,7 @@ public:
   StatNameManagedStorage(StatName src, SymbolTable& table) noexcept
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameManagedStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); } // NOLINT(clang-analyzer-unix.Malloc)
 
 private:
   SymbolTable& symbol_table_;
@@ -753,6 +753,16 @@ public:
    * @return the StatName held in the container for this name.
    */
   StatName add(absl::string_view name);
+
+  /**
+   * Adds the StatName to the pool preserving the representation.
+   * This avoids stringifying if we already have a StatName object
+   * and is useful if parts of the StatName are dynamically encoded.
+   * @param name the stat name to add the container.
+   * @return the StatName held in the container for this name.
+   *
+   */
+  StatName add(StatName name);
 
   /**
    * Does essentially the same thing as add(), but returns the storage as a

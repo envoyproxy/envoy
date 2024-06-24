@@ -25,7 +25,7 @@ TEST(ExactMapMatcherTest, NoMatch) {
 TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
+          DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}),
       absl::nullopt);
 
   TestData data;

@@ -26,8 +26,8 @@ class Encode1xxLocalReplyFilterConfig
 public:
   Encode1xxLocalReplyFilterConfig() : EmptyHttpFilterConfig("encode1xx-local-reply-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<Encode1xxLocalReplyFilter>());
     };

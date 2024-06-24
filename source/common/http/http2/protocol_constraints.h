@@ -47,7 +47,7 @@ public:
 
   // Track received frames of various types.
   // Return an error status if inbound frame constraints were violated.
-  Status trackInboundFrames(size_t length, uint8_t type, uint8_t flags, uint32_t padding_length);
+  Status trackInboundFrame(uint8_t type, bool end_stream, bool is_empty);
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
   void incrementOpenedStreamCount() { ++opened_streams_; }

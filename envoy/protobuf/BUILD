@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "message_validator_interface",
     hdrs = ["message_validator.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/runtime:runtime_interface",
         "//source/common/protobuf",
     ],

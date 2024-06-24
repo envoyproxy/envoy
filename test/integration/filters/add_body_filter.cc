@@ -19,13 +19,16 @@ public:
   AddBodyFilterConfig(
       test::integration::filters::AddBodyFilterConfig::FilterCallback where_to_add_body,
       uint32_t body_size,
-      test::integration::filters::AddBodyFilterConfig::FilterCallback where_to_stop_and_buffer)
+      test::integration::filters::AddBodyFilterConfig::FilterCallback where_to_stop_and_buffer,
+      bool add_trailers_in_encode_decode_header)
       : where_to_add_body_(where_to_add_body), body_size_(body_size),
-        where_to_stop_and_buffer_(where_to_stop_and_buffer) {}
+        where_to_stop_and_buffer_(where_to_stop_and_buffer),
+        add_trailers_in_encode_decode_header_(add_trailers_in_encode_decode_header) {}
 
   const test::integration::filters::AddBodyFilterConfig::FilterCallback where_to_add_body_;
   const uint32_t body_size_;
   const test::integration::filters::AddBodyFilterConfig::FilterCallback where_to_stop_and_buffer_;
+  bool add_trailers_in_encode_decode_header_;
 };
 
 // A test filter that adds body data to a request/response without body payload.
@@ -40,6 +43,11 @@ public:
         Buffer::OwnedImpl body("body");
         headers.setContentLength(body.length());
         decoder_callbacks_->addDecodedData(body, false);
+        if (config_->add_trailers_in_encode_decode_header_) {
+          auto& trailers = decoder_callbacks_->addDecodedTrailers();
+          trailers.addCopy(Http::LowerCaseString("dummy_request_trailer"),
+                           "dummy_request_trailer_value");
+        }
       } else {
         headers.removeContentLength();
       }
@@ -103,6 +111,11 @@ public:
         Buffer::OwnedImpl body("body");
         headers.setContentLength(body.length());
         encoder_callbacks_->addEncodedData(body, false);
+        if (config_->add_trailers_in_encode_decode_header_) {
+          auto& trailers = encoder_callbacks_->addEncodedTrailers();
+          trailers.addCopy(Http::LowerCaseString("dummy_response_trailer"),
+                           "dummy_response_trailer_value");
+        }
       }
     } else if (config_->where_to_add_body_ ==
                test::integration::filters::AddBodyFilterConfig::ENCODE_HEADERS) {
@@ -124,12 +137,13 @@ public:
   AddBodyFilterFactory() : DualFactoryBase("add-body-filter") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
       DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<AddBodyFilterConfig>(
         proto_config.where_to_add_body(), proto_config.body_size(),
-        proto_config.where_to_stop_and_buffer());
+        proto_config.where_to_stop_and_buffer(),
+        proto_config.add_trailers_in_encode_decode_header());
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<AddBodyStreamFilter>(filter_config));
     };

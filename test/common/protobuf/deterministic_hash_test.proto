@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package deterministichashtest;
+
+import "google/protobuf/any.proto";
+
+enum FooEnum {
+  ZERO = 0;
+  FOO = 1;
+  BAR = 2;
+}
+
+message Maps {
+  map<bool, string> bool_string = 1;
+  map<string, bool> string_bool = 2;
+  map<int32, uint32> int32_uint32 = 3;
+  map<uint32, int32> uint32_int32 = 4;
+  map<int64, uint64> int64_uint64 = 5;
+  map<uint64, string> uint64_int64 = 6;
+};
+
+message Recursion {
+  Recursion child = 1;
+  uint32 index = 2;
+};
+
+message RepeatedFields {
+  repeated bool bools = 1;
+  repeated string strings = 2;
+  repeated int32 int32s = 3;
+  repeated uint32 uint32s = 4;
+  repeated int64 int64s = 5;
+  repeated uint64 uint64s = 6;
+  repeated bytes byteses = 7;
+  repeated double doubles = 8;
+  repeated float floats = 9;
+  repeated FooEnum enums = 10;
+  repeated Recursion messages = 11;
+};
+
+message SingleFields {
+  bool b = 1;
+  string string = 2;
+  int32 int32 = 3;
+  uint32 uint32 = 4;
+  int64 int64 = 5;
+  uint64 uint64 = 6;
+  bytes bytes = 7;
+  double db = 8;
+  float f = 9;
+  FooEnum e = 10;
+};
+
+message AnyContainer {
+  google.protobuf.Any any = 1;
+};

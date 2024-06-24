@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/extensions/common/matcher/matcher.h"
@@ -76,6 +77,27 @@ public:
 };
 
 using SinkPtr = std::unique_ptr<Sink>;
+using SinkContext =
+    absl::variant<std::reference_wrapper<Server::Configuration::FactoryContext>,
+                  std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>;
+
+/**
+ * Abstract tap sink factory. Produces a factory that can instantiate SinkPtr objects
+ */
+class TapSinkFactory : public Config::TypedFactory {
+public:
+  ~TapSinkFactory() override = default;
+  std::string category() const override { return "envoy.tap.sinks"; }
+
+  /**
+   * Create a Sink that can be used for writing out data produced by the tap filter.
+   * @param config supplies the protobuf configuration for the sink factory
+   * @param cluster_manager is a ClusterManager from the HTTP/transport socket context
+   */
+  virtual SinkPtr createSinkPtr(const Protobuf::Message& config, SinkContext context) PURE;
+};
+
+using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;
 
 /**
  * Generic configuration for a tap extension (filter, transport socket, etc.).

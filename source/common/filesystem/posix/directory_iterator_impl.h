@@ -29,7 +29,7 @@ private:
   void nextEntry();
   void openDirectory();
 
-  DirectoryEntry makeEntry(absl::string_view filename) const;
+  absl::StatusOr<DirectoryEntry> makeEntry(absl::string_view filename) const;
 
   std::string directory_path_;
   DIR* dir_{nullptr};

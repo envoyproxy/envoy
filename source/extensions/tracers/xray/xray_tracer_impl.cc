@@ -63,8 +63,9 @@ Driver::Driver(const XRayConfiguration& config,
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, Envoy::SystemTime start_time,
-                                   const Tracing::Decision tracing_decision) {
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
+                                   Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
   // if there's a X-Ray header and it has a sampling decision already determined (i.e. Sample=1)
   // then we can move on; otherwise, we ask the sampling strategy whether this request should be
@@ -74,9 +75,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // If we have a XRay TraceID in the headers, then we create a SpanContext to pass that trace-id
   // around if no TraceID (which means no x-ray header) then this is a brand new span.
 
-  // TODO(marcomagdy) - how do we factor this into the logic above
+  // TODO(suniltheta) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = trace_context.getByKey(XRayTraceHeader);
+  const auto header = xRayTraceHeader().get(trace_context);
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
   if (header.has_value()) {
@@ -105,10 +106,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    return tracer->startSpan(config, operation_name, start_time,
+    return tracer->startSpan(config, operation_name, stream_info.startTime(),
                              header.has_value() ? absl::optional<XRayHeader>(xray_header)
                                                 : absl::nullopt,
-                             trace_context.getByKey(XForwardedForHeader));
+                             xForwardedForHeader().get(trace_context));
   }
 
   // Instead of returning nullptr, we return a Span that is marked as not-sampled.

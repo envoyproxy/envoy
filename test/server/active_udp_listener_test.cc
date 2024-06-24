@@ -194,37 +194,6 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 }
 
-TEST_P(ActiveUdpListenerTest, UdpListenerWorkerRouterTest) {
-  uint32_t concurrency = 2;
-  setup(concurrency);
-
-  uint64_t listener_tag = 1;
-  EXPECT_CALL(listener_config_, listenerTag()).WillOnce(Return(listener_tag));
-  active_listener_->destination_ = 1;
-
-  EXPECT_CALL(listener_config_, filterChainFactory());
-  auto another_udp_listener = new NiceMock<Network::MockUdpListener>();
-  EXPECT_CALL(*another_udp_listener, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-  EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _)).WillOnce(Return(another_udp_listener));
-#ifndef NDEBUG
-  EXPECT_CALL(dispatcher_, isThreadSafe()).WillOnce(Return(false));
-#endif
-  auto another_active_listener = std::make_unique<TestActiveRawUdpListener>(
-      1, concurrency, conn_handler_, listen_socket_, dispatcher_, listener_config_);
-
-  EXPECT_CALL(conn_handler_, getUdpListenerCallbacks(_, _))
-      .WillOnce(Invoke([&](uint64_t tag, const Network::Address::Instance& address) {
-        EXPECT_EQ(listener_tag, tag);
-        EXPECT_EQ(*listen_socket_->connectionInfoProvider().localAddress(), address);
-        return std::reference_wrapper<Network::UdpListenerCallbacks>(*another_active_listener);
-      }));
-
-  Network::UdpRecvData data;
-  active_listener_->onData(std::move(data));
-
-  EXPECT_CALL(*another_udp_listener, onDestroy());
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy

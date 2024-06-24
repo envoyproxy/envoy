@@ -159,7 +159,9 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
 void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) {
   switch (reason) {
   case StreamResetReason::ConnectionTermination:
-  case StreamResetReason::ConnectionFailure:
+  case StreamResetReason::LocalConnectionFailure:
+  case StreamResetReason::RemoteConnectionFailure:
+  case StreamResetReason::ConnectionTimeout:
     parent_.host()->cluster().trafficStats()->upstream_rq_pending_failure_eject_.inc();
     closed_with_active_rq_ = true;
     break;

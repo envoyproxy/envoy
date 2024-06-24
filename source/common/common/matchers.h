@@ -40,7 +40,8 @@ public:
   /**
    * Create the matcher object.
    */
-  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value);
+  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value,
+                                           Server::Configuration::CommonFactoryContext& context);
 };
 
 class NullMatcher : public ValueMatcher {
@@ -86,20 +87,27 @@ public:
   bool match(absl::string_view) const override { return true; }
 };
 
+StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
+                                           Server::Configuration::CommonFactoryContext& context);
+
 template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  explicit StringMatcherImpl(const StringMatcherType& matcher) : matcher_(matcher) {
+  explicit StringMatcherImpl(const StringMatcherType& matcher,
+                             Server::Configuration::CommonFactoryContext& context)
+      : matcher_(matcher) {
     if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
-      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
+      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine());
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use
         lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
       }
+    } else if (matcher.has_custom()) {
+      custom_ = getExtensionStringMatcher(matcher.custom(), context);
     }
   }
 
@@ -121,11 +129,13 @@ public:
                  : absl::StrContains(value, matcher_.contains());
     case StringMatcherType::MatchPatternCase::kSafeRegex:
       return regex_->match(value);
-    case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
-      break;
+    case StringMatcherType::MatchPatternCase::kCustom:
+      return custom_->match(value);
+    default:
+      PANIC("unexpected");
     }
-    PANIC("unexpected");
   }
+
   bool match(const ProtobufWkt::Value& value) const override {
 
     if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
@@ -158,11 +168,22 @@ private:
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
+  StringMatcherPtr custom_;
+};
+
+class StringMatcherExtensionFactory : public Config::TypedFactory {
+public:
+  virtual StringMatcherPtr
+  createStringMatcher(const Protobuf::Message& config,
+                      Server::Configuration::CommonFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.string_matcher"; }
 };
 
 class ListMatcher : public ValueMatcher {
 public:
-  ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher);
+  ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
+              Server::Configuration::CommonFactoryContext& context);
 
   bool match(const ProtobufWkt::Value& value) const override;
 
@@ -172,9 +193,21 @@ private:
   ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 
+class OrMatcher : public ValueMatcher {
+public:
+  OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher,
+            Server::Configuration::CommonFactoryContext& context);
+
+  bool match(const ProtobufWkt::Value& value) const override;
+
+private:
+  std::vector<ValueMatcherConstSharedPtr> or_matchers_;
+};
+
 class MetadataMatcher {
 public:
-  MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher);
+  MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher,
+                  Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Check whether the metadata is matched to the matcher.
@@ -192,7 +225,8 @@ private:
 
 class FilterStateMatcher {
 public:
-  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher);
+  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                     Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Check whether the filter state object is matched to the matcher.
@@ -208,14 +242,25 @@ private:
 
 class PathMatcher : public StringMatcher {
 public:
-  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path) : matcher_(path.path()) {}
-  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) : matcher_(matcher) {}
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path,
+              Server::Configuration::CommonFactoryContext& context)
+      : matcher_(path.path(), context) {}
+  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher,
+              Server::Configuration::CommonFactoryContext& context)
+      : matcher_(matcher, context) {}
 
-  static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
-  static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
-  static PathMatcherConstSharedPtr createPattern(const std::string& pattern, bool ignore_case);
   static PathMatcherConstSharedPtr
-  createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
+  createExact(const std::string& exact, bool ignore_case,
+              Server::Configuration::CommonFactoryContext& context);
+  static PathMatcherConstSharedPtr
+  createPrefix(const std::string& prefix, bool ignore_case,
+               Server::Configuration::CommonFactoryContext& context);
+  static PathMatcherConstSharedPtr
+  createPattern(const std::string& pattern, bool ignore_case,
+                Server::Configuration::CommonFactoryContext& context);
+  static PathMatcherConstSharedPtr
+  createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
+                  Server::Configuration::CommonFactoryContext& context);
 
   bool match(const absl::string_view path) const override;
   const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>& matcher() const {

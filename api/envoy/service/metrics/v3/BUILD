@@ -8,7 +8,7 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/config/core/v3:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_xds//udpa/annotations:pkg",
         "@prometheus_metrics_model//:client_model",
     ],
 )

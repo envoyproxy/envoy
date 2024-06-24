@@ -25,9 +25,9 @@ public:
 
   /**
    * @param add a static secret from envoy::extensions::transport_sockets::tls::v3::Secret.
-   * @throw an EnvoyException if the secret is invalid or not supported, or there is duplicate.
+   * @return a status indicating if the function completed successfully.
    */
-  virtual void
+  virtual absl::Status
   addStaticSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) PURE;
 
   /**

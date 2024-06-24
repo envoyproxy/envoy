@@ -33,8 +33,8 @@ class SipFilterConfigTestBase {
 public:
   void testConfig(envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_).value(); });
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.serverFactoryContext()));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -48,9 +48,12 @@ public:
 class SipFilterConfigTest : public testing::Test, public SipFilterConfigTestBase {};
 
 TEST_F(SipFilterConfigTest, ValidateFail) {
-  EXPECT_THROW(factory_.createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy(), context_),
-               ProtoValidationException);
+  EXPECT_THROW(
+      factory_
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy(), context_)
+          .IgnoreError(),
+      ProtoValidationException);
 }
 
 TEST_F(SipFilterConfigTest, ValidProtoConfiguration) {
@@ -90,7 +93,7 @@ sip_filters:
       parseSipProxyFromYaml(yaml);
   std::string cluster = "A";
   config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster(cluster);
-  EXPECT_NO_THROW({ factory_.createFilterFactoryFromProto(config, context_); });
+  EXPECT_NO_THROW({ factory_.createFilterFactoryFromProto(config, context_).IgnoreError(); });
 }
 
 // Test config with an explicitly defined router filter.
@@ -126,8 +129,8 @@ sip_filters:
   envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy config =
       parseSipProxyFromYaml(yaml);
 
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "no_such_filter");
+  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_).IgnoreError(),
+                          EnvoyException, "no_such_filter");
 }
 
 // Test config with multiple filters.
@@ -182,8 +185,9 @@ customized_affinity:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   const auto options = std::make_shared<ProtocolOptionsConfigImpl>(config);
-  EXPECT_CALL(*context.cluster_manager_.thread_local_cluster_.cluster_.info_,
-              extensionProtocolOptions(_))
+  EXPECT_CALL(
+      *context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+      extensionProtocolOptions(_))
       .WillRepeatedly(Return(options));
 
   EXPECT_EQ(true, options->sessionAffinity());

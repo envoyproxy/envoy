@@ -22,11 +22,6 @@ public:
       : BaseIntegrationTest(GetParam(), configToUse()), api_(Api::createApiForTest()),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
                   queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'dns_filter.my_prefix.local_a_record_answers' and
-    // stat_prefix 'my_prefix'.
-    skip_tag_extraction_rule_check_ = true;
-
     setupResponseParser();
   }
 
@@ -61,8 +56,8 @@ static_resources:
                        Network::Test::getLoopbackAddressString(GetParam()));
   }
 
-  Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPort() {
-    auto addr = Network::Utility::parseInternetAddressAndPort(
+  Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPortNoThrow() {
+    auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(
         fmt::format("{}:{}", Envoy::Network::Test::getLoopbackAddressUrlString(version_), 0),
         false);
 
@@ -195,7 +190,7 @@ listener_filters:
     }
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto addr_port = getListenerBindAddressAndPort();
+      auto addr_port = getListenerBindAddressAndPortNoThrow();
       auto listener_0 = getListener0(addr_port);
       auto listener_1 = getListener1(addr_port);
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(listener_0);
@@ -232,7 +227,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsFilterIntegrationTest,
 TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::UdpRecvData response;
@@ -250,7 +245,7 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
 TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::UdpRecvData response;
@@ -268,7 +263,7 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
 TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::UdpRecvData response;
@@ -286,7 +281,7 @@ TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
 TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   uint16_t record_type;
@@ -310,7 +305,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
 TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   uint16_t record_type;
@@ -335,7 +330,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
 TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithPortServiceRecordLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string service("_http._tcp.web.foo1.com");
@@ -370,7 +365,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTe
   constexpr size_t endpoints = 2;
   setup(endpoints);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string service("_https._tcp.web.foo1.com");

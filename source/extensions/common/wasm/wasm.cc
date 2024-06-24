@@ -8,6 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
 
 #include "absl/strings/str_cat.h"
@@ -68,7 +69,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
                                       [this, weak](Event::PostCb post_cb) {
                                         auto lock = weak.lock();
                                         if (lock) { // See if we are still alive.
-                                          server_shutdown_post_cb_ = post_cb;
+                                          server_shutdown_post_cb_ = std::move(post_cb);
                                         }
                                       });
 }
@@ -148,7 +149,7 @@ Wasm::~Wasm() {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
   if (server_shutdown_post_cb_) {
-    dispatcher_.post(server_shutdown_post_cb_);
+    dispatcher_.post(std::move(server_shutdown_post_cb_));
   }
 }
 
@@ -167,7 +168,7 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
   }
   auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->wasm()->sharedThis()), root_context,
                    context_id = context->id(),
-                   token](Envoy::Network::DnsResolver::ResolutionStatus status,
+                   token](Envoy::Network::DnsResolver::ResolutionStatus status, absl::string_view,
                           std::list<Envoy::Network::DnsResponse>&& response) {
     auto wasm = weak_wasm.lock();
     if (!wasm) {
@@ -179,8 +180,10 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    context->wasm()->dnsResolver() = dns_resolver_factory.createDnsResolver(
-        context->wasm()->dispatcher(), context->wasm()->api(), typed_dns_resolver_config);
+    context->wasm()->dnsResolver() = THROW_OR_RETURN_VALUE(
+        dns_resolver_factory.createDnsResolver(context->wasm()->dispatcher(),
+                                               context->wasm()->api(), typed_dns_resolver_config),
+        Network::DnsResolverSharedPtr);
   }
   context->wasm()->dnsResolver()->resolve(std::string(address.value()),
                                           Network::DnsLookupFamily::Auto, callback);
@@ -226,12 +229,10 @@ ContextBase* Wasm::createRootContext(const std::shared_ptr<PluginBase>& plugin) 
 
 ContextBase* Wasm::createVmContext() { return new Context(this); }
 
-void Wasm::log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
-               const Http::ResponseHeaderMap* response_headers,
-               const Http::ResponseTrailerMap* response_trailers,
-               const StreamInfo::StreamInfo& stream_info) {
+void Wasm::log(const PluginSharedPtr& plugin, const Formatter::HttpFormatterContext& log_context,
+               const StreamInfo::StreamInfo& info) {
   auto context = getRootContext(plugin, true);
-  context->log(request_headers, response_headers, response_trailers, stream_info);
+  context->log(log_context, info);
 }
 
 void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot) {
@@ -315,8 +316,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Event::Dispatcher& dispatcher, Api::Api& api,
                 Server::ServerLifecycleNotifier& lifecycle_notifier,
-                Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
-                CreateWasmCallback&& cb, CreateContextFn create_root_context_for_testing) {
+                RemoteAsyncDataProviderPtr& remote_data_provider, CreateWasmCallback&& cb,
+                CreateContextFn create_root_context_for_testing) {
   auto& stats_handler = getCreateStatsHandler();
   std::string source, code;
   auto config = plugin->wasmConfig();
@@ -376,7 +377,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       stats_handler.onEvent(WasmEvent::RemoteLoadCacheMiss);
     }
   } else if (vm_config.code().has_local()) {
-    code = Config::DataSource::read(vm_config.code().local(), true, api);
+    code = THROW_OR_RETURN_VALUE(Config::DataSource::read(vm_config.code().local(), true, api),
+                                 std::string);
     source = Config::DataSource::getPath(vm_config.code().local())
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
@@ -454,7 +456,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       cb(nullptr);
       return false;
     } else {
-      remote_data_provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
           cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
           api.randomGenerator(), true, fetch_callback);
     }

@@ -1,0 +1,75 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "http"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "connect"
+            }
+            headers {
+              key: "content-type"
+              value: "application/json"
+            }
+            headers {
+              key: "connection"
+              value: "upgrade"
+            }
+            headers {
+              key: "-upstream-canary"
+              value: "empty"
+            }
+            headers {
+              key: "if-match"
+              value: "empty"
+            }
+            headers {
+              key: "host"
+              value: "empty"
+            }
+            headers {
+              key: "proxy-authorization"
+              value: "empty"
+            }
+            headers {
+              key: "-retry-on"
+              value: "5xx"
+            }
+            headers {
+              key: "-upstream-healthchecked-cluster"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

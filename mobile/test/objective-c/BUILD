@@ -1,6 +1,9 @@
-load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 envoy_mobile_objc_test(
     name = "envoy_bridge_utility_test",
@@ -8,7 +11,6 @@ envoy_mobile_objc_test(
         "EnvoyBridgeUtilityTest.m",
     ],
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_objc_bridge_lib",
@@ -21,10 +23,37 @@ envoy_mobile_objc_test(
         "EnvoyKeyValueStoreBridgeImplTest.m",
     ],
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
         "//library/objective-c:envoy_objc_bridge_lib",
+    ],
+)
+
+envoy_objc_library(
+    name = "envoy_test_server",
+    testonly = True,
+    srcs = [
+        "EnvoyTestServer.mm",
+    ],
+    hdrs = ["EnvoyTestServer.h"],
+    module_name = "EnvoyTestServer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//test/common/integration:test_server_interface_lib",
+    ],
+)
+
+envoy_objc_library(
+    name = "envoy_test_api",
+    testonly = True,
+    srcs = [
+        "EnvoyTestApi.mm",
+    ],
+    hdrs = ["EnvoyTestApi.h"],
+    module_name = "EnvoyTestApi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//test/common/proxy:test_apple_proxy_settings_lib",
     ],
 )

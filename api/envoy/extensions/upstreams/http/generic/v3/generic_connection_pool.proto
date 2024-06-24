@@ -12,7 +12,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Generic Connection Pool]
 
-// A connection pool which forwards downstream HTTP as TCP or HTTP to upstream,
+// A connection pool which forwards downstream HTTP as TCP, UDP or HTTP to upstream,
 // based on CONNECT configuration.
 // [#extension: envoy.upstreams.http.generic]
 message GenericConnectionPoolProto {

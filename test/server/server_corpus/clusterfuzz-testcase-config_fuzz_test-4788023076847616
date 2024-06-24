@@ -46,7 +46,6 @@ static_resources {
         seconds: 2559
         nanos: 16384
       }
-      event_log_path: "]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
       interval_jitter_percent: 524288
       tls_options {
         alpn_protocols: "/"
@@ -178,7 +177,6 @@ static_resources {
 }
 cluster_manager {
   load_stats_config {
-    transport_api_version: V3
   }
 }
 stats_sinks {

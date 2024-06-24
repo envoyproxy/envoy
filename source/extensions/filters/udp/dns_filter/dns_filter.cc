@@ -20,9 +20,12 @@ static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config)
-    : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
+    : root_scope_(context.scope()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
+      api_(context.serverFactoryContext().api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
-      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
+      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT),
+      random_(context.serverFactoryContext().api().randomGenerator()) {
   using envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
@@ -52,7 +55,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       // Creating the IP address will throw an exception if the address string is malformed
       for (auto index = 0; index < address_list.size(); index++) {
         const auto address_iter = std::next(address_list.begin(), (i++ % address_list.size()));
-        auto ipaddr = Network::Utility::parseInternetAddress(*address_iter, 0 /* port */);
+        auto ipaddr = Network::Utility::parseInternetAddressNoThrow(*address_iter, 0 /* port */);
+        if (!ipaddr) {
+          throw EnvoyException(absl::StrCat("malformed IP address: ", *address_iter));
+        }
         addrs.push_back(std::move(ipaddr));
       }
 
@@ -197,16 +203,15 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
 
   const auto& datasource = config.external_dns_table();
   bool data_source_loaded = false;
-  try {
+  TRY_NEEDS_AUDIT {
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
     MessageUtil::loadFromFile(datasource.filename(), table,
                               ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;
@@ -245,7 +250,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     for (const auto& ip : iplist) {
       incrementExternalQueryTypeAnswerCount(query->type_);
       const std::chrono::seconds ttl = getDomainTTL(query->name_);
-      message_parser_.storeDnsAnswerRecord(context, *query, ttl, std::move(ip));
+      message_parser_.storeDnsAnswerRecord(context, *query, ttl, ip);
     }
     sendDnsResponse(std::move(context));
   };
@@ -497,7 +502,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   size_t cluster_endpoints = 0;
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
-    // TODO(abaptiste): consider using host weights when returning answer addresses
+    // TODO(suniltheta): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);
 
     for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {

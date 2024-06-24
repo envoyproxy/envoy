@@ -22,14 +22,13 @@ public:
       Http::HttpServerPropertiesCacheManagerFactory& alternate_protocol_cache_manager_factory,
       TimeSource& time_source);
 
-  // Returns the alternate protocols cache for the current thread.
-  Http::HttpServerPropertiesCacheSharedPtr getAlternateProtocolCache(Event::Dispatcher& dispatcher);
-
   TimeSource& timeSource() { return time_source_; }
+  const Http::HttpServerPropertiesCacheManagerSharedPtr alternateProtocolCacheManager() {
+    return alternate_protocol_cache_manager_;
+  }
 
 private:
   const Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocol_cache_manager_;
-  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config_;
   TimeSource& time_source_;
 };
 
@@ -50,8 +49,8 @@ public:
   void onDestroy() override;
 
 private:
-  const Http::HttpServerPropertiesCacheSharedPtr cache_;
-  TimeSource& time_source_;
+  FilterConfigSharedPtr config_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace AlternateProtocolsCache

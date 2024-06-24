@@ -120,7 +120,7 @@ void HealthCheckFilter::onComplete() {
   const std::string* details = &RcDetails::get().HealthCheckOk;
   bool degraded = false;
   if (context_.healthCheckFailed()) {
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck);
     final_status = Http::Code::ServiceUnavailable;
     details = &RcDetails::get().HealthCheckFailed;
   } else {
@@ -171,7 +171,8 @@ void HealthCheckFilter::onComplete() {
     }
 
     if (!Http::CodeUtility::is2xx(enumToInt(final_status))) {
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck);
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::FailedLocalHealthCheck);
     }
   }
 

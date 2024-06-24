@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,15 +10,11 @@ namespace File {
 /**
  * Config registration for the standard output access log. @see AccessLogInstanceFactory.
  */
-class StdoutAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class StdoutAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::ListenerAccessLogFactoryContext& context) override;
-
-  AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::CommonFactoryContext& context) override;
+                          Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
@@ -28,15 +24,11 @@ public:
 /**
  * Config registration for the standard error access log. @see AccessLogInstanceFactory.
  */
-class StderrAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class StderrAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::ListenerAccessLogFactoryContext& context) override;
-
-  AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::CommonFactoryContext& context) override;
+                          Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

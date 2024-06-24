@@ -1,10 +1,9 @@
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
-
-#include "cache_file_fixed_block.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,6 +33,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
         absl::MutexLock lock(&mu_);
         cancel_action_in_flight_ = nullptr;
         if (!open_result.ok()) {
+          cache_.stats().cache_miss_.inc();
           cb(LookupResult{});
           return;
         }
@@ -47,12 +47,14 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
               if (!read_result.ok() ||
                   read_result.value()->length() != CacheFileFixedBlock::size()) {
                 invalidateCacheEntry();
+                cache_.stats().cache_miss_.inc();
                 cb(LookupResult{});
                 return;
               }
               header_block_.populateFromStringView(read_result.value()->toString());
               if (!header_block_.isValid()) {
                 invalidateCacheEntry();
+                cache_.stats().cache_miss_.inc();
                 cb(LookupResult{});
                 return;
               }
@@ -64,6 +66,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                     if (!read_result.ok() ||
                         read_result.value()->length() != header_block_.headerSize()) {
                       invalidateCacheEntry();
+                      cache_.stats().cache_miss_.inc();
                       cb(LookupResult{});
                       return;
                     }
@@ -75,6 +78,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                           absl::StrSplit(header_proto.headers().at(0).value(), ','),
                           lookup().requestHeaders());
                       if (!maybe_vary_key.has_value()) {
+                        cache_.stats().cache_miss_.inc();
                         cb(LookupResult{});
                         return;
                       }
@@ -91,6 +95,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                       ASSERT(queued.ok(), queued.ToString());
                       return;
                     }
+                    cache_.stats().cache_hit_.inc();
                     cb(lookup().makeLookupResult(
                         headersFromHeaderProto(header_proto), metadataFromHeaderProto(header_proto),
                         header_block_.bodySize(), header_block_.trailerSize() > 0));

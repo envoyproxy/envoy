@@ -1,11 +1,38 @@
---- a/BUILD	2021-09-03 23:20:52.000000000 +0000
-+++ b/BUILD	2022-08-15 18:03:01.635257570 +0000
-@@ -28,7 +28,7 @@
- package(
+diff --git a/BUILD b/BUILD
+index 06b69411a8..05cd878ae8 100644
+--- a/BUILD
++++ b/BUILD
+@@ -29,7 +29,7 @@ licenses(["reciprocal"])
      default_visibility = ["//visibility:public"],
+     features = [
+         "-parse_headers",
+-        "layering_check",
++        "-layering_check",
+     ],
+ )
+ 
+diff --git a/src/core/BUILD b/src/core/BUILD
+index 1bb970e049..81265483e9 100644
+--- a/src/core/BUILD
++++ b/src/core/BUILD
+@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+ package(
+     default_visibility = ["//:__subpackages__"],
      features = [
 -        "layering_check",
 +        "-layering_check",
-         "-parse_headers",
      ],
  )
+ 
+diff --git a/src/core/lib/promise/detail/promise_like.h b/src/core/lib/promise/detail/promise_like.h
+--- a/src/core/lib/promise/detail/promise_like.h	2024-04-18 19:47:19.524155042 +0000
++++ b/src/core/lib/promise/detail/promise_like.h	2024-04-18 23:40:29.050761807 +0000
+@@ -71,7 +71,7 @@
+ 
+ template <typename F>
+ class PromiseLike<F, absl::enable_if_t<!std::is_void<
+-                         typename std::result_of<F()>::type>::value>> {
++                         typename std::invoke_result<F>::type>::value>> {
+  private:
+   GPR_NO_UNIQUE_ADDRESS F f_;
+ 

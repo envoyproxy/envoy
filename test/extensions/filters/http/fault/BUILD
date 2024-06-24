@@ -28,6 +28,7 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -52,9 +53,9 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "fault_filter_integration_test",
+    size = "large",
     srcs = ["fault_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.fault"],
-    shard_count = 2,
     deps = [
         "//source/extensions/filters/http/fault:config",
         "//test/integration:http_protocol_integration_lib",

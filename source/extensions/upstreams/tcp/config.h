@@ -35,7 +35,7 @@ private:
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {
 public:
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsConfig(
       const Protobuf::Message& config,
       Server::Configuration::ProtocolOptionsFactoryContext& context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<

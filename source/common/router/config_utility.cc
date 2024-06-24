@@ -9,17 +9,19 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/regex.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
 
 absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
+maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
+                         Server::Configuration::CommonFactoryContext& context) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kStringMatch:
-    return Matchers::StringMatcherImpl(config.string_match());
+    return Matchers::StringMatcherImpl(config.string_match(), context);
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kPresentMatch:
     return absl::nullopt;
@@ -34,20 +36,24 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
 } // namespace
 
 ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
-    const envoy::config::route::v3::QueryParameterMatcher& config)
-    : name_(config.name()), matcher_(maybeCreateStringMatcher(config)) {}
+    const envoy::config::route::v3::QueryParameterMatcher& config,
+    Server::Configuration::CommonFactoryContext& context)
+    : name_(config.name()), matcher_(maybeCreateStringMatcher(config, context)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
-    const Http::Utility::QueryParams& request_query_params) const {
-  auto query_param = request_query_params.find(name_);
-  if (query_param == request_query_params.end()) {
+    const Http::Utility::QueryParamsMulti& request_query_params) const {
+  // This preserves the legacy behavior of ignoring all but the first value for a given key
+  auto data = request_query_params.getFirstValue(name_);
+  if (!data.has_value()) {
     return false;
-  } else if (!matcher_.has_value()) {
-    // Present match.
-    return true;
-  } else {
-    return matcher_.value().match(query_param->second);
   }
+
+  if (!matcher_.has_value()) {
+    // Present check
+    return true;
+  }
+
+  return matcher_.value().match(data.value());
 }
 
 Upstream::ResourcePriority
@@ -63,7 +69,7 @@ ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& pri
 }
 
 bool ConfigUtility::matchQueryParams(
-    const Http::Utility::QueryParams& query_params,
+    const Http::Utility::QueryParamsMulti& query_params,
     const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
@@ -100,36 +106,6 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
     return static_cast<Http::Code>(route.direct_response().status());
   }
   return {};
-}
-
-std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
-                                                   Api::Api& api, uint32_t max_body_size_bytes) {
-  if (!route.has_direct_response() || !route.direct_response().has_body()) {
-    return EMPTY_STRING;
-  }
-  const auto& body = route.direct_response().body();
-  const std::string& filename = body.filename();
-  if (!filename.empty()) {
-    if (!api.fileSystem().fileExists(filename)) {
-      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
-    }
-    const ssize_t size = api.fileSystem().fileSize(filename);
-    if (size < 0) {
-      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
-    }
-    if (static_cast<uint64_t>(size) > max_body_size_bytes) {
-      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, size, max_body_size_bytes));
-    }
-    return api.fileSystem().fileReadToEnd(filename);
-  }
-  const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
-                                                            : body.inline_bytes());
-  if (inline_body.length() > max_body_size_bytes) {
-    throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
-                                     inline_body.length(), max_body_size_bytes));
-  }
-  return inline_body;
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(

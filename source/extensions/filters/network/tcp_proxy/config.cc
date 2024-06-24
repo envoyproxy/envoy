@@ -19,8 +19,8 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
   Envoy::TcpProxy::ConfigSharedPtr filter_config(
       std::make_shared<Envoy::TcpProxy::Config>(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<Envoy::TcpProxy::Filter>(filter_config, context.clusterManager()));
+    filter_manager.addReadFilter(std::make_shared<Envoy::TcpProxy::Filter>(
+        filter_config, context.serverFactoryContext().clusterManager()));
   };
 }
 

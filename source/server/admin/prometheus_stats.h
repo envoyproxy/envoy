@@ -28,6 +28,7 @@ public:
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+                                    const Upstream::ClusterManager& cluster_manager,
                                     Buffer::Instance& response, const StatsParams& params,
                                     const Stats::CustomStatNamespaces& custom_namespaces);
   /**
@@ -35,6 +36,11 @@ public:
    * of <tag_name>="<tag_value>" pairs.
    */
   static std::string formattedTags(const std::vector<Stats::Tag>& tags);
+
+  /**
+   * Validate the given params, returning an error on invalid arguments
+   */
+  static absl::Status validateParams(const StatsParams& params);
 
   /**
    * Format the given metric name, and prefixed with "envoy_" if it does not have a custom

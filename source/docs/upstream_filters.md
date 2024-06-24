@@ -1,6 +1,6 @@
-# Converting a downstream filter to be a dual filter
+# Converting a downstream HTTP filter to be a dual filter
 
-Before coverting a filter to be an upstream filter you should do some basic
+Before coverting a filter to be an upstream HTTP filter you should do some basic
 functionality analysis. Make sure
 
   * The filter does not use any downstream-only functionality, accessed via
@@ -11,7 +11,7 @@ functionality analysis. Make sure
   * Either the filter does not access streamInfo in a non-const way, or you test
     and document how the filter interacts with hedging and retries. Note that
     for hedging, a single downstream StreamInfo is accessible in parallel to
-    both instances of the upstream filter instance, so it must be resiliant to
+    both instances of the upstream HTTP filter instance, so it must be resiliant to
     parallel access.
   * Any code accessing the downstream connection checks to make sure it is
     present. The downstream connection will not be available for mirrored/shadowed requests.
@@ -33,6 +33,6 @@ Assuming your filter inherits from FactoryBase:
   * If your filter is listed in ``source/extensions/extensions_metadata.yaml``
     add ``envoy.filters.http.upstream`` to the filter category.
 
-Your filter should now be available as an upstream filter.
+Your filter should now be available as an upstream HTTP filter.
 
 An example PR for conversion is [23071](https://github.com/envoyproxy/envoy/pull/23071)

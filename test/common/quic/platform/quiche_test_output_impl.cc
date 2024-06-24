@@ -95,7 +95,7 @@ bool QuicheLoadTestOutputImpl(absl::string_view filename, std::string* data) {
     QUICHE_LOG(ERROR) << "Test output file does not exist: " << read_path;
     return false;
   }
-  *data = file_system.fileReadToEnd(read_path);
+  *data = file_system.fileReadToEnd(read_path).value();
   return true;
 }
 

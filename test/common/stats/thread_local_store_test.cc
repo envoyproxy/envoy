@@ -22,6 +22,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
@@ -37,6 +38,7 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
@@ -100,6 +102,7 @@ public:
     return num_tls_histograms;
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -129,6 +132,7 @@ private:
 
 class HistogramTest : public testing::Test {
 public:
+  using Bucket = ParentHistogram::Bucket;
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
   HistogramTest()
@@ -225,6 +229,7 @@ public:
     return *predicates;
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -775,6 +780,89 @@ TEST_F(StatsThreadLocalStoreTest, SharedScopes) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsFixedValue) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto* tag_specifier = stats_config.add_stats_tags();
+  tag_specifier->set_tag_name("foo");
+  tag_specifier->set_fixed_value("bar");
+
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("c1"), pool, tags);
+
+  ASSERT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("foo", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+  EXPECT_THAT(store_->fixedTags(), UnorderedElementsAre(Tag{"foo", "bar"}));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueNoMatch) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto* tag_specifier = stats_config.add_stats_tags();
+  tag_specifier->set_tag_name("foo");
+  tag_specifier->set_regex("bar");
+
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("c1"), pool, tags);
+
+  ASSERT_EQ(1, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueWithMatch) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto* tag_specifier = stats_config.add_stats_tags();
+  tag_specifier->set_tag_name("foo_tag");
+  tag_specifier->set_regex("^foo.(.+)");
+
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("foo.bar"), pool, tags);
+
+  ASSERT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("foo_tag", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+}
+
+TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexBuiltinExpression) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  const Stats::TagVector tags_vector;
+  store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
+
+  StatNamePool pool(symbol_table_);
+  StatNameTagVector tags{{pool.add("a"), pool.add("b")}};
+  store_->extractAndAppendTags(pool.add("cluster.foo.bar"), pool, tags);
+
+  ASSERT_EQ(2, tags.size());
+  EXPECT_EQ("a", symbol_table_.toString(tags[0].first));
+  EXPECT_EQ("b", symbol_table_.toString(tags[0].second));
+  EXPECT_EQ("envoy.cluster_name", symbol_table_.toString(tags[1].first));
+  EXPECT_EQ("foo", symbol_table_.toString(tags[1].second));
+}
+
 class LookupWithStatNameTest : public ThreadLocalStoreNoMocksMixin, public testing::Test {};
 
 TEST_F(LookupWithStatNameTest, All) {
@@ -861,7 +949,8 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "noop");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
 
   // Testing No-op counters, gauges, histograms which match the prefix "noop".
 
@@ -938,7 +1027,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Will block all stats containing any capital alphanumeric letter.
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
       TestUtility::createRegexMatcher(".*[A-Z].*"));
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = scope_.counterFromString("lowercase_counter");
@@ -981,7 +1071,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // the string "invalid".
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "invalid");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
 
   Counter& valid_counter = scope_.counterFromString("valid_counter");
   valid_counter.inc();
@@ -1044,7 +1135,8 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixDot) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "cluster."); // Prefix match can be executed symbolically.
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   uint64_t mem_consumed = memoryConsumedAddingClusterStats();
 
   // No memory is consumed at all while rejecting stats from "prefix."
@@ -1060,13 +1152,85 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixNoDot) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "cluster"); // No dot at the end means we have to compare as strings.
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   uint64_t mem_consumed = memoryConsumedAddingClusterStats();
 
   // Memory is consumed at all while rejecting stats from "prefix" in proportion
   // to the number of stat instantiations attempted.
   EXPECT_MEMORY_EQ(mem_consumed, 2936480);
   EXPECT_MEMORY_LE(mem_consumed, 3500000);
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenPrefixExclusion) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "cluster.");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("cluster.accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge =
+      scope_.gaugeFromString("cluster.hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "cluster.hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenPrefixInclusive) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_prefix(
+      "cluster.");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenExclusionRegex) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*"));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectHiddenInclusionRegex) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  // Create inclusion list to only accept names that have at least one capital letter.
+  stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*[A-Z].*"));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
+}
+
+TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->set_reject_all(true);
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  Gauge& accumulate_gauge =
+      scope_.gaugeFromString("accumulate_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(accumulate_gauge.name(), "");
+  Gauge& hidden_gauge = scope_.gaugeFromString("hidden_gauge", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
 }
 
 // Tests the logic for caching the stats-matcher results, and in particular the
@@ -1260,7 +1424,8 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_, context_));
 
   // They can no longer be found.
   EXPECT_EQ(0, store_->counters().size());
@@ -1294,7 +1459,8 @@ TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
   envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_, context_));
 
   // They can no longer be found.
   EXPECT_EQ(0, store_->counters().size());
@@ -1346,7 +1512,8 @@ protected:
 
     // Use a tag producer that will produce tags.
     envoy::config::metrics::v3::StatsConfig stats_config;
-    store_.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+    const Stats::TagVector tags_vector;
+    store_.setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());
   }
 
   ~StatsThreadLocalStoreTestNoFixture() override {
@@ -1389,7 +1556,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.97 * million_);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.99 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -1631,7 +1798,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   }
 }
 
-TEST_F(HistogramTest, ParentHistogramBucketSummary) {
+TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Histogram& histogram = scope_.histogramFromString("histogram", Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
@@ -1647,6 +1814,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
+  EXPECT_THAT(parent_histogram->detailedTotalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
+  EXPECT_THAT(parent_histogram->detailedIntervalBuckets(), UnorderedElementsAre(Bucket{10, 1, 1}));
 }
 
 TEST_F(HistogramTest, ForEachHistogram) {
@@ -1671,7 +1840,8 @@ TEST_F(HistogramTest, ForEachHistogram) {
   // Verify that rejecting histograms removes them from the iteration set.
   envoy::config::metrics::v3::StatsConfig stats_config_;
   stats_config_.mutable_stats_matcher()->set_reject_all(true);
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   num_histograms = 0;
   num_iterations = 0;
   store_->forEachHistogram([&num_histograms](std::size_t size) { num_histograms = size; },
@@ -2012,11 +2182,14 @@ protected:
       layer->set_name("admin");
       layer->mutable_admin_layer();
     }
-    loader_ =
-        std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_,
-                                              *store_, generator_, validation_visitor_, *api_);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, *store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Event::MockDispatcher dispatcher_;
   Api::ApiPtr api_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -2089,7 +2262,8 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
   // Verify that rejecting histograms removes them from the sink set.
   envoy::config::metrics::v3::StatsConfig stats_config_;
   stats_config_.mutable_stats_matcher()->set_reject_all(true);
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   num_sinked_histograms = 0;
   num_iterations = 0;
   store_->forEachSinkedHistogram(

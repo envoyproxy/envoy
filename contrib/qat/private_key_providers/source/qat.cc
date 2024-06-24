@@ -17,7 +17,8 @@ QatManager::QatManager(LibQatCryptoSharedPtr libqat) {
   libqat_ = libqat;
   CpaStatus status = libqat_->icpSalUserStart("SSL");
   if (status != CPA_STATUS_SUCCESS) {
-    throw EnvoyException("Failed to start QAT device.");
+    ENVOY_LOG(warn, "Failed to start QAT device.");
+    qat_is_supported_ = false;
   }
 }
 
@@ -63,6 +64,8 @@ int createIndex() {
 int QatManager::connectionIndex() { CONSTRUCT_ON_FIRST_USE(int, createIndex()); }
 
 int QatManager::contextIndex() { CONSTRUCT_ON_FIRST_USE(int, createIndex()); }
+
+bool QatManager::checkQatDevice() { return qat_is_supported_; }
 
 QatHandle::~QatHandle() {
   if (polling_thread_ == nullptr) {
@@ -371,9 +374,7 @@ static void decryptCb(void* callback_tag, CpaStatus status, void* data, CpaFlatB
 }
 } // namespace
 
-QatContext::QatContext(QatHandle& handle)
-    : handle_(handle), last_status_(CPA_STATUS_RETRY), decrypted_data_length_(0), read_fd_(-1),
-      write_fd_(-1) {}
+QatContext::QatContext(QatHandle& handle) : handle_(handle) {}
 
 QatContext::~QatContext() {
   if (read_fd_ >= 0) {

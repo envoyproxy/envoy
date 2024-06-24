@@ -4,11 +4,9 @@ import static org.chromium.net.testing.CronetTestRule.getContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.NativeTestServer;
 import org.chromium.net.testing.TestUrlRequestCallback;
@@ -17,11 +15,12 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests that making a large number of requests do not lead to crashes.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetStressTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
@@ -40,7 +39,6 @@ public class CronetStressTest {
 
   @Test
   @LargeTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testLargeNumberOfUploads() throws Exception {
     final int kNumRequest = 1000;

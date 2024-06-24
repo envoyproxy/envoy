@@ -17,6 +17,8 @@ public:
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
   MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(bool, skipHotRestartOnNoParent, (), (const));
+  MOCK_METHOD(bool, skipHotRestartParentStats, (), (const));
   MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
@@ -34,6 +36,7 @@ public:
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
+  MOCK_METHOD(bool, logFormatSet, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
   MOCK_METHOD(bool, enableFineGrainLogging, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
@@ -53,7 +56,6 @@ public:
   MOCK_METHOD(const std::string&, socketPath, (), (const));
   MOCK_METHOD(mode_t, socketMode, (), (const));
   MOCK_METHOD((const Stats::TagVector&), statsTags, (), (const));
-  MOCK_METHOD(const std::string&, listenerManager, (), (const));
 
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;

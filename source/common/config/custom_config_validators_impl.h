@@ -1,8 +1,8 @@
 #pragma once
 
+#include "envoy/config/config_validator.h"
+#include "envoy/config/custom_config_validators.h"
 #include "envoy/server/instance.h"
-
-#include "source/common/config/custom_config_validators.h"
 
 namespace Envoy {
 namespace Config {

@@ -3,13 +3,14 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/common/tls/server_context_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "extension_registry.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -18,12 +19,17 @@ using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
 
-XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {
-  Grpc::forceRegisterDefaultGoogleGrpcCredentialsFactory();
-  override_builder_config_ = false;
-  expect_dns_ = false; // doesn't use DFP.
+XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()) {}
+
+void XdsIntegrationTest::initialize() {
   create_xds_upstream_ = true;
+  tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
+
+  // Register the extensions required for Envoy Mobile.
+  ExtensionRegistry::registerFactories();
+  // For server TLS.
+  Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
@@ -32,10 +38,9 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
 
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.
   setUpstreamCount(1);
-}
 
-void XdsIntegrationTest::initialize() {
   BaseClientIntegrationTest::initialize();
+
   default_request_headers_.setScheme("https");
 }
 
@@ -87,6 +92,11 @@ XdsIntegrationTest::createSingleEndpointClusterConfig(const std::string& cluster
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
           .PackFrom(options);
   return config;
+}
+
+std::string XdsIntegrationTest::getUpstreamCert() {
+  return TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
 }
 
 } // namespace Envoy

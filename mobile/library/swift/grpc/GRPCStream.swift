@@ -61,18 +61,6 @@ public final class GRPCStream: NSObject {
     return self
   }
 
-  /// Close stream by sending the "end stream" signal to the peer and
-  /// then waiting for the peer to finish before actually closing the stream.
-  public func close() {
-    // TODO(Augustyniak): Remove the method once `cancel` method is proved
-    // to work fine.
-
-    // The gRPC protocol requires the client stream to close with a DATA frame.
-    // More information here:
-    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-    self.underlyingStream.close(data: Data())
-  }
-
   /// Cancel the stream forcefully regardless of whether the peer has more data to send.
   public func cancel() {
     self.underlyingStream.cancel()

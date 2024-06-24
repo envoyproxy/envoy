@@ -56,7 +56,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
-    : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(),
+    : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), "",
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
@@ -118,7 +118,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   } else if (engine_result_ == Deny) {
     callbacks_->connection().streamInfo().setConnectionTerminationDetails(
         Filters::Common::RBAC::responseDetail(log_policy_id));
-    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "rbac_deny_close");
     return Network::FilterStatus::StopIteration;
   }
 

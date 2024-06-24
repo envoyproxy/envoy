@@ -195,11 +195,14 @@ public:
   jsonLoadFromString(const std::string& json,
                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
+#ifndef TARGET_OS_IOS
   /**
    * Execute a program under ::system. Any failure is fatal.
    * @param args program path and arguments.
    */
+
   static void exec(const std::vector<std::string>& args);
+#endif
 
   /**
    * Dumps the contents of the string into a temporary file from temporaryDirectory() + filename.
@@ -283,7 +286,7 @@ private:
   const std::string new_link_;
   const std::string target1_;
   const std::string target2_;
-  bool use_target1_;
+  bool use_target1_{true};
 };
 
 } // namespace Envoy

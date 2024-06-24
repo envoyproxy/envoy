@@ -12,12 +12,13 @@ namespace Http {
 class RequestIDExtensionFactory {
 public:
   /**
-   * Read a RequestIDExtension definition from proto and create it.
+   * Read a RequestIDExtension definition from proto and create it or return an
+   * error status.
    */
-  static RequestIDExtensionSharedPtr fromProto(
+  static absl::StatusOr<RequestIDExtensionSharedPtr> fromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
           config,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::FactoryContext& context);
 };
 
 } // namespace Http

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
+#include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
@@ -18,11 +18,11 @@ public:
         *parent_.stats().rootScope(), parent_.listenerManager(),
         parent_.messageValidationContext().dynamicValidationVisitor());
   }
-  std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  Filter::NetworkFilterFactoriesList createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-        filters, filter_chain_factory_context);
+        filters, filter_chain_factory_context, network_config_provider_manager_);
   }
   Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -34,6 +34,12 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters, context);
+  }
+  Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) override {
+    return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
+        filters, context, quic_listener_config_provider_manager_);
   }
   Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
@@ -55,7 +61,9 @@ public:
   }
 
 private:
+  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
   Instance& parent_;
 };
 

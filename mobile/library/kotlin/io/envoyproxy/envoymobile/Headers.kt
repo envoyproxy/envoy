@@ -1,8 +1,8 @@
 package io.envoyproxy.envoymobile
 
 /**
- * Base class that is used to represent header/trailer data structures.
- * To instantiate new instances, see `{Request|Response}HeadersBuilder`.
+ * Base class that is used to represent header/trailer data structures. To instantiate new
+ * instances, see `{Request|Response}HeadersBuilder`.
  */
 open class Headers {
   internal val container: HeadersContainer
@@ -17,13 +17,11 @@ open class Headers {
   }
 
   /**
-   * Get the value for the provided header name. It's discouraged
-   * to use this dictionary for equality key-based lookups as this
-   * may lead to issues with headers that do not follow expected
+   * Get the value for the provided header name. It's discouraged to use this dictionary for
+   * equality key-based lookups as this may lead to issues with headers that do not follow expected
    * casing i.e., "Content-Length" instead of "content-length".
    *
    * @param name: Header name for which to get the current value.
-   *
    * @return The current headers specified for the provided name.
    */
   fun value(name: String): List<String>? {

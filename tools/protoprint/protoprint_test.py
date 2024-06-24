@@ -12,8 +12,6 @@ import tempfile
 from tools.protoprint.test_data import data as test_data
 from tools.run_command import run_command
 
-from envoy_repo import PATH
-
 
 def path_and_filename(label):
     """Retrieve actual path and filename from bazel label
@@ -131,8 +129,6 @@ def main():
             tar.extractall(formatted)
         with tarfile.open(parsed.golden) as tar:
             tar.extractall(golden)
-
-        os.chdir(PATH)
 
         messages = ""
         logging.basicConfig(format='%(message)s')

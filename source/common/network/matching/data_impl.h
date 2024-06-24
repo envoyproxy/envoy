@@ -13,14 +13,19 @@ namespace Matching {
 class MatchingDataImpl : public MatchingData {
 public:
   explicit MatchingDataImpl(const ConnectionSocket& socket,
-                            const StreamInfo::FilterState& filter_state)
-      : socket_(socket), filter_state_(filter_state) {}
+                            const StreamInfo::FilterState& filter_state,
+                            const envoy::config::core::v3::Metadata& dynamic_metadata)
+      : socket_(socket), filter_state_(filter_state), dynamic_metadata_(dynamic_metadata) {}
   const ConnectionSocket& socket() const override { return socket_; }
   const StreamInfo::FilterState& filterState() const override { return filter_state_; }
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
+    return dynamic_metadata_;
+  }
 
 private:
   const ConnectionSocket& socket_;
   const StreamInfo::FilterState& filter_state_;
+  const envoy::config::core::v3::Metadata& dynamic_metadata_;
 };
 
 /**

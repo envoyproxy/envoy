@@ -2,7 +2,9 @@
 
 #include "envoy/http/header_validator_errors.h"
 
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/strings/match.h"
@@ -16,16 +18,15 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::envoy::extensions::http::header_validators::envoy_default::v3::
     HeaderValidatorConfig_UriPathNormalizationOptions;
+using ::Envoy::Http::HeaderUtility;
+using ::Envoy::Http::PathNormalizerResponseCodeDetail;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
-struct PathNormalizerResponseCodeDetailValues {
-  const std::string RedirectNormalized = "uhv.path_noramlization_redirect";
-};
-
-using PathNormalizerResponseCodeDetail = ConstSingleton<PathNormalizerResponseCodeDetailValues>;
-
-PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
+PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config,
+                               const ConfigOverrides& config_overrides)
+    : config_(config), config_overrides_(config_overrides) {}
 
 PathNormalizer::DecodedOctet
 PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
@@ -56,6 +57,8 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     return {PercentDecodeResult::Invalid};
   }
 
+  const bool preserve_case = config_overrides_.preserve_url_encoded_case_;
+
   char ch = '\0';
   // Normalize and decode the octet
   for (int i = 0; i < 2; ++i) {
@@ -71,19 +74,21 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
 
     // normalize
     nibble = nibble >= 'a' ? nibble ^ 0x20 : nibble;
-    *iter = nibble;
+    if (!preserve_case) {
+      *iter = nibble;
+    }
 
     // decode
     int factor = i == 0 ? 16 : 1;
     ch += factor * (nibble >= 'A' ? (nibble - 'A' + 10) : (nibble - '0'));
   }
 
-  if (testChar(kUnreservedCharTable, ch)) {
+  if (testCharInTable(kUnreservedCharTable, ch)) {
     // Based on RFC, only decode characters in the UNRESERVED set.
     return {PercentDecodeResult::Decoded, ch};
   }
 
-  if (ch == '/') {
+  if (ch == '/' || ch == '\\') {
     // We decoded a slash character and how we handle it depends on the active configuration.
     switch (config_.uri_path_normalization_options().path_with_escaped_slashes_action()) {
     case HeaderValidatorConfig_UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT:
@@ -172,19 +177,16 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // asterisk-form  = "*"
   //
   // TODO(#23887) - potentially separate path normalization into multiple independent operations.
-  const bool is_connect_method =
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
-  const bool is_options_method =
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options;
-  const auto original_path = header_map.path();
-  if (original_path == "*" && is_options_method) {
+  const auto original_path = header_map.getPathValue();
+  if (original_path == "*" &&
+      header_map.getMethodValue() == ::Envoy::Http::Headers::get().MethodValues.Options) {
     // asterisk-form, only valid for OPTIONS request
     return PathNormalizationResult::success();
   }
 
-  if (is_connect_method) {
-    // The :path can only be empty for CONNECT methods, where the request-target is in
-    // authority-form, which Envoy will have already moved :path to :authority.
+  if (HeaderUtility::isStandardConnectRequest(header_map)) {
+    // The :path can only be empty for standard CONNECT methods, where the request-target is in
+    // authority-form for HTTP/1 requests, or :path is empty for HTTP/2 requests.
     if (original_path.empty()) {
       return PathNormalizationResult::success();
     }
@@ -236,6 +238,12 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     redirect |= result.action() == PathNormalizationResult::Action::Redirect;
   }
 
+  // The `envoy.uhv.allow_non_compliant_characters_in_path` flag allows the \ (back slash)
+  // character, which legacy path normalization was changing to / (forward slash).
+  if (config_overrides_.allow_non_compliant_characters_in_path_) {
+    translateBackToForwardSlashes(path);
+  }
+
   if (!config_.uri_path_normalization_options().skip_merging_slashes()) {
     // pass 2: merge duplicate slashes (if configured to do so)
     const auto result = mergeSlashesPass(path);
@@ -263,10 +271,18 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();
+}
+
+void PathNormalizer::translateBackToForwardSlashes(std::string& path) const {
+  for (char& character : path) {
+    if (character == '\\') {
+      character = '/';
+    }
+  }
 }
 
 PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& path) const {
@@ -275,6 +291,8 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   auto write = std::next(begin);
   auto end = path.end();
   bool redirect = false;
+  const bool allow_invalid_url_encoding =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uhv_allow_malformed_url_encoding");
 
   while (read != end) {
     if (*read == '%') {
@@ -282,6 +300,12 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
       // TODO(#23885) - add and honor config to not reject invalid percent-encoded octets.
       switch (decode_result.result()) {
       case PercentDecodeResult::Invalid:
+        if (allow_invalid_url_encoding) {
+          // Write the % character that starts invalid URL encoded sequence and then continue
+          // scanning from the next character.
+          *write++ = *read++;
+          break;
+        }
         ABSL_FALLTHROUGH_INTENDED;
       case PercentDecodeResult::Reject:
         // Reject the request
@@ -315,7 +339,7 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   path.resize(std::distance(begin, write));
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+            ::Envoy::Http::PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
   return PathNormalizationResult::success();

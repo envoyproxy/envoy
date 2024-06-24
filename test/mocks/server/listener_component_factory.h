@@ -27,13 +27,16 @@ public:
   MOCK_METHOD(LdsApi*, createLdsApi_,
               (const envoy::config::core::v3::ConfigSource&,
                const xds::core::v3::ResourceLocator*));
-  MOCK_METHOD(std::vector<Network::FilterFactoryCb>, createNetworkFilterFactoryList,
+  MOCK_METHOD(Filter::NetworkFilterFactoriesList, createNetworkFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Configuration::FilterChainFactoryContext& filter_chain_factory_context));
   MOCK_METHOD(Filter::ListenerFilterFactoriesList, createListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(std::vector<Network::UdpListenerFilterFactoryCb>, createUdpListenerFilterFactoryList,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
+               Configuration::ListenerFactoryContext& context));
+  MOCK_METHOD(Filter::QuicListenerFilterFactoriesList, createQuicListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
@@ -45,6 +48,8 @@ public:
   MOCK_METHOD(uint64_t, nextListenerTag, ());
   MOCK_METHOD(Filter::TcpListenerFilterConfigProviderManagerImpl*,
               getTcpListenerConfigProviderManager, ());
+  MOCK_METHOD(Filter::QuicListenerFilterConfigProviderManagerImpl*,
+              getQuicListenerConfigProviderManager, ());
 
   std::shared_ptr<Network::MockListenSocket> socket_;
 };

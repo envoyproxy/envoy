@@ -28,7 +28,7 @@ public:
 private:
   const uint32_t port_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
-  const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;

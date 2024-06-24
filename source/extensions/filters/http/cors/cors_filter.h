@@ -100,12 +100,13 @@ private:
   bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
+  bool forwardNotMatchingPreflights();
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2> policies_;
   bool is_cors_request_{};
-  const Http::HeaderEntry* origin_{};
+  std::string latched_origin_;
 
   CorsFilterConfigSharedPtr config_;
 };

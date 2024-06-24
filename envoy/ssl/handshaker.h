@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/post_io_action.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 
@@ -90,6 +91,11 @@ public:
    * The list of supported protocols exposed via ALPN, from ContextConfig.
    */
   virtual absl::string_view alpnProtocols() const PURE;
+
+  /**
+   * @return reference to the server lifecycle notifier
+   */
+  virtual Server::ServerLifecycleNotifier& lifecycleNotifier() PURE;
 };
 
 struct HandshakerCapabilities {
@@ -113,6 +119,10 @@ struct HandshakerCapabilities {
   // Should return true if this handshaker is FIPS-compliant.
   // Envoy will fail to compile if this returns true and `--define=boringssl=fips`.
   bool is_fips_compliant = true;
+
+  // Whether or not a handshaker implementation provides its own list of
+  // supported signature algorithms.
+  bool provides_sigalgs = false;
 };
 
 class HandshakerFactory : public Config::TypedFactory {

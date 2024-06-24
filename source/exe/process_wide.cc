@@ -4,7 +4,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
-#include "source/common/http/http2/nghttp2.h"
 #include "source/server/proto_descriptors.h"
 
 namespace Envoy {
@@ -31,10 +30,13 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
     // TODO(mattklein123): Audit the following as not all of these have to be re-initialized in the
     // edge case where something does init/destroy/init/destroy.
     Event::Libevent::Global::initialize();
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (validate_proto_descriptors) {
       Envoy::Server::validateProtoDescriptors();
     }
-    Http::Http2::initializeNghttp2Logging();
+#else
+    UNREFERENCED_PARAMETER(validate_proto_descriptors);
+#endif
 
     // We do not initialize Google gRPC here -- we instead instantiate
     // Grpc::GoogleGrpcContext in MainCommon immediately after instantiating

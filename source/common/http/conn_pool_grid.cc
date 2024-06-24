@@ -30,13 +30,12 @@ std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
 
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
-                                                     PoolIterator pool_it,
                                                      ConnectionPool::Callbacks& callbacks,
                                                      const Instance::StreamOptions& options)
     : grid_(grid), decoder_(decoder), inner_callbacks_(&callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it), stream_options_(options) {
+      stream_options_(options) {
   if (!stream_options_.can_use_http3_) {
     // If alternate protocols are explicitly disabled, there must have been a failed request over
     // HTTP/3 and the failure must be post-handshake. So disable HTTP/3 for this request.
@@ -45,8 +44,8 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
 }
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
-    WrapperCallbacks& parent, PoolIterator it)
-    : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
+    WrapperCallbacks& parent, ConnectionPool::Instance& pool)
+    : parent_(parent), pool_(pool) {}
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttemptCallbacks() {
   if (cancellable_ != nullptr) {
@@ -90,18 +89,23 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   }
 
   // If the next connection attempt does not immediately fail, let it proceed.
-  if (tryAnotherConnection()) {
+  if (tryAnotherConnection().has_value()) {
     return;
   }
 
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller, if the caller hasn't already been notified.
+  signalFailureAndDeleteSelf(reason, transport_failure_reason, host);
+}
+
+void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
+    ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
+    Upstream::HostDescriptionConstSharedPtr host) {
   ConnectionPool::Callbacks* callbacks = inner_callbacks_;
   inner_callbacks_ = nullptr;
   deleteThis();
   if (callbacks != nullptr) {
-    ENVOY_LOG(trace, "Passing pool failure up to caller.", describePool(attempt->pool()),
-              host->hostname());
+    ENVOY_LOG(trace, "Passing pool failure up to caller.");
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
   }
 }
@@ -111,10 +115,11 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
-ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newStream() {
-  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.",
-            describePool(**current_), grid_.origin_.hostname_);
-  auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, current_);
+ConnectivityGrid::StreamCreationResult
+ConnectivityGrid::WrapperCallbacks::newStream(ConnectionPool::Instance& pool) {
+  ENVOY_LOG(trace, "{} pool attempting to create a new stream to host '{}'.", describePool(pool),
+            grid_.origin_.hostname_);
+  auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, pool);
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   if (!next_attempt_timer_->enabled()) {
     next_attempt_timer_->enableTimer(grid_.next_attempt_duration_);
@@ -148,6 +153,8 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   if (callbacks != nullptr) {
     callbacks->onPoolReady(encoder, host, info, protocol);
+  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.avoid_zombie_streams")) {
+    encoder.getStream().resetStream(StreamResetReason::LocalReset);
   }
 }
 
@@ -187,19 +194,22 @@ void ConnectivityGrid::WrapperCallbacks::cancelAllPendingAttempts(
   connection_attempts_.clear();
 }
 
-bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
-  absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
-  if (!next_pool.has_value()) {
-    // If there are no other pools to try, return false.
-    return false;
+absl::optional<ConnectivityGrid::StreamCreationResult>
+ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+  if (grid_.destroying_) {
+    return {};
+  }
+  if (has_attempted_http2_) {
+    // If there are no other pools to try, return an empty optional.
+    return {};
   }
   // Create a new connection attempt for the next pool. If we reach this point
   // return true regardless of if newStream resulted in an immediate result or
   // an async call, as either way the attempt will result in success/failure
   // callbacks.
-  current_ = next_pool.value();
-  newStream();
-  return true;
+  grid_.createNextPool(); // Make sure the HTTP/2 pool exists
+  has_attempted_http2_ = true;
+  return newStream(*grid_.http2_pool_);
 }
 
 ConnectivityGrid::ConnectivityGrid(
@@ -211,15 +221,15 @@ ConnectivityGrid::ConnectivityGrid(
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
     Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
-    : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
-      priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
-      state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
+    : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
+      transport_socket_options_(transport_socket_options), state_(state),
+      next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
               host_->address()->ip()->port()),
-      quic_info_(quic_info) {
+      quic_info_(quic_info), priority_(priority) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
@@ -234,45 +244,50 @@ ConnectivityGrid::ConnectivityGrid(
 ConnectivityGrid::~ConnectivityGrid() {
   // Ignore idle callbacks while the pools are destroyed below.
   destroying_ = true;
-  // Callbacks might have pending streams registered with the pools, so cancel and delete
-  // the callback before deleting the pools.
-  wrapped_callbacks_.clear();
-  pools_.clear();
+  while (!wrapped_callbacks_.empty()) {
+    // Before tearing down the callbacks, make sure they pass up pool failure to
+    // the caller. We do not call onPoolFailure because it does up-calls to the
+    // (delete-in-process) grid.
+    wrapped_callbacks_.front()->signalFailureAndDeleteSelf(
+        ConnectionPool::PoolFailureReason::LocalConnectionFailure, "grid teardown", host_);
+  }
+  http2_pool_.reset();
+  http3_pool_.reset();
 }
 
 void ConnectivityGrid::deleteIsPending() {
   deferred_deleting_ = true;
+
   for (const auto& pool : pools_) {
     pool->deleteIsPending();
   }
 }
 
-absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
+ConnectionPool::Instance* ConnectivityGrid::createNextPool() {
   ASSERT(!deferred_deleting_);
   // Pools are created by newStream, which should not be called during draining.
   ASSERT(!draining_);
-  // Right now, only H3 and TCP are supported, so if there are 2 pools we're done.
-  if (pools_.size() == 2 || draining_) {
-    return absl::nullopt;
+  // If both pools exist we're done.
+  if ((http2_pool_ && http3_pool_) || draining_) {
+    return nullptr;
   }
 
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
-  ConnectionPool::InstancePtr pool;
-  if (pools_.empty()) {
-    pool = Http3::allocateConnPool(
+  if (!http3_pool_) {
+    http3_pool_ = Http3::allocateConnPool(
         dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
         state_, quic_stat_names_, *alternate_protocols_, scope_,
         makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
+    pools_.push_back(http3_pool_.get());
   } else {
-    pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
-                                                   options_, transport_socket_options_, state_,
-                                                   origin_, alternate_protocols_);
+    http2_pool_ = std::make_unique<HttpConnPoolImplMixed>(
+        dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_,
+        state_, origin_, alternate_protocols_);
+    pools_.push_back(http2_pool_.get());
   }
 
-  setupPool(*pool);
-  pools_.push_back(std::move(pool));
-
-  return --pools_.end();
+  setupPool(*pools_.back());
+  return pools_.back();
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
@@ -280,7 +295,6 @@ void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
-  // This is O(n) but the function is constant and there are no plans for n > 8.
   for (const auto& pool : pools_) {
     if (pool->hasActiveConnections()) {
       return true;
@@ -288,7 +302,6 @@ bool ConnectivityGrid::hasActiveConnections() const {
   }
   return false;
 }
-
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks,
                                                          const Instance::StreamOptions& options) {
@@ -297,10 +310,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   // New streams should not be created during draining.
   ASSERT(!draining_);
 
-  if (pools_.empty()) {
-    createNextPool();
+  // Always start with the HTTP/3 pool if it exists.
+  ConnectionPool::Instance* pool = http3_pool_ ? http3_pool_.get() : http2_pool_.get();
+  if (!pool) {
+    pool = createNextPool();
   }
-  PoolIterator pool = pools_.begin();
   Instance::StreamOptions overriding_options = options;
   bool delay_tcp_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
@@ -309,15 +323,15 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       delay_tcp_attempt = false;
     }
   } else {
-    // Before skipping to the next pool, make sure it has been created.
+    // Make sure the HTTP/2 pool is created.
     createNextPool();
-    ++pool;
+    pool = http2_pool_.get();
   }
   auto wrapped_callback =
-      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks, overriding_options);
-  ConnectionPool::Cancellable* ret = wrapped_callback.get();
+      std::make_unique<WrapperCallbacks>(*this, decoder, callbacks, overriding_options);
+  WrapperCallbacks* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
-  if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {
+  if (ret->newStream(*pool) == StreamCreationResult::ImmediateResult) {
     // If newStream succeeds, return nullptr as the caller has received their
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object has also been deleted.
@@ -325,7 +339,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
-    wrapped_callbacks_.front()->tryAnotherConnection();
+    absl::optional<StreamCreationResult> result = ret->tryAnotherConnection();
+    if (result.has_value() && result.value() == StreamCreationResult::ImmediateResult) {
+      // As above, if we have an immediate success, return nullptr.
+      return nullptr;
+    }
   }
   return ret;
 }
@@ -337,17 +355,11 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
 }
 
 void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
-  if (draining_) {
-    // A drain callback has already been set, and only needs to happen once.
-    return;
-  }
-
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     // Note that no new pools can be created from this point on
     // as createNextPool fast-fails if `draining_` is true.
     draining_ = true;
   }
-
   for (auto& pool : pools_) {
     pool->drainConnections(drain_behavior);
   }
@@ -359,16 +371,8 @@ bool ConnectivityGrid::maybePreconnect(float) {
   return false; // Preconnect not yet supported for the grid.
 }
 
-absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::nextPool(PoolIterator pool_it) {
-  pool_it++;
-  if (pool_it != pools_.end()) {
-    return pool_it;
-  }
-  return createNextPool();
-}
-
 bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
-  return &pool == pools_.begin()->get();
+  return &pool == http3_pool_.get();
 }
 
 HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
@@ -386,7 +390,6 @@ void ConnectivityGrid::markHttp3Broken() {
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }
 
 bool ConnectivityGrid::isIdle() const {
-  // This is O(n) but the function is constant and there are no plans for n > 8.
   bool idle = true;
   for (const auto& pool : pools_) {
     idle &= pool->isIdle();

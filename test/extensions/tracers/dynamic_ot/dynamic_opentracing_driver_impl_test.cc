@@ -5,6 +5,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -40,10 +41,11 @@ public:
   Stats::IsolatedStoreImpl stats_;
 
   const std::string operation_name_{"test"};
-  Http::TestRequestHeaderMapImpl request_headers_{
+  Tracing::TestTraceContextImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  SystemTime start_time_;
+
   NiceMock<Tracing::MockConfig> config_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
@@ -53,6 +55,8 @@ TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
             DynamicOpenTracingDriver::formatErrorMessage(error_code, "abc"));
 }
 
+// TODO(https://github.com/envoyproxy/envoy/issues/34321)
+#if !__has_feature(address_sanitizer)
 TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   {
     std::string invalid_library = "abc123";
@@ -77,8 +81,9 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
   {
-    Tracing::SpanPtr first_span = driver_->startSpan(
-        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr first_span =
+        driver_->startSpan(config_, request_headers_, stream_info_, operation_name_,
+                           {Tracing::Reason::Sampling, true});
     first_span->finishSpan();
     driver_->tracer().Close();
   }
@@ -90,7 +95,8 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   EXPECT_NE(spans_json, nullptr);
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
-#endif
+#endif // GCC
+#endif // ASAN
 
 } // namespace
 } // namespace DynamicOt

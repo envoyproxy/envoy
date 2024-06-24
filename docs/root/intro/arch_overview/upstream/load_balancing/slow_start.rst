@@ -61,3 +61,6 @@ Once endpoints E1 and E2 exit slow start mode, their load balancing weight remai
 .. image:: /_static/slow_start_example.svg
    :width: 60%
    :align: center
+
+*Note* in case when multiple priorities are used with slow start and lower priority has just one endpoint A, during cross-priority spillover there will be no progressive increase of traffic to endpoint A, all traffic will shift at once.
+Same applies to locality weighted loadbalancing, when slow start is enabled for the upstream cluster and traffic is routed cross zone to a zone with one endpoint A, there will be no progressive increase of traffic to endpoint A.

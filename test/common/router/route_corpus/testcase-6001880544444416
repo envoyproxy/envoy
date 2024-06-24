@@ -1,0 +1,29 @@
+config {
+  virtual_hosts {
+    name: " "
+    domains: ""
+    matcher {
+      matcher_list {
+        matchers {
+          on_match {
+            action {
+              name: "route"
+              typed_config {
+                type_url: "type.googleapis.com/envoy.config.route.v3.Route"
+              }
+            }
+          }
+        }
+      }
+      on_no_match {
+        action {
+          name: "route"
+          typed_config {
+            type_url: "type.googleapis.com/envoy.config.route.v3.Route"
+          }
+        }
+      }
+    }
+  }
+}
+random_value: 8388608

@@ -67,6 +67,7 @@ binary size:
 6. ``--define=signal_trace=disabled``: more info in the `envoy docs <envoy_docs>`_. Due to the project's ``.bazelrc``.
 7. ``--define=tcmalloc=disabled``: more info in the `envoy docs <envoy_docs>`_. Due to the project's ``.bazelrc``.
 8. ``--define=hot_restart=disabled``: more info in the `envoy docs <envoy_docs>`_. Due to the project's ``.bazelrc``.
+9. ``--define=envoy_mobile_xds=disabled``: more info in the `envoy docs <envoy_docs>`_. Due to the project's ``.bazelrc``.
 
 After compiling, the binary can be stripped of all symbols by using ``strip``::
 

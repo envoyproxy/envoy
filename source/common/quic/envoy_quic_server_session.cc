@@ -2,12 +2,13 @@
 
 #include <iterator>
 #include <memory>
+#include <type_traits>
 
 #include "source/common/common/assert.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
-
-#include "quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -19,7 +20,8 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats)
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(
@@ -27,7 +29,18 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
           std::make_shared<QuicSslConnectionInfo>(*this), std::move(stream_info)),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
       listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
-      connection_stats_(connection_stats) {}
+      connection_stats_(connection_stats) {
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+    http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
+  }
+#endif
+  // If a factory is available, create a debug visitor and attach it to the connection.
+  if (debug_visitor_factory.has_value()) {
+    debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this, streamInfo());
+    quic_connection_->set_debug_visitor(debug_visitor_.get());
+  }
+}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -199,16 +212,37 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
 void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                                               const quic::QuicSocketAddress& peer_address,
                                               const quic::QuicReceivedPacket& packet) {
-  if (quic_connection_->deferSend()) {
-    // If L4 filters causes the connection to be closed early during initialization, now
-    // is the time to actually close the connection.
-    maybeHandleCloseDuringInitialize();
-  }
+  // If L4 filters causes the connection to be closed early during initialization, now
+  // is the time to actually close the connection.
+  maybeHandleCloseDuringInitialize();
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
-  if (connection()->sent_server_preferred_address().IsInitialized() &&
-      self_address == connection()->sent_server_preferred_address()) {
+  if (connection()->expected_server_preferred_address().IsInitialized() &&
+      self_address == connection()->expected_server_preferred_address()) {
     connection_stats_.num_packets_rx_on_preferred_address_.inc();
   }
+  maybeApplyDelayedClose();
+}
+
+std::vector<absl::string_view>::const_iterator
+EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) const {
+  if (!position_.has_value()) {
+    return quic::QuicServerSessionBase::SelectAlpn(alpns);
+  }
+  const std::vector<absl::string_view>& configured_alpns =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(
+          position_->filter_chain_.transportSocketFactory())
+          .supportedAlpnProtocols();
+  if (configured_alpns.empty()) {
+    return quic::QuicServerSessionBase::SelectAlpn(alpns);
+  }
+
+  for (absl::string_view configured_alpn : configured_alpns) {
+    auto it = absl::c_find(alpns, configured_alpn);
+    if (it != alpns.end()) {
+      return it;
+    }
+  }
+  return alpns.end();
 }
 
 } // namespace Quic

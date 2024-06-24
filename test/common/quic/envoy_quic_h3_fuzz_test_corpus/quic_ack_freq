@@ -1,0 +1,10 @@
+frames {
+  qframe {
+    ack_frequency {
+      control_frame_id: 0,
+      sequence_number: 1,
+      packet_tolerance: 1,
+      milliseconds: 100,
+    }
+  }
+}

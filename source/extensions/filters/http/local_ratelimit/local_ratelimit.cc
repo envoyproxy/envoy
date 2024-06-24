@@ -23,7 +23,8 @@ const std::string& PerConnectionRateLimiter::key() {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+    Upstream::ClusterManager& cm, Singleton::Manager& singleton_manager, Stats::Scope& scope,
     Runtime::Loader& runtime, const bool per_route)
     : dispatcher_(dispatcher), status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
@@ -33,8 +34,10 @@ FilterConfig::FilterConfig(
       tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
-      rate_limiter_(new Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_)),
+      always_consume_default_token_bucket_(
+          config.has_always_consume_default_token_bucket()
+              ? config.always_consume_default_token_bucket().value()
+              : true),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
@@ -46,15 +49,21 @@ FilterConfig::FilterConfig(
               ? absl::optional<Envoy::Runtime::FractionalPercent>(
                     Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
               : absl::nullopt),
-      response_headers_parser_(
-          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
-      request_headers_parser_(Envoy::Router::HeaderParser::configure(
-          config.request_headers_to_add_when_not_enforced())),
+      response_headers_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
+          Router::HeaderParserPtr)),
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.request_headers_to_add_when_not_enforced()),
+          Router::HeaderParserPtr)),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
-      vh_rate_limits_(config.vh_rate_limits()) {
+      vh_rate_limits_(config.vh_rate_limits()),
+      rate_limited_grpc_status_(
+          config.rate_limited_as_resource_exhausted()
+              ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
+              : absl::nullopt) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -63,6 +72,31 @@ FilterConfig::FilterConfig(
   if (per_route && !config.has_token_bucket()) {
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
+
+  Filters::Common::LocalRateLimit::ShareProviderSharedPtr share_provider;
+  if (config.has_local_cluster_rate_limit()) {
+    if (rate_limit_per_connection_) {
+      throw EnvoyException("local_cluster_rate_limit is set and "
+                           "local_rate_limit_per_downstream_connection is set to true");
+    }
+    if (!cm.localClusterName().has_value()) {
+      throw EnvoyException("local_cluster_rate_limit is set but no local cluster name is present");
+    }
+
+    // If the local cluster name is set then the relevant cluster must exist or the cluster
+    // manager will fail to initialize.
+    share_provider_manager_ = Filters::Common::LocalRateLimit::ShareProviderManager::singleton(
+        dispatcher, cm, singleton_manager);
+    if (!share_provider_manager_) {
+      throw EnvoyException("local_cluster_rate_limit is set but no local cluster is present");
+    }
+
+    share_provider = share_provider_manager_->getShareProvider(config.local_cluster_rate_limit());
+  }
+
+  rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
+      always_consume_default_token_bucket_, std::move(share_provider));
 }
 
 bool FilterConfig::requestAllowed(
@@ -142,8 +176,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       [this, config](Http::HeaderMap& headers) {
         config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
-      absl::nullopt, "local_rate_limited");
-  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      config->rateLimitedGrpcStatus(), "local_rate_limited");
+  decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -208,7 +242,8 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
   if (typed_state == nullptr) {
     auto limiter = std::make_shared<PerConnectionRateLimiter>(
         config->fillInterval(), config->maxTokens(), config->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), config->descriptors());
+        decoder_callbacks_->dispatcher(), config->descriptors(),
+        config->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,

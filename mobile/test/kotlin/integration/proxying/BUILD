@@ -1,15 +1,9 @@
-load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
-load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@envoy_mobile//bazel:envoy_mobile_android_test.bzl", "envoy_mobile_android_test")
 
-envoy_mobile_kt_library(
-    name = "proxy_lib",
-    srcs = ["Proxy.kt"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-    ],
-)
+licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 envoy_mobile_android_test(
     name = "proxy_info_intent_perform_http_request_using_proxy_test",
@@ -17,18 +11,22 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPRequestUsingProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -38,18 +36,22 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPSRequestUsingProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -59,18 +61,22 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -80,18 +86,22 @@ envoy_mobile_android_test(
         "ProxyInfoIntentPerformHTTPSRequestBadHostnameTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -101,18 +111,22 @@ envoy_mobile_android_test(
         "ProxyPollPerformHTTPRequestUsingProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )
 
@@ -122,17 +136,21 @@ envoy_mobile_android_test(
         "ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest.kt",
     ],
     exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
-    ],
+        "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_and_listener_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_and_listener_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-        "//test/kotlin/integration/proxying:proxy_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
     ],
 )

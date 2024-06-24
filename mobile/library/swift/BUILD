@@ -1,16 +1,17 @@
-load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
-load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_xcframework")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_defines", "envoy_mobile_package")
+load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
+load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 swift_library(
     name = "ios_lib",
     srcs = [
-        "CompressionAlgorithm.swift",
         "DirectResponse.swift",
         "Engine.swift",
         "EngineBuilder.swift",
@@ -43,7 +44,6 @@ swift_library(
         "StreamClientImpl.swift",
         "StreamIntel.swift",
         "StreamPrototype.swift",
-        "TestEngineBuilder.swift",
         "Trailers.swift",
         "extensions/UserDefaults+KeyValueStore.swift",
         "filters/AsyncRequestFilter.swift",
@@ -75,17 +75,9 @@ swift_library(
         "stats/Element.swift",
         "stats/Tags.swift",
         "stats/TagsBuilder.swift",
-    ] + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],
-    copts = select({
-        "//bazel:envoy_mobile_swift_cxx_interop": [
-            "-enable-experimental-cxx-interop",
-            "-Xcc",
-            "-std=c++17",
-            "-Xcc",
-            "-Wno-deprecated-declarations",
-        ],
-        "//conditions:default": [],
-    }),
+    ] + [
+        "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
+    ],
     defines = envoy_mobile_defines("@envoy"),
     features = [
         "swift.emit_symbol_graph",

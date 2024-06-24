@@ -12,10 +12,10 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/http/rest_api_fetcher.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/config_subscription/rest/rest_api_fetcher.h"
 
 #include "absl/container/node_hash_set.h"
 #include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
@@ -81,7 +81,7 @@ public:
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Random::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
-  const Network::Address::IpList& ipAllowlist() { return ip_allowlist_; }
+  const Network::Address::IpList& ipAllowlist() { return *ip_allowlist_; }
   GlobalStats& stats() { return stats_; }
 
 private:
@@ -99,7 +99,7 @@ private:
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   ThreadLocal::SlotPtr tls_;
-  Network::Address::IpList ip_allowlist_;
+  std::unique_ptr<Network::Address::IpList> ip_allowlist_;
   GlobalStats stats_;
 };
 

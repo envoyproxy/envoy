@@ -33,20 +33,37 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * Context passed to cluster factory to access envoy resources. Cluster factory should only access
+ * Context passed to cluster factory to access Envoy resources. Cluster factory should only access
  * the rest of the server through this context object.
  */
-class ClusterFactoryContext : public Server::Configuration::FactoryContextBase {
+class ClusterFactoryContext {
 public:
+  virtual ~ClusterFactoryContext() = default;
+
+  /**
+   * @return Server::Configuration::ServerFactoryContext& the server factory context. All the
+   *         server-wide resources should be accessed through this context.
+   */
+  virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   * TODO(wbpcode): clusterManager() of ServerFactoryContext still be invalid when loading
+   * static cluster. So we need to provide an cluster manager reference here.
+   * This could be removed after https://github.com/envoyproxy/envoy/issues/26653 is resolved.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
+   * messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
   /**
    * @return bool flag indicating whether the cluster is added via api.
    */
   virtual bool addedViaApi() PURE;
-
-  /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
    * @return Network::DnsResolverSharedPtr the dns resolver for the server.
@@ -54,29 +71,14 @@ public:
   virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
 
   /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& logManager() PURE;
-
-  /**
    * @return Ssl::ContextManager& the SSL context manager.
    */
   virtual Ssl::ContextManager& sslContextManager() PURE;
 
   /**
-   * @return the server-wide stats store.
-   */
-  virtual Stats::Store& stats() PURE;
-
-  /**
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
    */
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
-
-  // Server::Configuration::FactoryContextBase
-  Stats::Scope& scope() override { return *stats().rootScope(); }
-
-  Stats::Scope& serverScope() override { return *stats().rootScope(); }
 };
 
 /**
@@ -92,12 +94,11 @@ public:
    * with the provided parameters, it should throw an EnvoyException in the case of general error.
    * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
-   * @return a pair containing the cluster instance as well as an option thread aware load
-   *         balancer if this cluster has an integrated load balancer.
+   * @return a pair containing the cluster instance as well as an option thread aware load balancer
+   * if this cluster has an integrated load balancer or an absl::Satus error on failure.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(Server::Configuration::ServerFactoryContext& server_context,
-         const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) PURE;
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
+  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.clusters"; }
 };

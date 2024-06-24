@@ -16,6 +16,9 @@ envoy_cc_mock(
         "//contrib/generic_proxy/filters/network/source/interface:config_interface",
         "//contrib/generic_proxy/filters/network/source/interface:filter_interface",
         "//source/common/protobuf",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/upstream:host_mocks",
     ],
 )
 

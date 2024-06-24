@@ -61,13 +61,14 @@ public:
     Http::Matching::HttpMatchingDataImpl data(info);
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
-    if (result.data_) {
-      if (!result.data_.value().empty()) {
-        descriptor_entry = {descriptor_key_, result.data_.value()};
-      }
-      return true;
+    if (absl::holds_alternative<absl::monostate>(result.data_)) {
+      return false;
     }
-    return false;
+    const std::string& str = absl::get<std::string>(result.data_);
+    if (!str.empty()) {
+      descriptor_entry = {descriptor_key_, str};
+    }
+    return true;
   }
 
 private:
@@ -169,8 +170,10 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
   }
 
   // TODO: increase the efficiency, avoid string transform back and forth
+  // Note: we don't do validity checking for CIDR range here because we know
+  // from addressAsString this is a valid address.
   Network::Address::CidrRange cidr_entry =
-      Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
+      *Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
   descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
 
   return true;
@@ -228,11 +231,12 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
-    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "header_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers(), context)) {}
 
 bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                 const std::string&,
@@ -247,17 +251,18 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
 }
 
 QueryParameterValueMatchAction::QueryParameterValueMatchAction(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_query_parameters_(buildQueryParameterMatcherVector(action)) {}
+      action_query_parameters_(buildQueryParameterMatcherVector(action, context)) {}
 
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
     const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&) const {
-  Http::Utility::QueryParams query_parameters =
-      Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+  Http::Utility::QueryParamsMulti query_parameters =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
   if (expect_match_ ==
       ConfigUtility::matchQueryParams(query_parameters, action_query_parameters_)) {
     descriptor_entry = {descriptor_key_, descriptor_value_};
@@ -269,17 +274,18 @@ bool QueryParameterValueMatchAction::populateDescriptor(
 
 std::vector<ConfigUtility::QueryParameterMatcherPtr>
 QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action) {
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context) {
   std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
   for (const auto& query_parameter : action.query_parameters()) {
-    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
+    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
   }
   return ret;
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
-    ProtobufMessage::ValidationVisitor& validator)
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
@@ -306,9 +312,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new MetaDataAction(action.metadata()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
-      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
+      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match(), context));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kExtension: {
+      ProtobufMessage::ValidationVisitor& validator = context.messageValidationVisitor();
       auto* factory = Envoy::Config::Utility::getFactory<RateLimit::DescriptorProducerFactory>(
           action.extension());
       if (!factory) {
@@ -328,12 +335,13 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
       RateLimit::DescriptorProducerPtr producer =
-          factory->createDescriptorProducerFromProto(*message, validator);
+          factory->createDescriptorProducerFromProto(*message, context);
       if (producer) {
         actions_.emplace_back(std::move(producer));
       } else {
-        throw EnvoyException(
+        creation_status = absl::InvalidArgumentError(
             absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
+        return;
       }
       break;
     }
@@ -343,10 +351,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::
         kQueryParameterValueMatch:
       actions_.emplace_back(
-          new QueryParameterValueMatchAction(action.query_parameter_value_match()));
+          new QueryParameterValueMatchAction(action.query_parameter_value_match(), context));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
-      throw EnvoyException("invalid config");
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
   if (config.has_limit()) {
@@ -357,7 +365,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit_Override::OverrideSpecifierCase::
         OVERRIDE_SPECIFIER_NOT_SET:
-      throw EnvoyException("invalid config");
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
 }
@@ -396,11 +404,12 @@ RateLimitPolicyImpl::RateLimitPolicyImpl()
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-    ProtobufMessage::ValidationVisitor& validator)
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : RateLimitPolicyImpl() {
+  creation_status = absl::OkStatus();
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, validator));
+        new RateLimitPolicyEntryImpl(rate_limit, context, creation_status));
     uint64_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

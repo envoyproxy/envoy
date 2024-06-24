@@ -24,12 +24,12 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {
-    return fmt::format(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-                           "contrib/mysql_proxy/filters/network/test/mysql_test_config.yaml")),
-                       Platform::null_device_path,
-                       Network::Test::getLoopbackAddressString(GetParam()),
-                       Network::Test::getLoopbackAddressString(GetParam()),
-                       Network::Test::getAnyAddressString(GetParam()));
+    return fmt::format(
+        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/mysql_proxy/filters/network/test/mysql_test_config.yaml"))),
+        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
+        Network::Test::getLoopbackAddressString(GetParam()),
+        Network::Test::getAnyAddressString(GetParam()));
   }
 
 public:
@@ -110,7 +110,8 @@ TEST_P(MySQLIntegrationTest, MySQLLoginTest) {
  * - correct number of attempts
  * - no failures
  */
-TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
+// TODO(https://github.com/envoyproxy/envoy/issues/30852) enable
+TEST_P(MySQLIntegrationTest, DISABLED_MySQLUnitTestMultiClientsLoop) {
   int idx;
   std::string rcvd_data;
 

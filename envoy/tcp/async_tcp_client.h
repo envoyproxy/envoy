@@ -40,15 +40,26 @@ public:
 
   /**
    * Connect to a remote host. Errors or connection events are reported via the
-   * event callback registered via setAsyncTcpClientCallbacks().
+   * event callback registered via setAsyncTcpClientCallbacks(). If the callbacks
+   * needs to be changed before reconnecting, it is required to set the callbacks
+   * again, before calling to connect() to attempting to reconnect.
+   * @returns true if a new client has created and the connection is in progress.
+   * @returns false if an underlying client exists and is connected or connecting.
    */
   virtual bool connect() PURE;
 
   /**
-   * Close the client. It abortively closes the connection discarding any unsent data.
+   * Close the client. It closes the connection based on close type.
    * The underlying connection will be defer deleted when a Close event is received.
+   * Abrt/NoFlush will abortively closes the connection discarding any unsent data.
+   * @param type the connection close type.
    */
-  virtual void close() PURE;
+  virtual void close(Network::ConnectionCloseType type) PURE;
+
+  /**
+   * @return the detected close type from socket.
+   */
+  virtual Network::DetectedCloseType detectedCloseType() const PURE;
 
   /**
    * Write data through the client.
@@ -80,6 +91,11 @@ public:
    * @return if the client connects to a peer host.
    */
   virtual bool connected() PURE;
+
+  /**
+   * @return the streamInfo of the current connection if there is any.
+   */
+  virtual OptRef<StreamInfo::StreamInfo> getStreamInfo() PURE;
 };
 
 using AsyncTcpClientPtr = std::unique_ptr<AsyncTcpClient>;

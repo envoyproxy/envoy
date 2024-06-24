@@ -1,12 +1,38 @@
-#!/bin/bash -E
+#!/usr/bin/env bash
+
+set -E
 
 TESTFILTER="${1:-*}"
 TESTEXCLUDES="${2}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
+WARNINGS=()
+
+# Sandboxes listed here should be regarded as broken(/untested) until whatever
+# is causing them to flake is resolved!!!
+FLAKY_SANDBOXES=(
+    # https://github.com/envoyproxy/envoy/issues/28542
+    double-proxy
+    # https://github.com/envoyproxy/envoy/issues/31347
+    local_ratelimit
+    # https://github.com/envoyproxy/envoy/issues/31333
+    locality-load-balancing
+    # https://github.com/envoyproxy/envoy/issues/33533
+    lua-cluster-specifier
+    # https://github.com/envoyproxy/envoy/issues/28541
+    wasm-cc
+    # https://github.com/envoyproxy/envoy/issues/28546
+    websocket)
+
 
 trap_errors () {
     local frame=0 command line sub file
+    for flake in "${FLAKY_SANDBOXES[@]}"; do
+        if [[ "$example" == "./${flake}" ]]; then
+            WARNINGS+=("FAILED (${flake})")
+            return
+        fi
+    done
     if [[ -n "$example" ]]; then
         command=" (${example})"
     fi
@@ -42,6 +68,12 @@ run_examples () {
 }
 
 run_examples
+
+if [[ "${#WARNINGS[@]}" -ne "0" ]]; then
+    for warning in "${WARNINGS[@]}"; do
+        echo "WARNING: $warning" >&2
+    done
+fi
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:"

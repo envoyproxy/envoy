@@ -27,6 +27,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "connect_integration_test",
+    size = "large",
     srcs = ["connect_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [

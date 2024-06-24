@@ -55,3 +55,6 @@ run_log "Test updated Wasm header"
 responds_with_header \
     "x-wasm-custom: BAR" \
     http://localhost:8000
+
+# Restore original Dockerfile
+mv Dockerfile-proxy.bak Dockerfile-proxy

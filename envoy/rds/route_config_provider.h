@@ -50,8 +50,9 @@ public:
 
   /**
    * Callback used to notify RouteConfigProvider about configuration changes.
+   * @return Status indicating if the call was successful or had graceful error handling.
    */
-  virtual void onConfigUpdate() PURE;
+  virtual absl::Status onConfigUpdate() PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

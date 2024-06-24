@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.os.ConditionVariable;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
@@ -18,10 +17,9 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.chromium.net.impl.CronetMetrics;
+import org.chromium.net.impl.CronvoyMetrics;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.MetricsTestUtil;
@@ -35,11 +33,12 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Test RequestFinishedInfo.Listener and the metrics information it provides.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class RequestFinishedInfoTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
@@ -63,7 +62,7 @@ public class RequestFinishedInfoTest {
       assertTrue(mCallback.isDone());
       super.onRequestFinished(requestInfo);
     }
-  };
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -78,7 +77,7 @@ public class RequestFinishedInfoTest {
   }
 
   static class DirectExecutor implements Executor {
-    private ConditionVariable mBlock = new ConditionVariable();
+    private final ConditionVariable mBlock = new ConditionVariable();
 
     @Override
     public void execute(Runnable task) {
@@ -90,7 +89,7 @@ public class RequestFinishedInfoTest {
   }
 
   static class ThreadExecutor implements Executor {
-    private List<Thread> mThreads = new ArrayList<Thread>();
+    private final List<Thread> mThreads = new ArrayList<Thread>();
 
     @Override
     public void execute(Runnable task) {
@@ -108,7 +107,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListener() throws Exception {
@@ -116,8 +114,7 @@ public class RequestFinishedInfoTest {
     mTestFramework.mCronetEngine.addRequestFinishedListener(requestFinishedListener);
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -137,7 +134,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListenerDirectExecutor() throws Exception {
@@ -147,8 +143,7 @@ public class RequestFinishedInfoTest {
     mTestFramework.mCronetEngine.addRequestFinishedListener(requestFinishedListener);
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -170,7 +165,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListenerDifferentThreads() throws Exception {
@@ -180,8 +174,7 @@ public class RequestFinishedInfoTest {
     mTestFramework.mCronetEngine.addRequestFinishedListener(secondListener);
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -212,7 +205,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @Ignore("Needs debugging")
   @SuppressWarnings("deprecation")
@@ -254,13 +246,12 @@ public class RequestFinishedInfoTest {
     assertNotNull(metrics.getRequestEnd());
     MetricsTestUtil.assertAfter(endTime, metrics.getRequestEnd());
     MetricsTestUtil.assertAfter(metrics.getRequestEnd(), metrics.getRequestStart());
-    assertTrue(metrics.getSentByteCount() == 0);
-    assertTrue(metrics.getReceivedByteCount() == 0);
+    assertEquals(0, (long)metrics.getSentByteCount());
+    assertEquals(0, (long)metrics.getReceivedByteCount());
   }
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testRequestFinishedListenerRemoved() throws Exception {
@@ -283,7 +274,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testRequestFinishedListenerCanceledRequest() throws Exception {
     TestRequestFinishedListener requestFinishedListener = new TestRequestFinishedListener();
@@ -326,7 +316,6 @@ public class RequestFinishedInfoTest {
   // collection is enabled and the URLRequest hasn't been created. See http://crbug.com/675629.
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testExceptionInRequestStart() throws Exception {
     // The listener in this test shouldn't get any tasks.
@@ -368,9 +357,9 @@ public class RequestFinishedInfoTest {
     long receivedByteCount = 15;
     // Make sure nothing gets reordered inside the Metrics class
     RequestFinishedInfo.Metrics metrics =
-        new CronetMetrics(requestStart, dnsStart, dnsEnd, connectStart, connectEnd, sslStart,
-                          sslEnd, sendingStart, sendingEnd, pushStart, pushEnd, responseStart,
-                          requestEnd, socketReused, sentByteCount, receivedByteCount);
+        new CronvoyMetrics(requestStart, dnsStart, dnsEnd, connectStart, connectEnd, sslStart,
+                           sslEnd, sendingStart, sendingEnd, pushStart, pushEnd, responseStart,
+                           requestEnd, socketReused, sentByteCount, receivedByteCount);
     assertEquals(new Date(requestStart), metrics.getRequestStart());
     // -1 timestamp should translate to null
     assertNull(metrics.getDnsEnd());
@@ -390,7 +379,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @SuppressWarnings("deprecation")
   public void testOrderSuccessfulRequest() throws Exception {
@@ -399,8 +387,7 @@ public class RequestFinishedInfoTest {
         new AssertCallbackDoneRequestFinishedListener(callback);
     mTestFramework.mCronetEngine.addRequestFinishedListener(requestFinishedListener);
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation("request annotation")
         .addRequestAnnotation(this)
@@ -420,7 +407,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @RequiresMinApi(11)
   public void testUpdateAnnotationOnSucceeded() throws Exception {
@@ -437,8 +423,7 @@ public class RequestFinishedInfoTest {
     TestRequestFinishedListener requestFinishedListener =
         new AssertCallbackDoneRequestFinishedListener(callback);
     ExperimentalUrlRequest.Builder urlRequestBuilder =
-        (ExperimentalUrlRequest.Builder)mTestFramework.mCronetEngine.newUrlRequestBuilder(
-            mUrl, callback, callback.getExecutor());
+        mTestFramework.mCronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
     Date startTime = new Date();
     urlRequestBuilder.addRequestAnnotation(requestAnnotation)
         .setRequestFinishedListener(requestFinishedListener)
@@ -458,7 +443,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   // Tests a failed request where the error originates from Java.
   public void testOrderFailedRequestJava() throws Exception {
@@ -491,7 +475,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   @Ignore("Needs debugging")
   // Tests a failed request where the error originates from native code.
@@ -521,7 +504,6 @@ public class RequestFinishedInfoTest {
 
   @Test
   @SmallTest
-  @OnlyRunNativeCronet
   @Feature({"Cronet"})
   public void testOrderCanceledRequest() throws Exception {
     final TestUrlRequestCallback callback = new TestUrlRequestCallback() {

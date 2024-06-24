@@ -26,11 +26,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // downstream.
 message LocalResponsePolicy {
   // Optional new local reply body text. It will be used
-  // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
+  // in the ``%LOCAL_REPLY_BODY%`` command operator in the ``body_format``.
   config.core.v3.DataSource body = 1;
 
-  // Optional body format to be used for this response. If `body_format` is  not
-  // provided, and `body` is, the contents of `body` will be used to populate
+  // Optional body format to be used for this response. If ``body_format`` is  not
+  // provided, and ``body`` is, the contents of ``body`` will be used to populate
   // the body of the local reply without formatting.
   config.core.v3.SubstitutionFormatString body_format = 2;
 

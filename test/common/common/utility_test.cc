@@ -266,7 +266,7 @@ TEST(StringUtil, WhitespaceChars) {
 
 TEST(StringUtil, itoa) {
   char buf[32];
-  EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(StringUtil::itoa(buf, 20, 1), 0), "itoa buffer too small");
 
   EXPECT_EQ(1UL, StringUtil::itoa(buf, sizeof(buf), 0));
   EXPECT_STREQ("0", buf);
@@ -1082,19 +1082,35 @@ TEST(TrieLookupTable, LongestPrefix) {
   const char* cstr_a = "a";
   const char* cstr_b = "b";
   const char* cstr_c = "c";
+  const char* cstr_d = "d";
+  const char* cstr_e = "e";
+  const char* cstr_f = "f";
 
   EXPECT_TRUE(trie.add("foo", cstr_a));
   EXPECT_TRUE(trie.add("bar", cstr_b));
   EXPECT_TRUE(trie.add("baro", cstr_c));
+  EXPECT_TRUE(trie.add("foo/bar", cstr_d));
+  // Verify that prepending and appending branches to a node both work.
+  EXPECT_TRUE(trie.add("barn", cstr_e));
+  EXPECT_TRUE(trie.add("barp", cstr_f));
 
   EXPECT_EQ(cstr_a, trie.find("foo"));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
+  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo/"));
+  EXPECT_EQ(cstr_d, trie.findLongestPrefix("foo/bar"));
+  EXPECT_EQ(cstr_d, trie.findLongestPrefix("foo/bar/zzz"));
 
   EXPECT_EQ(cstr_b, trie.find("bar"));
   EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
   EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
   EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
+
+  EXPECT_EQ(cstr_e, trie.find("barn"));
+  EXPECT_EQ(cstr_e, trie.findLongestPrefix("barnacle"));
+
+  EXPECT_EQ(cstr_f, trie.find("barp"));
+  EXPECT_EQ(cstr_f, trie.findLongestPrefix("barpomus"));
 
   EXPECT_EQ(nullptr, trie.find("toto"));
   EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));

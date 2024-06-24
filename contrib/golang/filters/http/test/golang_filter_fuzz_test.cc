@@ -5,10 +5,11 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
+#include "contrib/golang/common/dso/test/mocks.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
-#include "contrib/golang/filters/http/test/common/dso/mocks.h"
 #include "contrib/golang/filters/http/test/golang_filter_fuzz.pb.validate.h"
 #include "gmock/gmock.h"
 
@@ -22,7 +23,7 @@ namespace {
 
 class FuzzerMocks {
 public:
-  FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
+  FuzzerMocks() : addr_(*Network::Address::PipeInstance::create("/test/test.sock")) {
 
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
@@ -45,18 +46,20 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
     return;
   }
 
-  auto dso_lib = std::make_shared<Dso::MockDsoInstance>();
+  auto dso_lib = std::make_shared<Dso::MockHttpFilterDsoImpl>();
 
   // hard code the return config_id to 1 since the default 0 is invalid.
-  ON_CALL(*dso_lib.get(), envoyGoFilterNewHttpPluginConfig(_, _)).WillByDefault(Return(1));
+  ON_CALL(*dso_lib.get(), envoyGoFilterNewHttpPluginConfig(_)).WillByDefault(Return(1));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpHeader(_, _, _, _))
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpData(_, _, _, _))
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
+  ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpLog(_, _))
+      .WillByDefault(Invoke([&](httpRequest*, int) -> void {}));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpDestroy(_, _))
       .WillByDefault(Invoke([&](httpRequest* p0, int) -> void {
         // delete the filter->req_, make LeakSanitizer happy.
-        auto req = reinterpret_cast<httpRequestInternal*>(p0);
+        auto req = reinterpret_cast<HttpRequestInternal*>(p0);
         delete req;
       }));
 
@@ -74,8 +77,9 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
   TestUtility::loadFromYaml(yaml, proto_config);
 
   // Prepare filter.
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib);
-  std::unique_ptr<Filter> filter = std::make_unique<Filter>(config, dso_lib);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", context);
+  std::unique_ptr<Filter> filter = std::make_unique<Filter>(config, dso_lib, 0);
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 

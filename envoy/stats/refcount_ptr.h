@@ -91,6 +91,7 @@ public:
 #endif
   bool operator==(const RefcountPtr& a) const { return ptr_ == a.ptr_; }
   bool operator!=(const RefcountPtr& a) const { return ptr_ != a.ptr_; }
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
   uint32_t use_count() const { return ptr_->use_count(); }
   void reset() {
     resetInternal();
@@ -115,7 +116,7 @@ private:
 // forth.
 #if __cplusplus < 202002L
 template <class T> static bool operator==(std::nullptr_t, const RefcountPtr<T>& a) {
-  return a == nullptr;
+  return a == nullptr; // NOLINT(clang-analyzer-cplusplus.Move)
 }
 template <class T> static bool operator!=(std::nullptr_t, const RefcountPtr<T>& a) {
   return a != nullptr;

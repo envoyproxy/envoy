@@ -16,11 +16,11 @@ interface AsyncResponseFilter : ResponseFilter {
 
   /**
    * Invoked explicitly in response to an asynchronous `resumeResponse()` callback when filter
-   * iteration has been stopped. The parameters passed to this invocation will be a snapshot
-   * of any stream state that has not yet been forwarded along the filter chain.
+   * iteration has been stopped. The parameters passed to this invocation will be a snapshot of any
+   * stream state that has not yet been forwarded along the filter chain.
    *
-   * As with other filter invocations, this will be called on Envoy's main thread, and thus
-   * no additional synchronization is required between this and other invocations.
+   * As with other filter invocations, this will be called on Envoy's main thread, and thus no
+   * additional synchronization is required between this and other invocations.
    *
    * @param headers: Headers, if `StopIteration` was returned from `onResponseHeaders`.
    * @param data: Any data that has been buffered where `StopIterationAndBuffer` was returned.

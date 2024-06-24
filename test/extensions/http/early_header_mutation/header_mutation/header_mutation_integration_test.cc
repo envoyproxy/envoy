@@ -47,8 +47,6 @@ public:
 
     HttpIntegrationTest::initialize();
   }
-
-  ScopedInjectableLoader<Regex::Engine> engine_{std::make_unique<Regex::GoogleReEngine>()};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, HeaderMutationIntegrationTest,

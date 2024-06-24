@@ -23,19 +23,19 @@ documentation.
 The documentation can be built locally in the root of https://github.com/envoyproxy/envoy via:
 
 ```
-docs/build.sh
+ci/do_ci.sh docs
 ```
 
 To skip configuration examples validation:
 
 ```
-SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
+SPHINX_SKIP_CONFIG_VALIDATION=true ci/do_ci.sh docs
 ```
 
 Or to use a hermetic Docker container:
 
 ```
-./ci/run_envoy_docker.sh './ci/do_ci.sh docs'
+./ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
 ```
 
 This process builds RST documentation directly from the proto files, merges it with the static RST

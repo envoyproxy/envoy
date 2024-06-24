@@ -9,6 +9,8 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/envoyproxy/envoy/badge)](https://securityscorecards.dev/viewer/?uri=github.com/envoyproxy/envoy)
+[![CLOMonitor](https://img.shields.io/endpoint?url=https://clomonitor.io/api/projects/cncf/envoy/badge)](https://clomonitor.io/projects/cncf/envoy)
 [![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
@@ -18,9 +20,6 @@ involved and how Envoy plays a role, read the CNCF
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
 * [Unofficial Chinese documentation](https://cloudnative.to/envoy/)
-* Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
-([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
-to find out more about the origin story and design philosophy of Envoy
 * [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model
 * [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture

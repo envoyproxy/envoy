@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -9,16 +11,19 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
-#include "source/extensions/filters/network/rbac/config.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/utility.h"
+
+#if defined(USE_CEL)
+#include "source/extensions/filters/network/rbac/config.h"
+#endif // USE_CEL
 
 #include "gtest/gtest.h"
 
@@ -107,14 +112,17 @@ public:
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
 
-      tcp_proxy_config.mutable_access_log_flush_interval()->set_seconds(1); // 1s
+      tcp_proxy_config.mutable_access_log_options()
+          ->mutable_access_log_flush_interval()
+          ->set_seconds(1); // 1s
 
       tcp_proxy->PackFrom(tcp_proxy_config);
     });
     BaseIntegrationTest::initialize();
   }
 
-  void setupTlsInspectorFilter(bool ssl_terminate, bool enable_ja3_fingerprinting = false) {
+  void setupTlsInspectorFilter(absl::optional<ConfigHelper::ServerSslOptions> server_ssl_options,
+                               bool enable_ja3_fingerprinting = false) {
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -123,11 +131,20 @@ public:
       auto* alpn = filter_chain->mutable_filter_chain_match()->add_application_protocols();
       *alpn = "envoyalpn";
       auto* filter = filter_chain->mutable_filters(0);
+      envoy::extensions::filters::network::echo::v3::Echo echo;
       filter->set_name("envoy.filters.network.echo");
-      filter->clear_typed_config();
+      filter->mutable_typed_config()->PackFrom(echo);
     });
+    if (server_ssl_options.has_value()) {
+      config_helper_.addSslConfig(server_ssl_options.value());
+    }
+  }
+
+  void setupTlsInspectorFilter(bool ssl_terminate, bool enable_ja3_fingerprinting = false) {
     if (ssl_terminate) {
-      config_helper_.addSslConfig();
+      setupTlsInspectorFilter(ConfigHelper::ServerSslOptions{}, enable_ja3_fingerprinting);
+    } else {
+      setupTlsInspectorFilter(std::nullopt, enable_ja3_fingerprinting);
     }
   }
 
@@ -135,8 +152,8 @@ public:
                           const Ssl::ClientSslTransportOptions& ssl_options = {},
                           const std::string& curves_list = "") {
     // Set up the SSL client.
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
     context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
@@ -234,9 +251,7 @@ public:
     // Clear connection unique id which is not deterministic.
     log_entry->mutable_common_properties()->clear_stream_id();
 
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
-
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -311,9 +326,14 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      downstream_wire_bytes_received: 3
+      upstream_wire_bytes_sent: 3
+      upstream_wire_bytes_received: 5
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -369,6 +389,11 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      downstream_wire_bytes_received: 3
+      upstream_wire_bytes_sent: 3
+      upstream_wire_bytes_received: 5
+      access_log_type: TcpPeriodic
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -394,6 +419,7 @@ tcp_logs:
   cleanup();
 }
 
+#if defined(USE_CEL)
 // Test RBAC.
 TEST_P(TcpGrpcAccessLogIntegrationTest, RBACAccessLogFlow) {
   config_helper_.addNetworkFilter(R"EOF(
@@ -457,10 +483,13 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
       upstream_request_attempt_count: 1
+      downstream_wire_bytes_sent: 5
+      upstream_wire_bytes_received: 5
       connection_termination_details: rbac_access_denied_matched_policy[none]
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
@@ -473,6 +502,7 @@ tcp_logs:
 
   cleanup();
 }
+#endif // USE_CEL
 
 // Ssl Terminated by Envoy, no `ja3` fingerprint.
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedNoJA3) {
@@ -520,6 +550,7 @@ tcp_logs:
           subject_alt_name:
             uri: "spiffe://lyft.com/frontend-team"
           subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -527,6 +558,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -583,6 +615,7 @@ tcp_logs:
           subject_alt_name:
             uri: "spiffe://lyft.com/frontend-team"
           subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -590,6 +623,7 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      access_log_type: NotSet
     connection_properties:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -636,6 +670,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -689,6 +724,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -742,6 +778,7 @@ tcp_logs:
         socket_address:
       upstream_local_address:
         socket_address:
+      access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
           address: {}
@@ -755,6 +792,187 @@ tcp_logs:
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()))));
 
+  cleanup();
+}
+
+// TLS handshake failure. Access log should contain a downstream connection
+// termination reason and cert info.
+TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_VerifyFailed) {
+  ConfigHelper::ServerSslOptions server_options{};
+  server_options.setEcdsaCert(true);
+  server_options.setRsaCert(true);
+  server_options.setExpectClientEcdsaCert(true);
+  setupTlsInspectorFilter(server_options);
+  initialize();
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setClientEcdsaCert(false);
+  ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  setupSslConnection(/*expect_connection_open=*/false,
+                     /*ssl_options=*/ssl_options, /*curves_list=*/"P-256");
+
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+    user_agent_name: "envoy"
+  log_name: foo
+tcp_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: {0}
+      downstream_local_address:
+        socket_address:
+          address: {0}
+      downstream_transport_failure_reason: "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end:TLS_error_end"
+      access_log_type: NotSet
+      downstream_direct_remote_address:
+        socket_address:
+          address: {0}
+      tls_properties:
+        tls_version: TLSv1_2
+        tls_cipher_suite:
+          value: 49199
+        local_certificate_properties:
+          subject_alt_name:
+            - uri: "spiffe://lyft.com/backend-team"
+          subject: "emailAddress=backend-team@lyft.com,CN=Test Backend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+        peer_certificate_properties:
+          subject_alt_name:
+            - uri: "spiffe://lyft.com/frontend-team"
+          subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+      upstream_remote_address:
+        socket_address: {{}}
+      upstream_local_address:
+        socket_address: {{}}
+    connection_properties: {{}}
+)EOF",
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+  cleanup();
+}
+
+TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_NoSharedCipher) {
+  setupTlsInspectorFilter(ConfigHelper::ServerSslOptions{}.setEcdsaCert(false).setRsaCert(true));
+  initialize();
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setClientEcdsaCert(true);
+  ssl_options.setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  setupSslConnection(/*expect_connection_open=*/false,
+                     /*ssl_options=*/ssl_options, /*curves_list=*/"P-256");
+
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(
+      // note: no peer certificate properties here, because the handshake fails
+      // at an earlier stage
+      waitForAccessLogRequest(fmt::format(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+    user_agent_name: "envoy"
+  log_name: foo
+tcp_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: {0}
+      downstream_local_address:
+        socket_address:
+          address: {0}
+      downstream_transport_failure_reason: "TLS_error:|268435640:SSL routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end:TLS_error_end"
+      access_log_type: NotSet
+      downstream_direct_remote_address:
+        socket_address:
+          address: {0}
+      tls_properties:
+        tls_version: TLSv1_2
+        tls_cipher_suite:
+          value: 65535
+        local_certificate_properties:
+          subject_alt_name:
+            - uri: "spiffe://lyft.com/backend-team"
+          subject: "emailAddress=backend-team@lyft.com,CN=Test Backend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+        peer_certificate_properties: {{}}
+      upstream_remote_address:
+        socket_address: {{}}
+      upstream_local_address:
+        socket_address: {{}}
+    connection_properties: {{}}
+)EOF",
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+  cleanup();
+}
+
+TEST_P(TcpGrpcAccessLogIntegrationTest, SslHandshakeFailure_UnsupportedProtocol) {
+  setupTlsInspectorFilter(
+      ConfigHelper::ServerSslOptions{}.setEcdsaCert(true).setRsaCert(false).setTlsV13(false));
+  initialize();
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setClientEcdsaCert(true);
+  ssl_options.setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
+  setupSslConnection(/*expect_connection_open=*/false,
+                     /*ssl_options=*/ssl_options, /*curves_list=*/"P-256");
+
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+    user_agent_name: "envoy"
+  log_name: foo
+tcp_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: {0}
+      downstream_local_address:
+        socket_address:
+          address: {0}
+      downstream_transport_failure_reason: "TLS_error:|268435696:SSL routines:OPENSSL_internal:UNSUPPORTED_PROTOCOL:TLS_error_end:TLS_error_end"
+      access_log_type: NotSet
+      downstream_direct_remote_address:
+        socket_address:
+          address: {0}
+      tls_properties:
+        tls_version: TLSv1_2
+        tls_cipher_suite:
+          value: 65535
+        local_certificate_properties:
+          subject_alt_name:
+            - uri: "spiffe://lyft.com/backend-team"
+          subject: "emailAddress=backend-team@lyft.com,CN=Test Backend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+        peer_certificate_properties: {{}}
+      upstream_remote_address:
+        socket_address: {{}}
+      upstream_local_address:
+        socket_address: {{}}
+    connection_properties: {{}}
+)EOF",
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
   cleanup();
 }
 

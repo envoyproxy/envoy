@@ -158,6 +158,11 @@ SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
   PANIC("not implemented");
 }
 
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, static_cast<char*>(buffer), length, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
   const ssize_t rc = ::recv(socket, static_cast<char*>(buffer), length, flags);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
@@ -207,7 +212,7 @@ bool OsSysCallsImpl::supportsUdpGso() const {
   return false;
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion) const {
   // Windows doesn't support it.
   return false;
 }
@@ -239,12 +244,20 @@ SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
 
 SysCallIntResult OsSysCallsImpl::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
+  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
+    const int rc = ::WSASetRecvIPEcn(sockfd, *(int*)optval == 1);
+    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  }
   const int rc = ::setsockopt(sockfd, level, optname, static_cast<const char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallIntResult OsSysCallsImpl::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
+  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
+    const int rc = ::WSAGetRecvIPEcn(sockfd, (DWORD*)optval);
+    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  }
   const int rc = ::getsockopt(sockfd, level, optname, static_cast<char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }

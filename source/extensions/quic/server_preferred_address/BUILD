@@ -1,12 +1,12 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         "//envoy/registry",
         "//source/common/quic:envoy_quic_server_preferred_address_config_factory_interface",
+        "//source/common/quic:envoy_quic_utils_lib",
         "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,

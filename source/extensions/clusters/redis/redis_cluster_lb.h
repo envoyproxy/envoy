@@ -8,7 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/crc16.h"
 #include "source/extensions/filters/network/common/redis/client.h"
@@ -149,21 +149,20 @@ public:
   void onHostHealthUpdate() override;
 
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override;
-  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override;
 
 private:
   class RedisShard {
   public:
     RedisShard(Upstream::HostConstSharedPtr primary, Upstream::HostVectorConstSharedPtr replicas,
-               Upstream::HostVectorConstSharedPtr all_hosts)
+               Upstream::HostVectorConstSharedPtr all_hosts, Random::RandomGenerator& random)
         : primary_(std::move(primary)) {
       replicas_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                 std::move(replicas), Upstream::HostsPerLocalityImpl::empty()),
-                            nullptr, {}, {});
+                            nullptr, {}, {}, random.random());
       all_hosts_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                  std::move(all_hosts), Upstream::HostsPerLocalityImpl::empty()),
-                             nullptr, {}, {});
+                             nullptr, {}, {}, random.random());
     }
     const Upstream::HostConstSharedPtr primary() const { return primary_; }
     const Upstream::HostSetImpl& replicas() const { return replicas_; }
@@ -171,8 +170,8 @@ private:
 
   private:
     const Upstream::HostConstSharedPtr primary_;
-    Upstream::HostSetImpl replicas_{0, absl::nullopt};
-    Upstream::HostSetImpl all_hosts_{0, absl::nullopt};
+    Upstream::HostSetImpl replicas_{0, absl::nullopt, absl::nullopt};
+    Upstream::HostSetImpl all_hosts_{0, absl::nullopt, absl::nullopt};
   };
 
   using RedisShardSharedPtr = std::shared_ptr<const RedisShard>;
@@ -236,7 +235,7 @@ public:
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override{};
+  absl::Status initialize() override { return absl::OkStatus(); }
 
 private:
   Upstream::LoadBalancerFactorySharedPtr factory_;

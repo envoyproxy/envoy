@@ -3,7 +3,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -44,10 +43,9 @@ public:
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return should_reject_ ? ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()}
+                          : ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Value()};
   }
-
-  std::set<std::string> configTypes() override { return {}; }
 
   std::string name() const override {
     return absl::StrCat(category(), ".fake_config_validator_",
@@ -65,10 +63,7 @@ class CustomConfigValidatorsImplTest : public testing::Test {
 public:
   CustomConfigValidatorsImplTest()
       : factory_accept_(false), factory_reject_(true), register_factory_accept_(factory_accept_),
-        register_factory_reject_(factory_reject_) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-  }
+        register_factory_reject_(factory_reject_) {}
 
   static envoy::config::core::v3::TypedExtensionConfig parseConfig(const std::string& config) {
     envoy::config::core::v3::TypedExtensionConfig proto;
@@ -83,12 +78,17 @@ public:
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   const testing::NiceMock<Server::MockInstance> server_;
   const std::string type_url_{Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()};
-  TestScopedRuntime scoped_runtime_;
 
-  static constexpr char AcceptValidatorConfig[] =
-      "name: envoy.config.validators.fake_config_validator_accept";
-  static constexpr char RejectValidatorConfig[] =
-      "name: envoy.config.validators.fake_config_validator_reject";
+  static constexpr char AcceptValidatorConfig[] = R"EOF(
+      name: envoy.config.validators.fake_config_validator_accept
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Value
+  )EOF";
+  static constexpr char RejectValidatorConfig[] = R"EOF(
+      name: envoy.config.validators.fake_config_validator_reject
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
 };
 
 // Validates that empty config that has no validators is always accepted.

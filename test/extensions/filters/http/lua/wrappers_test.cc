@@ -12,7 +12,6 @@
 using testing::Expectation;
 using testing::InSequence;
 using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -349,6 +348,7 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
       function callMe(object)
         testPrint(object:downstreamLocalAddress())
         testPrint(object:downstreamDirectRemoteAddress())
+        testPrint(object:downstreamRemoteAddress())
       end
     )EOF"};
 
@@ -360,13 +360,17 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
       new Network::Address::Ipv4Instance("127.0.0.1", 8000)};
   auto downstream_direct_remote =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
+  auto downstream_remote = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("10.1.2.3", 5000)};
   stream_info.downstream_connection_info_provider_->setLocalAddress(address);
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
       downstream_direct_remote);
+  stream_info.downstream_connection_info_provider_->setRemoteAddress(downstream_remote);
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint(address->asString()));
   EXPECT_CALL(printer_, testPrint(downstream_direct_remote->asString()));
+  EXPECT_CALL(printer_, testPrint(downstream_remote->asString()));
   start("callMe");
   wrapper.reset();
 }
@@ -416,7 +420,8 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
 
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -459,7 +464,8 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
 
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   (*stream_info.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -493,7 +499,8 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -541,7 +548,8 @@ TEST_F(LuaStreamInfoWrapperTest, BadTypesInTableForDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
@@ -562,7 +570,8 @@ TEST_F(LuaStreamInfoWrapperTest, ModifyDuringIterationForDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_THROW_WITH_MESSAGE(
@@ -596,7 +605,8 @@ TEST_F(LuaStreamInfoWrapperTest, ModifyAfterIterationForDynamicMetadata) {
 
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -621,7 +631,8 @@ TEST_F(LuaStreamInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_THROW_WITH_MESSAGE(

@@ -28,8 +28,7 @@ void MultiEnvoyTest::createL1Envoy() {
       zero.push_back(0);
     }
   }
-  ConfigHelper l1_helper(version_, *api_,
-                         MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper l1_helper(version_, config_helper_.bootstrap());
   l1_helper.setPorts(zero, true); // Zero out ports set by config_helper_'s finalize();
   const std::string bootstrap_path = finalizeConfigWithPorts(l1_helper, ports, use_lds_);
 
@@ -52,7 +51,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiEnvoyTest,
 // This test does not currently support mixed protocol hops, or much of the other envoy test
 // framework knobs.
 TEST_P(MultiEnvoyTest, SimpleRequestAndResponse) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "true");
   initialize();
   createL1Envoy();
 
@@ -74,7 +72,6 @@ TEST_P(MultiEnvoyTest, SimpleRequestAndResponse) {
 
 // Similar to SimpleRequestAndResponse but tear down the L2 first.
 TEST_P(MultiEnvoyTest, SimpleRequestAndResponseL2Teardown) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.remove_runtime_singleton", "true");
   initialize();
   createL1Envoy();
 

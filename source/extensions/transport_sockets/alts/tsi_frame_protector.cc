@@ -3,6 +3,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 
+#include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/tsi/transport_security_grpc.h"
 #include "src/core/tsi/transport_security_interface.h"
 

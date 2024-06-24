@@ -21,11 +21,15 @@ namespace Options {
 namespace {
 
 TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
+// This proto is not defined in ../source/common/protobuf/create_reflectable_message.cc
+#ifndef ENVOY_ENABLE_FULL_PROTOS
+  return;
+#endif
   ExtensionRegistry::registerFactories();
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> mock_stream_info;
   Upstream::RetryExtensionFactoryContextImpl retry_extension_factory_context{
-      *mock_factory_context.singleton_manager_};
+      *mock_factory_context.server_factory_context_.singleton_manager_};
 
   auto connectivity_manager = Network::ConnectivityManagerFactory(mock_factory_context).get();
   ASSERT_NE(nullptr, connectivity_manager);
@@ -45,15 +49,14 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTestWithoutConnecti
   ExtensionRegistry::registerFactories();
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   Upstream::RetryExtensionFactoryContextImpl retry_extension_factory_context{
-      *mock_factory_context.singleton_manager_};
+      *mock_factory_context.server_factory_context_.singleton_manager_};
 
   auto factory = Registry::FactoryRegistry<Upstream::RetryOptionsPredicateFactory>::getFactory(
       "envoy.retry_options_predicates.network_configuration");
   ASSERT_NE(nullptr, factory);
 
   auto proto_config = factory->createEmptyConfigProto();
-  EXPECT_DEATH(factory->createOptionsPredicate(*proto_config, retry_extension_factory_context),
-               "unexpected nullptr network connectivity_manager");
+  EXPECT_DEATH(factory->createOptionsPredicate(*proto_config, retry_extension_factory_context), "");
 }
 
 } // namespace

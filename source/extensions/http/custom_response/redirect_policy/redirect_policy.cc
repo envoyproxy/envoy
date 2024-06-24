@@ -67,10 +67,12 @@ RedirectPolicy::RedirectPolicy(
                        ? absl::optional<::Envoy::Http::Code>(
                              static_cast<::Envoy::Http::Code>(config.status_code().value()))
                        : absl::optional<::Envoy::Http::Code>{}},
-      response_header_parser_(
-          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
-      request_header_parser_(
-          Envoy::Router::HeaderParser::configure(config.request_headers_to_add())),
+      response_header_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
+          Router::HeaderParserPtr)),
+      request_header_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.request_headers_to_add()),
+          Router::HeaderParserPtr)),
       modify_request_headers_action_(createModifyRequestHeadersAction(config, context)) {
   // Ensure that exactly one of uri_ or redirect_action_ is specified.
   ASSERT((uri_ || redirect_action_) && !(uri_ && redirect_action_));
@@ -86,10 +88,6 @@ RedirectPolicy::RedirectPolicy(
     throw EnvoyException(
         absl::StrCat("#fragment is not supported for custom response. Specified path_redirect is ",
                      redirect_action_->path_redirect_));
-  }
-  if (redirect_action_ && redirect_action_->host_redirect_.empty() &&
-      redirect_action_->path_redirect_.empty()) {
-    throw EnvoyException("At least one of host_redirect and path_redirect needs to be specified");
   }
 }
 
@@ -116,20 +114,24 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   // the remote source and return.
   auto encoder_callbacks = custom_response_filter.encoderCallbacks();
   auto decoder_callbacks = custom_response_filter.decoderCallbacks();
-  const Policy* policy = encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
-      "envoy.filters.http.custom_response");
-  if (policy) {
-    ENVOY_BUG(policy == this, "Policy filter state should be this policy.");
-    //  Apply mutations if this is not an error or redirect response. Else leave be.
-    auto const cr_code = ::Envoy::Http::Utility::getResponseStatusOrNullopt(headers);
-    if (!cr_code.has_value() || (*cr_code < 100 || *cr_code > 299)) {
-      return ::Envoy::Http::FilterHeadersStatus::Continue;
-    }
+  const ::Envoy::Extensions::HttpFilters::CustomResponse::CustomResponseFilterState* filter_state =
+      encoder_callbacks->streamInfo()
+          .filterState()
+          ->getDataReadOnly<
+              ::Envoy::Extensions::HttpFilters::CustomResponse::CustomResponseFilterState>(
+              "envoy.filters.http.custom_response");
+  if (filter_state) {
+    ENVOY_BUG(filter_state->policy.get() == this, "Policy filter state should be this policy.");
     // Apply header mutations.
     response_header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
+    const absl::optional<::Envoy::Http::Code> status_code_to_use =
+        status_code_.has_value() ? status_code_
+                                 : (filter_state->original_response_code.has_value()
+                                        ? filter_state->original_response_code
+                                        : absl::nullopt);
     // Modify response status code.
-    if (status_code_.has_value()) {
-      auto const code = *status_code_;
+    if (status_code_to_use.has_value()) {
+      auto const code = *status_code_to_use;
       headers.setStatus(std::to_string(enumToInt(code)));
       encoder_callbacks->streamInfo().setResponseCode(static_cast<uint32_t>(code));
     }
@@ -192,7 +194,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   // Apply header mutations before recalculating the route.
   request_header_parser_->evaluateHeaders(*downstream_headers, decoder_callbacks->streamInfo());
   if (modify_request_headers_action_) {
-    modify_request_headers_action_->modifyRequestHeaders(*downstream_headers,
+    modify_request_headers_action_->modifyRequestHeaders(*downstream_headers, headers,
                                                          decoder_callbacks->streamInfo(), *this);
   }
   const auto route = decoder_callbacks->route();
@@ -207,10 +209,19 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   }
   downstream_headers->setMethod(::Envoy::Http::Headers::get().MethodValues.Get);
   downstream_headers->remove(::Envoy::Http::Headers::get().ContentLength);
+  // Cache the original response code.
+  absl::optional<::Envoy::Http::Code> original_response_code;
+  absl::optional<uint64_t> current_code =
+      ::Envoy::Http::Utility::getResponseStatusOrNullopt(headers);
+  if (current_code.has_value()) {
+    original_response_code = static_cast<::Envoy::Http::Code>(*current_code);
+  }
   encoder_callbacks->streamInfo().filterState()->setData(
       // TODO(pradeepcrao): Currently we don't have a mechanism to add readonly
       // objects to FilterState, even if they're immutable.
-      "envoy.filters.http.custom_response", const_cast<RedirectPolicy*>(this)->shared_from_this(),
+      "envoy.filters.http.custom_response",
+      std::make_shared<::Envoy::Extensions::HttpFilters::CustomResponse::CustomResponseFilterState>(
+          const_cast<RedirectPolicy*>(this)->shared_from_this(), original_response_code),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
   restore_original_headers.cancel();
   decoder_callbacks->recreateStream(nullptr);

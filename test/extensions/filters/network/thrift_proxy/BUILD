@@ -318,6 +318,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
@@ -339,12 +340,12 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "integration_test",
+    size = "large",
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    shard_count = 12,
     tags = ["skip_on_windows"],
     deps = [
         ":integration_lib",
@@ -357,12 +358,12 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "translation_integration_test",
+    size = "large",
     srcs = ["translation_integration_test.cc"],
     data = [
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    shard_count = 4,
     deps = [
         ":integration_lib",
         ":utility_lib",
@@ -395,6 +396,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "trds_integration_test",
+    size = "large",
     srcs = ["trds_integration_test.cc"],
     data = [
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",

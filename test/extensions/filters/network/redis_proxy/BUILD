@@ -18,9 +18,6 @@ envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    # This test takes a while to run specially under tsan.
-    # Shard it to avoid test timeout.
-    shard_count = 2,
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
@@ -31,6 +28,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:connection_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -49,6 +47,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/extensions/clusters/redis:redis_cluster_mocks",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/common/redis:mocks_lib",
@@ -93,6 +92,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/extensions/common/redis:cluster_refresh_manager_interface",
         "//source/extensions/filters/network/common/redis:client_interface",
@@ -113,7 +113,6 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -131,6 +130,7 @@ envoy_extension_cc_benchmark_binary(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
@@ -148,8 +148,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
@@ -159,6 +162,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
+    size = "large",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [

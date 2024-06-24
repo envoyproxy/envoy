@@ -5,6 +5,17 @@
 
 namespace Envoy {
 namespace Stats {
+
+bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b) {
+  return a.count_ == b.count_ && std::abs(a.lower_bound_ - b.lower_bound_) < 0.001 &&
+         std::abs(a.width_ - b.width_) < 0.001;
+}
+
+std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket) {
+  return out << "(min_value=" << bucket.lower_bound_ << ", width=" << bucket.width_
+             << ", count=" << bucket.count_ << ")";
+}
+
 namespace TestUtil {
 
 void forEachSampleStat(int num_clusters, bool include_other_stats,
@@ -281,6 +292,10 @@ std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool c
     it->second.clear();
   }
   return copy;
+}
+
+bool TestStore::histogramRecordedValues(const std::string& name) const {
+  return histogram_values_map_.contains(name);
 }
 
 // TODO(jmarantz): this utility is intended to be used both for unit tests

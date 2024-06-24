@@ -5,9 +5,9 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -22,10 +22,16 @@ using ::quiche::BalsaHeaders;
 constexpr absl::string_view kColonSlashSlash = "://";
 // Response must start with "HTTP".
 constexpr char kResponseFirstByte = 'H';
+constexpr absl::string_view kHttpVersionPrefix = "HTTP/";
 
-#ifndef ENVOY_ENABLE_UHV
-// When UHV is enabled, BalsaParser allows any method and defers to UHV for
-// validation. When UHV is disabled, BalsaParser behavior matches http-parser.
+// Allowed characters for field names according to Section 5.1
+// and for methods according to Section 9.1 of RFC 9110:
+// https://www.rfc-editor.org/rfc/rfc9110.html
+constexpr absl::string_view kValidCharacters =
+    "!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
+constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
+constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
+
 bool isFirstCharacterOfValidMethod(char c) {
   static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
                                                    'N', 'O', 'P', 'R', 'S', 'T', 'U'};
@@ -35,7 +41,16 @@ bool isFirstCharacterOfValidMethod(char c) {
   return std::binary_search(begin, end, c);
 }
 
-bool isMethodValid(absl::string_view method) {
+// TODO(#21245): Skip method validation altogether when UHV method validation is
+// enabled.
+bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
+  if (allow_custom_methods) {
+    return !method.empty() &&
+           std::all_of(method.begin(), method.end(), [](absl::string_view::value_type c) {
+             return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
+           });
+  }
+
   static constexpr absl::string_view kValidMethods[] = {
       "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
       "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
@@ -47,7 +62,6 @@ bool isMethodValid(absl::string_view method) {
   const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
   return std::binary_search(begin, end, method);
 }
-#endif
 
 // This function is crafted to match the URL validation behavior of the http-parser library.
 bool isUrlValid(absl::string_view url, bool is_connect) {
@@ -107,42 +121,52 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
          std::all_of(path_query.begin(), path_query.end(), is_valid_path_query_char);
 }
 
+// Returns true if `version_input` is a valid HTTP version string as defined at
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3, or empty (for HTTP/0.9).
 bool isVersionValid(absl::string_view version_input) {
-  // HTTP-version is defined at
-  // https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3. HTTP/0.9 requests
-  // have no http-version, so empty `version_input` is also accepted.
+  if (version_input.empty()) {
+    return true;
+  }
 
-  static const auto regex = [] {
-    envoy::type::matcher::v3::RegexMatcher matcher;
-    *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
-    matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
-    return Regex::Utility::parseRegex(matcher);
-  }();
+  if (!absl::StartsWith(version_input, kHttpVersionPrefix)) {
+    return false;
+  }
+  version_input.remove_prefix(kHttpVersionPrefix.size());
 
-  return regex->match(version_input);
+  // Version number is in the form of "[0-9].[0-9]".
+  return version_input.size() == 3 && absl::ascii_isdigit(version_input[0]) &&
+         version_input[1] == '.' && absl::ascii_isdigit(version_input[2]);
+}
+
+bool isHeaderNameValid(absl::string_view name) {
+  return std::all_of(name.begin(), name.end(), [](absl::string_view::value_type c) {
+    return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
+  });
 }
 
 } // anonymous namespace
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
-                         bool enable_trailers)
-    : message_type_(type), connection_(connection) {
+                         bool enable_trailers, bool allow_custom_methods)
+    : message_type_(type), connection_(connection), enable_trailers_(enable_trailers),
+      allow_custom_methods_(allow_custom_methods) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
-  http_validation_policy.disallow_header_continuation_lines = true;
+  http_validation_policy.disallow_header_continuation_lines = false;
   http_validation_policy.require_header_colon = true;
-  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_multiple_content_length = true;
   http_validation_policy.disallow_transfer_encoding_with_content_length = false;
+  http_validation_policy.validate_transfer_encoding = false;
+  http_validation_policy.require_content_length_if_body_required = false;
+  http_validation_policy.disallow_invalid_header_characters_in_response = true;
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
-  if (enable_trailers) {
-    framer_.set_balsa_trailer(&trailers_);
-  }
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
+  framer_.EnableTrailers();
 
   switch (message_type_) {
   case MessageType::Request:
@@ -158,13 +182,20 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
-#ifndef ENVOY_ENABLE_UHV
-    if (message_type_ == MessageType::Request && !isFirstCharacterOfValidMethod(*slice)) {
+    if (delay_reset_) {
+      if (first_message_) {
+        first_message_ = false;
+      } else {
+        framer_.Reset();
+      }
+    }
+
+    if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
+        !isFirstCharacterOfValidMethod(*slice)) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_METHOD";
       return 0;
     }
-#endif
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
@@ -250,13 +281,12 @@ void BalsaParser::OnBodyChunkInput(absl::string_view input) {
 
 void BalsaParser::OnHeaderInput(absl::string_view /*input*/) {}
 void BalsaParser::OnTrailerInput(absl::string_view /*input*/) {}
-void BalsaParser::OnHeader(absl::string_view /*key*/, absl::string_view /*value*/) {}
 
 void BalsaParser::ProcessHeaders(const BalsaHeaders& headers) {
-  processHeadersOrTrailersImpl(headers);
+  validateAndProcessHeadersOrTrailersImpl(headers, /* trailers = */ false);
 }
-void BalsaParser::ProcessTrailers(const BalsaHeaders& trailer) {
-  processHeadersOrTrailersImpl(trailer);
+void BalsaParser::OnTrailers(std::unique_ptr<quiche::BalsaHeaders> trailers) {
+  validateAndProcessHeadersOrTrailersImpl(*trailers, /* trailers = */ true);
 }
 
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
@@ -266,13 +296,11 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-#ifndef ENVOY_ENABLE_UHV
-  if (!isMethodValid(method_input)) {
+  if (!isMethodValid(method_input, allow_custom_methods_)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;
   }
-#endif
   const bool is_connect = method_input == Headers::get().MethodValues.Connect;
   if (!isUrlValid(request_uri, is_connect)) {
     status_ = ParserStatus::Error;
@@ -312,6 +340,8 @@ void BalsaParser::OnChunkLength(size_t chunk_length) {
 
 void BalsaParser::OnChunkExtensionInput(absl::string_view /*input*/) {}
 
+void BalsaParser::OnInterimHeaders(std::unique_ptr<BalsaHeaders> /*headers*/) {}
+
 void BalsaParser::HeaderDone() {
   if (status_ == ParserStatus::Error) {
     return;
@@ -331,7 +361,9 @@ void BalsaParser::MessageDone() {
     return;
   }
   status_ = convertResult(connection_->onMessageComplete());
-  framer_.Reset();
+  if (!delay_reset_) {
+    framer_.Reset();
+  }
   first_byte_processed_ = false;
   headers_done_ = false;
 }
@@ -357,6 +389,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
     error_message_ = "header value contains invalid chars";
     break;
+  case BalsaFrameEnums::MULTIPLE_CONTENT_LENGTH_KEYS:
+    error_message_ = "HPE_UNEXPECTED_CONTENT_LENGTH";
+    break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
   }
@@ -368,21 +403,44 @@ void BalsaParser::HandleWarning(BalsaFrameEnums::ErrorCode error_code) {
   }
 }
 
-void BalsaParser::processHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers) {
-  for (const std::pair<absl::string_view, absl::string_view>& key_value : headers.lines()) {
+void BalsaParser::validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers,
+                                                          bool trailers) {
+  for (const auto& [key, value] : headers.lines()) {
     if (status_ == ParserStatus::Error) {
       return;
     }
 
-    absl::string_view key = key_value.first;
+    if (!isHeaderNameValid(key)) {
+      status_ = ParserStatus::Error;
+      error_message_ = "HPE_INVALID_HEADER_TOKEN";
+      return;
+    }
+
+    if (trailers && !enable_trailers_) {
+      continue;
+    }
+
     status_ = convertResult(connection_->onHeaderField(key.data(), key.length()));
-
     if (status_ == ParserStatus::Error) {
       return;
     }
 
-    absl::string_view value = key_value.second;
-    status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+    // Remove CR and LF characters to match http-parser behavior.
+    auto is_cr_or_lf = [](char c) { return c == '\r' || c == '\n'; };
+    if (std::any_of(value.begin(), value.end(), is_cr_or_lf)) {
+      std::string value_without_cr_or_lf;
+      value_without_cr_or_lf.reserve(value.size());
+      for (char c : value) {
+        if (!is_cr_or_lf(c)) {
+          value_without_cr_or_lf.push_back(c);
+        }
+      }
+      status_ = convertResult(connection_->onHeaderValue(value_without_cr_or_lf.data(),
+                                                         value_without_cr_or_lf.length()));
+    } else {
+      // No need to copy if header value does not contain CR or LF.
+      status_ = convertResult(connection_->onHeaderValue(value.data(), value.length()));
+    }
   }
 }
 

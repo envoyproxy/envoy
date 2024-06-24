@@ -48,8 +48,10 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
+        "//envoy/stats:timespan_interface",
         "//envoy/tcp:async_tcp_client_interface",
         "//envoy/upstream:thread_local_cluster_interface",
         "//source/common/network:filter_lib",
+        "//source/common/stats:timespan_lib",
     ],
 )

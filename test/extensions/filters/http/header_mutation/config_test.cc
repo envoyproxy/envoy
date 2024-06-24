@@ -49,7 +49,8 @@ TEST(FactoryTest, FactoryTest) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
 
-  auto cb = factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+  auto cb =
+      factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

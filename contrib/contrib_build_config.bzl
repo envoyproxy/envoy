@@ -1,9 +1,16 @@
 # See bazel/README.md for details on how this system works.
 CONTRIB_EXTENSIONS = {
     #
-    # HTTP filters
+    # Compression
     #
 
+    "envoy.compression.qatzip.compressor":                      "//contrib/qat/compression/qatzip/compressor/source:config",
+    "envoy.compression.qatzstd.compressor":                      "//contrib/qat/compression/qatzstd/compressor/source:config",
+
+    #
+    # HTTP filters
+    #
+    "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
@@ -15,12 +22,13 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":                    "//contrib/client_ssl_auth/filters/network/source:config",
-    "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source:kafka_broker_config_lib",
+    "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source/broker:config_lib",
     "envoy.filters.network.kafka_mesh":                         "//contrib/kafka/filters/network/source/mesh:config_lib",
     "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
+    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
 
     #
     # Sip proxy
@@ -52,7 +60,7 @@ CONTRIB_EXTENSIONS = {
     # Connection Balance extensions
     #
 
-    "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
+    "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
 
     #
     # Regex engines
@@ -65,10 +73,18 @@ CONTRIB_EXTENSIONS = {
     #
     "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
     "envoy.generic_proxy.codecs.dubbo":                         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
+    "envoy.generic_proxy.codecs.http1":                         "//contrib/generic_proxy/filters/network/source/codecs/http1:config",
+    "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
 
     #
     # xDS delegates
     #
 
     "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
+
+    #
+    # cluster specifier plugin
+    #
+
+    "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
 }

@@ -4,9 +4,9 @@ Original Source
 ===============
 
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.original_src.v3.OriginalSrc``.
-* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
 
-The original source http filter replicates the downstream remote address of the connection on
+The original source HTTP filter replicates the downstream remote address of the connection on
 the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP
 address ``10.1.2.3``, then Envoy will connect to the upstream with source IP ``10.1.2.3``. The
 downstream remote address is determined based on the logic for the "trusted client address"

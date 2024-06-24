@@ -17,6 +17,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/status.h"
+#include "source/common/http/character_set_validation.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -31,6 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
@@ -65,10 +67,8 @@ absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
-      remove_port |=
-          (request_protocol == Http::Headers::get().SchemeValues.Https) && request_port == ":443";
-      remove_port |=
-          (request_protocol == Http::Headers::get().SchemeValues.Http) && request_port == ":80";
+      remove_port |= Http::Utility::schemeIsHttps(request_protocol) && request_port == ":443";
+      remove_port |= Http::Utility::schemeIsHttp(request_protocol) && request_port == ":80";
     }
 
     if (remove_port) {
@@ -102,8 +102,8 @@ struct SettingsEntryEquals {
   }
 };
 
-void validateCustomSettingsParameters(
-    const envoy::config::core::v3::Http2ProtocolOptions& options) {
+absl::Status
+validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
   absl::node_hash_set<SettingsEntry, SettingsEntryHash, SettingsEntryEquals> custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
@@ -122,15 +122,17 @@ void validateCustomSettingsParameters(
     switch (it.identifier().value()) {
     case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
-        throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
-                             "SETTINGS parameter.");
+        return absl::InvalidArgumentError(
+            "server push is not supported by Envoy and can not be enabled via a "
+            "SETTINGS parameter.");
       }
       break;
     case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
-      throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
-                           "through the named field");
+      return absl::InvalidArgumentError(
+          "the \"allow_connect\" SETTINGS parameter must only be configured "
+          "through the named field");
     case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
@@ -153,16 +155,17 @@ void validateCustomSettingsParameters(
   }
 
   if (!custom_parameter_collisions.empty()) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers = {{{}}}",
         absl::StrJoin(custom_parameter_collisions, ",")));
   }
   if (!parameter_collisions.empty()) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
         "custom parameters",
         absl::StrJoin(parameter_collisions, ",")));
   }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -185,23 +188,23 @@ const uint32_t OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const ProtobufWkt::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
-  if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
-    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+  if (ret.status().ok() && !options.has_override_stream_error_on_invalid_http_message() &&
+      hcm_stream_error_set) {
+    ret->mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   }
   return ret;
 }
 
-envoy::config::core::v3::Http2ProtocolOptions
+absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
-  // This will throw an exception when a custom parameter and a named parameter collide.
-  validateCustomSettingsParameters(options);
+  RETURN_IF_NOT_OK(validateCustomSettingsParameters(options));
 
   if (!options.has_override_stream_error_on_invalid_http_message()) {
     options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
@@ -391,6 +394,10 @@ Utility::parseCookies(const RequestHeaderMap& headers,
   return cookies;
 }
 
+bool Utility::Url::containsFragment() { return (component_bitmap_ & (1 << UcFragment)); }
+
+bool Utility::Url::containsUserinfo() { return (component_bitmap_ & (1 << UcUserinfo)); }
+
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
@@ -400,10 +407,13 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   if (result != 0) {
     return false;
   }
+
   if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
       (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
     return false;
   }
+
+  component_bitmap_ = u.field_set;
   scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
                               u.field_data[UF_SCHEMA].len);
 
@@ -455,9 +465,22 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
                               const bool append_xfh) {
-  if (append_xfh && !headers.getHostValue().empty()) {
-    headers.appendForwardedHost(headers.getHostValue(), ",");
+  const auto host = headers.getHostValue();
+
+  // Only append to x-forwarded-host if the value was not the last value appended.
+  const auto xfh = headers.getForwardedHostValue();
+
+  if (append_xfh && !host.empty()) {
+    if (!xfh.empty()) {
+      const auto xfh_split = StringUtil::splitToken(xfh, ",");
+      if (!xfh_split.empty() && xfh_split.back() != host) {
+        headers.appendForwardedHost(host, ",");
+      }
+    } else {
+      headers.appendForwardedHost(host, ",");
+    }
   }
+
   headers.setHost(hostname);
 }
 
@@ -467,35 +490,31 @@ std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   return fmt::format("https://{}{}", headers.getHostValue(), headers.getPathValue());
 }
 
-Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
+Utility::QueryParamsMulti Utility::QueryParamsMulti::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    QueryParams params;
-    return params;
+    return {};
   }
 
   start++;
-  return parseParameters(url, start, /*decode_params=*/false);
+  return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/false);
 }
 
-Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+Utility::QueryParamsMulti
+Utility::QueryParamsMulti::parseAndDecodeQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    QueryParams params;
-    return params;
+    return {};
   }
 
   start++;
-  return parseParameters(url, start, /*decode_params=*/true);
+  return Utility::QueryParamsMulti::parseParameters(url, start, /*decode_params=*/true);
 }
 
-Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0, /*decode_params=*/true);
-}
-
-Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
-                                              bool decode_params) {
-  QueryParams params;
+Utility::QueryParamsMulti Utility::QueryParamsMulti::parseParameters(absl::string_view data,
+                                                                     size_t start,
+                                                                     bool decode_params) {
+  QueryParamsMulti params;
 
   while (start < data.size()) {
     size_t end = data.find('&', start);
@@ -508,17 +527,39 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
     if (equal != std::string::npos) {
       const auto param_name = StringUtil::subspan(data, start, start + equal);
       const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
-      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
-                     decode_params ? PercentEncoding::decode(param_value) : param_value);
+      params.add(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                 decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
       const auto param_name = StringUtil::subspan(data, start, end);
-      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
+      params.add(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
     }
 
     start = end + 1;
   }
 
   return params;
+}
+
+void Utility::QueryParamsMulti::remove(absl::string_view key) { this->data_.erase(key); }
+
+void Utility::QueryParamsMulti::add(absl::string_view key, absl::string_view value) {
+  auto result = this->data_.emplace(std::string(key), std::vector<std::string>{std::string(value)});
+  if (!result.second) {
+    result.first->second.push_back(std::string(value));
+  }
+}
+
+void Utility::QueryParamsMulti::overwrite(absl::string_view key, absl::string_view value) {
+  this->data_[key] = std::vector<std::string>{std::string(value)};
+}
+
+absl::optional<std::string> Utility::QueryParamsMulti::getFirstValue(absl::string_view key) const {
+  auto it = this->data_.find(key);
+  if (it == this->data_.end()) {
+    return std::nullopt;
+  }
+
+  return absl::optional<std::string>{it->second.at(0)};
 }
 
 absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
@@ -534,17 +575,14 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 std::string Utility::stripQueryString(const HeaderString& path) {
   absl::string_view path_str = path.getStringView();
   size_t query_offset = path_str.find('?');
-  return std::string(path_str.data(),
-                     query_offset != path_str.npos ? query_offset : path_str.size());
+  return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
-std::string Utility::replaceQueryString(const HeaderString& path,
-                                        const Utility::QueryParams& params) {
+std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) const {
   std::string new_path{Http::Utility::stripQueryString(path)};
 
-  if (!params.empty()) {
-    const auto new_query_string = Http::Utility::queryParamsToString(params);
-    absl::StrAppend(&new_path, new_query_string);
+  if (!this->data_.empty()) {
+    absl::StrAppend(&new_path, this->toString());
   }
 
   return new_path;
@@ -561,7 +599,8 @@ std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const s
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
                                         const std::string& path, const std::chrono::seconds max_age,
-                                        bool httponly) {
+                                        bool httponly,
+                                        const Http::CookieAttributeRefVector attributes) {
   std::string cookie_value;
   // Best effort attempt to avoid numerous string copies.
   cookie_value.reserve(value.size() + path.size() + 30);
@@ -573,6 +612,15 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   if (!path.empty()) {
     absl::StrAppend(&cookie_value, "; Path=", path);
   }
+
+  for (auto const& attribute : attributes) {
+    if (attribute.get().value().empty()) {
+      absl::StrAppend(&cookie_value, "; ", attribute.get().name());
+    } else {
+      absl::StrAppend(&cookie_value, "; ", attribute.get().name(), "=", attribute.get().value());
+    }
+  }
+
   if (httponly) {
     absl::StrAppend(&cookie_value, "; HttpOnly");
   }
@@ -609,6 +657,10 @@ bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty() &&
          headers.Protocol()->value() != Headers::get().ProtocolValues.Bytestream;
+}
+
+bool Utility::isH3UpgradeRequest(const RequestHeaderMap& headers) {
+  return isH2UpgradeRequest(headers);
 }
 
 bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
@@ -734,19 +786,19 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   }
 
   absl::string_view xff_string(xff_header->value().getStringView());
-  static const std::string separator(",");
+  static constexpr absl::string_view separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
-    const std::string::size_type last_comma = xff_string.rfind(separator);
-    if (last_comma == std::string::npos) {
+    const absl::string_view::size_type last_comma = xff_string.rfind(separator);
+    if (last_comma == absl::string_view::npos) {
       return {nullptr, false};
     }
     xff_string = xff_string.substr(0, last_comma);
   }
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
-  const std::string::size_type last_comma = xff_string.rfind(separator);
-  if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
+  const absl::string_view::size_type last_comma = xff_string.rfind(separator);
+  if (last_comma != absl::string_view::npos && last_comma + separator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + separator.size());
   }
 
@@ -761,14 +813,14 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::parseInternetAddressNoThrow(std::string(xff_string));
   if (address != nullptr) {
-    return {address, last_comma == std::string::npos && num_to_skip == 0};
+    return {address, last_comma == absl::string_view::npos && num_to_skip == 0};
   }
   return {nullptr, false};
 }
 
 bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
-  static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
-  static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
+  static constexpr size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
+  static constexpr size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
 
   // Remove any headers nominated by the Connection header. The TE header
   // is sanitized and removed only if it's empty after removing unsupported values
@@ -970,22 +1022,26 @@ RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri
   return message;
 }
 
-// TODO(jmarantz): make QueryParams a real class and put this serializer there,
-// along with proper URL escaping of the name and value.
-std::string Utility::queryParamsToString(const QueryParams& params) {
+std::string Utility::QueryParamsMulti::toString() const {
   std::string out;
   std::string delim = "?";
-  for (const auto& p : params) {
-    absl::StrAppend(&out, delim, p.first, "=", p.second);
-    delim = "&";
+  for (const auto& p : this->data_) {
+    for (const auto& v : p.second) {
+      absl::StrAppend(&out, delim, p.first, "=", v);
+      delim = "&";
+    }
   }
   return out;
 }
 
 const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
   switch (reset_reason) {
-  case Http::StreamResetReason::ConnectionFailure:
-    return "connection failure";
+  case Http::StreamResetReason::LocalConnectionFailure:
+    return "local connection failure";
+  case Http::StreamResetReason::RemoteConnectionFailure:
+    return "remote connection failure";
+  case Http::StreamResetReason::ConnectionTimeout:
+    return "connection timeout";
   case Http::StreamResetReason::ConnectionTermination:
     return "connection termination";
   case Http::StreamResetReason::LocalReset:
@@ -1023,6 +1079,10 @@ void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeRequestFromH1toH3(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
     headers.setStatus(200);
@@ -1034,6 +1094,10 @@ void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   }
 }
 
+void Utility::transformUpgradeResponseFromH1toH3(ResponseHeaderMap& headers) {
+  transformUpgradeResponseFromH1toH2(headers);
+}
+
 void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
@@ -1043,6 +1107,10 @@ void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   headers.removeProtocol();
 }
 
+void Utility::transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers) {
+  transformUpgradeRequestFromH2toH1(headers);
+}
+
 void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
                                                  absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
@@ -1050,6 +1118,11 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
   }
+}
+
+void Utility::transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers,
+                                                 absl::string_view upgrade) {
+  transformUpgradeResponseFromH2toH1(headers, upgrade);
 }
 
 std::string Utility::PercentEncoding::encode(absl::string_view value,
@@ -1123,7 +1196,7 @@ namespace {
 // %-encode all ASCII character codepoints, EXCEPT:
 // ALPHA | DIGIT | * | - | . | _
 // SPACE is encoded as %20, NOT as the + character
-constexpr uint32_t kUrlEncodedCharTable[] = {
+constexpr std::array<uint32_t, 8> kUrlEncodedCharTable = {
     // control characters
     0b11111111111111111111111111111111,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -1139,7 +1212,7 @@ constexpr uint32_t kUrlEncodedCharTable[] = {
     0b11111111111111111111111111111111,
 };
 
-constexpr uint32_t kUrlDecodedCharTable[] = {
+constexpr std::array<uint32_t, 8> kUrlDecodedCharTable = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -1155,14 +1228,9 @@ constexpr uint32_t kUrlDecodedCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
-bool testChar(const uint32_t table[8], char c) {
-  uint8_t uc = static_cast<uint8_t>(c);
-  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
-}
+bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
 
-bool shouldPercentEncodeChar(char c) { return testChar(kUrlEncodedCharTable, c); }
-
-bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c); }
+bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
 } // namespace
 
 std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
@@ -1178,6 +1246,15 @@ std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view 
     }
   }
   return encoded;
+}
+
+bool Utility::PercentEncoding::queryParameterIsUrlEncoded(absl::string_view value) {
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
@@ -1262,7 +1339,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
-void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+absl::Status
+Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
   if (retry_policy.has_retry_back_off()) {
     const auto& core_back_off = retry_policy.retry_back_off();
 
@@ -1271,9 +1349,11 @@ void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+      return absl::InvalidArgumentError(
+          "max_interval must be greater than or equal to the base_interval");
     }
   }
+  return absl::OkStatus();
 }
 
 envoy::config::route::v3::RetryPolicy
@@ -1310,9 +1390,30 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
       Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
 
   // set all the other fields with appropriate values.
-  route_retry_policy.set_retry_on(retry_on);
+  if (!retry_on.empty()) {
+    route_retry_policy.set_retry_on(retry_on);
+  } else {
+    route_retry_policy.set_retry_on(retry_policy.retry_on());
+  }
   route_retry_policy.mutable_per_try_timeout()->CopyFrom(
       route_retry_policy.retry_back_off().max_interval());
+
+  if (retry_policy.has_retry_priority()) {
+    route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());
+    route_retry_policy.mutable_retry_priority()->mutable_typed_config()->MergeFrom(
+        retry_policy.retry_priority().typed_config());
+  }
+
+  if (!retry_policy.retry_host_predicate().empty()) {
+    for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
+      auto* route_host_predicate = route_retry_policy.mutable_retry_host_predicate()->Add();
+      route_host_predicate->set_name(host_predicate.name());
+      route_host_predicate->mutable_typed_config()->MergeFrom(host_predicate.typed_config());
+    }
+  }
+
+  route_retry_policy.set_host_selection_retry_max_attempts(
+      retry_policy.host_selection_retry_max_attempts());
 
   return route_retry_policy;
 }
@@ -1330,6 +1431,18 @@ Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
                                 // Http::Code::RequestTimeout is more expensive because HTTP1 client
                                 // cannot use the connection any more.
                                 : Http::Code::RequestTimeout;
+}
+
+bool Utility::schemeIsValid(const absl::string_view scheme) {
+  return schemeIsHttp(scheme) || schemeIsHttps(scheme);
+}
+
+bool Utility::schemeIsHttp(const absl::string_view scheme) {
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
+}
+
+bool Utility::schemeIsHttps(const absl::string_view scheme) {
+  return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 
 std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,
@@ -1398,6 +1511,45 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   }
 
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
+}
+
+bool Utility::isValidRefererValue(absl::string_view value) {
+
+  // First, we try to parse it as an absolute URL and
+  // ensure that there is no fragment or userinfo.
+  // If that fails, we can just parse it as a relative reference
+  // and expect no fragment
+  // NOTE: "about:blank" is incorrectly rejected here, because
+  // url.initialize uses http_parser_parse_url, which requires
+  // a host to be present if there is a schema.
+  Utility::Url url;
+
+  if (url.initialize(value, false)) {
+    return !(url.containsFragment() || url.containsUserinfo());
+  }
+
+  bool seen_slash = false;
+
+  for (char c : value) {
+    switch (c) {
+    case ':':
+      if (!seen_slash) {
+        // First path segment cannot contain ':'
+        // https://www.rfc-editor.org/rfc/rfc3986#section-3.3
+        return false;
+      }
+      continue;
+    case '/':
+      seen_slash = true;
+      continue;
+    default:
+      if (!testCharInTable(kUriQueryAndFragmentCharTable, c)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 } // namespace Http

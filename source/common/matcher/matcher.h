@@ -166,7 +166,7 @@ public:
     case MatcherType::MATCHER_TYPE_NOT_SET:
       return createAnyMatcher(config);
     }
-    return nullptr;
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   absl::optional<OnMatchFactoryCb<DataType>>
@@ -201,7 +201,6 @@ private:
     }
 
     auto on_no_match = createOnMatch(config.on_no_match());
-
     return [matcher_factories, on_no_match]() {
       auto list_matcher = std::make_unique<ListMatcher<DataType>>(
           on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
@@ -242,7 +241,9 @@ private:
       auto input_matcher = createInputMatcher(field_predicate.single_predicate());
 
       return [data_input, input_matcher]() {
-        return std::make_unique<SingleFieldMatcher<DataType>>(data_input(), input_matcher());
+        return THROW_OR_RETURN_VALUE(
+            SingleFieldMatcher<DataType>::create(data_input(), input_matcher()),
+            std::unique_ptr<SingleFieldMatcher<DataType>>);
       };
     }
     case (PredicateType::kOrMatcher):
@@ -318,7 +319,7 @@ private:
   template <class OnMatchType>
   absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     if (on_match.has_matcher()) {
-      return [matcher_factory = create(on_match.matcher())]() {
+      return [matcher_factory = std::move(create(on_match.matcher()))]() {
         return OnMatch<DataType>{{}, matcher_factory()};
       };
     } else if (on_match.has_action()) {
@@ -340,9 +341,9 @@ private:
   InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
     switch (predicate.matcher_case()) {
     case SinglePredicateType::kValueMatch:
-      return [value_match = predicate.value_match()]() {
+      return [&context = server_factory_context_, value_match = predicate.value_match()]() {
         return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
-            value_match);
+            value_match, context);
       };
     case SinglePredicateType::kCustomMatch: {
       auto& factory =

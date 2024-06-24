@@ -23,8 +23,10 @@ envoy_cc_mock(
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/router:upstream_codec_filter_lib",
+        "//source/common/stats:deferred_creation",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -216,6 +218,7 @@ envoy_cc_mock(
     hdrs = ["typed_load_balancer_factory.h"],
     deps = [
         "//envoy/upstream:load_balancer_interface",
+        "//source/common/upstream:load_balancer_factory_base_lib",
     ],
 )
 

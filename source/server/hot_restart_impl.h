@@ -98,11 +98,15 @@ private:
 class HotRestartImpl : public HotRestart {
 public:
   HotRestartImpl(uint32_t base_id, uint32_t restart_epoch, const std::string& socket_path,
-                 mode_t socket_mode);
+                 mode_t socket_mode, bool skip_hot_restart_on_no_parent, bool skip_parent_stats);
 
   // Server::HotRestart
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) override;
+  void registerUdpForwardingListener(
+      Network::Address::InstanceConstSharedPtr address,
+      std::shared_ptr<Network::UdpListenerConfig> listener_config) override;
+  OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;
@@ -120,6 +124,7 @@ public:
   static std::string hotRestartVersion();
 
 private:
+  friend class HotRestartUdpForwardingTestHelper;
   uint32_t base_id_;
   uint32_t scaled_base_id_;
   HotRestartingChild as_child_;

@@ -39,7 +39,7 @@ public:
     const auto& address = data.localAddress();
 
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address.ip()->addressAsString()};
@@ -63,13 +63,17 @@ DECLARE_FACTORY(DestinationIPInputFactory);
 DECLARE_FACTORY(UdpDestinationIPInputFactory);
 DECLARE_FACTORY(HttpDestinationIPInputFactory);
 
+// With the support of generic matching API, integer is allowed in inputs such as
+// `DestinationPortInput` and `SourcePortInput`. As a result, there is no longer a need for the
+// redundant conversion of int-to-string. We can change them here once IntInputMatcher (for integer
+// type input) is implemented.
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.localAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             absl::StrCat(address.ip()->port())};
@@ -99,7 +103,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address.ip()->addressAsString()};
@@ -128,7 +132,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.remoteAddress();
     if (address.type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             absl::StrCat(address.ip()->port())};
@@ -157,7 +161,7 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& address = data.connectionInfoProvider().directRemoteAddress();
     if (address->type() != Network::Address::Type::Ip) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             address->ip()->addressAsString()};
@@ -189,7 +193,7 @@ public:
     if (is_local_connection) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
@@ -217,7 +221,7 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               std::string(server_name)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
@@ -252,30 +256,47 @@ public:
 
 DECLARE_FACTORY(TransportProtocolInputFactory);
 
-class FilterStateInput : public Matcher::DataInput<MatchingData> {
+template <class MatchingDataType>
+class FilterStateInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  FilterStateInput(
-      const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput& input_config)
-      : filter_state_key_(input_config.key()) {}
+  FilterStateInput(const std::string& filter_state_key) : filter_state_key_(filter_state_key) {}
 
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto* filter_state_object =
+        data.filterState().template getDataReadOnly<StreamInfo::FilterState::Object>(
+            filter_state_key_);
+
+    if (filter_state_object != nullptr) {
+      auto str = filter_state_object->serializeAsString();
+      if (str.has_value()) {
+        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, str.value()};
+      } else {
+        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      }
+    }
+
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  }
 
 private:
   const std::string filter_state_key_;
 };
 
-class FilterStateInputFactory : public Matcher::DataInputFactory<MatchingData> {
+template <class MatchingDataType>
+class FilterStateInputBaseFactory : public Matcher::DataInputFactory<MatchingDataType> {
 public:
   std::string name() const override { return "envoy.matching.inputs.filter_state"; }
 
-  Matcher::DataInputFactoryCb<MatchingData> createDataInputFactoryCb(
-      const Protobuf::Message& message,
-      ProtobufMessage::ValidationVisitor& message_validation_visitor) override {
-    const auto& proto_config = MessageUtil::downcastAndValidate<
+  Matcher::DataInputFactoryCb<MatchingDataType>
+  createDataInputFactoryCb(const Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput&>(
-        message, message_validation_visitor);
+        message, validation_visitor);
 
-    return [proto_config]() { return std::make_unique<FilterStateInput>(proto_config); };
+    return [filter_state_key = typed_config.key()] {
+      return std::make_unique<FilterStateInput<MatchingDataType>>(filter_state_key);
+    };
   };
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -285,6 +306,7 @@ public:
 };
 
 DECLARE_FACTORY(FilterStateInputFactory);
+DECLARE_FACTORY(HttpFilterStateInputFactory);
 
 } // namespace Matching
 } // namespace Network

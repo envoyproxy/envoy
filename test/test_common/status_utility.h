@@ -40,6 +40,20 @@ MATCHER_P(StatusIs, expected_code, "") {
   return true;
 }
 
+// Check that a Status code equal to its argument.
+//
+// For example:
+//
+// Status<int> status(absl::InvalidArgumentError("bad argument!"));
+// EXPECT_THAT(status, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+MATCHER_P(StatusCodeIs, expected_code, "") {
+  if (arg.code() != expected_code) {
+    *result_listener << "which has unexpected status: " << arg.code();
+    return false;
+  }
+  return true;
+}
+
 // A polymorphic matcher class for matching absl::Status or absl::StatusOr.
 // Not intended for direct use, see HasStatus, HasStatusCode, HasStatusMessage and IsOk
 // below.

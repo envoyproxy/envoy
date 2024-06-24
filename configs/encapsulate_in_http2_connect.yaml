@@ -2,7 +2,7 @@
 # request which is sent upstream port 10001.
 # It can be used to test TCP tunneling as described in
 # https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
-# and running `curl -x 127.0.0.1:10000 https://www.google.com`
+# and running `curl -H 'Host: www.google.com' --resolve www.google.com:10000:127.0.0.1 https://www.google.com:10000`
 
 admin:
   address:

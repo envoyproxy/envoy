@@ -91,17 +91,19 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  origin_ = headers.getInline(origin_handle.handle());
-  if (origin_ == nullptr || origin_->value().empty()) {
+  const Http::HeaderEntry* origin = headers.getInline(origin_handle.handle());
+  if (origin == nullptr || origin->value().empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (!isOriginAllowed(origin_->value())) {
+  const bool origin_allowed = isOriginAllowed(origin->value());
+  if (!origin_allowed) {
     config_->stats().origin_invalid_.inc();
-    return Http::FilterHeadersStatus::Continue;
+  } else {
+    config_->stats().origin_valid_.inc();
+    latched_origin_ = std::string(origin->value().getStringView());
   }
 
-  config_->stats().origin_valid_.inc();
   if (shadowEnabled() && !enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -117,11 +119,21 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // This is pre-flight request, as it fulfills the following requirements:
+  // - method is OPTIONS
+  // - "origin" header is not empty
+  // - "Access-Control-Request-Method" is not empty"
+  if (!origin_allowed && forwardNotMatchingPreflights()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   auto response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
-  response_headers->setInline(access_control_allow_origin_handle.handle(),
-                              origin_->value().getStringView());
+  if (origin_allowed) {
+    response_headers->setInline(access_control_allow_origin_handle.handle(),
+                                origin->value().getStringView());
+  }
 
   if (allowCredentials()) {
     response_headers->setReferenceInline(access_control_allow_credentials_handle.handle(),
@@ -172,8 +184,13 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
   if (!is_cors_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
+  // Origin did not match. Do not modify the response headers.
+  if (latched_origin_.empty()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
-  headers.setInline(access_control_allow_origin_handle.handle(), origin_->value().getStringView());
+  headers.setInline(access_control_allow_origin_handle.handle(), latched_origin_);
+
   if (allowCredentials()) {
     headers.setReferenceInline(access_control_allow_credentials_handle.handle(),
                                Http::CustomHeaders::get().CORSValues.True);
@@ -210,6 +227,15 @@ const std::vector<Matchers::StringMatcherPtr>* CorsFilter::allowOrigins() {
     }
   }
   return nullptr;
+}
+
+bool CorsFilter::forwardNotMatchingPreflights() {
+  for (const auto policy : policies_) {
+    if (policy && policy->forwardNotMatchingPreflights()) {
+      return policy->forwardNotMatchingPreflights().value();
+    }
+  }
+  return true;
 }
 
 const std::string& CorsFilter::allowMethods() {

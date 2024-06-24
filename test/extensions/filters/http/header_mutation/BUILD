@@ -42,6 +42,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "header_mutation_integration_test",
+    size = "large",
     srcs = ["header_mutation_integration_test.cc"],
     extension_names = ["envoy.filters.http.header_mutation"],
     deps = [
@@ -50,5 +51,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )

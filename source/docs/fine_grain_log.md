@@ -40,7 +40,25 @@ Runtime update of Fine-Grain Logger is supported with administration interface, 
 3. `POST /logging?paths=file_path1:level1,file_path2:level2...`: Change log level of multiple file paths at once;
 4. `POST /logging?level=<level>`: Change levels of all loggers.
 
-Users can view and change the log level in a granularity of file in runtime through admin page. Note that `file_path` is determined by `__FILE__` macro, which is the path seen by preprocessor.
+Users can view and change the log level by file granularity at runtime through the admin page.
+
+Envoy admin `/logging` supports the file basename, glob ``*`` and ``?`` match for the fine-grain loggers update as well. For example, the following loggers are active in Envoy right now, and 0 means trace level.
+
+```
+  source/server/admin/admin_filter.cc: 0
+  source/common/event/dispatcher_impl.cc: 0
+  source/common/network/tcp_listener_impl.cc: 0
+  source/common/network/udp_listener_impl.cc: 0
+```
+
+  1. ``POST /logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  2. ``POST /logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
+  3. ``POST /logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
+    Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.
+  4. ``POST /logging?paths=???_listener_impl:info`` will make the level of ``source/common/network/tcp_listener_impl.cc``, ``source/common/network/udp_listener_impl.cc`` be info.
+  5. ``POST /logging?paths=???_listener_impl:info,tcp_listener_impl:warning``, the level of ``source/common/network/tcp_listener_impl.cc`` will be info, since the first match will take effect.
+  6. ``POST /logging?level=info`` will change the default verbosity level to info. All the unmatched loggers in the following update will be this default level.
+
 
 ### Implementation Details
 Fine-Grain Logger can be divided into two parts:
@@ -59,4 +77,5 @@ Fine-Grain Logger provides control interfaces through command line and admin pag
 
 To pass the arguments such as log format and default log level to Fine-Grain Logger, `fine_grain_log_format` and `fine_grain_default_level` are added in `class Context` and they are updated when a new logging context is activated. `getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(level, format)` is called in `Context::activate()` to set log format and update loggers' previous default level to the new level.
 
-To support the runtime update in admin page, log handler in admin page uses `getFineGrainLogContext().listFineGrainLoggers()` to show all Fine-Grain Loggers, `getFineGrainLogContext().setFineGrainLogger(name, level)` to set a specific logger and `getFineGrainLogContext().setAllFineGrainLoggers(level)` to set all loggers.
+To support the runtime update in admin page, log handler in admin page uses `getFineGrainLogContext().listFineGrainLoggers()` to show all Fine-Grain Loggers, `getFineGrainLogContext().setFineGrainLogger(name, level)` to set a specific logger, `getFineGrainLogContext().setAllFineGrainLoggers(level)` to set all loggers, and `getFineGrainLogContext().updateVerbositySetting(glob_levels)` to set glob matched loggers.
+

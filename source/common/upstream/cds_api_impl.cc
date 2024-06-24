@@ -25,16 +25,20 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
       helper_(cm, "cds"), cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
   if (cds_resources_locator == nullptr) {
-    subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+    subscription_ = THROW_OR_RETURN_VALUE(cm_.subscriptionFactory().subscriptionFromConfigSource(
+                                              cds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
 }
 
-void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string& version_info) {
+absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                        const std::string& version_info) {
   auto all_existing_clusters = cm_.clusters();
   // Exclude the clusters which CDS wants to add.
   for (const auto& resource : resources) {
@@ -49,23 +53,25 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   for (const auto& [cluster_name, _] : all_existing_clusters.warming_clusters_) {
     UNREFERENCED_PARAMETER(_);
     // Do not add the cluster twice when the cluster is both active and warming.
-    if (all_existing_clusters.active_clusters_.count(cluster_name) == 0) {
+    if (!all_existing_clusters.active_clusters_.contains(cluster_name)) {
       *to_remove_repeated.Add() = cluster_name;
     }
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
-void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string& system_version_info) {
+absl::Status
+CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                           const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                           const std::string& system_version_info) {
   auto exception_msgs =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
+  return absl::OkStatus();
 }
 
 void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

@@ -21,6 +21,11 @@ TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
+      downstreamProtocol() == Http::CodecType::HTTP3) {
+    // TODO(#26236) - Fix test flakiness over HTTP/3.
+    return;
+  }
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
@@ -41,13 +46,15 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/shelf"},
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "123", false);
@@ -69,13 +76,15 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   config_helper_.prependFilter(ConfigHelper::defaultBufferFilter(), testing_downstream_filter_);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/shelf"},
+                                                                 {":authority", "sni.lyft.com"}});
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "0123", false);
@@ -99,7 +108,6 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   // Make sure the connection isn't closed during request upload.
   // Without a large drain-close it's possible that the local reply will be sent
   // during request upload, and continued upload will result in TCP reset before
@@ -116,7 +124,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/dynamo/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024 * 65, false);
@@ -124,6 +132,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
@@ -139,7 +148,7 @@ ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.filters.http.buffer"].PackFrom(buffer_per_route);
+        (*config)["buffer"].PackFrom(buffer_per_route);
       };
 }
 
@@ -159,7 +168,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"}},
       1024 * 65);
 
@@ -188,7 +197,7 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
-                                     {":authority", "host"},
+                                     {":authority", "sni.lyft.com"},
                                      {"x-forwarded-for", "10.0.0.1"}},
       1024 * 65);
 

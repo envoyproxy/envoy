@@ -46,7 +46,7 @@ public:
   virtual bool onSSLRequest() PURE;
   virtual bool shouldEncryptUpstream() const PURE;
   virtual void sendUpstream(Buffer::Instance&) PURE;
-  virtual void encryptUpstream(bool, Buffer::Instance&) PURE;
+  virtual bool encryptUpstream(bool, Buffer::Instance&) PURE;
 };
 
 // Postgres message decoder.

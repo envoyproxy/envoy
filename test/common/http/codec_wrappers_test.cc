@@ -8,6 +8,25 @@ using testing::_;
 namespace Envoy {
 namespace Http {
 
+class MockResponseDecoderWrapper : public ResponseDecoderWrapper {
+public:
+  MockResponseDecoderWrapper() : ResponseDecoderWrapper(inner_decoder_) {}
+  MockResponseDecoder& innerEncoder() { return inner_decoder_; }
+  void onDecodeComplete() override {}
+  void onPreDecodeComplete() override {}
+
+private:
+  MockResponseDecoder inner_decoder_;
+};
+
+TEST(MockResponseDecoderWrapper, dumpState) {
+  MockResponseDecoderWrapper wrapper;
+
+  std::stringstream os;
+  EXPECT_CALL(wrapper.innerEncoder(), dumpState(_, _));
+  wrapper.dumpState(os, 0);
+}
+
 class MockRequestEncoderWrapper : public RequestEncoderWrapper {
 public:
   MockRequestEncoderWrapper() : RequestEncoderWrapper(&inner_encoder_) {}
@@ -68,6 +87,9 @@ TEST(RequestEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
   EXPECT_CALL(wrapper.innerEncoder(), encodeData(_, false));
   wrapper.encodeData(data, false);
   EXPECT_FALSE(wrapper.encodeComplete());
+
+  EXPECT_CALL(wrapper.innerEncoder(), http1StreamEncoderOptions());
+  wrapper.http1StreamEncoderOptions();
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeTrailers(_));
   wrapper.encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});

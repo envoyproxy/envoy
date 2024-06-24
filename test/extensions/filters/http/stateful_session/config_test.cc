@@ -66,7 +66,8 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   StatefulSessionFactoryConfig factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
@@ -81,7 +82,9 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
       EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.http.stateful_session.not_exist'");
 
-  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context));
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context)
+                      .status()
+                      .IgnoreError());
   EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
                                                           context.messageValidationVisitor()));
 }

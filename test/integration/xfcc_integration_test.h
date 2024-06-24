@@ -40,7 +40,7 @@ public:
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   void initialize() override;

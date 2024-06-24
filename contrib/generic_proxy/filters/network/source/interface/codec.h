@@ -14,66 +14,86 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 /**
- * Decoder of request.
+ * Server codec that used to decode downstream request and encode upstream response.
+ * This codec is used by downstream connection.
  */
-class RequestDecoder {
+class ServerCodec {
 public:
-  virtual ~RequestDecoder() = default;
+  virtual ~ServerCodec() = default;
 
-  // The decode() method may be called multiple times for single request or response.
-  // So an independent setDecoderCallback() is used to set decoding callback.
-  virtual void setDecoderCallback(RequestDecoderCallback& callback) PURE;
-  virtual void decode(Buffer::Instance& buffer) PURE;
+  /**
+   * Set callbacks of server codec.
+   * @param callbacks callbacks of server codec. This callback will have same or longer
+   * lifetime as the server codec.
+   */
+  virtual void setCodecCallbacks(ServerCodecCallbacks& callbacks) PURE;
+
+  /**
+   * Decode request frame from downstream connection.
+   * @param buffer data to decode.
+   * @param end_stream whether this is the last data of the downstream connection.
+   */
+  virtual void decode(Buffer::Instance& buffer, bool end_stream) PURE;
+
+  /**
+   * Encode response frame and send it to upstream connection by the writeToConnection()
+   * method of the codec callbacks.
+   * @param frame response frame to encode. NOTE: the generic proxy will assume this is
+   * sync encoding and the frame may be destroyed after this method is called.
+   * @param ctx context of encoding that will be used to provide additional information
+   * to the codec. Like the route that the downstream request is matched to.
+   * @return the size of the encoded data or error message if encoding failed.
+   */
+  virtual EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) PURE;
+
+  /**
+   * Create a response frame with specified status and flags.
+   * @param status status of the response.
+   * @param data any data that generic proxy filter wants to tell the codec.
+   * @param request origin request that the response is created for.
+   * @return ResponseHeaderFramePtr the response frame. Only single frame is allowed for
+   * local response.
+   */
+  virtual ResponseHeaderFramePtr respond(Status status, absl::string_view data,
+                                         const RequestHeaderFrame& request) PURE;
 };
 
 /**
- * Decoder of response.
+ * Client codec that used to decode upstream response and encode downstream request.
+ * This codec is used by upstream connection.
  */
-class ResponseDecoder {
+class ClientCodec {
 public:
-  virtual ~ResponseDecoder() = default;
-
-  // The decode() method may be called multiple times for single request or response.
-  // So an independent setDecoderCallback() is used to set decoding callback.
-  virtual void setDecoderCallback(ResponseDecoderCallback& callback) PURE;
-  virtual void decode(Buffer::Instance& buffer) PURE;
-};
-
-/*
- * Encoder of request.
- */
-class RequestEncoder {
-public:
-  virtual ~RequestEncoder() = default;
-
-  virtual void encode(const Request&, RequestEncoderCallback& callback) PURE;
-};
-
-/*
- * Encoder of response.
- */
-class ResponseEncoder {
-public:
-  virtual ~ResponseEncoder() = default;
-
-  virtual void encode(const Response&, ResponseEncoderCallback& callback) PURE;
-};
-
-class MessageCreator {
-public:
-  virtual ~MessageCreator() = default;
+  virtual ~ClientCodec() = default;
 
   /**
-   * Create local response message for local reply.
+   * Set callbacks of client codec.
+   * @param callbacks callbacks of client codec. This callback will have same lifetime
+   * as the client codec.
    */
-  virtual ResponsePtr response(Status status, const Request& origin_request) PURE;
+  virtual void setCodecCallbacks(ClientCodecCallbacks& callbacks) PURE;
+
+  /**
+   * Decode response frame from upstream connection.
+   * @param buffer data to decode.
+   * @param end_stream whether this is the last data of the upstream connection.
+   */
+  virtual void decode(Buffer::Instance& buffer, bool end_stream) PURE;
+
+  /**
+   * Encode request frame and send it to upstream connection by the writeToConnection()
+   * method of the codec callbacks.
+   * @param frame request frame to encode. NOTE: the generic proxy will assume this is
+   * sync encoding and the frame may be destroyed after this method is called.
+   * @param ctx context of encoding that will be used to provide additional information
+   * to the codec. Like the route that the request is matched to.
+   * @return the size of the encoded data or error message if encoding failed.
+   */
+  virtual EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) PURE;
 };
 
-using RequestDecoderPtr = std::unique_ptr<RequestDecoder>;
-using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
-using RequestEncoderPtr = std::unique_ptr<RequestEncoder>;
-using ResponseEncoderPtr = std::unique_ptr<ResponseEncoder>;
-using MessageCreatorPtr = std::unique_ptr<MessageCreator>;
+using ServerCodecPtr = std::unique_ptr<ServerCodec>;
+using ClientCodecPtr = std::unique_ptr<ClientCodec>;
 
 /**
  * Factory used to create generic stream encoder and decoder. If the developer wants to add
@@ -84,30 +104,15 @@ class CodecFactory {
 public:
   virtual ~CodecFactory() = default;
 
-  /*
-   * Create request decoder.
+  /**
+   * Create a server codec instance.
    */
-  virtual RequestDecoderPtr requestDecoder() const PURE;
-
-  /*
-   * Create response decoder.
-   */
-  virtual ResponseDecoderPtr responseDecoder() const PURE;
-
-  /*
-   * Create request encoder.
-   */
-  virtual RequestEncoderPtr requestEncoder() const PURE;
-
-  /*
-   * Create response encoder.
-   */
-  virtual ResponseEncoderPtr responseEncoder() const PURE;
+  virtual ServerCodecPtr createServerCodec() const PURE;
 
   /**
-   * Create message creator.
+   * Create a client codec instance.
    */
-  virtual MessageCreatorPtr messageCreator() const PURE;
+  virtual ClientCodecPtr createClientCodec() const PURE;
 };
 
 using CodecFactoryPtr = std::unique_ptr<CodecFactory>;
@@ -124,11 +129,13 @@ public:
 
   /**
    * Create a custom proxy instance.
+   * @param context supplies the filter chain factory context.
    * @param filter_manager the filter manager of the network filter chain.
    * @param filter_config supplies the read filter config.
    */
-  virtual void createProxy(Network::FilterManager& filter_manager,
-                           const FilterConfigSharedPtr& filter_config) const PURE;
+  virtual void createProxy(Server::Configuration::FactoryContext& context,
+                           Network::FilterManager& filter_manager,
+                           FilterConfigSharedPtr filter_config) const PURE;
 };
 using ProxyFactoryPtr = std::unique_ptr<ProxyFactory>;
 
@@ -144,7 +151,7 @@ public:
    * @return CodecFactoryPtr the codec factory.
    */
   virtual CodecFactoryPtr createCodecFactory(const Protobuf::Message&,
-                                             Envoy::Server::Configuration::FactoryContext&) PURE;
+                                             Server::Configuration::ServerFactoryContext&) PURE;
 
   /**
    * Create a optional custom proxy factory.
@@ -154,7 +161,7 @@ public:
    * custom proxy is needed and the default generic proxy will be used.
    */
   virtual ProxyFactoryPtr createProxyFactory(const Protobuf::Message&,
-                                             Envoy::Server::Configuration::FactoryContext&) {
+                                             Server::Configuration::ServerFactoryContext&) {
     return nullptr;
   }
 

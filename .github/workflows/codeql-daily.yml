@@ -1,38 +1,43 @@
+name: CodeQL/daily
+
+permissions:
+  contents: read
+
 on:
   schedule:
   - cron: '0 12 * * 4'
 
 concurrency:
-  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
+
 
 jobs:
   CodeQL-Build:
 
     permissions:
       security-events: write  # for github/codeql-action/analyze to upload SARIF results
+      pull-requests: read
     strategy:
       fail-fast: false
 
     # CodeQL runs on ubuntu-20.04
     runs-on: ubuntu-20.04
+    if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        # We must fetch at least the immediate parents so that if this is
-        # a pull request then we can checkout the head.
-        fetch-depth: 2
+      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
 
-    # If this run was triggered by a pull request event, then checkout
-    # the head of the pull request instead of the merge commit.
-    - run: git checkout HEAD^2
-      if: ${{ github.event_name == 'pull_request' }}
+    - name: Free disk space
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.30
+      with:
+        to_remove: |
+          /usr/local/lib/android
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@32dc499307d133bb5085bae78498c0ac2cf762d5
+      uses: github/codeql-action/init@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # codeql-bundle-v3.25.8
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -41,7 +46,9 @@ jobs:
       shell: bash
       run: |
        sudo apt-get update --error-on=any
-       sudo apt-get install --yes libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       sudo apt-get install --yes \
+           libtool cmake automake autoconf make ninja-build curl unzip \
+           virtualenv openjdk-11-jdk build-essential libc++1
        # Note: the llvm/clang version should match the version specifed in:
        #  - bazel/repository_locations.bzl
        #  - .github/workflows/codeql-push.yml
@@ -56,11 +63,12 @@ jobs:
       run: |
        bazel/setup_clang.sh bin/clang14
        bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/...
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ \
+           //source/common/http/...
 
     - name: Clean Artifacts
       run: |
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@32dc499307d133bb5085bae78498c0ac2cf762d5
+      uses: github/codeql-action/analyze@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # codeql-bundle-v3.25.8

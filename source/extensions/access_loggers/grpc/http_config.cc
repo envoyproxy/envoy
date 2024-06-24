@@ -18,17 +18,10 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+AccessLog::InstanceSharedPtr
+HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                                  AccessLog::FilterPtr&& filter,
+                                                  Server::Configuration::FactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
@@ -36,8 +29,8 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
       config, context.messageValidationVisitor());
 
   return std::make_shared<HttpGrpcAccessLog>(
-      std::move(filter), proto_config, context.threadLocal(),
-      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
+      std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
@@ -49,7 +42,7 @@ std::string HttpGrpcAccessLogFactory::name() const { return "envoy.access_logger
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(HttpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(HttpGrpcAccessLogFactory, AccessLog::AccessLogInstanceFactory,
                         "envoy.http_grpc_access_log");
 
 } // namespace HttpGrpc

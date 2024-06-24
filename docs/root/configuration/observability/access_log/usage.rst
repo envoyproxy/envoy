@@ -157,7 +157,9 @@ The following command operators are supported:
 
   .. code-block:: none
 
-    %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
+    %START_TIME(%Y/%m/%dT%H:%M:%S%z)%
+
+    %START_TIME(%s)%
 
     # To include millisecond fraction of the second (.000 ... .999). E.g. 1527590590.528.
     %START_TIME(%s.%3f)%
@@ -167,6 +169,14 @@ The following command operators are supported:
     %START_TIME(%s.%9f)%
 
   In typed JSON logs, START_TIME is always rendered as a string.
+
+.. _config_access_log_format_emit_time:
+
+%EMIT_TIME%
+  The time when log entry is emitted including milliseconds.
+
+  EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %REQUEST_HEADERS_BYTES%
   HTTP
@@ -183,6 +193,30 @@ The following command operators are supported:
     Downstream bytes received on connection.
 
   UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%BYTES_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Body bytes retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
+    Not implemented (0).
+
+  Renders a numeric value in typed JSON logs.
+
+%PACKETS_RETRANSMITTED%
+  HTTP/3 (QUIC)
+    Number of packets retransmitted.
+
+  HTTP/1 and HTTP/2
+    Not implemented (0).
+
+  TCP/UDP
     Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
@@ -360,6 +394,33 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+.. _config_access_log_format_common_duration:
+
+%COMMON_DURATION(START:END:PRECISION)%
+  HTTP
+    Total duration between the START time point and the END time point in specific PRECISION.
+    The START and END time points are specified by the following values (NOTE: all values
+    here are case-sensitive):
+
+    * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
+    * ``DS_RX_END``: The time point of the downstream request receiving end.
+    * ``US_TX_BEG``: The time point of the upstream request sending begin.
+    * ``US_TX_END``: The time point of the upstream request sending end.
+    * ``US_RX_BEG``: The time point of the upstream response receiving begin.
+    * ``US_RX_END``: The time point of the upstream response receiving end.
+    * ``DS_TX_BEG``: The time point of the downstream response sending begin.
+    * ``DS_TX_END``: The time point of the downstream response sending end.
+    * Dynamic value: Other values will be treated as custom time points that are set by named keys.
+
+    The PRECISION is specified by the following values (NOTE: all values here are case-sensitive):
+
+    * ``ms``: Millisecond precision.
+    * ``us``: Microsecond precision.
+    * ``ns``: Nanosecond precision.
+
+  TCP/UDP
+    Not implemented ("-").
+
 %REQUEST_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte of
@@ -424,43 +485,66 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
-.. _config_access_log_format_response_flags:
-
-%RESPONSE_FLAGS%
-  Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
-  the descriptions do not apply. Possible values are:
-
-  HTTP and TCP
-    * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
-    * **UF**: Upstream connection failure in addition to 503 response code.
-    * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
-    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
-    * **NC**: Upstream cluster not found.
-    * **DT**: When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
-  HTTP only
-    * **DC**: Downstream connection termination.
-    * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
-    * **UT**: Upstream request timeout in addition to 504 response code.
-    * **LR**: Connection local reset in addition to 503 response code.
-    * **UR**: Upstream remote reset in addition to 503 response code.
-    * **UC**: Upstream connection termination in addition to 503 response code.
-    * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
-    * **UAEX**: The request was denied by the external authorization service.
-    * **RLSE**: The request was rejected because there was an error in rate limit service.
-    * **IH**: The request was rejected because it set an invalid value for a
-      :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
-    * **SI**: Stream idle timeout in addition to 408 or 504 response code.
-    * **DPE**: The downstream request had an HTTP protocol error.
-    * **UPE**: The upstream response had an HTTP protocol error.
-    * **UMSDR**: The upstream request reached max stream duration.
-    * **OM**: Overload Manager terminated the request.
-    * **DF**: The request was terminated due to DNS resolution failure.
+%UPSTREAM_CONNECTION_POOL_READY_DURATION%
+  HTTP/TCP
+    Total duration in milliseconds from when the upstream request was created to when the connection pool is ready.
 
   UDP
     Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
+.. _config_access_log_format_response_flags:
+
+%RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
+  Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
+  the descriptions do not apply. %RESPONSE_FLAGS% will output a short string. %RESPONSE_FLAGS_LONG% will output a Pascal case string.
+  Possible values are:
+
+HTTP and TCP
+
+.. csv-table::
+  :header: Long name, Short name, Description
+  :widths: 1, 1, 3
+
+  **NoHealthyUpstream**, **UH**, No healthy upstream hosts in upstream cluster in addition to 503 response code.
+  **UpstreamConnectionFailure**, **UF**, Upstream connection failure in addition to 503 response code.
+  **UpstreamOverflow**, **UO**, Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
+  **NoRouteFound**, **NR**, No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code or no matching filter chain for a downstream connection.
+  **UpstreamRetryLimitExceeded**, **URX**, The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
+  **NoClusterFound**, **NC**, Upstream cluster not found.
+  **DurationTimeout**, **DT**, When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
+
+HTTP only
+
+.. csv-table::
+  :header: Long name, Short name, Description
+  :widths: 1, 1, 3
+
+  **DownstreamConnectionTermination**, **DC**, Downstream connection termination.
+  **FailedLocalHealthCheck**, **LH**, Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
+  **UpstreamRequestTimeout**, **UT**, Upstream request timeout in addition to 504 response code.
+  **LocalReset**, **LR**, Connection local reset in addition to 503 response code.
+  **UpstreamRemoteReset**, **UR**, Upstream remote reset in addition to 503 response code.
+  **UpstreamConnectionTermination**, **UC**, Upstream connection termination in addition to 503 response code.
+  **DelayInjected**, **DI**, The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+  **FaultInjected**, **FI**, The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
+  **RateLimited**, **RL**, The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+  **UnauthorizedExternalService**, **UAEX**, The request was denied by the external authorization service.
+  **RateLimitServiceError**, **RLSE**, The request was rejected because there was an error in rate limit service.
+  **InvalidEnvoyRequestHeaders**, **IH**, The request was rejected because it set an invalid value for a :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
+  **StreamIdleTimeout**, **SI**, Stream idle timeout in addition to 408 or 504 response code.
+  **DownstreamProtocolError**, **DPE**, The downstream request had an HTTP protocol error.
+  **UpstreamProtocolError**, **UPE**, The upstream response had an HTTP protocol error.
+  **UpstreamMaxStreamDurationReached**, **UMSDR**, The upstream request reached max stream duration.
+  **ResponseFromCacheFilter**, **RFCF**, The response was served from an Envoy cache filter.
+  **NoFilterConfigFound**, **NFCF**, The request is terminated because filter configuration was not received within the permitted warming deadline.
+  **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
+  **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
+  **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
+
+UDP
+  Not implemented ("-").
 
 %ROUTE_NAME%
   HTTP/TCP
@@ -476,8 +560,16 @@ The following command operators are supported:
   TCP/UDP
     Not implemented ("-")
 
+.. _config_access_log_format_upstream_host:
+
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections).
+  Main address of upstream host (e.g., ip:port for TCP connections).
+
+.. _config_access_log_format_upstream_host_name:
+
+%UPSTREAM_HOST_NAME%
+  Upstream host name (e.g., DNS name). If no DNS name is available, the main address of the upstream host
+  (e.g., ip:port for TCP connections) will be used.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -495,9 +587,12 @@ The following command operators are supported:
   Local port of the upstream connection.
   IP addresses are the only address type with a port component.
 
+.. _config_access_log_format_upstream_remote_address:
+
 %UPSTREAM_REMOTE_ADDRESS%
   Remote address of the upstream connection. If the address is an IP address it includes both
-  address and port.
+  address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value if the upstream
+  host only has one address and connection is established successfully.
 
 %UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the upstream connection, without any port component.
@@ -600,6 +695,12 @@ The following command operators are supported:
   If the original connection was redirected by iptables TPROXY, and the listener's transparent
   option was set to true, this represents the original destination address and port.
 
+  .. note::
+
+    This may not be the physical remote address of the peer if the address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>`.
+
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
   Local address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
@@ -612,6 +713,15 @@ The following command operators are supported:
 
 %CONNECTION_ID%
   An identifier for the downstream connection. It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to
+  cross-reference timer-based reports for the same connection. The identifier
+  is unique with high likelihood within an execution, but can duplicate across
+  multiple instances or between restarts.
+
+.. _config_access_log_format_upstream_connection_id:
+
+%UPSTREAM_CONNECTION_ID%
+  An identifier for the upstream connection. It can be used to
   cross-reference TCP access logs across multiple log sinks, or to
   cross-reference timer-based reports for the same connection. The identifier
   is unique with high likelihood within an execution, but can duplicate across
@@ -845,7 +955,7 @@ The following command operators are supported:
 
 .. _config_access_log_format_filter_state:
 
-%FILTER_STATE(KEY:F):Z%
+%FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
     :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
@@ -854,6 +964,8 @@ The following command operators are supported:
     F is an optional parameter used to indicate which method FilterState uses for serialization.
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to 'FIELD'.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -865,7 +977,7 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
-%UPSTREAM_FILTER_STATE(KEY:F):Z%
+%UPSTREAM_FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
     Extracts filter state from upstream components like cluster or transport socket extensions.
 
@@ -876,6 +988,8 @@ The following command operators are supported:
     F is an optional parameter used to indicate which method FilterState uses for serialization.
     If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to 'FIELD'.
 
   TCP/UDP
     Not implemented.
@@ -887,6 +1001,32 @@ The following command operators are supported:
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI)
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_LOCAL_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the peer certificate received from the downstream client to establish the
+    TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_LOCAL_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the peer certificate received from the downstream client to establish the
+    TLS connection.
   UDP
     Not implemented ("-").
 
@@ -1042,6 +1182,42 @@ The following command operators are supported:
   UPSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
+%UPSTREAM_PEER_URI_SAN%
+  HTTP/TCP/THRIFT
+    The URIs present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_URI_SAN%
+  HTTP/TCP/THRIFT
+    The URIs present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
 %HOSTNAME%
   The system hostname.
 
@@ -1051,6 +1227,34 @@ The following command operators are supported:
 %FILTER_CHAIN_NAME%
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+.. _config_access_log_format_access_log_type:
+
+%ACCESS_LOG_TYPE%
+  The type of the access log, which indicates when the access log was recorded. If a non-supported log (from the list below),
+  uses this substitution string, then the value will be an empty string.
+
+  * TcpUpstreamConnected - When TCP Proxy filter has successfully established an upstream connection.
+  * TcpPeriodic - On any TCP Proxy filter periodic log record.
+  * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
+  * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
+                                              indicating a successful HTTP tunnel.
+  * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
+  * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
+  * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
+  * UpstreamPeriodic - On any HTTP Router filter periodic log record.
+  * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
+  * UdpTunnelUpstreamConnected - When UDP Proxy filter has successfully established an upstream connection.
+                                 Note: It is only relevant for UDP tunneling over HTTP.
+  * UdpPeriodic - On any UDP Proxy filter periodic log record.
+  * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
+
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.
+
+%TRACE_ID%
+  HTTP
+    The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
+  TCP/UDP
+    Not implemented ("-").

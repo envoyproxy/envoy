@@ -6,6 +6,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/type/v3/ratelimit_unit.pb.h"
 
@@ -102,13 +103,13 @@ public:
    * Creates a particular DescriptorProducer implementation.
    *
    * @param config supplies the configuration for the descriptor extension.
-   * @param validator configuration validation visitor.
+   * @param context supplies the factory context.
    * @return DescriptorProducerPtr the rate limit descriptor producer which will be used to
    * populate rate limit descriptors.
    */
   virtual DescriptorProducerPtr
   createDescriptorProducerFromProto(const Protobuf::Message& config,
-                                    ProtobufMessage::ValidationVisitor& validator) PURE;
+                                    Server::Configuration::CommonFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.rate_limit_descriptors"; }
 };

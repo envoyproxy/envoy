@@ -14,6 +14,10 @@ public:
   virtual ~IppCrypto() = default;
 
   virtual int mbxIsCryptoMbApplicable(uint64_t features) PURE;
+  virtual uint32_t mbxNistp256EcdsaSignSslMb8(uint8_t* pa_sign_r[8], uint8_t* pa_sign_s[8],
+                                              const uint8_t* const pa_msg[8],
+                                              const BIGNUM* const pa_eph_skey[8],
+                                              const BIGNUM* const pa_reg_skey[8]) PURE;
   virtual uint32_t mbxRsaPrivateCrtSslMb8(const uint8_t* const from_pa[8], uint8_t* const to_pa[8],
                                           const BIGNUM* const p_pa[8], const BIGNUM* const q_pa[8],
                                           const BIGNUM* const dp_pa[8],

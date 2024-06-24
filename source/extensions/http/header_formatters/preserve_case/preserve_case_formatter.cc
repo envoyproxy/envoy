@@ -13,6 +13,7 @@ PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
     : forward_reason_phrase_(forward_reason_phrase),
       formatter_type_on_envoy_headers_(formatter_type_on_envoy_headers) {
   switch (formatter_type_on_envoy_headers_) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
       DEFAULT:
     header_key_formatter_on_enovy_headers_ = Envoy::Http::HeaderKeyFormatterConstPtr();
@@ -22,9 +23,6 @@ PreserveCaseHeaderFormatter::PreserveCaseHeaderFormatter(
     header_key_formatter_on_enovy_headers_ =
         std::make_unique<Envoy::Http::Http1::ProperCaseHeaderKeyFormatter>();
     break;
-  default:
-    throw EnvoyException(fmt::format("Not supported FormatterTypeOnEnvoyHeaders: {}.",
-                                     formatter_type_on_envoy_headers_));
   }
 }
 

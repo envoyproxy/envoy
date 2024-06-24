@@ -65,11 +65,11 @@ def reorder_headers(path):
     # Filters that define the #include blocks
     block_filters = [
         file_header_filter(),
-        regex_filter('<.*\.h>'),
-        regex_filter('<.*>'),
+        regex_filter(r'<.*\.h>'),
+        regex_filter(r'<.*>'),
     ]
     for subdir in include_dir_order:
-        block_filters.append(regex_filter('"' + subdir + '/.*"'))
+        block_filters.append(regex_filter(r'"' + subdir + r'/.*"'))
 
     blocks = []
     already_included = set([])

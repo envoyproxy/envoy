@@ -3,15 +3,15 @@
 Listener filters
 ================
 
-Envoy's :ref:`listener filters <envoy_v3_api_msg_config.listener.v3.Filter>`
+Envoy's :ref:`listener filters <envoy_v3_api_msg_config.listener.v3.ListenerFilter>`
 may be used to manipulate connection metadata.
 
-The main purpose of :ref:`listener filters <envoy_v3_api_msg_config.listener.v3.Filter>`
+The main purpose of :ref:`listener filters <envoy_v3_api_msg_config.listener.v3.ListenerFilter>`
 are to make adding further system integration functions easier by not requiring changes
 to Envoy core functionality, and also to make interaction between multiple such features more
 explicit.
 
-The API for :ref:`listener filters <envoy_v3_api_msg_config.listener.v3.Filter>` is relatively
+The API for :ref:`listener filters <envoy_v3_api_msg_config.listener.v3.ListenerFilter>` is relatively
 simple since ultimately these filters operate on newly accepted sockets.
 
 Filters in the chain can stop and subsequently continue iteration to further filters. This allows

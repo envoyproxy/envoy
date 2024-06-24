@@ -40,10 +40,6 @@ public:
   enum RequestStatus getStatus() { return status_; }
   void scheduleCallback(enum RequestStatus status);
 
-  // Buffer length is the same as the max signature length (4096 bits = 512 bytes)
-  unsigned char out_buf_[MAX_SIGNATURE_SIZE];
-  // The real length of the signature.
-  size_t out_len_{};
   // Incoming data buffer.
   std::unique_ptr<uint8_t[]> in_buf_;
 
@@ -55,6 +51,30 @@ private:
   Ssl::PrivateKeyConnectionCallbacks& cb_;
   // For scheduling the callback to the next dispatcher cycle.
   Event::SchedulableCallbackPtr schedulable_{};
+};
+
+// CryptoMbEcdsaContext is a CryptoMbContext which holds the extra ECDSA parameters and has
+// custom initialization function.
+class CryptoMbEcdsaContext : public CryptoMbContext {
+public:
+  CryptoMbEcdsaContext(bssl::UniquePtr<EC_KEY> ec_key, Event::Dispatcher& dispatcher,
+                       Ssl::PrivateKeyConnectionCallbacks& cb)
+      : CryptoMbContext(dispatcher, cb), ec_key_(std::move(ec_key)) {}
+  bool ecdsaInit(const uint8_t* in, size_t in_len);
+
+  // ECDSA key.
+  bssl::UniquePtr<EC_KEY> ec_key_{};
+  // ECDSA context to create the ephemeral key k_.
+  bssl::UniquePtr<BN_CTX> ctx_{};
+  BIGNUM* k_{};
+  // ECDSA parameters, which will contain values whose memory is managed within
+  // BoringSSL ECDSA key structure, so not wrapped in smart pointers.
+  const BIGNUM* priv_key_{};
+  size_t sig_len_{};
+
+  // ECDSA signature.
+  uint8_t sig_r_[32]{};
+  uint8_t sig_s_[32]{};
 };
 
 // CryptoMbRsaContext is a CryptoMbContext which holds the extra RSA parameters and has
@@ -83,9 +103,15 @@ public:
 
   // Buffer for `Lenstra` check.
   unsigned char lenstra_to_[MAX_SIGNATURE_SIZE];
+
+  // Buffer length is the same as the max signature length (4096 bits = 512 bytes)
+  unsigned char out_buf_[MAX_SIGNATURE_SIZE];
+  // The real length of the signature.
+  size_t out_len_{};
 };
 
 using CryptoMbContextSharedPtr = std::shared_ptr<CryptoMbContext>;
+using CryptoMbEcdsaContextSharedPtr = std::shared_ptr<CryptoMbEcdsaContext>;
 using CryptoMbRsaContextSharedPtr = std::shared_ptr<CryptoMbRsaContext>;
 
 // CryptoMbQueue maintains the request queue and is able to process it.
@@ -101,6 +127,7 @@ public:
 private:
   void processRequests();
   void processRsaRequests();
+  void processEcdsaRequests();
   void startTimer();
   void stopTimer();
 
@@ -166,6 +193,7 @@ public:
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
+  bool isAvailable() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int connectionIndex();
@@ -191,6 +219,8 @@ private:
   ThreadLocal::TypedSlotPtr<ThreadLocalData> tls_;
 
   CryptoMbStats stats_;
+
+  bool initialized_{};
 };
 
 } // namespace CryptoMb

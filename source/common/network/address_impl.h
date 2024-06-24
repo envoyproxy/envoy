@@ -11,11 +11,15 @@
 #include "envoy/network/socket.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/statusor.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
+
+// Add an address-specific version for easier searching.
+#define TRY_NEEDS_AUDIT_ADDRESS TRY_NEEDS_AUDIT
 
 /**
  * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
@@ -81,7 +85,7 @@ class InstanceFactory {
 public:
   template <typename InstanceType, typename... Args>
   static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
-    absl::Status status;
+    absl::Status status = absl::OkStatus();
     // Use new instead of make_shared here because the instance constructors are private and must be
     // called directly here.
     std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
@@ -143,6 +147,12 @@ public:
   // Validate that IPv4 is supported on this platform, raise an exception for the
   // given address if not.
   static absl::Status validateProtocolSupported();
+
+  /**
+   * For use in tests only.
+   * Force validateProtocolSupported() to return false for IPv4.
+   */
+  static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
 
 private:
   /**
@@ -226,6 +236,12 @@ public:
   // Validate that IPv6 is supported on this platform
   static absl::Status validateProtocolSupported();
 
+  /**
+   * For use in tests only.
+   * Force validateProtocolSupported() to return false for IPv6.
+   */
+  static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
+
 private:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
@@ -285,14 +301,16 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
-                        const SocketInterface* sock_interface = nullptr);
+  static absl::StatusOr<std::unique_ptr<PipeInstance>>
+  create(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
+         const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string pipe path.
    */
-  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
-                        const SocketInterface* sock_interface = nullptr);
+  static absl::StatusOr<std::unique_ptr<PipeInstance>>
+  create(const std::string& pipe_path, mode_t mode = 0,
+         const SocketInterface* sock_interface = nullptr);
 
   static absl::Status validateProtocolSupported() { return absl::OkStatus(); }
 
@@ -314,6 +332,8 @@ public:
   absl::string_view addressType() const override { return "default"; }
 
 private:
+  explicit PipeInstance(const std::string& pipe_path, mode_t mode,
+                        const SocketInterface* sock_interface, absl::Status& creation_status);
   /**
    * Construct from an existing unix address.
    * Store the error status code in passed in parameter instead of throwing.

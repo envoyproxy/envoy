@@ -9,7 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderMutation {
 
-Http::FilterFactoryCb HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
     const ProtoConfig& config, const std::string&, DualInfo,
     Server::Configuration::ServerFactoryContext&) {
   auto filter_config = std::make_shared<HeaderMutationConfig>(config);

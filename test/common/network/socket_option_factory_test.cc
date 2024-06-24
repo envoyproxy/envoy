@@ -178,6 +178,21 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   EXPECT_EQ(value_bstr, option_details->value_);
 }
 
+TEST_F(SocketOptionFactoryTest, TestBuildZeroSoLingerOptions) {
+  struct linger expected_linger;
+  expected_linger.l_onoff = 1;
+  expected_linger.l_linger = 0;
+  absl::string_view linger_bstr{reinterpret_cast<const char*>(&expected_linger),
+                                sizeof(struct linger)};
+  auto socket_options = SocketOptionFactory::buildZeroSoLingerOptions();
+  auto option_details = socket_options->at(0)->getOptionDetails(
+      socket_mock_, envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  EXPECT_TRUE(option_details.has_value());
+  EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
+  EXPECT_EQ(SO_LINGER, option_details->name_.option());
+  EXPECT_EQ(linger_bstr, option_details->value_);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

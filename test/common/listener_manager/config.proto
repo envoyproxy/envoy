@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.extensions.listener_managers.listener_manager;
+
+message NonTerminalFilter {
+}
+
+message TestStatsFilter {
+}
+
+message OriginalDstTestFilter {
+}
+
+message OriginalDstTestIPv6Filter {
+}

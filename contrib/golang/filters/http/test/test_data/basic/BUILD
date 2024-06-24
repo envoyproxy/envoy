@@ -14,7 +14,9 @@ go_binary(
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
     deps = [
-        "//contrib/golang/filters/http/source/go/pkg/api",
+        "//contrib/golang/common/go/api",
         "//contrib/golang/filters/http/source/go/pkg/http",
+        "@org_golang_google_protobuf//types/known/anypb",
+        "@org_golang_google_protobuf//types/known/structpb",
     ],
 )

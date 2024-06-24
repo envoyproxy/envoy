@@ -21,29 +21,30 @@ Configuration
 -------------
 
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`
 
 This HTTP :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` has two fields:
 
-* Field *providers* specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.
-* Field *rules* specifies matching rules and their requirements. If a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be used.
+* Field ``providers`` specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.
+* Field ``rules`` specifies matching rules and their requirements. If a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be used.
 
 JwtProvider
 ~~~~~~~~~~~
 
 :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>` specifies how a JWT should be verified. It has the following fields:
 
-* *issuer*: the principal that issued the JWT, usually a URL or an email address.
-* *audiences*: a list of JWT audiences allowed to access. A JWT containing any of these audiences will be accepted.
+* ``issuer``: the principal that issued the JWT, usually a URL or an email address.
+* ``audiences``: a list of JWT audiences allowed to access. A JWT containing any of these audiences will be accepted.
   If not specified, the audiences in JWT will not be checked.
-* *local_jwks*: fetch JWKS in local data source, either in a local file or embedded in the inline string.
-* *remote_jwks*: fetch JWKS from a remote HTTP server, also specify cache duration.
-* *forward*: if true, JWT will be forwarded to the upstream.
-* *from_headers*: extract JWT from HTTP headers.
-* *from_params*: extract JWT from query parameters.
-* *from_cookies*: extract JWT from HTTP request cookies.
-* *forward_payload_header*: forward the JWT payload in the specified HTTP header.
-* *claim_to_headers*: copy JWT claim to HTTP header.
-* *jwt_cache_config*: Enables JWT cache, its size can be specified by *jwt_cache_size*. Only valid JWT tokens are cached.
+* ``local_jwks``: fetch JWKS in local data source, either in a local file or embedded in the inline string.
+* ``remote_jwks``: fetch JWKS from a remote HTTP server, also specify cache duration.
+* ``forward``: if true, JWT will be forwarded to the upstream.
+* ``from_headers``: extract JWT from HTTP headers.
+* ``from_params``: extract JWT from query parameters.
+* ``from_cookies``: extract JWT from HTTP request cookies.
+* ``forward_payload_header``: forward the JWT payload in the specified HTTP header.
+* ``claim_to_headers``: copy JWT claim to HTTP header.
+* ``jwt_cache_config``: Enables JWT cache, its size can be specified by ``jwt_cache_size``. Only valid JWT tokens are cached.
 
 Default Extract Location
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,7 +54,7 @@ If :ref:`from_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.J
 
   Authorization: Bearer <token>
 
-and query parameter key *access_token* as::
+and query parameter key ``access_token`` as::
 
   /path?access_token=<JWT>
 
@@ -99,7 +100,7 @@ This means all of the following will return a JWT of ``eyJFbnZveSI6ICJyb2NrcyJ9.
 The header :ref:`name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.name>` may be ``Authorization``.
 
 The :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` must match exactly, i.e., case-sensitively.
-If the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` is not found, the header is skipped: not considered as a source for a JWT token.
+If the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` is not found, the header is skipped, not considered as a source for a JWT token.
 
 If there are no JWT-legal characters after the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>`, the entire string after it
 is taken to be the JWT token. This is unlikely to succeed; the error will reported by the JWT parser.
@@ -163,11 +164,15 @@ Another config example using inline JWKS:
       forward: true
       forward_payload_header: x-jwt-payload
 
-Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as::
+Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as:
 
-     jwt-assertion: <JWT>.
+.. code-block::
 
-JWT payload will be added to the request header as following format::
+     jwt-assertion: <JWT>
+
+JWT payload will be added to the request header as following format:
+
+.. code-block::
 
     x-jwt-payload: base64url_encoded(jwt_payload_in_JSON)
 
@@ -176,12 +181,12 @@ RequirementRule
 
 :ref:`RequirementRule <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.RequirementRule>` has two fields:
 
-* Field *match* specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.
-* Field *requires* specifies the JWT requirement, e.g. which provider is required.
+* Field ``match`` specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.
+* Field ``requires`` specifies the JWT requirement, e.g. which provider is required.
 
 .. important::
    - **If a request matches multiple rules, the first matched rule will apply**.
-   - If the matched rule has empty *requires* field, **JWT verification is not required**.
+   - If the matched rule has empty ``requires`` field, **JWT verification is not required**.
    - If a request doesn't match any rules, **JWT verification is not required**.
 
 Single requirement config example
@@ -245,8 +250,8 @@ Group requirement config example
 
 Above config uses more complex *group* requirements:
 
-* The first *rule* specifies *requires_any*; if any of **provider1** or **provider2** requirement is satisfied, the request is OK to proceed.
-* The second *rule* specifies *requires_all*; only if both **provider1** and **provider2** requirements are satisfied, the request is OK to proceed.
+* The first *rule* specifies ``requires_any``; if any of ``provider1`` or ``provider2`` requirement is satisfied, the request is OK to proceed.
+* The second *rule* specifies ``requires_all``; only if both ``provider1`` and ``provider2`` requirements are satisfied, the request is OK to proceed.
 
 Copy validated JWT claims to HTTP request headers example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,8 +261,8 @@ If a JWT is valid, you can add some of its claims of type (string, integer, bool
 
 The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has two fields:
 
-* Field *header_name* specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
-* Field *claim_name* specifies the claim from verified jwt token.
+* Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
+* Field ``claim_name`` specifies the claim from verified jwt token.
 
 .. code-block:: yaml
 
@@ -269,7 +274,13 @@ The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt
         claim_name: sub
       - header_name: x-jwt-claim-nested-key
         claim_name: nested.claim.key
+      - header_name: x-jwt-tenants
+        claim_name: tenants
 
-JWT claim ("sub" and "nested.claim.key") will be added to HTTP headers as following format::
+In this example the `tenants` claim is an object, therefore the JWT claim ("sub", "nested.claim.key" and "tenants") will be added to HTTP headers as following format:
+
+.. code-block::
+
     x-jwt-claim-sub: <JWT Claim>
     x-jwt-claim-nested-key: <JWT Claim>
+    x-jwt-tenants: <Base64 encoded JSON JWT Claim>

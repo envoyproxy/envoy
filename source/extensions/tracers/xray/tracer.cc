@@ -95,17 +95,24 @@ void Span::finishSpan() {
   // `direction` will be either "ingress" or "egress"
   s.mutable_annotations()->insert({std::string(DirectionKey), direction()});
 
-  const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
+  const std::string json = MessageUtil::getJsonStringFromMessageOrError(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+const Tracing::TraceContextHandler& xRayTraceHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-amzn-trace-id");
+}
+
+const Tracing::TraceContextHandler& xForwardedForHeader() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-forwarded-for");
+}
+
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  trace_context.setByReferenceKey(XRayTraceHeader, xray_header_value);
+  xRayTraceHeader().setRefKey(trace_context, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,

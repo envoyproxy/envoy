@@ -1,8 +1,11 @@
 package io.envoyproxy.envoymobile
 
-import org.assertj.core.api.Assertions.assertThat
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class ResponseHeadersTest {
   @Test
   fun `parsing status code from headers returns first status`() {
@@ -30,17 +33,13 @@ class ResponseHeadersTest {
 
   @Test
   fun `adding HTTP status code sets the appropriate header`() {
-    val headers = ResponseHeadersBuilder()
-      .addHttpStatus(200)
-      .build()
+    val headers = ResponseHeadersBuilder().addHttpStatus(200).build()
     assertThat(headers.value(":status")).containsExactly("200")
   }
 
   @Test
   fun `adding negative HTTP status code no-ops`() {
-    val headers = ResponseHeadersBuilder()
-      .addHttpStatus(-123)
-      .build()
+    val headers = ResponseHeadersBuilder().addHttpStatus(-123).build()
     assertThat(headers.value(":status")).isNull()
   }
 

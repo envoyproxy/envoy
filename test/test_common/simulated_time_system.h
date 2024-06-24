@@ -104,7 +104,7 @@ private:
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_);
+  uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_){0};
   std::atomic<uint32_t> warning_logged_{};
 };
 

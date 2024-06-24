@@ -1,7 +1,10 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
+
+envoy_mobile_package()
 
 swift_library(
     name = "appmain",

@@ -1,11 +1,11 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -39,7 +39,6 @@ envoy_cc_library(
     deps = [
         ":config_utility_lib",
         ":context_lib",
-        ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
         ":reset_header_parser_lib",
@@ -58,6 +57,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:hash_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/common:packed_struct_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/early_data:default_early_data_policy_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:config",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
@@ -95,6 +96,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:matchers_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -174,11 +176,42 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "rds_lib",
-    srcs = ["rds_impl.cc"],
-    hdrs = ["rds_impl.h"],
+    name = "route_provider_manager_lib",
+    srcs = [
+        "route_provider_manager.cc",
+        "static_route_provider_impl.cc",
+    ],
+    hdrs = [
+        "route_provider_manager.h",
+        "static_route_provider_impl.h",
+    ],
     deps = [
         ":config_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/router:rds_interface",
+        "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/router:route_config_update_info_interface",
+        "//source/common/router:route_config_update_impl_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_lib",
+    srcs = [
+        "rds_impl.cc",
+    ],
+    hdrs = [
+        "rds_impl.h",
+    ],
+    deps = [
+        ":config_lib",
+        ":route_provider_manager_lib",
         "//envoy/config:subscription_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
@@ -195,6 +228,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -225,6 +259,7 @@ envoy_cc_library(
         "//envoy/config:config_provider_interface",
         "//envoy/config:subscription_interface",
         "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/router:scopes_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
@@ -296,6 +331,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/http:stateful_session_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/router:router_filter_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
@@ -332,8 +368,8 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_http_factory_context_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
@@ -405,6 +441,7 @@ envoy_cc_library(
         "//envoy/router:shadow_writer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
     ],
 )
@@ -417,31 +454,14 @@ envoy_cc_library(
     ],
     hdrs = ["header_parser.h"],
     deps = [
-        ":header_formatter_lib",
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "header_formatter_lib",
-    srcs = ["header_formatter.cc"],
-    hdrs = ["header_formatter.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//envoy/router:string_accessor_interface",
-        "//envoy/stream_info:filter_state_interface",
-        "//envoy/stream_info:stream_info_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/json:json_loader_lib",
     ],
 )
 

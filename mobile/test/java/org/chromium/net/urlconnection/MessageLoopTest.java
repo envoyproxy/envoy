@@ -4,7 +4,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -18,11 +17,12 @@ import org.chromium.net.testing.Feature;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests the MessageLoop implementation.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class MessageLoopTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
@@ -42,7 +42,7 @@ public class MessageLoopTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testInterrupt() throws Exception {
-    final MessageLoop loop = new MessageLoop();
+    final CronvoyMessageLoop loop = new CronvoyMessageLoop();
     assertFalse(loop.isRunning());
     Future future = mExecutorService.submit(new Runnable() {
       @Override
@@ -85,7 +85,7 @@ public class MessageLoopTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testTaskFailed() throws Exception {
-    final MessageLoop loop = new MessageLoop();
+    final CronvoyMessageLoop loop = new CronvoyMessageLoop();
     assertFalse(loop.isRunning());
     Future future = mExecutorService.submit(new Runnable() {
       @Override
@@ -136,7 +136,7 @@ public class MessageLoopTest {
   @SmallTest
   @Feature({"Cronet"})
   public void testLoopWithTimeout() throws Exception {
-    final MessageLoop loop = new MessageLoop();
+    final CronvoyMessageLoop loop = new CronvoyMessageLoop();
     assertFalse(loop.isRunning());
     // The MessageLoop queue is empty. Use a timeout of 100ms to check that
     // it doesn't block forever.

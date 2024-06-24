@@ -15,10 +15,10 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
-#include "source/extensions/transport_sockets/tls/stats.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
+#include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/cert_validator/utility.h"
+#include "source/common/tls/stats.h"
+#include "source/common/tls/utility.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -31,8 +31,9 @@ namespace Tls {
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                 SslStats& stats, TimeSource& time_source)
-    : stats_(stats), time_source_(time_source) {
+                                 SslStats& stats,
+                                 Server::Configuration::CommonFactoryContext& context)
+    : stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -48,7 +49,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
         // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
         // deprecated field match_subject_alt_names is removed
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher, context));
       }
     }
   }
@@ -61,7 +62,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
           "Multiple trust bundles are given for one trust domain for ", domain.name()));
     }
 
-    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
+    auto cert = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(domain.trust_bundle(), true, config->api()), std::string);
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
@@ -103,7 +105,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   }
 }
 
-void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
   // Use a generic lambda to be compatible with BoringSSL before and after
   // https://boringssl-review.googlesource.com/c/boringssl/+/56190
   bssl::UniquePtr<STACK_OF(X509_NAME)> list(
@@ -119,10 +121,11 @@ void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
 
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      throw EnvoyException(absl::StrCat("Failed to load trusted client CA certificate"));
+      return absl::InvalidArgumentError("Failed to load trusted client CA certificate");
     }
   }
   SSL_CTX_set_client_CA_list(ctx, list.release());
+  return absl::OkStatus();
 }
 
 void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
@@ -139,25 +142,8 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   }
 }
 
-int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
+absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-}
-
-int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
-                                                  Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                                                  X509& leaf_cert,
-                                                  const Network::TransportSocketOptions*) {
-  STACK_OF(X509)* cert_chain = X509_STORE_CTX_get0_untrusted(store_ctx);
-  X509_VERIFY_PARAM* verify_param = X509_STORE_CTX_get0_param(store_ctx);
-  std::string error_details;
-  bool verified =
-      verifyCertChainUsingTrustBundleStore(leaf_cert, cert_chain, verify_param, error_details);
-  if (ssl_extended_info) {
-    ssl_extended_info->setCertificateValidationStatus(
-        verified ? Envoy::Ssl::ClientValidationStatus::Validated
-                 : Envoy::Ssl::ClientValidationStatus::Failed);
-  }
-  return verified ? 1 : 0;
 }
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
@@ -326,9 +312,10 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                       SslStats& stats, TimeSource& time_source) override {
-    return std::make_unique<SPIFFEValidator>(config, stats, time_source);
+  CertValidatorPtr
+  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+                      Server::Configuration::CommonFactoryContext& context) override {
+    return std::make_unique<SPIFFEValidator>(config, stats, context);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }

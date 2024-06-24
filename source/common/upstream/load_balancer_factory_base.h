@@ -18,7 +18,9 @@ public:
   // Upstream::TypedLoadBalancerFactory
   std::string name() const override { return name_; }
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Proto>(); }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Proto()};
+  }
 
 protected:
   TypedLoadBalancerFactoryBase(const std::string& name) : name_(name) {}

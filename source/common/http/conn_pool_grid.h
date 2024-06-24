@@ -6,13 +6,22 @@
 #include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Http {
 
-// An HTTP connection pool which will handle the connectivity grid of
-// [WiFi / cellular] [ipv4 / ipv6] [QUIC / TCP].
-// Currently only [QUIC / TCP are handled]
+// An HTTP connection pool which handles HTTP/3 failing over to HTTP/2
+//
+// The ConnectivityGrid wraps an inner HTTP/3 and HTTP/2 pool.
+//
+// each newStream attempt to the grid creates a wrapper callback which attempts
+// to hide from the caller that there may be serial or parallel newStream calls
+// to the HTTP/3 and HTTP/2 pools.
+//
+// Any cancel call on the wrapper callbacks cancels either or both stream
+// attempts to the wrapped pools. the wrapper callbacks will only pass up
+// failure if both HTTP/3 and HTTP/2 attempts fail.
 class ConnectivityGrid : public ConnectionPool::Instance,
                          public Http3::PoolConnectResultCallback,
                          protected Logger::Loggable<Logger::Id::pool> {
@@ -28,8 +37,6 @@ public:
     StreamCreationPending,
   };
 
-  using PoolIterator = std::list<ConnectionPool::InstancePtr>::iterator;
-
   // This is a class which wraps a caller's connection pool callbacks to
   // auto-retry pools in the case of connection failure.
   //
@@ -38,14 +45,14 @@ public:
   class WrapperCallbacks : public ConnectionPool::Cancellable,
                            public LinkedObject<WrapperCallbacks> {
   public:
-    WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
+    WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder,
                      ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
                                        public LinkedObject<ConnectionAttemptCallbacks> {
     public:
-      ConnectionAttemptCallbacks(WrapperCallbacks& parent, PoolIterator it);
+      ConnectionAttemptCallbacks(WrapperCallbacks& parent, ConnectionPool::Instance& pool);
       ~ConnectionAttemptCallbacks() override;
 
       StreamCreationResult newStream();
@@ -58,31 +65,30 @@ public:
                        StreamInfo::StreamInfo& info,
                        absl::optional<Http::Protocol> protocol) override;
 
-      ConnectionPool::Instance& pool() { return **pool_it_; }
+      ConnectionPool::Instance& pool() { return pool_; }
 
       void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy);
 
     private:
       // A pointer back up to the parent.
       WrapperCallbacks& parent_;
-      // The pool for this connection attempt.
-      const PoolIterator pool_it_;
+      ConnectionPool::Instance& pool_;
       // The handle to cancel this connection attempt.
       // This is owned by the pool which created it.
-      Cancellable* cancellable_;
+      Cancellable* cancellable_{nullptr};
     };
     using ConnectionAttemptCallbacksPtr = std::unique_ptr<ConnectionAttemptCallbacks>;
 
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
 
-    // Attempt to create a new stream for pool().
-    StreamCreationResult newStream();
+    // Attempt to create a new stream for pool.
+    StreamCreationResult newStream(ConnectionPool::Instance& pool);
 
     // Called on pool failure or timeout to kick off another connection attempt.
-    // Returns true if there is a failover pool and a connection has been
-    // attempted, false if all pools have been tried.
-    bool tryAnotherConnection();
+    // Returns the StreamCreationResult if there is a failover pool and a
+    // connection has been attempted, an empty optional otherwise.
+    absl::optional<StreamCreationResult> tryAnotherConnection();
 
     // Called by a ConnectionAttempt when the underlying pool fails.
     void onConnectionAttemptFailed(ConnectionAttemptCallbacks* attempt,
@@ -95,6 +101,12 @@ public:
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol);
+
+    // Called by onConnectionAttemptFailed and on grid deletion destruction to let wrapper
+    // callback subscribers know the connect attempt failed.
+    void signalFailureAndDeleteSelf(ConnectionPool::PoolFailureReason reason,
+                                    absl::string_view transport_failure_reason,
+                                    Upstream::HostDescriptionConstSharedPtr host);
 
   private:
     // Removes this from the owning list, deleting it.
@@ -120,8 +132,8 @@ public:
     ConnectionPool::Callbacks* inner_callbacks_;
     // The timer which tracks when new connections should be attempted.
     Event::TimerPtr next_attempt_timer_;
-    // The iterator to the last pool which had a connection attempt.
-    PoolIterator current_;
+    // Checks if http2 has been attempted.
+    bool has_attempted_http2_ = false;
     // True if the HTTP/3 attempt failed.
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
@@ -155,9 +167,6 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
   absl::string_view protocolDescription() const override { return "connection grid"; }
-
-  // Returns the next pool in the ordered priority list.
-  absl::optional<PoolIterator> nextPool(PoolIterator pool_it);
 
   // Returns true if pool is the grid's HTTP/3 connection pool.
   bool isPoolHttp3(const ConnectionPool::Instance& pool);
@@ -197,15 +206,14 @@ private:
   // that specifies HTTP/3 and HTTP/3 is not broken.
   bool shouldAttemptHttp3();
 
-  // Creates the next pool in the priority list, or absl::nullopt if all pools
-  // have been created.
-  virtual absl::optional<PoolIterator> createNextPool();
+  // Creates the next pool in the priority list, or nullptr if all pools have been created.
+  // TODO(alyssawilk) replace this now we have explicit pools.
+  virtual ConnectionPool::Instance* createNextPool();
 
   // This batch of member variables are latched objects required for pool creation.
   Event::Dispatcher& dispatcher_;
   Random::RandomGenerator& random_generator_;
   Upstream::HostConstSharedPtr host_;
-  Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
@@ -213,34 +221,40 @@ private:
   TimeSource& time_source_;
   HttpServerPropertiesCacheSharedPtr alternate_protocols_;
 
-  // True iff this pool is draining. No new streams or connections should be created
-  // in this state.
-  bool draining_{false};
-
   // Tracks the callbacks to be called on drain completion.
   std::list<Instance::IdleCb> idle_callbacks_;
 
-  // The connection pools to use to create new streams, ordered in the order of
-  // desired use.
-  std::list<ConnectionPool::InstancePtr> pools_;
-
-  // True iff under the stack of the destructor, to avoid calling drain
-  // callbacks on deletion.
-  bool destroying_{};
-
-  // True iff this pool is being being defer deleted.
-  bool deferred_deleting_{};
+  // The connection pools to use to create new streams
+  ConnectionPool::InstancePtr http3_pool_;
+  ConnectionPool::InstancePtr http2_pool_;
+  // A convenience vector to allow taking actions on all pools.
+  absl::InlinedVector<ConnectionPool::Instance*, 2> pools_;
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
 
   Quic::QuicStatNames& quic_stat_names_;
+
   Stats::Scope& scope_;
+
   // The origin for this pool.
   // Note the host name here is based off of the host name used for SNI, which
   // may be from the cluster config, or the request headers for auto-sni.
   HttpServerPropertiesCache::Origin origin_;
+
   Http::PersistentQuicInfo& quic_info_;
+  Upstream::ResourcePriority priority_;
+
+  // True iff this pool is draining. No new streams or connections should be created
+  // in this state.
+  bool draining_{false};
+
+  // True iff under the stack of the destructor, to avoid calling drain
+  // callbacks on deletion.
+  bool destroying_{};
+
+  // True iff this pool is being deferred deleted.
+  bool deferred_deleting_{};
 };
 
 } // namespace Http

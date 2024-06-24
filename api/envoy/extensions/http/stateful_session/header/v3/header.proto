@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // upstream host, this upstream host will be selected first. See :ref:`stateful session filter
 // <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>`.
 //
-// For example, if the header name is set to ``session-header``, envoy will prefer ``1.2.3.4:80``
+// For example, if the header name is set to ``session-header``, Envoy will prefer ``1.2.3.4:80``
 // as the upstream host when the request contains the following header:
 //
 // .. code-block:: none

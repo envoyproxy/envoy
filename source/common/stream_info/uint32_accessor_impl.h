@@ -18,6 +18,7 @@ public:
     message->set_value(value_);
     return message;
   }
+  absl::optional<std::string> serializeAsString() const override { return absl::StrCat(value_); }
 
   // From UInt32Accessor.
   void increment() override { value_++; }

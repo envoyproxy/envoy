@@ -6,8 +6,7 @@
 namespace Envoy {
 namespace Network {
 
-UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle)
-    : write_blocked_(false), io_handle_(io_handle) {}
+UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle) : io_handle_(io_handle) {}
 
 UdpDefaultWriter::~UdpDefaultWriter() = default;
 

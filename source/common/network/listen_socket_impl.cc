@@ -24,10 +24,10 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
   const Api::SysCallIntResult result = SocketImpl::bind(connection_info_provider_->localAddress());
   if (SOCKET_FAILURE(result.return_value_)) {
     close();
-    throw SocketBindException(fmt::format("cannot bind '{}': {}",
-                                          connection_info_provider_->localAddress()->asString(),
-                                          errorDetails(result.errno_)),
-                              result.errno_);
+    const std::string error =
+        fmt::format("cannot bind '{}': {}", connection_info_provider_->localAddress()->asString(),
+                    errorDetails(result.errno_));
+    throw SocketBindException(error, result.errno_);
   }
   return {0, 0};
 }
@@ -46,7 +46,7 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address, {}), address) {
-  RELEASE_ASSERT(io_handle_->isOpen(), "");
+  RELEASE_ASSERT(io_handle_ && io_handle_->isOpen(), "");
   bind(connection_info_provider_->localAddress());
 }
 

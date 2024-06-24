@@ -13,8 +13,10 @@ final class EngineApiTest: XCTestCase {
     let engineExpectation = self.expectation(description: "Engine Running")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
-      .addStatsFlushSeconds(1)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }

@@ -1,9 +1,8 @@
 #pragma once
 
+#include "source/extensions/common/dubbo/message.h"
+#include "source/extensions/common/dubbo/metadata.h"
 #include "source/extensions/common/dubbo/serializer.h"
-
-#include "message.h"
-#include "metadata.h"
 
 namespace Envoy {
 namespace Extensions {

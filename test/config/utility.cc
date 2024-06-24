@@ -30,6 +30,19 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+envoy::config::bootstrap::v3::Bootstrap&
+basicBootstrap(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(config, bootstrap);
+#else
+  UNREFERENCED_PARAMETER(config);
+  UNREFERENCED_PARAMETER(bootstrap);
+  PANIC("JSON compiled out: can't load config");
+#endif
+  return bootstrap;
+}
+} // namespace
 
 std::string ConfigHelper::baseConfigNoListeners() {
   return fmt::format(R"EOF(
@@ -45,7 +58,6 @@ admin:
       port_value: 0
 dynamic_resources:
   lds_config:
-    resource_api_version: V3
     path_config_source:
       path: {}
 static_resources:
@@ -194,7 +206,7 @@ std::string ConfigHelper::testInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.test"
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Struct
+  "@type": type.googleapis.com/test.integration.filters.TestInspectorFilterConfig
 )EOF";
 }
 
@@ -363,10 +375,8 @@ admin:
       port_value: 0
 dynamic_resources:
   cds_config:
-    resource_api_version: V3
     api_config_source:
       api_type: {}
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
@@ -438,13 +448,10 @@ std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
-    resource_api_version: V3
     ads: {{}}
   cds_config:
-    resource_api_version: V3
     ads: {{}}
   ads_config:
-    transport_api_version: V3
     api_type: {0}
     set_node_on_first_message_only: true
 static_resources:
@@ -483,140 +490,107 @@ admin:
 }
 
 // TODO(samflattery): bundle this up with buildCluster
-envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::string& name,
-                                                                     int port,
-                                                                     const std::string& address,
-                                                                     const std::string& lb_policy) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
-      fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: STATIC
-      load_assignment:
-        cluster_name: {}
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: {}
-                  port_value: {}
-              health_check_config:
-                address:
-                  socket_address:
-                    address: {}
-                    port_value: {}
-      lb_policy: {}
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {{}}
-    )EOF",
-                  name, name, address, port, address, port, lb_policy));
-}
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address,
+                                 const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.mutable_connect_timeout()->set_seconds(5);
+  cluster.set_type(envoy::config::cluster::v3::Cluster::STATIC);
+  cluster.set_name(name);
+  cluster.mutable_load_assignment()->set_cluster_name(name);
+  auto* endpoint =
+      cluster.mutable_load_assignment()->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* addr = endpoint->mutable_address();
+  addr->mutable_socket_address()->set_address(address);
+  addr->mutable_socket_address()->set_port_value(port);
+  addr = endpoint->mutable_health_check_config()->mutable_address();
+  addr->mutable_socket_address()->set_address(address);
+  addr->mutable_socket_address()->set_port_value(port);
+  cluster.set_lb_policy(lb_policy);
+  envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+  protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
-    const std::string& name, int port, const std::string& address, const std::string& lb_policy) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
-      fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 50s
-      type: STATIC
-      circuit_breakers:
-        thresholds:
-        - priority: DEFAULT
-          max_connections: 10000
-          max_pending_requests: 10000
-          max_requests: 10000
-          max_retries: 10000
-      load_assignment:
-        cluster_name: {}
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: {}
-                  port_value: {}
-      lb_policy: {}
-    )EOF",
-                  name, name, address, port, lb_policy));
-}
-
-envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
-                                                               const std::string& lb_policy) {
-  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
-  TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          ads: {{}}
-      lb_policy: {}
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {{}}
-    )EOF",
-                                        name, lb_policy),
-                            cluster);
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(protocol_options);
   return cluster;
 }
 
-envoy::config::cluster::v3::Cluster ConfigHelper::buildTlsCluster(const std::string& name,
-                                                                  const std::string& lb_policy) {
-  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
-  TestUtility::loadFromYaml(
-      fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          ads: {{}}
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-          common_tls_context:
-            validation_context:
-              trusted_ca:
-                filename: {}
-      lb_policy: {}
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {{}}
-    )EOF",
-                  name,
-                  TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"),
-                  lb_policy),
-      cluster);
+envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
+    const std::string& name, int port, const std::string& address,
+    const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name(name);
+  cluster.mutable_connect_timeout()->set_seconds(50);
+  cluster.set_type(envoy::config::cluster::v3::Cluster::STATIC);
+  auto* threshold = cluster.mutable_circuit_breakers()->mutable_thresholds()->Add();
+  threshold->set_priority(envoy::config::core::v3::RoutingPriority::DEFAULT);
+  threshold->mutable_max_connections()->set_value(10000);
+  threshold->mutable_max_pending_requests()->set_value(10000);
+  threshold->mutable_max_requests()->set_value(10000);
+  threshold->mutable_max_retries()->set_value(10000);
+  cluster.mutable_load_assignment()->set_cluster_name(name);
+  auto* endpoint =
+      cluster.mutable_load_assignment()->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  cluster.set_lb_policy(lb_policy);
+  auto* addr = endpoint->mutable_address();
+  addr->mutable_socket_address()->set_address(address);
+  addr->mutable_socket_address()->set_port_value(port);
+  return cluster;
+}
+
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildCluster(const std::string& name,
+                           const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.mutable_connect_timeout()->set_seconds(5);
+  cluster.set_type(envoy::config::cluster::v3::Cluster::EDS);
+  cluster.set_name(name);
+  cluster.set_lb_policy(lb_policy);
+
+  auto* eds = cluster.mutable_eds_cluster_config()->mutable_eds_config();
+  eds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  eds->mutable_ads();
+
+  envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+  protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(protocol_options);
+
+  return cluster;
+}
+
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildTlsCluster(const std::string& name,
+                              const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
+  envoy::config::cluster::v3::Cluster cluster = buildCluster(name, lb_policy);
+
+  auto* socket = cluster.mutable_transport_socket();
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
+  tls_socket.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+  socket->set_name("envoy.transport_sockets.tls");
+  socket->mutable_typed_config()->PackFrom(tls_socket);
   return cluster;
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
-ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
+ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address_str,
                                          uint32_t port) {
   API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
-  TestUtility::loadFromYaml(fmt::format(R"EOF(
-      cluster_name: {}
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: {}
-                port_value: {}
-    )EOF",
-                                        name, address, port),
-                            cluster_load_assignment);
+  cluster_load_assignment.set_cluster_name(name);
+  auto* address = cluster_load_assignment.add_endpoints()
+                      ->add_lb_endpoints()
+                      ->mutable_endpoint()
+                      ->mutable_address()
+                      ->mutable_socket_address();
+  address->set_address(address_str);
+  address->set_port_value(port);
+
   return cluster_load_assignment;
 }
 
@@ -624,32 +598,22 @@ envoy::config::endpoint::v3::ClusterLoadAssignment
 ConfigHelper::buildClusterLoadAssignmentWithLeds(const std::string& name,
                                                  const std::string& leds_collection_name) {
   API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
-  TestUtility::loadFromYaml(fmt::format(R"EOF(
-      cluster_name: {}
-      endpoints:
-        leds_cluster_locality_config:
-          leds_config:
-            resource_api_version: V3
-            ads: {{}}
-          leds_collection_name: {}
-    )EOF",
-                                        name, leds_collection_name),
-                            cluster_load_assignment);
+
+  cluster_load_assignment.set_cluster_name(name);
+  auto* lclc = cluster_load_assignment.add_endpoints()->mutable_leds_cluster_locality_config();
+  auto* leds = lclc->mutable_leds_config();
+  leds->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+  leds->mutable_ads();
+  lclc->set_leds_collection_name(leds_collection_name);
   return cluster_load_assignment;
 }
 
-envoy::config::endpoint::v3::LbEndpoint ConfigHelper::buildLbEndpoint(const std::string& address,
-                                                                      uint32_t port) {
+envoy::config::endpoint::v3::LbEndpoint
+ConfigHelper::buildLbEndpoint(const std::string& address_str, uint32_t port) {
   API_NO_BOOST(envoy::config::endpoint::v3::LbEndpoint) lb_endpoint;
-  TestUtility::loadFromYaml(fmt::format(R"EOF(
-      endpoint:
-        address:
-          socket_address:
-            address: {}
-            port_value: {}
-    )EOF",
-                                        address, port),
-                            lb_endpoint);
+  auto* address = lb_endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
+  address->set_address(address_str);
+  address->set_port_value(port);
   return lb_endpoint;
 }
 
@@ -657,6 +621,7 @@ envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains) {
   API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(
                                 R"EOF(
       name: {}
@@ -670,6 +635,12 @@ ConfigHelper::buildBaseListener(const std::string& name, const std::string& addr
                                 name, address, filter_chains),
                             listener);
   return listener;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(address);
+  UNREFERENCED_PARAMETER(filter_chains);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
@@ -687,7 +658,6 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
             rds:
               route_config_name: {}
               config_source:
-                resource_api_version: V3
                 ads: {{}}
             http_filters:
             - name: envoy.filters.http.router
@@ -701,6 +671,7 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
 envoy::config::route::v3::RouteConfiguration
 ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: "{}"
       virtual_hosts:
@@ -713,6 +684,11 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
                                         name, cluster),
                             route);
   return route;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(cluster);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
@@ -721,11 +697,14 @@ envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::str
   return endpoint;
 }
 
-ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-                           const std::string& config) {
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
+                           const std::string& config)
+    : ConfigHelper(version, basicBootstrap(bootstrap_, config)) {}
+
+ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,
+                           const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   RELEASE_ASSERT(!finalized_, "");
-  std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  TestUtility::loadFromFile(filename, bootstrap_, api);
+  bootstrap_ = bootstrap;
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
@@ -801,6 +780,7 @@ void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::
 
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
+#ifdef ENVOY_ENABLE_YAML
   RELEASE_ASSERT(!finalized_, "");
   ProtobufWkt::Struct cluster_metadata;
   TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
@@ -818,6 +798,11 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
     }
     break;
   }
+#else
+  UNREFERENCED_PARAMETER(metadata_yaml);
+  UNREFERENCED_PARAMETER(cluster_name);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 void ConfigHelper::setConnectConfig(
@@ -840,9 +825,10 @@ void ConfigHelper::setConnectConfig(
     match->mutable_connect_matcher();
   }
 
+  auto* upgrade = route->mutable_route()->add_upgrade_configs();
+  upgrade->set_upgrade_type("CONNECT");
+
   if (terminate_connect) {
-    auto* upgrade = route->mutable_route()->add_upgrade_configs();
-    upgrade->set_upgrade_type("CONNECT");
     auto* config = upgrade->mutable_connect_config();
     if (allow_post) {
       config->set_allow_post(true);
@@ -860,6 +846,30 @@ void ConfigHelper::setConnectConfig(
   }
 }
 
+void ConfigHelper::setConnectUdpConfig(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
+    bool terminate_connect, bool http3) {
+  auto* route_config = hcm.mutable_route_config();
+  ASSERT_EQ(1, route_config->virtual_hosts_size());
+  auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
+  auto* match = route->mutable_match();
+  match->Clear();
+  match->mutable_connect_matcher();
+
+  auto* upgrade = route->mutable_route()->add_upgrade_configs();
+  upgrade->set_upgrade_type("connect-udp");
+
+  if (terminate_connect) {
+    upgrade->mutable_connect_config();
+  }
+
+  hcm.add_upgrade_configs()->set_upgrade_type("connect-udp");
+  hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+  if (http3) {
+    hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+  }
+}
+
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
@@ -870,9 +880,11 @@ void ConfigHelper::applyConfigModifiers() {
 void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
     absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
-        alternate_protocol_cache_config) {
-  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
-                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        alternate_protocol_cache_config,
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+        configure_tls_context) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config,
+                     configure_tls_context](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -915,6 +927,9 @@ void ConfigHelper::configureUpstreamTls(
               .PackFrom(new_protocol_options);
     }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    if (configure_tls_context != nullptr) {
+      configure_tls_context(*tls_context.mutable_common_tls_context());
+    }
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
@@ -936,7 +951,15 @@ void ConfigHelper::configureUpstreamTls(
 void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
-  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+
+  if (value == "true") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(true);
+  } else if (value == "false") {
+    (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::boolValue(false);
+  } else {
+    (*static_layer->mutable_fields())[std::string(key)] =
+        ValueUtil::stringValue(std::string(value));
+  }
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
@@ -1194,7 +1217,13 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
     loadHttpConnectionManager(hcm_config);
 
     auto* filter_list_back = hcm_config.add_http_filters();
+#ifdef ENVOY_ENABLE_YAML
     TestUtility::loadFromYaml(config, *filter_list_back);
+#else
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(filter_list_back);
+    PANIC("YAML support compiled out");
+#endif
 
     // Now move it to the front.
     for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
@@ -1219,7 +1248,12 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
       old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
     }
     auto* filter_list_back = old_protocol_options.add_http_filters();
+#ifdef ENVOY_ENABLE_YAML
     TestUtility::loadFromYaml(config, *filter_list_back);
+#else
+    UNREFERENCED_PARAMETER(filter_list_back);
+    PANIC("YAML support compiled out");
+#endif
     for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
       old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
     }
@@ -1272,7 +1306,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  initializeTls(options, *tls_context.mutable_common_tls_context());
+  initializeTls(options, *tls_context.mutable_common_tls_context(), false);
   if (options.ocsp_staple_required_) {
     tls_context.set_ocsp_staple_policy(
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
@@ -1281,7 +1315,8 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(
+    bool enable_early_data, std::vector<absl::string_view> custom_alpns) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1291,8 +1326,12 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool enable_early_data
   }
   configDownstreamTransportSocketWithTls(
       bootstrap_,
-      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
+      [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+        initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
+                      true);
+        for (absl::string_view alpn : custom_alpns) {
+          common_tls_context.add_alpn_protocols(alpn);
+        }
       },
       enable_early_data);
 }
@@ -1409,9 +1448,14 @@ void ConfigHelper::initializeTlsKeyLog(
 
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
-  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
-  common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+    bool http3) {
+  if (!http3) {
+    // If it's HTTP/3, leave it empty as QUIC will derive the supported ALPNs from QUIC version by
+    // default.
+    common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+  }
 
   auto* validation_context = common_tls_context.mutable_validation_context();
   if (options.custom_validator_config_) {
@@ -1431,7 +1475,12 @@ void ConfigHelper::initializeTls(
           filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
       }
+#ifdef ENVOY_ENABLE_YAML
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+#else
+      UNREFERENCED_PARAMETER(cert_yaml);
+      PANIC("YAML support compiled out");
+#endif
       if (options.max_verify_depth_.has_value()) {
         validation_context->mutable_max_verify_depth()->set_value(
             options.max_verify_depth_.value());
@@ -1450,6 +1499,9 @@ void ConfigHelper::initializeTls(
   common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
       options.tlsv1_3_ ? envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3
                        : envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  for (const auto& curve : options.curves_) {
+    common_tls_context.mutable_tls_params()->add_ecdh_curves(curve);
+  }
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
@@ -1509,7 +1561,13 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   auto* filter_list_back = filter_chain->add_filters();
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+#else
+  UNREFERENCED_PARAMETER(filter_list_back);
+  UNREFERENCED_PARAMETER(filter_yaml);
+  PANIC("YAML support compiled out");
+#endif
 
   // Now move it to the front.
   for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
@@ -1521,7 +1579,13 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   RELEASE_ASSERT(!finalized_, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   auto* filter_list_back = listener->add_listener_filters();
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+#else
+  UNREFERENCED_PARAMETER(filter_list_back);
+  UNREFERENCED_PARAMETER(filter_yaml);
+  PANIC("YAML support compiled out");
+#endif
 
   // Now move it to the front.
   for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
@@ -1532,7 +1596,13 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
 void ConfigHelper::addBootstrapExtension(const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   auto* extension = bootstrap_.add_bootstrap_extensions();
+#ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(config, *extension);
+#else
+  UNREFERENCED_PARAMETER(extension);
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 bool ConfigHelper::loadHttpConnectionManager(
@@ -1579,9 +1649,14 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 
   const std::string lds_filename =
       bootstrap().dynamic_resources().lds_config().path_config_source().path();
+#ifdef ENVOY_ENABLE_YAML
   std::string file = TestEnvironment::writeStringToFileForTest(
-      "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
+      "new_lds_file", MessageUtil::getJsonStringFromMessageOrError(lds));
   TestEnvironment::renameFile(file, lds_filename);
+#else
+  UNREFERENCED_PARAMETER(lds_filename);
+  PANIC("YAML support compiled out");
+#endif
 }
 
 void ConfigHelper::setDownstreamOutboundFramesLimits(uint32_t max_all_frames,
@@ -1633,7 +1708,7 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   auto* timeout = route->mutable_timeout();
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
   // response_timeout.
-  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+  timeout->set_seconds(TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 
 envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(
@@ -1669,8 +1744,8 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  std::string path =
-      TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
+  std::string path = TestEnvironment::writeStringToFileForTest(
+      "cds.update.pb_text", MessageUtil::toTextProto(cds_response));
   TestEnvironment::renameFile(path, cds_path_);
 }
 
@@ -1691,8 +1766,8 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  std::string path =
-      TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
+  std::string path = TestEnvironment::writeStringToFileForTest(
+      "eds.update.pb_text", MessageUtil::toTextProto(eds_response));
   TestEnvironment::renameFile(path, eds_path_);
 }
 

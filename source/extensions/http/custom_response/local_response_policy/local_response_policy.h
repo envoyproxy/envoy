@@ -23,7 +23,7 @@ class LocalResponsePolicy : public Extensions::HttpFilters::CustomResponse::Poli
 public:
   LocalResponsePolicy(const envoy::extensions::http::custom_response::local_response_policy::v3::
                           LocalResponsePolicy& config,
-                      Server::Configuration::CommonFactoryContext& context);
+                      Server::Configuration::ServerFactoryContext& context);
 
   Envoy::Http::FilterHeadersStatus
   encodeHeaders(Envoy::Http::ResponseHeaderMap&, bool,
@@ -42,7 +42,7 @@ private:
   const absl::optional<std::string> local_body_;
 
   // body format
-  const Formatter::FormatterPtr formatter_;
+  Formatter::FormatterPtr formatter_;
 
   const absl::optional<Envoy::Http::Code> status_code_;
   const std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;

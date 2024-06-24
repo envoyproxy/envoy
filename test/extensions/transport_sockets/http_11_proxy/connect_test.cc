@@ -11,6 +11,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,6 +23,7 @@ using testing::ByMove;
 using testing::Const;
 using testing::InSequence;
 using testing::NiceMock;
+using testing::Optional;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -38,7 +40,7 @@ public:
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
-        Network::Utility::parseInternetAddressAndPort(address_string);
+        Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
     auto info =
         std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>("www.foo.com", address);
     if (no_proxy_protocol) {
@@ -65,7 +67,7 @@ public:
   void setAddress() {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
-    auto address = Network::Utility::parseInternetAddressAndPort(address_string);
+    auto address = Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
     transport_callbacks_.connection_.stream_info_.filterState()->setData(
         "envoy.network.transport_socket.http_11_proxy.address",
         std::make_unique<Network::Http11ProxyInfoFilterState>("www.foo.com", address),
@@ -91,7 +93,7 @@ TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnce) {
       .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);
-        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(length, Api::IoError::none());
       }));
   Buffer::OwnedImpl msg("initial data");
 
@@ -178,15 +180,13 @@ TEST_P(Http11ConnectTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
     InSequence s;
     EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
         .WillOnce(Invoke([&](Buffer::Instance&) {
-          return Api::IoCallUint64Result(
-              0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                 Network::IoSocketError::deleteIoError));
+          return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
         }));
     EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
         .WillOnce(Invoke([&](Buffer::Instance& buffer) {
           auto length = buffer.length();
           buffer.drain(length);
-          return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+          return Api::IoCallUint64Result(length, Api::IoError::none());
         }));
   }
 
@@ -204,8 +204,7 @@ TEST_P(Http11ConnectTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   {
     InSequence s;
     EXPECT_CALL(io_handle_, write(_)).WillOnce(Invoke([&](Buffer::Instance&) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
-                                                        Network::IoSocketError::deleteIoError));
+      return Api::IoCallUint64Result(0, Network::IoSocketError::create(EADDRNOTAVAIL));
     }));
   }
 
@@ -222,15 +221,13 @@ TEST_P(Http11ConnectTest, StipsHeaderOnce) {
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
-        return Api::IoCallUint64Result(initial_data.length(),
-                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
   absl::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, absl::optional<uint64_t>) {
         buffer.add(connect);
-        return Api::IoCallUint64Result(connect.length(),
-                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(connect.length(), Api::IoError::none());
       }));
   EXPECT_CALL(*inner_socket_, doRead(_))
       .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 1, false}));
@@ -247,8 +244,7 @@ TEST_P(Http11ConnectTest, InsufficientData) {
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
-        return Api::IoCallUint64Result(initial_data.length(),
-                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
   absl::optional<uint64_t> expected_bytes(connect.length());
   Buffer::OwnedImpl buffer("");
@@ -262,9 +258,8 @@ TEST_P(Http11ConnectTest, PeekFail) {
   std::string connect("HTTP/1.1 200 OK\r\n\r\n");
   std::string initial_data(connect + "follow up data");
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
-      .WillOnce(Return(ByMove(
-          Api::IoCallUint64Result({}, Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
-                                                      Network::IoSocketError::deleteIoError)))));
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result({}, Network::IoSocketError::create(EADDRNOTAVAIL)))));
   EXPECT_CALL(io_handle_, read(_, _)).Times(0);
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
@@ -282,14 +277,12 @@ TEST_P(Http11ConnectTest, ReadFail) {
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
-        return Api::IoCallUint64Result(initial_data.length(),
-                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
   absl::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length(), Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
-                                            Network::IoSocketError::deleteIoError)))));
+          connect.length(), Network::IoSocketError::create(EADDRNOTAVAIL)))));
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
@@ -306,13 +299,12 @@ TEST_P(Http11ConnectTest, ShortRead) {
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
-        return Api::IoCallUint64Result(initial_data.length(),
-                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
   absl::optional<uint64_t> expected_bytes(connect.length());
   EXPECT_CALL(io_handle_, read(_, expected_bytes))
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length() - 1, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+      .WillOnce(
+          Return(ByMove(Api::IoCallUint64Result(connect.length() - 1, Api::IoError::none()))));
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
@@ -326,7 +318,7 @@ TEST_P(Http11ConnectTest, LongHeaders) {
 
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK)).WillOnce(Invoke([](void* buffer, size_t, int) {
     memset(buffer, 0, 2000);
-    return Api::IoCallUint64Result(2000, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+    return Api::IoCallUint64Result(2000, Api::IoError::none());
   }));
   EXPECT_CALL(io_handle_, read(_, _)).Times(0);
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
@@ -347,8 +339,7 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
   EXPECT_CALL(io_handle_, recv(_, 2000, MSG_PEEK))
       .WillOnce(Invoke([&initial_data](void* buffer, size_t, int) {
         memcpy(buffer, initial_data.data(), initial_data.length());
-        return Api::IoCallUint64Result(initial_data.length(),
-                                       Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        return Api::IoCallUint64Result(initial_data.length(), Api::IoError::none());
       }));
 
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
@@ -442,13 +433,81 @@ TEST(ParseTest, TestValidResponse) {
 
 // The SelfContainedParser is only intended for header parsing but for coverage,
 // test a request with a body.
-TEST(ParseTest, CoverResponseBody) {
+TEST(ParseTest, CoverResponseBodyHttp10) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
   std::string headers = "HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n";
   std::string body = "ab";
 
   SelfContainedParser parser;
   parser.parser().execute(headers.c_str(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
   parser.parser().execute(body.c_str(), body.length());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_FALSE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(2));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+TEST(ParseTest, CoverResponseBodyHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
+  std::string headers = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n";
+  std::string body = "ab";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.c_str(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+  parser.parser().execute(body.c_str(), body.length());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_TRUE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(2));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+// Regression tests for #34096.
+TEST(ParseTest, ContentLengthZeroHttp10) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
+  constexpr absl::string_view headers = "HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.data(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_FALSE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(0));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+TEST(ParseTest, ContentLengthZeroHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
+  constexpr absl::string_view headers = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.data(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_TRUE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(0));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
 }
 
 } // namespace

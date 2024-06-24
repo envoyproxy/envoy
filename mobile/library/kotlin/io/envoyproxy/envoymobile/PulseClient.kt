@@ -8,13 +8,9 @@ package io.envoyproxy.envoymobile
  */
 interface PulseClient {
 
-  /**
-   * @return A counter based on the joined elements.
-   */
+  /** @return A counter based on the joined elements. */
   fun counter(vararg elements: Element): Counter
 
-  /**
-   * @return A counter based on the joined elements with tags.
-   */
+  /** @return A counter based on the joined elements with tags. */
   fun counter(vararg elements: Element, tags: Tags): Counter
 }

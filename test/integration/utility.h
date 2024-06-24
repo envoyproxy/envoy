@@ -6,10 +6,12 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -85,7 +87,7 @@ public:
                       Event::Dispatcher& dispatcher,
                       Network::TransportSocketPtr transport_socket = nullptr);
   ~RawConnectionDriver();
-  const Network::Connection& connection() { return *client_; }
+
   testing::AssertionResult
   run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block,
       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
@@ -94,7 +96,7 @@ public:
     return callbacks_->last_connection_event_;
   }
   // Wait until connected or closed().
-  void waitForConnection();
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
   bool allBytesSent() const;
@@ -204,10 +206,13 @@ public:
    * Create transport socket factory for Quic upstream transport socket.
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
-  static Network::UpstreamTransportSocketFactoryPtr
-  createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
-                                           Ssl::ContextManager& context_manager,
-                                           const std::string& san_to_match);
+  static Network::UpstreamTransportSocketFactoryPtr createQuicUpstreamTransportSocketFactory(
+      Api::Api& api, Stats::Store& store, Ssl::ContextManager& context_manager,
+      ThreadLocal::Instance& threadlocal, const std::string& san_to_match);
+
+  static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(
+      const ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+          config);
 };
 
 // A set of connection callbacks which tracks connection state.

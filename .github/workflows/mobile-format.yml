@@ -1,0 +1,85 @@
+name: Mobile/Format
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-format
+
+  container:
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-format }}
+    needs: load
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    with:
+      args: ${{ matrix.args }}
+      command: ${{ matrix.command }}
+      container: ${{ matrix.container }}
+      request: ${{ needs.load.outputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: ${{ matrix.timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Format all
+          args: check
+          command: ./tools/check_format.sh
+          target: format-all
+          timeout-minutes: 45
+        - name: Swift lint
+          args: >-
+            lint
+            --strict
+          command: swiftlint
+          container: >-
+            ghcr.io/realm/swiftlint:0.50.3
+          target: swift-lint
+          timeout-minutes: 45
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-format }}
+    needs:
+    - load
+    - container
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

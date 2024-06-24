@@ -49,6 +49,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ratelimit_integration_test",
+    size = "large",
     srcs = ["ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.http.ratelimit"],
     deps = [

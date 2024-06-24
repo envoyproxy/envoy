@@ -254,7 +254,7 @@ public:
   explicit DispenserFilterConfigFactory(const std::string& name) : name_(name) {}
 
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
@@ -420,7 +420,10 @@ protected:
         tick_interval_ms: 1
         max_chunk_length: 5
     )EOF"
-                                                                        : "";
+                                                                        : R"EOF(
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    )EOF";
   }
 };
 
@@ -434,6 +437,8 @@ public:
     filter_chains:
       filters:
       - name: envoy.filters.network.echo
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
       )EOF");
   }
 
@@ -617,7 +622,10 @@ protected:
         tick_interval_ms: 1
         max_chunk_length: 10
     )EOF"
-                                                                        : "";
+                                                                        : R"EOF(
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    )EOF";
   }
 };
 

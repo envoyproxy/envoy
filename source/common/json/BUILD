@@ -45,3 +45,15 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "json_streamer_lib",
+    srcs = ["json_streamer.cc"],
+    hdrs = ["json_streamer.h"],
+    deps = [
+        ":json_sanitizer_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_util_lib",
+        "//source/common/common:assert_lib",
+    ],
+)

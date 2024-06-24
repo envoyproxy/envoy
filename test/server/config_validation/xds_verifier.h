@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -73,13 +72,13 @@ private:
   absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> all_routes_;
   absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> active_routes_;
 
-  uint32_t num_warming_;
-  uint32_t num_active_;
-  uint32_t num_draining_;
+  uint32_t num_warming_{0};
+  uint32_t num_active_{0};
+  uint32_t num_draining_{0};
 
-  uint32_t num_added_;
-  uint32_t num_modified_;
-  uint32_t num_removed_;
+  uint32_t num_added_{0};
+  uint32_t num_modified_{0};
+  uint32_t num_removed_{0};
 
   SotwOrDelta sotw_or_delta_;
 };

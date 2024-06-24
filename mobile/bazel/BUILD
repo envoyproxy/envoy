@@ -1,16 +1,11 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
-load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
-config_setting(
-    name = "envoy_mobile_swift_cxx_interop",
-    values = {"define": "envoy_mobile_swift_cxx_interop=enabled"},
-)
-
-kt_jvm_library(
+kt_android_library(
     name = "envoy_mobile_test_suite",
     srcs = [
         "EnvoyMobileTestSuite.kt",
@@ -37,11 +32,10 @@ alias(
     actual = "@bazel_tools//tools/zip:zipper",
 )
 
-# Don't depend on these directly, use //library/common/jni:jni_import_lib.
 alias(
     name = "jni",
     actual = "@bazel_tools//tools/jdk:jni",
-    visibility = ["//library/common/jni/import:__pkg__"],
+    visibility = ["//library/jni:__pkg__"],
 )
 
 # autoformat requires that there be no @bazel_tools references outside of //bazel,

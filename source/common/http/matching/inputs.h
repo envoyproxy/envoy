@@ -26,7 +26,7 @@ public:
     const OptRef<const HeaderType> maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
     auto header_string = HeaderUtility::getAllOfHeaderAsString(*maybe_headers, name_, ",");
@@ -36,7 +36,7 @@ public:
               std::string(header_string.result().value())};
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 
 private:
@@ -153,23 +153,23 @@ public:
     const auto maybe_headers = data.requestHeaders();
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
     const auto ret = maybe_headers->Path();
     if (!ret) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
-    Utility::QueryParams params =
-        Http::Utility::parseAndDecodeQueryString(ret->value().getStringView());
+    auto params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(ret->value().getStringView());
 
-    auto ItParam = params.find(query_param_);
-    if (ItParam == params.end()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    auto ItParam = params.getFirstValue(query_param_);
+    if (!ItParam.has_value()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
     }
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::move(ItParam->second)};
+            std::move(ItParam.value())};
   }
 
 private:

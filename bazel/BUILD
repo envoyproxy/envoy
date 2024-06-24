@@ -1,11 +1,12 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
+load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//dependency:macros.bzl", "updater")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -24,13 +25,25 @@ sh_library(
     srcs = ["volatile_env.sh"],
 )
 
+# Stamp derived from tree hash + dirty status if `BAZEL_VOLATILE_DIRTY`
+# is set, otherwise the git commit
+genrule(
+    name = "volatile-scm-hash",
+    outs = ["volatile-scm-hash.txt"],
+    cmd = """
+    grep BUILD_SCM_HASH bazel-out/volatile-status.txt > $@
+    """,
+    stamp = 1,
+    tags = ["no-remote-exec"],
+)
+
 genrule(
     name = "gnu_build_id",
     outs = ["gnu_build_id.ldscript"],
     cmd = """
       echo --build-id=0x$$(
-          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-        | sed 's/^BUILD_SCM_REVISION //') \\
+          grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+        | sed 's/^BUILD_SCM_REVISION //') \
         > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -43,8 +56,8 @@ genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
-      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-    | sed 's/^BUILD_SCM_REVISION //' \\
+      grep -E "^BUILD_SCM_REVISION" bazel-out/volatile-status.txt \
+    | sed 's/^BUILD_SCM_REVISION //' \
     | tr -d '\\n' \\
     > $@
     """,
@@ -338,6 +351,64 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "disable_http3_on_linux_ppc",
+    match_all = [
+        ":disable_http3",
+        ":linux_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_http3_on_windows_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":windows_x86_64",
+    ],
+)
+
+bool_flag(
+    name = "enabled",
+    build_setting_default = True,
+    visibility = ["//visibility:private"],
+)
+
+bool_flag(
+    name = "disabled",
+    build_setting_default = False,
+    visibility = ["//visibility:private"],
+)
+
+# Alias equal to "not(":disable_http3")" (if "not()" existed).
+alias(
+    name = "enable_http3_setting",
+    actual = select({
+        ":disable_http3": ":disabled",
+        "//conditions:default": ":enabled",
+    }),
+)
+
+config_setting(
+    name = "enable_http3",
+    flag_values = {":enable_http3_setting": "True"},
+)
+
+selects.config_setting_group(
+    name = "enable_http3_on_linux_ppc",
+    match_all = [
+        ":enable_http3",
+        ":linux_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "enable_http3_on_windows_x86_64",
+    match_all = [
+        ":enable_http3",
+        ":windows_x86_64",
+    ],
+)
+
 config_setting(
     name = "disable_admin_html",
     values = {"define": "admin_html=disabled"},
@@ -349,13 +420,35 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_envoy_mobile_request_compression",
-    values = {"define": "envoy_mobile_request_compression=disabled"},
+    name = "disable_envoy_mobile_xds",
+    values = {"define": "envoy_mobile_xds=disabled"},
+)
+
+config_setting(
+    name = "disable_yaml",
+    values = {"define": "envoy_yaml=disabled"},
+)
+
+# The goal here is to allow Envoy to build with this option but it is not yet
+# complete.  See https://github.com/envoyproxy/envoy/issues/27412
+config_setting(
+    name = "disable_exceptions",
+    values = {"define": "envoy_exceptions=disabled"},
+)
+
+config_setting(
+    name = "disable_full_protos",
+    values = {"define": "envoy_full_protos=disabled"},
 )
 
 config_setting(
     name = "disable_envoy_mobile_listener",
     values = {"define": "envoy_mobile_listener=disabled"},
+)
+
+config_setting(
+    name = "disable_http_datagrams",
+    values = {"define": "envoy_enable_http_datagrams=disabled"},
 )
 
 config_setting(
@@ -437,7 +530,6 @@ config_setting(
     name = "boringssl_fips",
     constraint_values = [
         "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
     ],
     values = {"define": "boringssl=fips"},
 )
@@ -447,18 +539,20 @@ config_setting(
     values = {"define": "boringssl=disabled"},
 )
 
+selects.config_setting_group(
+    name = "boringssl_fips_x86",
+    match_all = [
+        ":boringssl_fips",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
 config_setting(
     name = "zlib_ng",
     constraint_values = [
         "@platforms//os:linux",
     ],
     values = {"define": "zlib=ng"},
-)
-
-# TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
-config_setting(
-    name = "wasm_wavm",
-    values = {"define": "wasm=wavm"},
 )
 
 config_setting(
@@ -618,6 +712,11 @@ config_setting(
 )
 
 config_setting(
+    name = "android_system_helper",
+    values = {"define": "system-helper=android"},
+)
+
+config_setting(
     name = "libfuzzer_coverage",
     define_values = {
         "FUZZING_ENGINE": "libfuzzer",
@@ -657,6 +756,15 @@ selects.config_setting_group(
         ":ios_i386",
         ":ios_sim_arm64",
         ":ios_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "darwin_any",
+    match_any = [
+        ":darwin",
+        ":darwin_arm64",
+        ":darwin_x86_64",
     ],
 )
 
@@ -834,4 +942,38 @@ platform(
         "@platforms//os:ios",
         "@build_bazel_apple_support//constraints:device",
     ],
+)
+
+# A dependency required by python protobuf
+# Envoy does not have any C++ code that includes python.h so this dummy
+# target is enough. However if such code is added in the future when this
+# should be changed to alias "@system_python//:python_headers"
+cc_library(
+    name = "python_headers",
+    visibility = ["//visibility:public"],
+)
+
+# These can be run as follows:
+#
+# $ bazel run //bazel:update ENVOY_DEP NEW_VERSION
+# $ bazel run //bazel:api-update API_DEP NEW_VERSION
+updater(
+    name = "update",
+    data = ["//tools/dependency:check"],
+    dependencies = "//tools/dependency:filtered-dependencies",
+    post_script = ":version_update_post.sh",
+    pydict = True,
+    tags = ["skip_on_windows"],
+    version_file = ":repository_locations.bzl",
+)
+
+updater(
+    name = "api-update",
+    data = ["//tools/dependency:check"],
+    dependencies = "@envoy_api//bazel:repository_locations",
+    post_script = ":version_update_post.sh",
+    pydict = True,
+    tags = ["skip_on_windows"],
+    version_file = "@envoy_api//bazel:repository_locations.bzl",
+    version_path_replace = "external/envoy_api:api",
 )

@@ -78,7 +78,6 @@ then passing it to a previously created :ref:`StreamClient instance <api_startin
   val headers = RequestHeadersBuilder(RequestMethod.POST, "https", "api.envoyproxy.io", "/foo")
     .addRetryPolicy(RetryPolicy(...))
     .addUpstreamHttpProtocol(UpstreamRequestProtocol.HTTP2)
-    .enableRequestCompression(...)
     .add("x-custom-header", "foobar")
     ...
     .build()
@@ -88,7 +87,6 @@ then passing it to a previously created :ref:`StreamClient instance <api_startin
   let headers = RequestHeadersBuilder(method: .post, scheme: "https", authority: "api.envoyproxy.io", path: "/foo")
     .addRetryPolicy(RetryPolicy(...))
     .addUpstreamHttpProtocol(.http2)
-    .enableRequestCompression(...)
     .add(name: "x-custom-header", value: "foobar")
     ...
     .build()
@@ -146,18 +144,6 @@ For full documentation of how these retry rules perform, see Envoy's documentati
 
 - `Automatic retries <https://www.envoyproxy.io/learn/automatic-retries>`_
 - `Retry semantics <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_routing.html?highlight=exponential#retry-semantics>`_
-
-------------------------
-``CompressionAlgorithm``
-------------------------
-
-The ``CompressionAlgorithm`` type allows for compressing request bodies using either gzip or Brotli.
-This can be set by calling ``enableRequestCompression(...)`` on the ``RequestHeadersBuilder``.
-
-See the compression filter documentation for details about how and when this compression is applied:
-
-- `gzip compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/compressor/v3/gzip.proto>`_
-- `brotli compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/compressor/v3/brotli.proto>`_
 
 ----------
 ``Stream``

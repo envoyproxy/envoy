@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
@@ -91,6 +92,7 @@ envoy_cc_library(
 
 envoy_cc_test(
     name = "tls_inspector_integration_test",
+    size = "large",
     srcs = [
         "tls_inspector_integration_test.cc",
     ],
@@ -102,13 +104,13 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
+        "//source/common/tls:context_config_lib",
+        "//source/common/tls:context_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/integration:integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",

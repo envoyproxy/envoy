@@ -21,21 +21,21 @@ import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "MainActivity"
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
 private const val REQUEST_AUTHORITY = "api.lyft.com"
 private const val REQUEST_PATH = "/ping"
 private const val REQUEST_SCHEME = "https"
-private val FILTERED_HEADERS = setOf(
-  "server",
-  "filter-demo",
-  "buffer-filter-demo",
-  "async-filter-demo",
-  "x-envoy-upstream-service-time"
-)
+private val FILTERED_HEADERS =
+  setOf(
+    "server",
+    "filter-demo",
+    "buffer-filter-demo",
+    "async-filter-demo",
+    "x-envoy-upstream-service-time"
+  )
 
-/**
- * The main activity of the app.
- */
+/** The main activity of the app. */
 class MainActivity : Activity() {
   private val thread = HandlerThread(REQUEST_HANDLER_THREAD_NAME)
   private lateinit var recyclerView: RecyclerView
@@ -47,33 +47,35 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    engine = AndroidEngineBuilder(application)
-      .addLogLevel(LogLevel.DEBUG)
-      .enableProxying(true)
-      .addPlatformFilter(::DemoFilter)
-      .addPlatformFilter(::BufferDemoFilter)
-      .addPlatformFilter(::AsyncDemoFilter)
-      .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
-      .addStringAccessor("demo-accessor", { "PlatformString" })
-      .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
-      .setEventTracker({
-        for (entry in it.entries) {
-          Log.d("MainActivity", "Event emitted: ${entry.key}, ${entry.value}")
-        }
-      })
-      .setLogger {
-        Log.d("MainActivity", it)
-      }
-      .build()
+    engine =
+      AndroidEngineBuilder(application)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> Log.d(TAG, msg) }
+        .enableProxying(true)
+        .addPlatformFilter(::DemoFilter)
+        .addPlatformFilter(::BufferDemoFilter)
+        .addPlatformFilter(::AsyncDemoFilter)
+        .addNativeFilter(
+          "envoy.filters.http.buffer",
+          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
+        )
+        .addStringAccessor("demo-accessor", { "PlatformString" })
+        .setOnEngineRunning { Log.d(TAG, "Envoy async internal setup completed") }
+        .setEventTracker({
+          for (entry in it.entries) {
+            Log.d(TAG, "Event emitted: ${entry.key}, ${entry.value}")
+          }
+        })
+        .setLogger { _, message -> Log.d(TAG, message) }
+        .build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)
 
     viewAdapter = ResponseRecyclerViewAdapter()
     recyclerView.adapter = viewAdapter
-    val dividerItemDecoration = DividerItemDecoration(
-      recyclerView.context, DividerItemDecoration.VERTICAL
-    )
+    val dividerItemDecoration =
+      DividerItemDecoration(recyclerView.context, DividerItemDecoration.VERTICAL)
     recyclerView.addItemDecoration(dividerItemDecoration)
     thread.start()
     val handler = Handler(thread.looper)
@@ -86,7 +88,7 @@ class MainActivity : Activity() {
             makeRequest()
             recordStats()
           } catch (e: IOException) {
-            Log.d("MainActivity", "exception making request or recording stats", e)
+            Log.d(TAG, "exception making request or recording stats", e)
           }
 
           // Make a call and report stats again
@@ -106,10 +108,9 @@ class MainActivity : Activity() {
     // Note: this request will use an h2 stream for the upstream request due to https scheme.
     // The Java example uses http so http/1.1. This is done on purpose to test both paths in
     // end-to-end tests in CI.
-    val requestHeaders = RequestHeadersBuilder(
-      RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH)
+        .build()
     engine
       .streamClient()
       .newStreamPrototype()
@@ -125,9 +126,9 @@ class MainActivity : Activity() {
         }
         val headerText = sb.toString()
 
-        Log.d("MainActivity", message)
+        Log.d(TAG, message)
         responseHeaders.value("filter-demo")?.first()?.let { filterDemoValue ->
-          Log.d("MainActivity", "filter-demo: $filterDemoValue")
+          Log.d(TAG, "filter-demo: $filterDemoValue")
         }
 
         if (status == 200) {
@@ -139,7 +140,7 @@ class MainActivity : Activity() {
       .setOnError { error, _ ->
         val attemptCount = error.attemptCount ?: -1
         val message = "failed with error after $attemptCount attempts: ${error.message}"
-        Log.d("MainActivity", message)
+        Log.d(TAG, message)
         recyclerView.post { viewAdapter.add(Failure(message)) }
       }
       .start(Executors.newSingleThreadExecutor())

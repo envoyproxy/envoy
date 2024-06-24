@@ -27,12 +27,6 @@ extension String {
       return self.contains(/^[A-Za-z_]+$/)
     }
 
-    // `std` is the name of the C++ stdlib when importing it into Swift.
-    // So effectively this checks if we're compiling with `-enable-experimental-cxx-interop`.
-#if canImport(std)
-    return (self as NSString).range(of: kPattern, options: regularExpression).location != NSNotFound
-#else
     return self.range(of: kPattern, options: .regularExpression) != nil
-#endif
   }
 }

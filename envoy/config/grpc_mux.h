@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -105,6 +106,12 @@ public:
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
                                      const absl::flat_hash_set<std::string>& for_update) PURE;
+
+  /**
+   * Returns an EdsResourcesCache for this GrpcMux if there is one.
+   * @return EdsResourcesCacheOptRef optional eds resources cache for the gRPC-mux.
+   */
+  virtual EdsResourcesCacheOptRef edsResourcesCache() PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

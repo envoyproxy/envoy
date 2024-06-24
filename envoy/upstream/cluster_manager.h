@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -43,6 +44,7 @@ namespace Upstream {
  * ClusterUpdateCallbacks provide a way to expose Cluster lifecycle events in the
  * ClusterManager.
  */
+using ThreadLocalClusterCommand = std::function<ThreadLocalCluster&()>;
 class ClusterUpdateCallbacks {
 public:
   virtual ~ClusterUpdateCallbacks() = default;
@@ -50,11 +52,12 @@ public:
   /**
    * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
    * is updated in the ClusterManager.
-   * @param cluster is the ThreadLocalCluster that represents the updated
-   * cluster.
+   * @param cluster_name the name of the changed cluster.
+   * @param get_cluster is a callable that will provide the ThreadLocalCluster that represents the
+   * updated cluster. It should be used within the call or discarded.
    */
-  virtual void onClusterAddOrUpdate(ThreadLocalCluster& cluster) PURE;
-
+  virtual void onClusterAddOrUpdate(absl::string_view cluster_name,
+                                    ThreadLocalClusterCommand& get_cluster) PURE;
   /**
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
@@ -211,6 +214,21 @@ public:
 
   virtual ~ClusterManager() = default;
 
+  // API to initialize the ClusterManagerImpl instance based on the given Bootstrap config.
+  //
+  // This method *must* be called prior to invoking any other methods on the class and *must* only
+  // be called once. This method should be called immediately after ClusterManagerImpl construction
+  // and from the same thread in which the ClusterManagerImpl was constructed.
+  //
+  // The initialization is separated from the constructor because lots of work, including ADS
+  // initialization, is done in this method. If the contents of this method are invoked during
+  // construction, a derived class cannot override any of the virtual methods and have them invoked
+  // instead, since the base class's methods are used when in a base class constructor.
+  virtual absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
+
+  // API to return whether the ClusterManagerImpl instance is initialized.
+  virtual bool initialized() PURE;
+
   /**
    * Add or update a cluster via API. The semantics of this API are:
    * 1) The hash of the config is used to determine if an already existing cluster has changed.
@@ -239,7 +257,7 @@ public:
    * The "initialized callback" set in the method above is invoked when secondary and
    * dynamically provisioned clusters have finished initializing.
    */
-  virtual void
+  virtual absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   using ClusterInfoMap = absl::flat_hash_map<std::string, std::reference_wrapper<const Cluster>>;
@@ -314,6 +332,11 @@ public:
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
    */
   virtual void shutdown() PURE;
+
+  /**
+   * @return whether the shutdown method has been called.
+   */
+  virtual bool isShutdown() PURE;
 
   /**
    * @return cluster manager wide bind configuration for new upstream connections.
@@ -414,10 +437,10 @@ public:
   virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
 
   /**
-   * Check if the cluster is active and statically configured, and if not, throw exception.
+   * Check if the cluster is active and statically configured, and if not, return an error
    * @param cluster, the cluster to check.
    */
-  virtual void checkActiveStaticCluster(const std::string& cluster) PURE;
+  virtual absl::Status checkActiveStaticCluster(const std::string& cluster) PURE;
 
   /**
    * Allocates an on-demand CDS API provider from configuration proto or locator.
@@ -431,6 +454,19 @@ public:
   allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  /**
+   * @param common_lb_config The config field to be stored
+   * @return shared_ptr to the CommonLbConfig
+   */
+  virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
+  getCommonLbConfigPtr(
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
+
+  /**
+   * Returns an EdsResourcesCache that is unique for the cluster manager.
+   */
+  virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -470,6 +506,8 @@ public:
 
   /**
    * Allocate a cluster manager from configuration proto.
+   * The cluster manager initialize() method needs to be called right after this method.
+   * Please check https://github.com/envoyproxy/envoy/issues/33218 for details.
    */
   virtual ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
@@ -503,7 +541,7 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 

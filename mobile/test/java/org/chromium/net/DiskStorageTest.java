@@ -2,19 +2,19 @@ package org.chromium.net;
 
 import static org.chromium.net.testing.CronetTestRule.getContext;
 import static org.chromium.net.testing.CronetTestRule.getTestStorage;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.util.Arrays;
+
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.FileUtils;
 import org.chromium.net.testing.NativeTestServer;
@@ -26,12 +26,13 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Test CronetEngine disk storage.
  */
 @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1578")
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class DiskStorageTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
@@ -53,7 +54,6 @@ public class DiskStorageTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Crashing on Android Cronet Builder, see crbug.com/601409.
   public void testReadOnlyStorageDirectory() throws Exception {
     mReadOnlyStoragePath = PathUtils.getDataDirectory() + "/read_only";
@@ -83,7 +83,7 @@ public class DiskStorageTest {
       byte[] buffer = new byte[] {0, 0, 0, 0};
       int bytesRead = newVersionFile.read(buffer, 0, 4);
       assertEquals(4, bytesRead);
-      assertTrue(Arrays.equals(new byte[] {1, 0, 0, 0}, buffer));
+      assertArrayEquals(new byte[] {1, 0, 0, 0}, buffer);
     } finally {
       if (newVersionFile != null) {
         newVersionFile.close();
@@ -98,7 +98,6 @@ public class DiskStorageTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Crashing on Android Cronet Builder, see crbug.com/601409.
   public void testPurgeOldVersion() throws Exception {
     String testStorage = getTestStorage();
@@ -144,14 +143,14 @@ public class DiskStorageTest {
       byte[] buffer = new byte[] {0, 0, 0, 0};
       int bytesRead = newVersionFile.read(buffer, 0, 4);
       assertEquals(4, bytesRead);
-      assertTrue(Arrays.equals(new byte[] {1, 0, 0, 0}, buffer));
+      assertArrayEquals(new byte[] {1, 0, 0, 0}, buffer);
     } finally {
       if (newVersionFile != null) {
         newVersionFile.close();
       }
     }
     oldPrefsFile = new File(testStorage + "/local_prefs.json");
-    assertTrue(!oldPrefsFile.exists());
+    assertFalse(oldPrefsFile.exists());
     File diskCacheDir = new File(testStorage + "/disk_cache");
     assertTrue(diskCacheDir.exists());
     File prefsDir = new File(testStorage + "/prefs");
@@ -161,7 +160,6 @@ public class DiskStorageTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @OnlyRunNativeCronet
   // Tests that if cache version is current, Cronet does not purge the directory.
   public void testCacheVersionCurrent() throws Exception {
     // Initialize a CronetEngine and shut it down.

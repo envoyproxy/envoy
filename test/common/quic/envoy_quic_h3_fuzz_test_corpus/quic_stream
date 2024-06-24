@@ -1,0 +1,12 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 0,
+      fin: false,
+      offset: 0,
+      junk: "\000"
+    }
+  }
+}

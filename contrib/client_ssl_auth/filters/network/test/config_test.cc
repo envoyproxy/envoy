@@ -43,10 +43,10 @@ ip_white_list:
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
-  context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -62,10 +62,10 @@ ip_white_list:
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
-  context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -79,15 +79,15 @@ ip_white_list:
 )EOF" + GetParam();
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
-  context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   ClientSslAuthConfigFactory factory;
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config =
       *dynamic_cast<envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth*>(
           factory.createEmptyConfigProto().get());
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -96,8 +96,10 @@ ip_white_list:
 TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(
-      ClientSslAuthConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth(), context),
+      ClientSslAuthConfigFactory()
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth(), context)
+          .IgnoreError(),
       ProtoValidationException);
 }
 

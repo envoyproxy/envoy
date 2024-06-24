@@ -14,7 +14,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tools/testdata/protoxform/external:external_protos",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_xds//udpa/annotations:pkg",
         "@com_google_googleapis//google/api:annotations_proto",
         "@com_google_protobuf//:any_proto",
         "@envoy_api//envoy/annotations:pkg",

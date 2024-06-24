@@ -2,7 +2,6 @@
 
 export NAME=double-proxy
 export MANUAL=true
-export DELAY=5
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"

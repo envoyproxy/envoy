@@ -5,6 +5,7 @@
 #include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
@@ -21,25 +22,36 @@ namespace {
 
 class XRayDriverTest : public ::testing::Test {
 public:
+  XRayDriverTest() {
+    // To ensure the start_time_ is set to zero for each test to avoid flakiness.
+    stream_info_.start_time_ = Envoy::SystemTime{};
+    // To ensure the monotonicTime is set to value larger than 1s for each test
+    // to avoid flakiness.
+    stream_info_.ts_.setMonotonicTime(std::chrono::seconds(2048));
+  }
+
   const std::string operation_name_ = "test_operation_name";
+  // The MockStreamInfo will register the singleton time system to SimulatedTimeSystem and ignore
+  // the TestRealTimeSystem in the MockTracerFactoryContext.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Tracing::MockConfig> tracing_config_;
-  Http::TestRequestHeaderMapImpl request_headers_{
+  Tracing::TestTraceContextImpl request_headers_{
       {":authority", "api.amazon.com"}, {":path", "/"}, {":method", "GET"}};
 };
 
 TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=0");
+  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;Sampled=0");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   ASSERT_NE(span, nullptr);
   auto* xray_span = static_cast<XRay::Span*>(span.get());
@@ -47,29 +59,29 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=1");
+  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;Sampled=1");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   ASSERT_NE(span, nullptr);
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;Sampled=");
+  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;Sampled=");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   // sampling should fall back to the default manifest since:
   // a) there is no valid sampling decision in the X-Ray header
@@ -79,7 +91,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
-  request_headers_.addCopy(std::string(XRayTraceHeader), "Root=1-272793;Parent=5398ad8;");
+  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;");
   // sampling rules with default fixed_target = 0 & rate = 0
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", R"EOF(
 {
@@ -94,8 +106,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   // sampling will not be done since:
   // a) there is no sampling decision in the X-Ray header
@@ -111,8 +123,8 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
   // sampling should fall back to the default manifest since:
   // a) there is no X-Ray header to determine the sampling decision
@@ -122,14 +134,14 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
 }
 
 TEST_F(XRayDriverTest, XForwardedForHeaderSet) {
-  request_headers_.addCopy(std::string(XForwardedForHeader), "191.251.191.251");
+  request_headers_.set(xForwardedForHeader().key(), "191.251.191.251");
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
 
   ASSERT_NE(span, nullptr);
@@ -144,8 +156,8 @@ TEST_F(XRayDriverTest, XForwardedForHeaderNotSet) {
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
-  Envoy::SystemTime start_time;
-  auto span = driver.startSpan(tracing_config_, request_headers_, operation_name_, start_time,
+
+  auto span = driver.startSpan(tracing_config_, request_headers_, stream_info_, operation_name_,
                                tracing_decision);
 
   ASSERT_NE(span, nullptr);

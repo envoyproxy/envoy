@@ -77,6 +77,10 @@ followed.
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
 
+Pictorially this looks like:
+
+![Histogram Stat Flush](histogram.png)
+
 `ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
 they keep an embedded reference count and are removed from the set and destroyed
 when the last strong reference disappears. Consequently, we must hold a lock for
@@ -295,3 +299,11 @@ from the same symbol table. To facilitate this, a test-only global singleton can
 be instantiated, via either `Stats::TestUtil::TestSymbolTable` or
 `Stats::TestUtil::TestStore`. All such structures use a singleton symbol-table
 whose lifetime is a single test method. This should resolve the assertion.
+
+
+Deferred Initialization of Stats
+================================
+
+When :ref:`enable_deferred_creation_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>`
+is enabled in Bootstrap, for stats that are deferred creation compatible, the actual stats struct creation
+is deferred to first access of any member of that stats, i.e. instantiation only happens when an invocation on operator "*" or "->" happens.

@@ -6,7 +6,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.os.ConditionVariable;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.IOException;
 import java.util.concurrent.Executor;
@@ -15,7 +14,6 @@ import org.chromium.net.UrlRequest.Status;
 import org.chromium.net.UrlRequest.StatusListener;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.OnlyRunNativeCronet;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.NativeTestServer;
 import org.chromium.net.testing.TestUploadDataProvider;
@@ -28,12 +26,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests that {@link org.chromium.net.impl.CronetUrlRequest#getStatus(StatusListener)} works as
  * expected.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class GetStatusTest {
 
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
@@ -149,7 +148,6 @@ public class GetStatusTest {
   @SmallTest
   @Feature({"Cronet"})
   // Regression test for crbug.com/606872.
-  @OnlyRunNativeCronet
   @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1519")
   public void testGetStatusForUpload() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();

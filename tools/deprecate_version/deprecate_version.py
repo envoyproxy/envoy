@@ -65,13 +65,18 @@ def create_issues(access_token, runtime_and_pr):
     issues = []
     for runtime_guard, pr, commit in runtime_and_pr:
         # Who is the author?
+        login = None
         if pr:
             # Extract PR title, number, and author.
-            pr_info = repo.get_pull(pr)
-            change_title = pr_info.title
             number = ('#%d') % pr
-            login = pr_info.user.login
-        else:
+            try:
+                pr_info = repo.get_pull(pr)
+                change_title = pr_info.title
+                login = pr_info.user.login
+            except github.GithubException:
+                print("Failed to fetch info for %s, trying backup method", number)
+
+        if not login:
             # Extract commit message, sha, and author.
             # Only keep commit message title (remove description), and truncate to 50 characters.
             change_title = commit.message.split('\n')[0][:50]
@@ -110,16 +115,23 @@ def create_issues(access_token, runtime_and_pr):
     if get_confirmation():
         print('Creating issues...')
         for title, body, login in issues:
+            issue_created = False
             try:
-                repo.create_issue(title, body=body, assignees=[login], labels=labels)
+                # for setec backports, we may not find a user, which would make
+                # create_issue crash.
+                if login:
+                    repo.create_issue(title, body=body, assignees=[login], labels=labels)
+                    issue_created = True
             except github.GithubException as e:
+                print((
+                    'unable to assign issue %s to %s. Add them to the Envoy proxy org'
+                    'and assign it their way.') % (title, login))
+
+            if not issue_created:
                 try:
                     if login:
                         body += '\ncc @' + login
                     repo.create_issue(title, body=body, labels=labels)
-                    print((
-                        'unable to assign issue %s to %s. Add them to the Envoy proxy org'
-                        'and assign it their way.') % (title, login))
                 except github.GithubException as e:
                     print('GithubException while creating issue.')
                     raise
@@ -134,7 +146,7 @@ def get_runtime_and_pr():
     # PR they were added.
     features_to_flip = []
 
-    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_reloadable_features_.*).;')
+    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_(reloadable|restart)_features_.*).;')
 
     removal_date = date.today() - datetime.timedelta(days=183)
     found_test_feature_true = False

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+
+std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
+  return os << "[" << range.begin() << "," << range.end() << ")";
+}
 
 absl::optional<RangeDetails>
 RangeUtils::createRangeDetails(const Envoy::Http::RequestHeaderMap& request_headers,

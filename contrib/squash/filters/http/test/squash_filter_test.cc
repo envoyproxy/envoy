@@ -17,7 +17,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -34,10 +33,10 @@ SquashFilterConfig constructSquashFilterConfigFromYaml(
     const std::string& yaml, NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
   envoy::extensions::filters::http::squash::v3::Squash proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  return SquashFilterConfig(proto_config, context.cluster_manager_);
+  return {proto_config, context.server_factory_context_.cluster_manager_};
 }
 
-void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
+void expectJsonEq(const std::string& expected, const std::string& actual) {
   ProtobufWkt::Struct actualjson;
   TestUtility::loadFromJson(actual, actualjson);
 
@@ -60,11 +59,11 @@ TEST(SquashFilterConfigTest, V2ApiConversion) {
   )EOF";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  factory_context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_EQ("fake_cluster", config.clusterName());
-  EXPECT_JSON_EQ("{\"a\":\"b\"}", config.attachmentJson());
+  expectJsonEq("{\"a\":\"b\"}", config.attachmentJson());
   EXPECT_EQ(std::chrono::milliseconds(1001), config.requestTimeout());
   EXPECT_EQ(std::chrono::milliseconds(2002), config.attachmentPollPeriod());
   EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
@@ -92,10 +91,10 @@ TEST(SquashFilterConfigTest, ParsesEnvironment) {
   const std::string expected_json = "{\"a\":\"\"}";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
 
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 TEST(SquashFilterConfigTest, ParsesAndEscapesEnvironment) {
@@ -110,9 +109,9 @@ TEST(SquashFilterConfigTest, ParsesAndEscapesEnvironment) {
   const std::string expected_json = "{\"a\":\"\\\"\"}";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 TEST(SquashFilterConfigTest, TwoEnvironmentVariables) {
@@ -128,9 +127,9 @@ TEST(SquashFilterConfigTest, TwoEnvironmentVariables) {
   const std::string expected_json = "{\"a\":\"1-2\"}";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
   auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 TEST(SquashFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
@@ -147,15 +146,16 @@ TEST(SquashFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   const std::string expected_json = R"EOF({"a":[{"e": "some-config-value"},{"c":"d"}]})EOF";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
-  EXPECT_JSON_EQ(expected_json, config.attachmentJson());
+  expectJsonEq(expected_json, config.attachmentJson());
 }
 
 class SquashFilterTest : public testing::Test {
 public:
   SquashFilterTest()
-      : request_(&factory_context_.cluster_manager_.thread_local_cluster_.async_client_) {}
+      : request_(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                      .async_client_) {}
 
 protected:
   void SetUp() override {}
@@ -163,11 +163,14 @@ protected:
   void initFilter() {
     envoy::extensions::filters::http::squash::v3::Squash p;
     p.set_cluster("squash");
-    factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"squash"});
-    config_ = std::make_shared<SquashFilterConfig>(p, factory_context_.cluster_manager_);
+    factory_context_.server_factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"squash"});
+    config_ = std::make_shared<SquashFilterConfig>(
+        p, factory_context_.server_factory_context_.cluster_manager_);
 
-    filter_ = std::make_shared<SquashFilter>(config_, factory_context_.cluster_manager_);
+    filter_ = std::make_shared<SquashFilter>(
+        config_, factory_context_.server_factory_context_.cluster_manager_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
@@ -181,9 +184,10 @@ protected:
     attachmentTimeout_timer_ =
         new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
-        .WillRepeatedly(
-            ReturnRef(factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                httpAsyncClient())
+        .WillRepeatedly(ReturnRef(factory_context_.server_factory_context_.cluster_manager_
+                                      .thread_local_cluster_.async_client_));
 
     expectAsyncClientSend();
 
@@ -211,7 +215,8 @@ protected:
   }
 
   void expectAsyncClientSend() {
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .async_client_,
                 send_(_, _, _))
         .WillOnce(Invoke(
             [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
@@ -260,10 +265,14 @@ protected:
 TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   initFilter();
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
-      .WillOnce(ReturnRef(factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              httpAsyncClient())
+      .WillOnce(ReturnRef(factory_context_.server_factory_context_.cluster_manager_
+                              .thread_local_cluster_.async_client_));
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+      send_(_, _, _))
       .WillOnce(Invoke(
           [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
@@ -300,7 +309,9 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 
 TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   initFilter();
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              httpAsyncClient())
+      .Times(0);
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
@@ -376,7 +387,8 @@ TEST_F(SquashFilterTest, PollingAttachmentNoCluster) {
   completeGetStatusRequest("attaching");
 
   // Expect the second get attachment request
-  ON_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("squash"))
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_,
+          getThreadLocalCluster("squash"))
       .WillByDefault(Return(nullptr));
   EXPECT_CALL(filter_callbacks_.dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(filter_callbacks_.dispatcher_, popTrackedObject(_));
@@ -474,7 +486,9 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
         attachmentTimeout_timer_->invokeCallback();
       }));
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+      send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
                            const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));

@@ -45,22 +45,24 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
   factory_context_.prepareSimulatedSystemTime();
 
   // Set featureEnabled for mongo_proxy
-  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.proxy_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("mongo.connection_logging_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.logging_enabled", 100))
       .WillByDefault(Return(true));
 
   // Set featureEnabled for thrift_proxy
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.thrift_filter_enabled", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.thrift_filter_enforcing", 100))
       .WillByDefault(Return(true));
-  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+  ON_CALL(factory_context_.server_factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.test_key.thrift_filter_enabled", 100))
       .WillByDefault(Return(true));
 }
@@ -83,7 +85,7 @@ void UberWriteFilterFuzzer::fuzz(
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
     ENVOY_LOG_MISC(debug, "Config content after decoded: {}", message->DebugString());
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
+    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_).value();
     // Add filter to connection_.
     cb_(write_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
@@ -103,7 +105,8 @@ void UberWriteFilterFuzzer::fuzz(
     case test::extensions::filters::network::WriteAction::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.server_factory_context_.mainThreadDispatcher(),
+          Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

@@ -119,6 +119,10 @@ cleanup () {
 
     bring_down_example
 
+    if type -t finally &> /dev/null; then
+        finally
+    fi
+
     if [[ "$code" -ne 0 ]]; then
         run_log Failed
     else
@@ -142,14 +146,23 @@ _curl () {
     }
 }
 
+move_if_exists () {
+    if [ -e "$1" ]; then
+        mv "$1" "$2"
+    else
+        echo "Warning: $1 does not exist. Skipping move operation."
+    fi
+}
+
 responds_with () {
     local expected response
     expected="$1"
     shift
     response=$(_curl "${@}")
-    grep -s "$expected" <<< "$response" || {
+    grep -Fs "$expected" <<< "$response" || {
         echo "ERROR: curl (${*})" >&2
-        echo "EXPECTED: $expected" >&2
+        echo "EXPECTED:" >&2
+        echo "$expected" >&2
         echo "RECEIVED:" >&2
         echo "$response" >&2
         return 1
@@ -178,7 +191,8 @@ responds_with_header () {
     response=$(_curl --head "${@}")
     grep -s "$expected" <<< "$response"  || {
         echo "ERROR: curl (${*})" >&2
-        echo "EXPECTED HEADER: $expected" >&2
+        echo "EXPECTED HEADER:" >&2
+        echo "$expected" >&2
         echo "RECEIVED:" >&2
         echo "$response" >&2
         return 1

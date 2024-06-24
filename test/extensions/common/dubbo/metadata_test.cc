@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "source/extensions/common/dubbo/message_impl.h"
+#include "source/extensions/common/dubbo/message.h"
 #include "source/extensions/common/dubbo/metadata.h"
 
 #include "gtest/gtest.h"
@@ -13,10 +13,6 @@ namespace {
 
 TEST(ContextTest, ContextTest) {
   Context context;
-
-  // Simple set and get of serialize type.
-  context.setSerializeType(SerializeType::Hessian2);
-  EXPECT_EQ(SerializeType::Hessian2, context.serializeType());
 
   // Simple set and get of message type.
   context.setMessageType(MessageType::HeartbeatResponse);
@@ -63,10 +59,10 @@ TEST(MessageMetadataTest, MessageMetadataTest) {
   auto context = std::make_unique<Context>();
   auto raw_context = context.get();
 
-  auto request = std::make_unique<RpcRequestImpl>();
+  auto request = std::make_unique<RpcRequest>("a", "b", "c", "d");
   auto raw_request = request.get();
 
-  auto response = std::make_unique<RpcResponseImpl>();
+  auto response = std::make_unique<RpcResponse>();
   auto raw_response = response.get();
 
   // Simple set and get of context.

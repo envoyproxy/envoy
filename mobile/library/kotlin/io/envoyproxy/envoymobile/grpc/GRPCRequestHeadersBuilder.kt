@@ -45,15 +45,20 @@ class GRPCRequestHeadersBuilder : HeadersBuilder {
    * @param authority The URL authority for the request (i.e., "api.foo.com").
    * @param path Path for the RPC (i.e., `/pb.api.v1.Foo/GetBar`).
    */
-  constructor(scheme: String, authority: String, path: String) : super(HeadersContainer(
-    mapOf<String, MutableList<String>>(
-      ":authority" to mutableListOf<String>(authority),
-      ":method" to mutableListOf<String>("POST"),
-      ":path" to mutableListOf<String>(path),
-      ":scheme" to mutableListOf<String>(scheme),
-      "content-type" to mutableListOf<String>("application/grpc"),
+  constructor(
+    scheme: String,
+    authority: String,
+    path: String
+  ) : super(
+    HeadersContainer(
+      mapOf<String, MutableList<String>>(
+        ":authority" to mutableListOf<String>(authority),
+        ":method" to mutableListOf<String>("POST"),
+        ":path" to mutableListOf<String>(path),
+        ":scheme" to mutableListOf<String>(scheme),
+        "content-type" to mutableListOf<String>("application/grpc"),
+      )
     )
-  )
   )
 
   /**

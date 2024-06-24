@@ -1,15 +1,16 @@
 #include "extension_registry.h"
 #include "gtest/gtest.h"
+#include "library/cc/engine_builder.h"
 #include "library/common/engine_common.h"
 
 namespace Envoy {
 
 TEST(EngineCommonTest, SignalHandlingFalse) {
   ExtensionRegistry::registerFactories();
-  auto options = std::make_unique<Envoy::OptionsImpl>();
-  options->setConfigYaml(
-      "{\"layered_runtime\":{\"layers\":[{\"name\":\"static_layer_0\",\"static_layer\":{"
-      "\"overload\":{\"global_downstream_max_connections\":50000}}}]}}");
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
+
+  Platform::EngineBuilder builder;
+  options->setConfigProto(builder.generateBootstrap());
   EngineCommon main_common{std::move(options)};
   ASSERT_FALSE(main_common.server()->options().signalHandlingEnabled());
 }

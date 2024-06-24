@@ -60,28 +60,28 @@ public:
       InSequence s;
 
 #ifdef WIN32
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
       if (http2) {
         for (size_t i = 0; i < data.size(); i++) {
-          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
               .WillOnce(Invoke(
-                  [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                    ASSERT(iov->iov_len >= data.size());
-                    memcpy(iov->iov_base, data.data() + i, 1);
+                  [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                    ASSERT(length >= data.size());
+                    memcpy(buffer, data.data() + i, 1);
                     return Api::SysCallSizeResult{ssize_t(1), 0};
                   }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       } else {
         for (size_t i = 0; i < header.size(); i++) {
-          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-              .WillOnce(Invoke(
-                  [&header, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                    ASSERT(iov->iov_len >= header.size());
-                    memcpy(iov->iov_base, header.data() + i, 1);
-                    return Api::SysCallSizeResult{ssize_t(1), 0};
-                  }))
+          EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
+                                            int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data() + i, 1);
+                return Api::SysCallSizeResult{ssize_t(1), 0};
+              }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       }
@@ -117,7 +117,7 @@ public:
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
     while (!got_continue) {
-      file_event_callback_(Event::FileReadyType::Read);
+      ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
       auto status = filter_->onData(*buffer_);
       if (status == Network::FilterStatus::Continue) {
         got_continue = true;
@@ -135,28 +135,28 @@ public:
       InSequence s;
 
 #ifdef WIN32
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
       if (alpn == Http::Utility::AlpnNames::get().Http2c) {
         for (size_t i = 0; i < 24; i++) {
-          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+          EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
               .WillOnce(Invoke(
-                  [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                    ASSERT(iov->iov_len >= data.size());
-                    memcpy(iov->iov_base, data.data() + i, 1);
+                  [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                    ASSERT(length >= data.size());
+                    memcpy(buffer, data.data() + i, 1);
                     return Api::SysCallSizeResult{ssize_t(1), 0};
                   }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       } else {
         for (size_t i = 0; i < header.size(); i++) {
-          EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-              .WillOnce(Invoke(
-                  [&header, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                    ASSERT(iov->iov_len >= header.size());
-                    memcpy(iov->iov_base, header.data() + i, 1);
-                    return Api::SysCallSizeResult{ssize_t(1), 0};
-                  }))
+          EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
+                                            int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data() + i, 1);
+                return Api::SysCallSizeResult{ssize_t(1), 0};
+              }))
               .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
         }
       }
@@ -194,7 +194,7 @@ public:
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
     while (!got_continue) {
-      file_event_callback_(Event::FileReadyType::Read);
+      ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
       auto status = filter_->onData(*buffer_);
       if (status == Network::FilterStatus::Continue) {
         got_continue = true;
@@ -216,20 +216,20 @@ public:
     std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
     if (alpn == Http::Utility::AlpnNames::get().Http2c) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(
-              Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= data.size());
-                memcpy(iov->iov_base, data.data(), data.size());
+              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
                 return Api::SysCallSizeResult{ssize_t(data.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-          .WillOnce(
-              Invoke([&header](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= header.size());
-                memcpy(iov->iov_base, header.data(), header.size());
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+          .WillOnce(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
@@ -258,7 +258,7 @@ public:
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-    file_event_callback_(Event::FileReadyType::Read);
+    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
     EXPECT_EQ(status, Network::FilterStatus::Continue);
     if (alpn == Http::Utility::AlpnNames::get().Http11) {
@@ -277,20 +277,20 @@ public:
     std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
     if (http2) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(
-              Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= data.size());
-                memcpy(iov->iov_base, data.data(), data.size());
+              Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
                 return Api::SysCallSizeResult{ssize_t(data.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     } else {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-          .WillOnce(
-              Invoke([&header](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= header.size());
-                memcpy(iov->iov_base, header.data(), header.size());
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+          .WillOnce(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
@@ -317,7 +317,7 @@ public:
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-    file_event_callback_(Event::FileReadyType::Read);
+    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
     EXPECT_EQ(status, Network::FilterStatus::Continue);
     EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
@@ -447,12 +447,13 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   const std::string header = "505249202a20485454502f322e300d0a";
   std::vector<uint8_t> data = Hex::decode(std::string(header));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-      .WillOnce(Invoke([&data](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-        ASSERT(iov->iov_len >= data.size());
-        memcpy(iov->iov_base, data.data(), data.size());
-        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-      }))
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          }))
       .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -466,7 +467,7 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-  file_event_callback_(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto status = filter_->onData(*buffer_);
   EXPECT_EQ(status, Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
@@ -520,7 +521,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   {
     InSequence s;
 #ifdef WIN32
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
 #else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
@@ -537,16 +538,15 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
 #ifdef WIN32
     auto ctr = std::make_shared<size_t>(0);
     auto copy_len = std::make_shared<size_t>(1);
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .Times(num_loops)
-        .WillRepeatedly(
-            Invoke([&data, ctr, copy_len, num_loops](os_fd_t fd, const iovec* iov,
-                                                     int iovcnt) -> Api::SysCallSizeResult {
-              ASSERT(iov->iov_len >= 1);
-              memcpy(iov->iov_base, data.data() + *ctr, 1);
-              *ctr += 1;
-              return Api::SysCallSizeResult{ssize_t(1), 0};
-            }));
+        .WillRepeatedly(Invoke([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
+                                                       int) -> Api::SysCallSizeResult {
+          ASSERT(length >= 1);
+          memcpy(buffer, data.data() + *ctr, 1);
+          *ctr += 1;
+          return Api::SysCallSizeResult{ssize_t(1), 0};
+        }));
 #else
     auto ctr = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -572,7 +572,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   while (!got_continue) {
-    file_event_callback_(Event::FileReadyType::Read);
+    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
     if (status == Network::FilterStatus::Continue) {
       got_continue = true;
@@ -591,14 +591,14 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   {
     InSequence s;
 #ifdef WIN32
-    EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     for (size_t i = 0; i < 20; i++) {
-      EXPECT_CALL(os_sys_calls_, readv(_, _, _))
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Invoke(
-              [&data, i](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
-                ASSERT(iov->iov_len >= 20);
-                memcpy(iov->iov_base, data.data() + i, 1);
+              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= 20);
+                memcpy(buffer, data.data() + i, 1);
                 return Api::SysCallSizeResult{ssize_t(1), 0};
               }))
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
@@ -626,7 +626,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   while (!got_continue) {
-    file_event_callback_(Event::FileReadyType::Read);
+    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
     if (status == Network::FilterStatus::Continue) {
       got_continue = true;

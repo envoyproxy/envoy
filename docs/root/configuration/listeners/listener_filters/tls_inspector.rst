@@ -35,15 +35,50 @@ Statistics
 
 This filter has a statistics tree rooted at *tls_inspector* with the following statistics:
 
-.. csv-table::
-  :header: Name, Type, Description
+.. list-table::
+  :header-rows: 1
   :widths: 1, 1, 2
 
-  client_hello_too_large, Counter, Total unreasonably large Client Hello received
-  tls_found, Counter, Total number of times TLS was found
-  tls_not_found, Counter, Total number of times TLS was not found
-  alpn_found, Counter, Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ was successful
-  alpn_not_found, Counter, Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ has failed
-  sni_found, Counter, Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was found
-  sni_not_found, Counter, Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was not found
+  * - Name
+    - Type
+    - Description
+
+  * - client_hello_too_large
+    - Counter
+    - total unreasonably large client hello received
+
+  * - tls_found
+    - Counter
+    - Total number of times TLS was found
+
+  * - tls_not_found
+    - Counter
+    - Total number of times TLS was not found
+
+  * - alpn_found
+    - Counter
+    - Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ was successful
+
+  * - alpn_not_found
+    - Counter
+    - Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ has failed
+
+  * - sni_found
+    - Counter
+    - Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was found
+
+  * - sni_not_found
+    - Counter
+    - Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was not found
+
+  * - bytes_processed
+    - Histogram
+    - Records sizes which records the number of bytes the tls_inspector processed while analyzing for tls usage.
+      If the connection uses TLS: this is the size of client hello. If the client hello is too large, then the
+      recorded value will be 64KiB which is the maximum client hello size.
+      If the connection does not use TLS: it is the number of bytes processed
+      until the inspector determined the connection was not using TLS.
+      If the connection terminates early nothing is recorded if we didn't have
+      sufficient bytes for either of the cases above.
+
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/http/early_header_mutation.h"
 
 #include "gmock/gmock.h"

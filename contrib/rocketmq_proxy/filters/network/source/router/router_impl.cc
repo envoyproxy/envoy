@@ -16,7 +16,7 @@ namespace RocketmqProxy {
 namespace Router {
 
 RouterImpl::RouterImpl(Envoy::Upstream::ClusterManager& cluster_manager)
-    : cluster_manager_(cluster_manager), handle_(nullptr), active_message_(nullptr) {}
+    : cluster_manager_(cluster_manager) {}
 
 RouterImpl::~RouterImpl() {
   if (handle_) {

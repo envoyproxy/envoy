@@ -50,6 +50,9 @@ public:
       break;
     }
 
+    spawn_upstream_span_ =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, spawn_upstream_span, false);
+
     for (const auto& tag : tracing_config.custom_tags()) {
       custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
     }
@@ -101,6 +104,7 @@ public:
   Tracing::OperationName operationName() const override { return operation_name_; }
   bool verbose() const override { return verbose_; }
   uint32_t maxPathTagLength() const override { return max_path_tag_length_; }
+  bool spawnUpstreamSpan() const override { return spawn_upstream_span_; }
 
   // TODO(wbpcode): keep this field be public for compatibility. Then the HCM needn't change much
   // code to use this config.
@@ -111,6 +115,7 @@ public:
   envoy::type::v3::FractionalPercent overall_sampling_;
   bool verbose_{};
   uint32_t max_path_tag_length_{};
+  bool spawn_upstream_span_{};
 };
 
 } // namespace Tracing

@@ -1,4 +1,5 @@
+#pragma once
 
 #import <Foundation/Foundation.h>
 
-#import "test/swift/integration/test_extensions.h"
+#import "external/envoy_build_config/test_extensions.h"

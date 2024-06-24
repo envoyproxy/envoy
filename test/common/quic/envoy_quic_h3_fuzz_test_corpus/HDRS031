@@ -1,0 +1,71 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "https"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "delete"
+            }
+            headers {
+              key: "content-type"
+              value: "text/html; charset=UTF-8"
+            }
+            headers {
+              key: "via"
+              value: "empty"
+            }
+            headers {
+              key: "expires"
+              value: "empty"
+            }
+            headers {
+              key: "content-range"
+              value: "empty"
+            }
+            headers {
+              key: "expect"
+              value: "100-continue"
+            }
+            headers {
+              key: "-overloaded"
+              value: "true"
+            }
+            headers {
+              key: "-original-path"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -10,21 +10,34 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
+using AwsRequestSigningProtoConfig =
+    envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning;
+
+using AwsRequestSigningProtoPerRouteConfig =
+    envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute;
+
 /**
  * Config registration for the AWS request signing filter.
  */
 class AwsRequestSigningFilterFactory
-    : public Common::FactoryBase<
-          envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning> {
+    : public Common::DualFactoryBase<AwsRequestSigningProtoConfig,
+                                     AwsRequestSigningProtoPerRouteConfig> {
 public:
-  AwsRequestSigningFilterFactory() : FactoryBase("envoy.filters.http.aws_request_signing") {}
+  AwsRequestSigningFilterFactory() : DualFactoryBase("envoy.filters.http.aws_request_signing") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning&
-          proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProtoTyped(const AwsRequestSigningProtoConfig& proto_config,
+                                    const std::string& stats_prefix, DualInfo dual_info,
+                                    Server::Configuration::ServerFactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& per_route_config,
+                                       Server::Configuration::ServerFactoryContext& context,
+                                       ProtobufMessage::ValidationVisitor&) override;
 };
+
+using UpstreamAwsRequestSigningFilterFactory = AwsRequestSigningFilterFactory;
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters

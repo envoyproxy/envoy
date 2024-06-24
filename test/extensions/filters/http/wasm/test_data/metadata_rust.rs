@@ -15,7 +15,7 @@ impl Context for TestRoot {}
 
 impl RootContext for TestRoot {
     fn on_tick(&mut self) {
-        if let Some(value) = self.get_property(vec!["node", "metadata", "wasm_node_get_key"]) {
+        if let Some(value) = self.get_property(vec!["xds", "node", "metadata", "wasm_node_get_key"]) {
             debug!("onTick {}", String::from_utf8(value).unwrap());
         } else {
             debug!("missing node metadata");
@@ -30,7 +30,7 @@ impl Context for TestStream {}
 impl HttpContext for TestStream {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         if self
-            .get_property(vec!["node", "metadata", "wasm_node_get_key"])
+            .get_property(vec!["xds", "node", "metadata", "wasm_node_get_key"])
             .is_none()
         {
             debug!("missing node metadata");

@@ -120,6 +120,7 @@ envoy_cc_test(
     srcs = ["route_matcher_test.cc"],
     deps = [
         "//contrib/rocketmq_proxy/filters/network/source/router:route_matcher",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg_cc_proto",
     ],

@@ -5,6 +5,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_signal_trace",
 )
 
 licenses(["notice"])  # Apache 2
@@ -31,10 +32,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/common/signal:sigaction_lib"],
-    }),
+    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
 envoy_cc_test_library(
@@ -139,6 +137,8 @@ envoy_cc_test_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codec_interface",
         "//envoy/network:address_interface",
+        "//envoy/server/overload:thread_local_overload_state",
+        "//envoy/tracing:trace_context_interface",
         "//source/common/api:api_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
@@ -294,6 +294,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "stats_utility_lib",
+    hdrs = ["stats_utility.h"],
+    deps = [
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+    ],
+)
+
+envoy_cc_test_library(
     name = "status_utility_lib",
     hdrs = ["status_utility.h"],
 )
@@ -356,7 +365,7 @@ envoy_basic_cc_library(
 
 envoy_cc_test_library(
     name = "delegating_route_utility_lib",
-    srcs = ["delegating_route_utility.h"],
+    hdrs = ["delegating_route_utility.h"],
     deps = [
         "//source/common/router:delegating_route_lib",
     ],

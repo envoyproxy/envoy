@@ -67,7 +67,7 @@ envoy_cc_mock(
         "//envoy/http:conn_pool_interface",
         "//envoy/http:filter_interface",
         "//envoy/ssl:connection_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/http:conn_manager_config_interface",
         "//source/common/http:filter_manager_lib",
         "//source/common/http:header_map_lib",

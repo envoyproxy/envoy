@@ -1,4 +1,5 @@
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -17,14 +18,15 @@ class QuicServerTransportSocketFactoryConfigTest : public Event::TestUsingSimula
 public:
   QuicServerTransportSocketFactoryConfigTest()
       : server_api_(Api::createApiForTest(server_stats_store_, simTime())) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     Network::DownstreamTransportSocketFactoryPtr transport_socket_factory =
-        config_factory_.createTransportSocketFactory(proto_config, context_, {});
+        *config_factory_.createTransportSocketFactory(proto_config, context_, {});
     EXPECT_EQ(expect_early_data,
               static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
                   .earlyDataEnabled());
@@ -34,6 +36,7 @@ public:
   Stats::TestUtil::TestStore server_stats_store_;
   Api::ApiPtr server_api_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, EarlyDataEnabledByDefault) {
@@ -42,12 +45,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
 
   verifyQuicServerTransportSocketFactory(yaml, true);
@@ -59,12 +62,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 enable_early_data:
   value: false
 )EOF");
@@ -78,12 +81,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 enable_early_data:
   value: true
 )EOF");
@@ -98,12 +101,12 @@ downstream_tls_context:
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
   EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
                             "TLS Client Authentication is not supported over QUIC");
@@ -112,22 +115,32 @@ downstream_tls_context:
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
-    factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
-    factory_->initialize();
+    factory_ = *Quic::QuicClientTransportSocketFactory::create(
+        std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-  absl::optional<Quic::QuicClientTransportSocketFactory> factory_;
+  std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{
       new NiceMock<Ssl::MockClientContextConfig>};
   std::function<void()> update_callback_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
+TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
+  context_config_->alpn_ = "h3,h3-draft29";
+  factory_->initialize();
+  EXPECT_THAT(factory_->supportedAlpnProtocols(), testing::ElementsAre("h3", "h3-draft29"));
+}
+
 TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
+  factory_->initialize();
+  EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
   Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};

@@ -1,53 +1,86 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseHeaders
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.After
+import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+private const val ASSERTION_FILTER_TEXT_PROTO =
+  """
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+    match_config: {
+      http_request_headers_match: {
+        headers: { name: ':method', exact_match: 'GET' }
+        headers: { name: ':scheme', exact_match: 'https' }
+        headers: { name: ':path', exact_match: '/simple.txt' }
+      }
+    }
+  }
+"""
 
+@RunWith(RobolectricTestRunner::class)
 class SendHeadersTest {
-
   init {
     JniLibrary.loadTestLibrary()
+  }
+
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
+
+  @Before
+  fun setUp() {
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+  }
+
+  @After
+  fun tearDown() {
+    httpTestServer.shutdown()
   }
 
   @Test
   fun `successful sending of request headers`() {
     val headersExpectation = CountDownLatch(1)
 
-    val engine = EngineBuilder(Standard())
-    .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
-    .build()
+    val engine =
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
+        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
+        .build()
     val client = engine.streamClient()
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(
+          method = RequestMethod.GET,
+          scheme = "https",
+          authority = httpTestServer.address,
+          path = "/simple.txt"
+        )
+        .build()
 
     var resultHeaders: ResponseHeaders? = null
     var resultEndStream: Boolean? = null
-    client.newStreamPrototype()
+    client
+      .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, endStream, _ ->
         resultHeaders = responseHeaders
         resultEndStream = endStream
         headersExpectation.countDown()
       }
-      .setOnResponseData { _, endStream, _ ->
-        resultEndStream = endStream
-      }
+      .setOnResponseData { _, endStream, _ -> resultEndStream = endStream }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)

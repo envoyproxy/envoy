@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "utility_lib",
@@ -12,7 +12,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "@envoy//source/common/stats:utility_lib",
     ],
 )

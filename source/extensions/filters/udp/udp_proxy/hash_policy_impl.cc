@@ -1,5 +1,7 @@
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 

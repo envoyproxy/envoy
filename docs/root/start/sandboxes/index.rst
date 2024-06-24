@@ -42,42 +42,4 @@ Before you begin you will need to install the sandbox environment.
 
 The following sandboxes are available:
 
-.. toctree::
-    :maxdepth: 1
-
-    brotli
-    cache
-    cors
-    csrf
-    double-proxy
-    dynamic-configuration-filesystem
-    dynamic-configuration-control-plane
-    ext_authz
-    fault_injection
-    front_proxy
-    golang
-    grpc_bridge
-    gzip
-    jaeger_native_tracing
-    jaeger_tracing
-    kafka
-    load_reporting_service
-    locality_load_balancing
-    local_ratelimit
-    lua
-    mysql
-    opentelemetry
-    postgres
-    rbac
-    redis
-    route-mirror
-    skywalking
-    tls-inspector
-    tls-sni
-    tls
-    udp
-    wasm-cc
-    websocket
-    win32_front_proxy
-    zipkin
-    zstd
+.. include:: toctree.rst

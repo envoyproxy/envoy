@@ -4,6 +4,7 @@
 #include "test/mocks/stats/mocks.h"
 
 #include "contrib/kafka/filters/network/source/broker/filter.h"
+#include "contrib/kafka/filters/network/source/broker/filter_config.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,6 +32,15 @@ public:
 };
 
 using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
+
+class MockResponseRewriter : public ResponseRewriter {
+public:
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
+  MOCK_METHOD(void, process, (Buffer::Instance&));
+};
+
+using MockResponseRewriterSharedPtr = std::shared_ptr<MockResponseRewriter>;
 
 class MockResponseDecoder : public ResponseDecoder {
 public:
@@ -92,12 +102,13 @@ public:
 class KafkaBrokerFilterUnitTest : public testing::Test {
 protected:
   MockKafkaMetricsFacadeSharedPtr metrics_{std::make_shared<MockKafkaMetricsFacade>()};
+  MockResponseRewriterSharedPtr response_rewriter_{std::make_shared<MockResponseRewriter>()};
   MockResponseDecoderSharedPtr response_decoder_{std::make_shared<MockResponseDecoder>()};
   MockRequestDecoderSharedPtr request_decoder_{std::make_shared<MockRequestDecoder>()};
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
-  KafkaBrokerFilter testee_{metrics_, response_decoder_, request_decoder_};
+  KafkaBrokerFilter testee_{metrics_, response_rewriter_, response_decoder_, request_decoder_};
 
   void initialize() {
     testee_.initializeReadFilterCallbacks(filter_callbacks_);
@@ -138,6 +149,7 @@ TEST_F(KafkaBrokerFilterUnitTest, ShouldAcceptDataSentByKafkaBroker) {
   // given
   Buffer::OwnedImpl data;
   EXPECT_CALL(*response_decoder_, onData(_));
+  EXPECT_CALL(*response_rewriter_, process(_));
 
   // when
   initialize();

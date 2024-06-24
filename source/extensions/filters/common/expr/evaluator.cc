@@ -1,6 +1,7 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/singleton/manager.h"
 
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
@@ -15,7 +16,7 @@ namespace {
 
 #define ACTIVATION_TOKENS(_f)                                                                      \
   _f(Request) _f(Response) _f(Connection) _f(Upstream) _f(Source) _f(Destination) _f(Metadata)     \
-      _f(FilterState) _f(XDS)
+      _f(FilterState) _f(XDS) _f(UpstreamFilterState)
 
 #define _DECLARE(_t) _t,
 enum class ActivationToken { ACTIVATION_TOKENS(_DECLARE) };
@@ -33,15 +34,19 @@ const ActivationLookupTable& getActivationTokens() {
 
 absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
                                                      Protobuf::Arena* arena) const {
-  if (activation_info_ == nullptr) {
-    return {};
-  }
-  const StreamInfo::StreamInfo& info = *activation_info_;
   const auto& tokens = getActivationTokens();
   const auto token = tokens.find(name);
   if (token == tokens.end()) {
     return {};
   }
+  if (token->second == ActivationToken::XDS) {
+    return CelValue::CreateMap(
+        Protobuf::Arena::Create<XDSWrapper>(arena, *arena, activation_info_, local_info_));
+  }
+  if (activation_info_ == nullptr) {
+    return {};
+  }
+  const StreamInfo::StreamInfo& info = *activation_info_;
   switch (token->second) {
   case ActivationToken::Request:
     return CelValue::CreateMap(
@@ -63,27 +68,36 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
     return CelValue::CreateMap(
         Protobuf::Arena::Create<FilterStateWrapper>(arena, *arena, info.filterState()));
   case ActivationToken::XDS:
-    return CelValue::CreateMap(Protobuf::Arena::Create<XDSWrapper>(arena, *arena, info));
-  };
+    return {};
+  case ActivationToken::UpstreamFilterState:
+    if (info.upstreamInfo().has_value() &&
+        info.upstreamInfo().value().get().upstreamFilterState() != nullptr) {
+      return CelValue::CreateMap(Protobuf::Arena::Create<FilterStateWrapper>(
+          arena, *arena, *info.upstreamInfo().value().get().upstreamFilterState()));
+    }
+  }
   return {};
 }
 
 void StreamActivation::resetActivation() const {
+  local_info_ = nullptr;
   activation_info_ = nullptr;
   activation_request_headers_ = nullptr;
   activation_response_headers_ = nullptr;
   activation_response_trailers_ = nullptr;
 }
 
-ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
+                               const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers) {
-  return std::make_unique<StreamActivation>(info, request_headers, response_headers,
+  return std::make_unique<StreamActivation>(local_info, info, request_headers, response_headers,
                                             response_trailers);
 }
 
 BuilderPtr createBuilder(Protobuf::Arena* arena) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -110,6 +124,14 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   return builder;
 }
 
+SINGLETON_MANAGER_REGISTRATION(expression_builder);
+
+BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
+  return context.singletonManager().getTyped<BuilderInstance>(
+      SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
+      [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
+}
+
 ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {
   google::api::expr::v1alpha1::SourceInfo source_info;
   auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
@@ -121,11 +143,13 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 }
 
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
+                                  const LocalInfo::LocalInfo* local_info,
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers) {
-  auto activation = createActivation(info, request_headers, response_headers, response_trailers);
+  auto activation =
+      createActivation(local_info, info, request_headers, response_headers, response_trailers);
   auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
@@ -137,7 +161,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr);
+  auto eval_status = Expr::evaluate(expr, arena, nullptr, info, &headers, nullptr, nullptr);
   if (!eval_status.has_value()) {
     return false;
   }

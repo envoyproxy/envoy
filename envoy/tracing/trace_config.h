@@ -22,6 +22,11 @@ public:
   virtual OperationName operationName() const PURE;
 
   /**
+   * @return create separated child span for upstream request if true.
+   */
+  virtual bool spawnUpstreamSpan() const PURE;
+
+  /**
    * @return custom tags to be attached to the active span.
    */
   virtual const CustomTagMap* customTags() const PURE;
@@ -79,6 +84,11 @@ public:
    * @return operation name for tracing, e.g., ingress.
    */
   virtual OperationName operationName() const PURE;
+
+  /**
+   * @return create separated child span for upstream request if true.
+   */
+  virtual bool spawnUpstreamSpan() const PURE;
 
   /**
    * @return true if spans should be annotated with more detailed information.

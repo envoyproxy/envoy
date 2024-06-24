@@ -41,7 +41,6 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
 domain: "test"
 timeout: "1.337s"
 rate_limit_service:
-  transport_api_version: V3
   grpc_service:
     envoy_grpc:
       cluster_name: ratelimit_cluster
@@ -51,8 +50,9 @@ rate_limit_service:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Invoke([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
       }));
 

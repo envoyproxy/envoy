@@ -20,9 +20,7 @@ namespace Router {
 
 class ConfigTraitsImpl : public Rds::ConfigTraits {
 public:
-  ConfigTraitsImpl(const OptionalHttpFilters& optional_http_filters,
-                   ProtobufMessage::ValidationVisitor& validator)
-      : optional_http_filters_(optional_http_filters), validator_(validator) {}
+  ConfigTraitsImpl(ProtobufMessage::ValidationVisitor& validator) : validator_(validator) {}
 
   Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
@@ -30,17 +28,14 @@ public:
                                          bool validate_clusters_default) const override;
 
 private:
-  const OptionalHttpFilters optional_http_filters_;
   ProtobufMessage::ValidationVisitor& validator_;
 };
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                const OptionalHttpFilters& optional_http_filters)
-      : config_traits_(optional_http_filters,
-                       factory_context.messageValidationContext().dynamicValidationVisitor()),
+                                Server::Configuration::ServerFactoryContext& factory_context)
+      : config_traits_(factory_context.messageValidationContext().dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context) {}
 
   using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;

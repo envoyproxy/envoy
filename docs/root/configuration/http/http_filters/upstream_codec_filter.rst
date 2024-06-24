@@ -3,7 +3,7 @@
 Upstream Codec
 ==============
 
-The upstream codec filter is the only supported terminal filter for upstream filters.
+The upstream codec filter is the only supported terminal filter for upstream HTTP filters.
 It is responsible for encoding headers/body/data to the upstream codec, and decoding
 headers/body/data from the upstream codec, as well as updating stats and timing metrics.
 

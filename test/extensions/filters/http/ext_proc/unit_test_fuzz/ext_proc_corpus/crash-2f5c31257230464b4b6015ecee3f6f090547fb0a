@@ -1,0 +1,43 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  }
+  response_attributes: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  response_attributes: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  mutation_rules {
+    allow_expression {
+      regex: "!"
+    }
+  }
+  max_message_timeout {
+  }
+}
+request {
+}
+response {
+  request_body {
+  }
+  dynamic_metadata {
+    fields {
+      key: ""
+      value {
+        list_value {
+          values {
+            bool_value: false
+          }
+        }
+      }
+    }
+    fields {
+      key: ""
+      value {
+        string_value: ""
+      }
+    }
+  }
+  mode_override {
+    request_trailer_mode: SEND
+  }
+}

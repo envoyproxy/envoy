@@ -35,14 +35,14 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
     const auto& uri = ssl->uriSanPeerCertificate();
     if (!uri.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               absl::StrJoin(uri, ",")};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
@@ -63,14 +63,14 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
     const auto& dns = ssl->dnsSansPeerCertificate();
     if (!dns.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               absl::StrJoin(dns, ",")};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 
@@ -91,14 +91,14 @@ public:
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto& ssl = data.ssl();
     if (!ssl) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
     const auto& subject = ssl->subjectPeerCertificate();
     if (!subject.empty()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               std::string(subject)};
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 };
 

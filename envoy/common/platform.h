@@ -329,3 +329,9 @@ struct mmsghdr {
 // On non-Linux platforms use 128 which is libevent listener default
 #define ENVOY_TCP_BACKLOG_SIZE 128
 #endif
+
+#if defined(__linux__)
+#define ENVOY_PLATFORM_ENABLE_SEND_RST 1
+#else
+#define ENVOY_PLATFORM_ENABLE_SEND_RST 0
+#endif

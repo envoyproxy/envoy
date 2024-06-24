@@ -1,0 +1,187 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.grpc_field_extraction.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_field_extraction.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_field_extraction/v3;grpc_field_extractionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: gRPC Field Extraction]
+//
+// [#extension: envoy.filters.http.grpc_field_extraction]
+//
+// Overview
+// --------
+//
+// This filter supports extracting the fields from the first gRPC
+// request message no matter if it is unary or streaming and writing the result
+// to the destination, for which currently only the static Envoy dynamic metadata `envoy.filters.http.grpc_field_extraction` is supported.
+//
+// Assumptions
+// -----------
+//
+// This filter assumes
+//
+// 1. this filter is only applicable for gRPC with Protobuf as payload.
+// 2. for bi-directional and client-side gRPC streaming, the initial message from the client should not depend on receiving the server initial metadata.
+//
+// Process Flow
+// ------------
+//
+// When a request reaches the filter, it will check
+//
+// 1. if the request is the gRPC request configured for extraction, the filter tries to:
+//
+//   a. block the incoming data before decoding the first complete gRPC message
+//   b. look up the target field from the buffered gRPC message
+//   c. write the extraction result into the dynamic metadata and resume the request propagation.
+//
+// 2. otherwise, pass through the request.
+//
+// If the request is a malformed one found during 1.a or 1.b, the filter will reject the request.
+//
+// Config Requirements
+// -------------------
+//
+// Here are config requirements
+//
+// 1. the target field should be among the following primitive types: `string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
+//
+// 2. the target field could be repeated.
+//
+// 3. the intermediate type could also be repeated.
+//
+// Output Format
+// -------------
+//
+// 1. the extracted field names/values will be wrapped in be ``field<StringValue>`` -> ``values<ListValue of StringValue>``, which will be added in the dynamic ``metadata<google.protobuf.Struct>``.
+//
+// 2. if the field value is empty, a empty ``<ListValue>`` will be set.
+//
+// Performance
+// -----------
+//
+// This filter should be performant as it
+//
+// 1. converts between the gRPC message from EnvoyBuffer without data copy.
+// 2. parse the gRPC message binary directly without deserialization.
+//
+// though buffering the first message introduces some latency.
+//
+// Example
+// -------
+//
+// We have the following request definition for the gRPC method `pkg.svc.Method`.
+//
+// .. code-block:: proto
+//
+// 	message MethodRequest {
+// 	  string foo = 1;
+// 	  Nested nested = 2;
+// 	  uint32 baz = 3;
+// 	  ...
+// 	}
+//
+// 	message Nested {
+// 	 repeated string bar = 1;
+// 	}
+//
+// This is the filter config in JSON.
+//
+// .. code-block:: json
+//
+// 	{
+// 	  "descriptor_set":{},
+// 	  "extractions_by_method":{
+// 	     "pkg.svc.Method":{
+// 	        "request_field_extractions":{
+// 	           "foo":{
+// 	           },
+// 	           "nested.bar":{
+// 	           }
+// 	           "baz":{
+// 	           }
+// 	        }
+// 	     }
+// 	  }
+// 	}
+//
+// During runtime, the filter receives the following `MethodRequest` message in JSON.
+//
+// .. code-block:: json
+//
+// 	{
+// 	  "foo": "val_foo",
+// 	  "nested": { "bar": ["val_bar1", "val_bar2"]}
+// 	}
+//
+// The filter will write the following dynamic metadata(`envoy.filters.http.grpc_field_extraction`) in JSON.
+//
+// .. code-block:: json
+//
+// 	{
+// 	  "foo":[
+// 	     "val_foo"
+// 	  ],
+// 	  "nested.bar":[
+// 	     "val_bar1", "val_bar2"
+// 	  ]
+// 	  "baz":[
+// 	  ]
+// 	}
+
+message GrpcFieldExtractionConfig {
+  // The proto descriptor set binary for the gRPC services.
+  //
+  // It could be passed by a local file through ``Datasource.filename`` or embedded in the
+  // ``Datasource.inline_bytes``.
+  config.core.v3.DataSource descriptor_set = 1 [(validate.rules).message = {required: true}];
+
+  // Specify the extraction info.
+  // The key is the fully qualified gRPC method name.
+  // ``${package}.${Service}.${Method}``, like
+  // ``endpoints.examples.bookstore.BookStore.GetShelf``
+  //
+  // The value is the field extractions for individual gRPC method.
+  map<string, FieldExtractions> extractions_by_method = 2;
+}
+
+// This message can be used to support per route config approach later even
+// though the Istio doesn't support that so far.
+message FieldExtractions {
+  // The field extractions for requests.
+  // The key is the field path within the grpc request.
+  // For example, we can define ``foo.bar.name`` if we want to extract
+  // ``Request.foo.bar.name``.
+  //
+  // .. code-block:: proto
+  //
+  //  message Request {
+  //    Foo foo = 1;
+  //  }
+  //
+  //  message Foo {
+  //    Bar bar = 1;
+  //  }
+  //
+  //  message Bar {
+  //    string name = 1;
+  //  }
+  map<string, RequestFieldValueDisposition> request_field_extractions = 1;
+}
+
+message RequestFieldValueDisposition {
+  oneof disposition {
+    // The dynamic metadata namespace. If empty, "envoy.filters.http.grpc_field_extraction" will be used by default.
+    //
+    // Unimplemented. Uses "envoy.filters.http.grpc_field_extraction" for now.
+    string dynamic_metadata = 1;
+  }
+}

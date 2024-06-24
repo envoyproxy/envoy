@@ -6,7 +6,7 @@ from functools import cached_property
 
 from frozendict import frozendict
 import jinja2
-from packaging import version
+from packaging import version as _version
 
 from aio.run import runner
 
@@ -147,7 +147,7 @@ class VersionHistories(runner.Runner):
 
     @cached_property
     def project(self) -> IProject:
-        return Project()
+        return Project(path=self.args.path)
 
     @cached_property
     def sections(self) -> frozendict:
@@ -171,6 +171,7 @@ class VersionHistories(runner.Runner):
 
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
+        parser.add_argument("--path")
         parser.add_argument("output_file")
 
     def minor_index_path(self, minor_version) -> pathlib.Path:
@@ -192,7 +193,7 @@ class VersionHistories(runner.Runner):
         for changelog_version in self.project.changelogs:
             await self.write_version_history(changelog_version)
 
-    async def write_version_history(self, changelog_version: version.Version) -> None:
+    async def write_version_history(self, changelog_version: _version.Version) -> None:
         minor_version = utils.minor_version_for(changelog_version)
         root_path = self.tpath.joinpath(f"v{minor_version.base_version}")
         root_path.mkdir(parents=True, exist_ok=True)
@@ -258,7 +259,7 @@ class VersionHistories(runner.Runner):
             await self.write_version_history_minor_index(minor_version, patches)
 
     async def write_version_history_minor_index(
-            self, minor_version: version.Version, patch_versions) -> None:
+            self, minor_version: _version.Version, patch_versions) -> None:
         skip_first = (self.project.is_dev and self.project.is_current(patch_versions[0]))
         if skip_first:
             patch_versions = patch_versions[1:]

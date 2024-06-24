@@ -3,6 +3,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -34,13 +35,14 @@ private:
   absl::flat_hash_set<LowerCaseString> headers_;
 };
 
-Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules)
+Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules,
+                 Regex::Engine& regex_engine)
     : rules_(rules) {
   if (rules.has_allow_expression()) {
-    allow_expression_ = Regex::Utility::parseRegex(rules.allow_expression());
+    allow_expression_ = Regex::Utility::parseRegex(rules.allow_expression(), regex_engine);
   }
   if (rules.has_disallow_expression()) {
-    disallow_expression_ = Regex::Utility::parseRegex(rules.disallow_expression());
+    disallow_expression_ = Regex::Utility::parseRegex(rules.disallow_expression(), regex_engine);
   }
 }
 
@@ -108,7 +110,7 @@ bool Checker::isValidValue(const LowerCaseString& header_name,
       !HeaderUtility::authorityIsValid(header_value)) {
     return false;
   }
-  if (header_name == hdrs.Scheme && !HeaderUtility::schemeIsValid(header_value)) {
+  if (header_name == hdrs.Scheme && !Http::Utility::schemeIsValid(header_value)) {
     return false;
   }
   if (header_name == hdrs.Status) {

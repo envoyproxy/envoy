@@ -25,9 +25,7 @@ responds_with \
     -k "https://localhost:${PORT_HTTPS}/service/1"
 
 run_log "Scale up docker service1=3"
-"${DOCKER_COMPOSE[@]}" up -d --scale service1=3
-run_log "Snooze for 5 while docker compose scales..."
-sleep 5
+"${DOCKER_COMPOSE[@]}" up --wait -d --scale service1=3
 
 run_log "Test round-robin localhost:${PORT_PROXY}/service/1"
 "${DOCKER_COMPOSE[@]}" exec -T front-envoy bash -c "\

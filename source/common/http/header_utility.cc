@@ -2,9 +2,11 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "source/common/common/json_escape_string.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/character_set_validation.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -12,6 +14,10 @@
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+#include "quiche/common/structured_headers.h"
+#endif
 #include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
@@ -20,6 +26,9 @@ namespace Http {
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
   const absl::string_view ConnectUnsupported = "http.connect_not_supported";
+  const absl::string_view InvalidMethod = "http.invalid_method";
+  const absl::string_view InvalidPath = "http.invalid_path";
+  const absl::string_view InvalidScheme = "http.invalid_scheme";
 };
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
@@ -36,7 +45,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   d.present_match: Match will succeed if the header is present.
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
+HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config,
+                                      Server::Configuration::CommonFactoryContext& factory_context)
     : name_(config.name()), invert_match_(config.invert_match()),
       treat_missing_as_empty_(config.treat_missing_header_as_empty()) {
   switch (config.header_match_specifier_case()) {
@@ -46,7 +56,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
+    regex_ = Regex::Utility::parseRegex(config.safe_regex_match(), factory_context.regexEngine());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -73,7 +83,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::StringMatch;
     string_match_ =
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config.string_match());
+            config.string_match(), factory_context);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -186,13 +196,35 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
-bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
-  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
-}
-
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
                                                              http2::adapter::ObsTextOption::kAllow);
+}
+
+bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
+  if (!header_key.empty() && header_key[0] == ':') {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.sanitize_http2_headers_without_nghttp2")) {
+      // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
+      return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
+                                       header_key.size()) != 0;
+    }
+    header_key.remove_prefix(1);
+    if (header_key.empty()) {
+      return false;
+    }
+  }
+  // For all other header use HTTP/1 semantics. The only difference from HTTP/2 is that
+  // uppercase characters are allowed. This allows HTTP filters to add header with mixed
+  // case names. The HTTP/1 codec will send as is, as uppercase characters are allowed.
+  // However the HTTP/2 codec will NOT convert these to lowercase when serializing the
+  // header map, thus producing an invalid request.
+  // TODO(yanavlasov): make validation in HTTP/2 case stricter.
+  bool is_valid = true;
+  for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
+    is_valid &= testCharInTable(kGenericHeaderNameCharTable, *iter);
+  }
+  return is_valid;
 }
 
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
@@ -218,12 +250,86 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
+bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
+  return headers.Upgrade() && absl::EqualsIgnoreCase(headers.getUpgradeValue(),
+                                                     Http::Headers::get().UpgradeValues.ConnectUdp);
+}
+
+bool HeaderUtility::isConnectUdpResponse(const ResponseHeaderMap& headers) {
+  // In connect-udp case, Envoy will transform the H2 headers to H1 upgrade headers.
+  // A valid response should have SwitchingProtocol status and connect-udp upgrade.
+  return headers.Upgrade() && Utility::getResponseStatus(headers) == 101 &&
+         absl::EqualsIgnoreCase(headers.getUpgradeValue(),
+                                Http::Headers::get().UpgradeValues.ConnectUdp);
+}
+
 bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
                                       const ResponseHeaderMap& response_headers) {
   return request_headers && isConnect(*request_headers) &&
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
 }
+
+bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
+  // Per RFC 9298, the URI template must only contain ASCII characters in the range 0x21-0x7E.
+  absl::string_view path = headers.getPathValue();
+  for (char c : path) {
+    unsigned char ascii_code = static_cast<unsigned char>(c);
+    if (ascii_code < 0x21 || ascii_code > 0x7e) {
+      ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a bad character in the path {}", path);
+      return false;
+    }
+  }
+
+  // Extract target host and port from path using default template.
+  if (!absl::StartsWith(path, "/.well-known/masque/udp/")) {
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request path is not a well-known URI: {}", path);
+    return false;
+  }
+
+  std::vector<absl::string_view> path_split = absl::StrSplit(path, '/');
+  if (path_split.size() != 7 || path_split[4].empty() || path_split[5].empty() ||
+      !path_split[6].empty()) {
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a malformed URI template in the path {}", path);
+    return false;
+  }
+
+  // Utility::PercentEncoding::decode never returns an empty string if the input argument is not
+  // empty.
+  std::string target_host = Utility::PercentEncoding::decode(path_split[4]);
+  // Per RFC 9298, IPv6 Zone ID is not supported.
+  if (target_host.find('%') != std::string::npos) {
+    ENVOY_LOG_MISC(warn, "CONNECT-UDP request with a non-escpaed char (%) in the path {}", path);
+    return false;
+  }
+  std::string target_port = Utility::PercentEncoding::decode(path_split[5]);
+
+  // If the host is an IPv6 address, surround the address with square brackets.
+  in6_addr sin6_addr;
+  bool is_ipv6 = (inet_pton(AF_INET6, target_host.c_str(), &sin6_addr) == 1);
+  std::string new_host =
+      absl::StrCat((is_ipv6 ? absl::StrCat("[", target_host, "]") : target_host), ":", target_port);
+  headers.setHost(new_host);
+
+  return true;
+}
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
+  Http::HeaderMap::GetResult capsule_protocol =
+      headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
+  // When there are multiple Capsule-Protocol header entries, it returns false. RFC 9297 specifies
+  // that non-boolean value types must be ignored. If there are multiple header entries, the value
+  // type becomes a List so the header field must be ignored.
+  if (capsule_protocol.size() != 1) {
+    return false;
+  }
+  // Parses the header value and extracts the boolean value ignoring parameters.
+  absl::optional<quiche::structured_headers::ParameterizedItem> header_item =
+      quiche::structured_headers::ParseItem(capsule_protocol[0]->value().getStringView());
+  return header_item && header_item->item.is_boolean() && header_item->item.GetBoolean();
+}
+#endif
 
 bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
   return (headers.Method() &&
@@ -257,6 +363,19 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
   if (host[dot_index + 1] == ':') {
     headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
   }
+}
+
+bool HeaderUtility::hostHasPort(absl::string_view original_host) {
+  const absl::string_view::size_type port_start = getPortStart(original_host);
+  const absl::string_view port_str = original_host.substr(port_start + 1);
+  if (port_start == absl::string_view::npos) {
+    return false;
+  }
+  uint32_t port = 0;
+  if (!absl::SimpleAtoi(port_str, &port)) {
+    return false;
+  }
+  return true;
 }
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
@@ -297,11 +416,35 @@ absl::string_view::size_type HeaderUtility::getPortStart(absl::string_view host)
   return absl::string_view::npos;
 }
 
+constexpr bool isInvalidToken(unsigned char c) {
+  if (c == '!' || c == '|' || c == '~' || c == '*' || c == '+' || c == '-' || c == '.' ||
+      // #, $, %, &, '
+      (c >= '#' && c <= '\'') ||
+      // [0-9]
+      (c >= '0' && c <= '9') ||
+      // [A-Z]
+      (c >= 'A' && c <= 'Z') ||
+      // ^, _, `, [a-z]
+      (c >= '^' && c <= 'z')) {
+    return false;
+  }
+  return true;
+}
+
 absl::optional<std::reference_wrapper<const absl::string_view>>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
+  }
+  if (headers.Method()) {
+    absl::string_view method = headers.Method()->value().getStringView();
+    if (method.empty() || std::any_of(method.begin(), method.end(), isInvalidToken)) {
+      return SharedResponseCodeDetails::get().InvalidMethod;
+    }
+  }
+  if (headers.Scheme() && absl::StrContains(headers.Scheme()->value().getStringView(), ",")) {
+    return SharedResponseCodeDetails::get().InvalidScheme;
   }
   return absl::nullopt;
 }
@@ -362,6 +505,42 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
     }
+  }
+  return Http::okStatus();
+}
+
+Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
+    return Http::okStatus();
+  }
+
+  const HeaderEntry* invalid_entry = nullptr;
+  bool invalid_key = false;
+  headers.iterate([&invalid_entry, &invalid_key](const HeaderEntry& header) -> HeaderMap::Iterate {
+    if (!HeaderUtility::headerNameIsValid(header.key().getStringView())) {
+      invalid_entry = &header;
+      invalid_key = true;
+      return HeaderMap::Iterate::Break;
+    }
+
+    if (!HeaderUtility::headerValueIsValid(header.value().getStringView())) {
+      invalid_entry = &header;
+      invalid_key = false;
+      return HeaderMap::Iterate::Break;
+    }
+
+    return HeaderMap::Iterate::Continue;
+  });
+
+  if (invalid_entry) {
+    // The header key may contain non-printable characters. Escape the key so that the error
+    // details can be safely presented.
+    const absl::string_view key = invalid_entry->key().getStringView();
+    uint64_t extra_length = JsonEscaper::extraSpace(key);
+    const std::string escaped_key = JsonEscaper::escapeString(key, extra_length);
+
+    return absl::InvalidArgumentError(
+        absl::StrCat("invalid header ", invalid_key ? "name: " : "value for: ", escaped_key));
   }
   return Http::okStatus();
 }
@@ -476,6 +655,20 @@ std::string HeaderUtility::addEncodingToAcceptEncoding(absl::string_view accept_
   // Finally add a single instance of our content encoding.
   newContentEncodings.push_back(encoding);
   return absl::StrJoin(newContentEncodings, ",");
+}
+
+bool HeaderUtility::isStandardConnectRequest(const Http::RequestHeaderMap& headers) {
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
+         headers.getProtocolValue().empty();
+}
+
+bool HeaderUtility::isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers) {
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Connect &&
+         !headers.getProtocolValue().empty();
+}
+
+bool HeaderUtility::isPseudoHeader(absl::string_view header_name) {
+  return !header_name.empty() && header_name[0] == ':';
 }
 
 } // namespace Http

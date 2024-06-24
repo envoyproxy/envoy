@@ -16,8 +16,16 @@ envoy_extension_cc_test(
     srcs = [
         "opentelemetry_tracer_impl_test.cc",
     ],
+    copts = [
+        # Make sure that headers included from opentelemetry-api use Abseil from Envoy
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
+        "-DHAVE_ABSEIL",
+    ],
     extension_names = ["envoy.tracers.opentelemetry"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_optional",
+        "opentelemetry_api",
+    ],
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -34,6 +42,7 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -72,9 +81,39 @@ envoy_extension_cc_test(
     srcs = ["grpc_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
-        "//source/extensions/tracers/opentelemetry:grpc_trace_exporter",
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "http_trace_exporter_test",
+    srcs = ["http_trace_exporter_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    deps = [
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "operation_name_test",
+    srcs = ["operation_name_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    deps = [
+        "//source/extensions/tracers/opentelemetry:config",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
     ],
 )

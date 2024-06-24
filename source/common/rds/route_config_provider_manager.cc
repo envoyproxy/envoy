@@ -46,7 +46,8 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
       }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(provider->configInfo().value().version_);
-      dynamic_config->mutable_route_config()->PackFrom(provider->configInfo().value().config_);
+      MessageUtil::packFrom(*dynamic_config->mutable_route_config(),
+                            provider->configInfo().value().config_);
       TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
@@ -58,7 +59,8 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
-    static_config->mutable_route_config()->PackFrom(provider->configInfo().value().config_);
+    MessageUtil::packFrom(*static_config->mutable_route_config(),
+                          provider->configInfo().value().config_);
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *static_config->mutable_last_updated());
   }

@@ -37,9 +37,6 @@ The user account running the examples will need to have permission to use Docker
 
 Full instructions for installing Docker can be found on the `Docker website <https://docs.docker.com/get-docker/>`_
 
-If you want to use the Windows based Envoy images make sure that you
-`switch Docker to use Windows containers <https://docs.docker.com/docker-for-windows/#switch-between-windows-and-linux-containers>`_.
-
 .. _start_sandboxes_setup_docker_compose:
 
 Install ``docker compose``
@@ -107,6 +104,15 @@ Many of the examples use the `curl <https://curl.se/>`_ utility to make ``HTTP``
 Instructions for installing `curl <https://curl.se/>`_ on many platforms and operating systems
 can be `found on the curl website <https://curl.haxx.se/download.html>`_.
 
+.. _start_sandboxes_setup_envsubst:
+
+envsubst
+~~~~~~~~
+
+Some of the examples require the ``envsubst`` command to interpolate environment variables in templates.
+
+The command is a part of the GNU ‘gettext’ package, and is available through most package managers.
+
 .. _start_sandboxes_setup_jq:
 
 jq
@@ -117,6 +123,15 @@ whether it be ``HTTP`` response data, logs or statistics.
 
 Instructions for installing `jq <https://stedolan.github.io/jq/>`_ on many platforms and operating systems
 can be `found on the jq website <https://stedolan.github.io/jq/download/>`_.
+
+.. _start_sandboxes_setup_mkpasswd:
+
+mkpasswd
+~~~~~~~~
+
+Some of the examples require the ``mkpasswd`` command to generate ~random tokens.
+
+The command is a part of the ‘whois’ package, and is available through most package managers.
 
 .. _start_sandboxes_setup_netcat:
 

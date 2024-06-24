@@ -20,11 +20,13 @@ def envoy_cc_binary(
         visibility = None,
         external_deps = [],
         repository = "",
+        stamp = 1,
         stamped = False,
         deps = [],
         linkopts = [],
         tags = [],
-        features = []):
+        features = [],
+        linkstatic = True):
     linker_inputs = envoy_exported_symbols_input()
 
     if not linkopts:
@@ -42,10 +44,10 @@ def envoy_cc_binary(
         copts = envoy_copts(repository),
         linkopts = linkopts,
         testonly = testonly,
-        linkstatic = 1,
+        linkstatic = linkstatic,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
-        stamp = 1,
+        stamp = stamp,
         deps = deps,
         tags = tags,
         features = features,

@@ -26,10 +26,12 @@ The design of the filter and Lua support at a high level is as follows:
 Currently supported high level features
 ---------------------------------------
 
-**NOTE:** It is expected that this list will expand over time as the filter is used in production.
-The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
-safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
-API.
+.. note::
+
+  It is expected that this list will expand over time as the filter is used in production.
+  The API surface has been kept small on purpose. The goal is to make scripts extremely simple and
+  safe to write. Very complex or high performance use cases are assumed to use the native C++ filter
+  API.
 
 * Inspection of headers, body, and trailers while streaming in either the request flow, response
   flow, or both.
@@ -147,7 +149,7 @@ Statistics
 ----------
 .. _config_http_filters_lua_stats:
 
-The lua filter outputs statistics in the *.lua.* namespace by default. When
+The lua filter outputs statistics in the ``.lua.`` namespace by default. When
 there are multiple lua filters configured in a filter chain, stats from
 individual filter instance/script can be tracked by providing a per filter
 :ref:`stat prefix
@@ -412,7 +414,7 @@ the supported keys are:
   It refers to the same *asynchronous* flag as the first function signature.
 - *timeout_ms* is an integer that specifies the call timeout in milliseconds.
   It refers to the same *timeout_ms* argument as the first function signature.
-- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
+- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not. If not provided, the sampling decision of the parent span is used.
 - *return_duplicate_headers* is boolean flag that decides whether the repeated headers are allowed in response headers.
   If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
   If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
@@ -542,6 +544,17 @@ connection()
 Returns the current request's underlying :repo:`connection <envoy/network/connection.h>`.
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
+
+connectionStreamInfo()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local connectionStreamInfo = handle:connectionStreamInfo()
+
+Returns connection-level :repo:`information <envoy/stream_info/stream_info.h>` related to the current request.
+
+Returns a connection-level :ref:`stream info object <config_http_filters_lua_cx_stream_info_wrapper>`.
 
 importPublicKey()
 ^^^^^^^^^^^^^^^^^
@@ -786,8 +799,10 @@ downstreamLocalAddress()
 
   streamInfo:downstreamLocalAddress()
 
-Returns the string representation of :repo:`downstream remote address <envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`downstream local address <envoy/stream_info/stream_info.h>`
 used by the current request.
+
+.. _config_http_filters_lua_stream_info_downstream_direct_remote_address:
 
 downstreamDirectRemoteAddress()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -798,6 +813,19 @@ downstreamDirectRemoteAddress()
 
 Returns the string representation of :repo:`downstream directly connected address <envoy/stream_info/stream_info.h>`
 used by the current request. This is equivalent to the address of the physical connection.
+
+.. _config_http_filters_lua_stream_info_downstream_remote_address:
+
+downstreamRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamRemoteAddress()
+
+Returns the string representation of the downstream remote address for the current request. This may differ from
+:ref:`downstreamDirectRemoteAddress() <config_http_filters_lua_stream_info_downstream_direct_remote_address>` depending upon the setting of
+:ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
 
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^
@@ -830,6 +858,20 @@ requestedServerName()
 
 Returns the string representation of :repo:`requested server name <envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
+
+.. _config_http_filters_lua_cx_stream_info_wrapper:
+
+Connection stream info object API
+---------------------------------
+
+dynamicMetadata()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connectionStreamInfo:dynamicMetadata()
+
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
 Dynamic metadata object API
 ---------------------------
@@ -928,11 +970,21 @@ peerCertificateValidated()
 
 .. code-block:: lua
 
-  if downstreamSslConnection:peerCertificateVaidated() then
-    print("peer certificate is valiedated")
+  if downstreamSslConnection:peerCertificateValidated() then
+    print("peer certificate is validated")
   end
 
 Returns bool whether the peer certificate was validated.
+
+.. warning::
+
+   Client certificate validation is not currently performed upon TLS session resumption. For a
+   resumed TLS session this method will return false, regardless of whether the peer certificate is
+   valid.
+
+   The only known workaround for this issue is to disable TLS session resumption entirely, by
+   setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+   and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
 
 uriSanLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^

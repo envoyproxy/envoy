@@ -155,8 +155,8 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> void {
-        throw EnvoyException("failed");
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -176,8 +176,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) -> void {
-        throw EnvoyException("failed");
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -196,6 +197,25 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   EXPECT_EQ(0UL, config.stats().signing_added_.value());
   EXPECT_EQ("foo", config.hostRewrite());
   EXPECT_EQ(true, config.useUnsignedPayload());
+}
+
+// Verify filter functionality when a host rewrite happens on route-level config.
+TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
+  setup();
+  filter_config_->host_rewrite_ = "original-host";
+
+  Stats::IsolatedStoreImpl stats;
+  auto signer = std::make_unique<Common::Aws::MockSigner>();
+  EXPECT_CALL(*(signer), signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+
+  FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
+                                    "overridden-host", false);
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&per_route_config));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ("overridden-host", headers.getHostValue());
 }
 
 } // namespace

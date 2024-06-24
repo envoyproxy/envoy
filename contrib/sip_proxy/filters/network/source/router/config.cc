@@ -22,7 +22,8 @@ SipFilters::FilterFactoryCb RouterFilterConfigFactory::createFilterFactoryFromPr
 
   return [config, &context,
           stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(std::make_shared<Router>(config, context.clusterManager(), context));
+    callbacks.addDecoderFilter(
+        std::make_shared<Router>(config, context.serverFactoryContext().clusterManager(), context));
   };
 }
 

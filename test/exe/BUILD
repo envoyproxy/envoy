@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
     "envoy_sh_test",
@@ -60,13 +61,50 @@ envoy_sh_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "main_common_test_base_lib",
+    srcs = ["main_common_test_base.cc"],
+    hdrs = ["main_common_test_base.h"],
+    data = [
+        "//test/config/integration:google_com_proxy_port_0",
+    ],
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:contention_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "main_common_test",
     srcs = envoy_select_admin_functionality(["main_common_test.cc"]),
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
-    deps = [
+    deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
+        "//source/common/api:api_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
+        "//source/exe:platform_impl_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:contention_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "admin_response_test",
+    srcs = envoy_select_admin_functionality(["admin_response_test.cc"]),
+    data = [
+        "//test/config/integration:google_com_proxy_port_0",
+    ],
+    deps = envoy_select_admin_functionality([":main_common_test_base_lib"]) + [
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -79,14 +117,15 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "extra_extensions_test",
+    size = "large",
     srcs = ["extra_extensions_test.cc"],
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
         # gcc RBE build has trouble compiling target with all extensions
         "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
-        # This dependency MUST be main_common_lib to meet the purpose of this test
-        "//conditions:default": ["//source/exe:main_common_lib"],
+        # This dependency MUST be main_common_with_all_extensions_lib to meet the purpose of this test
+        "//conditions:default": ["//source/exe:main_common_with_all_extensions_lib"],
     }),
 )
 
@@ -102,6 +141,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "check_extensions_against_registry_test",
+    size = "large",
     srcs = ["check_extensions_against_registry_test.cc"],
     data = [
         "//source/extensions:extensions_metadata.yaml",
@@ -112,7 +152,7 @@ envoy_cc_test(
         # gcc RBE build has trouble compiling target with all extensions
         "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
         # This dependency MUST be main_common_lib to meet the purpose of this test
-        "//conditions:default": ["//source/exe:main_common_lib"],
+        "//conditions:default": ["//source/exe:main_common_with_all_extensions_lib"],
     }),
 )
 
@@ -149,7 +189,7 @@ envoy_cc_test(
     tags = ["manual"],
     deps = [
         "//source/common/api:api_lib",
-        "//source/exe:main_common_lib",
+        "//source/exe:main_common_with_all_extensions_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",

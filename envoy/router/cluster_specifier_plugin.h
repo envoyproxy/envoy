@@ -22,11 +22,11 @@ public:
   /**
    * Create route from related route entry and request headers.
    *
-   * @param parent related route entry.
+   * @param parent related route.
    * @param header request headers.
    * @return RouteConstSharedPtr final route with specific cluster.
    */
-  virtual RouteConstSharedPtr route(const RouteEntry& parent,
+  virtual RouteConstSharedPtr route(RouteConstSharedPtr parent,
                                     const Http::RequestHeaderMap& header) const PURE;
 };
 

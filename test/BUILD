@@ -21,9 +21,11 @@ envoy_cc_test_library(
         "main.cc",
         "test_listener.cc",
         "test_runner.cc",
+    ],
+    hdrs = [
+        "test_listener.h",
         "test_runner.h",
     ],
-    hdrs = ["test_listener.h"],
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

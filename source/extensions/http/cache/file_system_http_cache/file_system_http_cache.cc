@@ -373,16 +373,19 @@ void CacheShared::trackFileRemoved(uint64_t file_size) {
   //
   // See comment on size_bytes and size_count in stats.h for explanation of how stat
   // values can be out of sync with the actionable cache.
-  uint64_t count = size_count_;
-  while (count > 0 && !size_count_.compare_exchange_weak(count, count - 1)) {
-  }
+  uint64_t count, size;
+  do {
+    count = size_count_;
+  } while (count > 0 && !size_count_.compare_exchange_weak(count, count - 1));
+
   stats_.size_count_.set(size_count_);
   // Atomically decrease-but-clamp-at-zero the size of files in the cache, by file_size.
   //
   // See comment above for why; the same rationale applies here.
-  uint64_t size = size_bytes_;
-  while (size >= file_size && !size_bytes_.compare_exchange_weak(size, size - file_size)) {
-  }
+  do {
+    size = size_bytes_;
+  } while (size >= file_size && !size_bytes_.compare_exchange_weak(size, size - file_size));
+
   if (size < file_size) {
     size_bytes_ = 0;
   }

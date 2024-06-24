@@ -24,9 +24,9 @@ public:
   /**
    * Resolve a custom address string and port to an Address::Instance.
    * @param socket_address supplies the socket address to resolve.
-   * @return InstanceConstSharedPtr appropriate Address::Instance.
+   * @return InstanceConstSharedPtr appropriate Address::Instance or an error status.
    */
-  virtual InstanceConstSharedPtr
+  virtual absl::StatusOr<InstanceConstSharedPtr>
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) PURE;
 
   std::string category() const override { return "envoy.resolvers"; }

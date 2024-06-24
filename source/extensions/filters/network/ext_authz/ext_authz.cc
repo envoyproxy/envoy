@@ -22,9 +22,9 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Filter::callCheck() {
-  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
-                                                               config_->includePeerCertificate(),
-                                                               config_->destinationLabels());
+  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(
+      filter_callbacks_, check_request_, config_->includePeerCertificate(),
+      config_->includeTLSSession(), config_->destinationLabels());
   // Store start time of ext_authz filter call
   start_time_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   status_ = Status::Calling;
@@ -108,7 +108,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "ext_authz_close");
     filter_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+        StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
         response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
             ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied

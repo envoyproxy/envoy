@@ -11,11 +11,18 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 
 using testing::_;
 
-TEST(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
+class ScopeTrackerScopeStateTest : public testing::Test {
+protected:
+  void setExecutionContextEnabled(bool enabled) {
+    ScopeTrackerScopeState::executionContextEnabled() = enabled;
+  }
+};
+
+TEST_F(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
+  setExecutionContextEnabled(false);
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopeTrackedObject tracked_object;
@@ -33,5 +40,13 @@ TEST(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
   static_cast<Event::DispatcherImpl*>(dispatcher.get())->onFatalError(std::cerr);
 }
 
-} // namespace
+TEST_F(ScopeTrackerScopeStateTest, ExecutionContextEnabled) {
+  setExecutionContextEnabled(true);
+  Api::ApiPtr api(Api::createApiForTest());
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  MockScopeTrackedObject tracked_object;
+  EXPECT_CALL(tracked_object, executionContext());
+  ScopeTrackerScopeState scope(&tracked_object, *dispatcher);
+}
+
 } // namespace Envoy

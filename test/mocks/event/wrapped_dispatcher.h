@@ -60,19 +60,6 @@ public:
     return impl_.createFilesystemWatcher();
   }
 
-  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
-                                      bool bind_to_port, bool ignore_global_conn_limit) override {
-    return impl_.createListener(std::move(socket), cb, runtime, bind_to_port,
-                                ignore_global_conn_limit);
-  }
-
-  Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) override {
-    return impl_.createUdpListener(std::move(socket), cb, config);
-  }
-
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override {
     return impl_.createScaledTimer(minimum, std::move(cb));
@@ -96,7 +83,7 @@ public:
     return impl_.listenForSignal(signal_num, std::move(cb));
   }
 
-  void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
+  void post(Event::PostCb callback) override { impl_.post(std::move(callback)); }
 
   void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
     impl_.deleteInDispatcherThread(std::move(deletable));

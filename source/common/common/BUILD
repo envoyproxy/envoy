@@ -1,4 +1,8 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
@@ -7,10 +11,6 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
     "envoy_pch_library",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -52,6 +52,8 @@ envoy_cc_library(
         ":assert_lib",
         "//envoy/common:backoff_strategy_interface",
         "//envoy/common:random_generator_interface",
+        "//source/common/protobuf:utility_lib_header",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -143,6 +145,8 @@ envoy_cc_library(
     deps = [
         ":macros",
         ":safe_memcpy_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -205,12 +209,17 @@ envoy_cc_library(
         "json_escape_string.h",
         "logger.h",
     ],
-    external_deps = ["abseil_synchronization"],
+    external_deps = [
+        "abseil_synchronization",
+        "abseil_flat_hash_map",
+    ],
     deps = [
         ":base_logger_lib",
+        ":fmt_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//source/common/protobuf",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],
@@ -221,6 +230,10 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
+    external_deps = [
+        "abseil_strings",
+        "spdlog",
+    ],
 )
 
 envoy_cc_library(
@@ -308,6 +321,7 @@ envoy_cc_library(
         "//envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -340,7 +354,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
-        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -362,8 +376,10 @@ envoy_cc_library(
     name = "scope_tracker",
     hdrs = ["scope_tracker.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -371,6 +387,7 @@ envoy_cc_library(
     name = "scope_tracked_object_stack",
     hdrs = ["scope_tracked_object_stack.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/common:scope_tracker_interface",
     ],
 )
@@ -449,9 +466,22 @@ envoy_cc_library(
         ":assert_lib",
         ":hash_lib",
         ":non_copyable",
+        "//envoy/common:exception_lib",
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "compiled_string_map_lib",
+    hdrs = ["compiled_string_map.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//envoy/common:pure_lib",
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -571,5 +601,20 @@ envoy_pch_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "inline_map",
+    hdrs = [
+        "inline_map.h",
+    ],
+    external_deps = [
+        "abseil_node_hash_set",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/common:utility_lib",
     ],
 )

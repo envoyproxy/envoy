@@ -48,6 +48,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "config_impl_integration_test",
+    size = "large",
     srcs = [
         "config_impl_integration_test.cc",
     ],
@@ -113,6 +114,7 @@ envoy_cc_test(
     srcs = ["rds_impl_test.cc"],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/http:rds_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/admin:admin_lib",
@@ -122,6 +124,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -155,8 +158,10 @@ envoy_cc_test(
         "//envoy/config:subscription_interface",
         "//envoy/init:manager_interface",
         "//source/common/config:api_version_lib",
+        "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
+        "//source/common/http:rds_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/server/admin:admin_lib",
@@ -167,6 +172,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -207,6 +213,7 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -269,8 +276,11 @@ filegroup(
 
 envoy_cc_fuzz_test(
     name = "route_fuzz_test",
+    size = "large",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
+    # The :config_impl_test_static target does not build with coverage
+    tags = ["nocoverage"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
@@ -362,6 +372,7 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:host_mocks",
@@ -448,7 +459,6 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
-        "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
@@ -483,6 +493,17 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
         "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "delegating_route_impl_test",
+    srcs = ["delegating_route_impl_test.cc"],
+    deps = [
+        "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 

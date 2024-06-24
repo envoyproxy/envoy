@@ -19,9 +19,9 @@ TracerManagerImpl::getOrCreateTracer(const envoy::config::trace::v3::Tracing_Htt
   const auto cache_key = MessageUtil::hash(*config);
   const auto it = tracers_.find(cache_key);
   if (it != tracers_.end()) {
-    auto http_tracer = it->second.lock();
-    if (http_tracer) { // HttpTracer might have been released since it's a weak reference
-      return http_tracer;
+    auto tracer = it->second.lock();
+    if (tracer) { // Tracer might have been released since it's a weak reference
+      return tracer;
     }
   }
 
@@ -29,13 +29,13 @@ TracerManagerImpl::getOrCreateTracer(const envoy::config::trace::v3::Tracing_Htt
   //
   // Given that:
   //
-  // * HttpTracer is obtained only once per listener lifecycle
+  // * Tracer is obtained only once per listener lifecycle
   // * in a typical case, all listeners will have identical tracing configuration and, consequently,
-  //   will share the same HttpTracer instance
+  //   will share the same Tracer instance
   // * amount of memory held by an expired weak reference is minimal
   //
   // it seems reasonable to avoid introducing an external sweeper and only reclaim memory at
-  // the moment when a new HttpTracer instance is about to be created.
+  // the moment when a new Tracer instance is about to be created.
   removeExpiredCacheEntries();
 
   // Initialize a new tracer.
@@ -47,7 +47,7 @@ TracerManagerImpl::getOrCreateTracer(const envoy::config::trace::v3::Tracing_Htt
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       *config, factory_context_->messageValidationVisitor(), factory);
 
-  HttpTracerSharedPtr tracer =
+  TracerSharedPtr tracer =
       std::make_shared<Tracing::TracerImpl>(factory.createTracerDriver(*message, *factory_context_),
                                             factory_context_->serverFactoryContext().localInfo());
   tracers_.emplace(cache_key, tracer); // cache a weak reference
@@ -55,19 +55,18 @@ TracerManagerImpl::getOrCreateTracer(const envoy::config::trace::v3::Tracing_Htt
 }
 
 void TracerManagerImpl::removeExpiredCacheEntries() {
-  absl::erase_if(tracers_,
-                 [](const std::pair<const std::size_t, std::weak_ptr<HttpTracer>>& entry) {
-                   return entry.second.expired();
-                 });
+  absl::erase_if(tracers_, [](const std::pair<const std::size_t, std::weak_ptr<Tracer>>& entry) {
+    return entry.second.expired();
+  });
 }
 
 std::shared_ptr<TracerManager>
 TracerManagerImpl::singleton(Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<Tracing::TracerManagerImpl>(
+  return context.serverFactoryContext().singletonManager().getTyped<Tracing::TracerManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(tracer_manager), [&context] {
         return std::make_shared<Tracing::TracerManagerImpl>(
             std::make_unique<Tracing::TracerFactoryContextImpl>(
-                context.getServerFactoryContext(), context.messageValidationVisitor()));
+                context.serverFactoryContext(), context.messageValidationVisitor()));
       });
 }
 

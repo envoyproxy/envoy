@@ -25,7 +25,7 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
 
   ssl_async_event_ = dispatcher_.createFileEvent(
       fd,
-      [this, ctx, fd](uint32_t) -> void {
+      [this, ctx, fd](uint32_t) {
         CpaStatus status = CPA_STATUS_FAIL;
         {
           Thread::LockGuard data_lock(ctx->data_lock_);
@@ -41,6 +41,7 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
           ctx->setOpStatus(status);
         }
         this->cb_.onPrivateKeyMethodComplete();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
@@ -310,6 +311,7 @@ QatPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
 }
 
 bool QatPrivateKeyMethodProvider::checkFips() { return false; }
+bool QatPrivateKeyMethodProvider::isAvailable() { return initialized_; }
 
 QatPrivateKeyConnection::QatPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
                                                  Event::Dispatcher& dispatcher, QatHandle& handle,
@@ -347,19 +349,23 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     LibQatCryptoSharedPtr libqat)
-    : api_(factory_context.api()), libqat_(libqat) {
+    : api_(factory_context.serverFactoryContext().api()), libqat_(libqat) {
 
-  manager_ = factory_context.singletonManager().getTyped<QatManager>(
+  manager_ = factory_context.serverFactoryContext().singletonManager().getTyped<QatManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(qat_manager),
       [libqat] { return std::make_shared<QatManager>(libqat); });
 
   ASSERT(manager_);
 
+  if (!manager_->checkQatDevice()) {
+    return;
+  }
+
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 5));
 
   std::string private_key =
-      Config::DataSource::read(conf.private_key(), false, factory_context.api());
+      THROW_OR_RETURN_VALUE(Config::DataSource::read(conf.private_key(), false, api_), std::string);
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
@@ -371,13 +377,15 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
 
   if (EVP_PKEY_id(pkey.get()) != EVP_PKEY_RSA) {
     // TODO(ipuustin): add support also to ECDSA keys.
-    throw EnvoyException("Only RSA keys are supported.");
+    ENVOY_LOG(warn, "Only RSA keys are supported.");
+    return;
   }
   pkey_ = std::move(pkey);
 
   section_ = std::make_shared<QatSection>(libqat);
   if (!section_->startSection(api_, poll_delay)) {
-    throw EnvoyException("Failed to start QAT.");
+    ENVOY_LOG(warn, "Failed to start QAT.");
+    return;
   }
 
   method_ = std::make_shared<SSL_PRIVATE_KEY_METHOD>();
@@ -385,6 +393,7 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
   method_->decrypt = privateKeyDecrypt;
   method_->complete = privateKeyComplete;
 
+  initialized_ = true;
   ENVOY_LOG(info, "initialized QAT private key provider");
 }
 

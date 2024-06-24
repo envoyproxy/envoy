@@ -29,9 +29,10 @@ RdsRouteConfigProviderImpl::configInfo() const {
   return config_update_info_->configInfo();
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate() {
+absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
   tls_.runOnAllThreads([new_config = config_update_info_->parsedConfiguration()](
                            OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
+  return absl::OkStatus();
 }
 
 } // namespace Rds

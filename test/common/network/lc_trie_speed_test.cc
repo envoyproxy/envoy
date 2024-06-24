@@ -12,7 +12,7 @@ struct AddressInputs {
         "192.0.2.225",   "198.51.100.55", "198.51.100.105", "192.0.2.150",   "203.0.113.162",
         "203.0.113.110", "203.0.113.99",  "198.51.100.23",  "198.51.100.24", "203.0.113.12"};
     for (const auto& address : test_addresses) {
-      addresses_.push_back(Envoy::Network::Utility::parseInternetAddress(address));
+      addresses_.push_back(Envoy::Network::Utility::parseInternetAddressNoThrow(address));
     }
   }
 
@@ -30,17 +30,17 @@ struct CidrInputs {
         tag_data_.emplace_back(
             std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
                 {"tag_1",
-                 {Envoy::Network::Address::CidrRange::create(
+                 {*Envoy::Network::Address::CidrRange::create(
                      fmt::format("192.0.{}.{}/32", i, j))}}));
       }
     }
     tag_data_nested_prefixes_ = tag_data_;
     tag_data_nested_prefixes_.emplace_back(
         std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-            {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+            {"tag_0", {*Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
     tag_data_minimal_.emplace_back(
         std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-            {"tag_1", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+            {"tag_1", {*Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
   }
 
   std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tag_data_;
@@ -59,6 +59,7 @@ static void lcTrieConstruct(benchmark::State& state) {
 
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(inputs.tag_data_);
   }
   benchmark::DoNotOptimize(trie);
@@ -71,6 +72,7 @@ static void lcTrieConstructNested(benchmark::State& state) {
 
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(
         inputs.tag_data_nested_prefixes_);
   }
@@ -84,6 +86,8 @@ static void lcTrieConstructMinimal(benchmark::State& state) {
 
   std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
     trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(inputs.tag_data_minimal_);
   }
   benchmark::DoNotOptimize(trie);
@@ -100,6 +104,7 @@ static void lcTrieLookup(benchmark::State& state) {
   static size_t i = 0;
   size_t output_tags = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
     output_tags += lc_trie->getData(address_inputs.addresses_[i]).size();
@@ -119,6 +124,7 @@ static void lcTrieLookupWithNestedPrefixes(benchmark::State& state) {
   static size_t i = 0;
   size_t output_tags = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
     output_tags += lc_trie_nested_prefixes->getData(address_inputs.addresses_[i]).size();
@@ -137,6 +143,7 @@ static void lcTrieLookupMinimal(benchmark::State& state) {
   static size_t i = 0;
   size_t output_tags = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
     output_tags += lc_trie_minimal->getData(address_inputs.addresses_[i]).size();

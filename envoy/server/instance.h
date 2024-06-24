@@ -28,7 +28,7 @@
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
@@ -45,6 +45,11 @@ namespace Server {
 class Instance {
 public:
   virtual ~Instance() = default;
+
+  /**
+   * Runs the server.
+   */
+  virtual void run() PURE;
 
   /**
    * @return OptRef<Admin> the global HTTP admin endpoint for the server.
@@ -84,8 +89,10 @@ public:
 
   /**
    * Close the server's listening sockets and begin draining the listeners.
+   * @param options - if provided, options are passed through to shutdownListener.
    */
-  virtual void drainListeners() PURE;
+  virtual void
+  drainListeners(OptRef<const Network::ExtraShutdownListenerOptions> options = absl::nullopt) PURE;
 
   /**
    * @return DrainManager& singleton for use by the entire server.
@@ -136,6 +143,11 @@ public:
    * @return the server's overload manager.
    */
   virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return the server's null overload manager in case we want to skip overloading the server.
+   */
+  virtual OverloadManager& nullOverloadManager() PURE;
 
   /**
    * @return the server's secret manager
@@ -245,6 +257,11 @@ public:
    * @return const StatsConfig& the configuration of server stats.
    */
   virtual Configuration::StatsConfig& statsConfig() PURE;
+
+  /**
+   * @return the server regex engine.
+   */
+  virtual Regex::Engine& regexEngine() PURE;
 
   /**
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.

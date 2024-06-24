@@ -1,56 +1,86 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.KeyValueStore
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import java.nio.ByteBuffer
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.After
+import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-private const val testKey = "foo"
-private const val testValue = "bar"
+private const val TEST_KEY = "foo"
+private const val TEST_VALUE = "bar"
 
+@RunWith(RobolectricTestRunner::class)
 class KeyValueStoreTest {
-
   init {
     JniLibrary.loadTestLibrary()
   }
 
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
+
+  @Before
+  fun setUp() {
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+  }
+
+  @After
+  fun tearDown() {
+    httpTestServer.shutdown()
+  }
+
   @Test
   fun `a registered KeyValueStore implementation handles calls from a TestKeyValueStore filter`() {
-
     val readExpectation = CountDownLatch(3)
     val saveExpectation = CountDownLatch(1)
-    val testKeyValueStore = object : KeyValueStore {
-      override fun read(key: String): String? { readExpectation.countDown(); return null }
-      override fun remove(key: String) {}
-      override fun save(key: String, value: String) { saveExpectation.countDown() }
-    }
+    val testKeyValueStore =
+      object : KeyValueStore {
+        override fun read(key: String): String? {
+          readExpectation.countDown()
+          return null
+        }
 
-    val engine = EngineBuilder(Standard())
+        override fun remove(key: String) {}
+
+        override fun save(key: String, value: String) {
+          saveExpectation.countDown()
+        }
+      }
+
+    val engine =
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .addKeyValueStore("envoy.key_value.platform_test", testKeyValueStore)
-        .addNativeFilter("envoy.filters.http.test_kv_store", "{'@type': type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore, kv_store_name: envoy.key_value.platform_test, test_key: $testKey, test_value: $testValue}")
-        .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
+        .addNativeFilter(
+          "envoy.filters.http.test_kv_store",
+          "[type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore] { kv_store_name: 'envoy.key_value.platform_test', test_key: '$TEST_KEY', test_value: '$TEST_VALUE'}"
+        )
         .build()
     val client = engine.streamClient()
 
-    val requestHeaders = RequestHeadersBuilder(
-      method = RequestMethod.GET,
-      scheme = "https",
-      authority = "example.com",
-      path = "/test"
-    )
-      .build()
+    val requestHeaders =
+      RequestHeadersBuilder(
+          method = RequestMethod.GET,
+          scheme = "https",
+          authority = httpTestServer.address,
+          path = "/simple.txt"
+        )
+        .build()
 
-    client.newStreamPrototype()
+    client
+      .newStreamPrototype()
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)

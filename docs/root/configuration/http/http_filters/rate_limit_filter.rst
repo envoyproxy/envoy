@@ -158,7 +158,7 @@ no entry is added.
 Statistics
 ----------
 
-The rate limit filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
+The rate limit filter outputs statistics in the ``cluster.<route target cluster>.ratelimit.<optional stat prefix>.`` namespace.
 429 responses or the configured :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>` are emitted to the normal cluster :ref:`dynamic HTTP statistics
 <config_cluster_manager_cluster_stats_dynamic_http>`.
 

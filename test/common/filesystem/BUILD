@@ -23,6 +23,7 @@ envoy_cc_test(
     deps = [
         "//source/common/filesystem:directory_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

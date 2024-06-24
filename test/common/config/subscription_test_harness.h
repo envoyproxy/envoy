@@ -127,6 +127,7 @@ ACTION_P(ThrowOnRejectedConfig, accept) {
   if (!accept) {
     throw EnvoyException("bad config");
   }
+  return absl::OkStatus();
 }
 
 } // namespace Config

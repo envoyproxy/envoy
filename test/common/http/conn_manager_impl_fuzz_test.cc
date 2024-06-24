@@ -94,7 +94,7 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                    FilterChainManager& manager) -> bool {
           return filter_factory_.createFilterChain(manager);
@@ -128,11 +128,15 @@ public:
   // Http::ConnectionManagerConfig
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return flush_access_log_on_tunnel_successfully_established_;
+  }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&) override {
+                                  ServerConnectionCallbacks&, Server::OverloadManager&) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
@@ -169,12 +173,19 @@ public:
     }
     return nullptr;
   }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    if (use_srds_) {
+      return scope_key_builder_;
+    }
+    return {};
+  }
   const std::string& serverName() const override { return server_name_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
+  bool shouldSchemeMatchUpstream() const override { return scheme_match_upstream_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -190,7 +201,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
-  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
+  Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
@@ -224,11 +235,12 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Protocol) override {
+  Http::ServerHeaderValidatorPtr makeHeaderValidator(Protocol) override {
     // TODO(yanavlasov): fuzz test interface should use the default validator, although this could
     // be changed too
     return nullptr;
   }
+  bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
 
@@ -237,6 +249,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  bool flush_access_log_on_new_request_ = false;
+  bool flush_access_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};
@@ -247,10 +261,12 @@ public:
   bool use_srds_{};
   Router::MockRouteConfigProvider route_config_provider_;
   Router::MockScopedRouteConfigProvider scoped_route_config_provider_;
+  Router::MockScopeKeyBuilder scope_key_builder_;
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   absl::optional<std::string> scheme_;
+  bool scheme_match_upstream_{};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
@@ -269,7 +285,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
+  Tracing::TracerSharedPtr tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
   bool stream_error_on_invalid_http_messaging_ = false;
@@ -325,6 +341,11 @@ public:
           // If sendLocalReply is called:
           ON_CALL(encoder_, encodeHeaders(_, true))
               .WillByDefault(Invoke([this](const ResponseHeaderMap&, bool end_stream) -> void {
+                response_state_ =
+                    end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+              }));
+          ON_CALL(encoder_, encodeData(_, true))
+              .WillByDefault(Invoke([this](const Buffer::Instance&, bool end_stream) -> void {
                 response_state_ =
                     end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
               }));
@@ -514,7 +535,7 @@ public:
         // Similarly, local replies should always contain this.
         const auto status = Utility::getResponseStatusOrNullopt(*headers);
         // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
-        // guaranteed by the codec parsers. See include/envoy/http/filter.h.
+        // guaranteed by the codec parsers. See envoy/http/filter.h.
         if (!status.has_value() || (CodeUtility::is1xx(status.value()) &&
                                     status.value() != enumToInt(Http::Code::SwitchingProtocols))) {
           headers->setReferenceKey(Headers::get().Status, "200");
@@ -581,15 +602,12 @@ using FuzzStreamPtr = std::unique_ptr<FuzzStream>;
 DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-    return;
-  } catch (const Envoy::ProtobufMessage::DeprecatedProtoFieldException& e) {
-    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
+  } catch (const Envoy::EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
 
-  FuzzConfig config(input.forward_client_cert());
+  std::shared_ptr<FuzzConfig> config = std::make_shared<FuzzConfig>(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Random::MockRandomGenerator> random;
   Stats::SymbolTableImpl symbol_table;
@@ -614,7 +632,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, overload_manager, config.time_system_);
+                                     cluster_manager, overload_manager, config->time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;
@@ -629,7 +647,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(
-          conn_manager, config,
+          conn_manager, *config,
           Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers(),
                                                       /* ignore_headers =*/{}, {":authority"}),
           action.new_stream().status(), action.new_stream().end_stream()));

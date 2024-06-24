@@ -434,11 +434,13 @@ TEST_P(WasmNetworkFilterTest, CloseDownstream) {
   EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
   Buffer::OwnedImpl fake_downstream_data("Fake");
   filter().onCreate(); // Create context without calling OnNewConnection.
-  EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_downstream_data, false));
+  EXPECT_CALL(read_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close"));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_downstream_data, false));
 
   // Should close downstream.
-  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
-  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
 }
 
 TEST_P(WasmNetworkFilterTest, CloseUpstream) {
@@ -448,11 +450,13 @@ TEST_P(WasmNetworkFilterTest, CloseUpstream) {
   EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
   Buffer::OwnedImpl fake_upstream_data("Fake");
   filter().onCreate(); // Create context without calling OnNewConnection.
-  EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_upstream_data, false));
+  EXPECT_CALL(write_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close"));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_upstream_data, false));
 
-  // Should close downstream.
-  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
-  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  // Should close upstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
 }
 
 } // namespace Wasm

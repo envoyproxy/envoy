@@ -18,7 +18,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-TEST(OpenCensusTracerConfigTest, InvalidStackdriverConfiguration) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(InvalidStackdriverConfiguration)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   OpenCensusTracerFactory factory;
 
@@ -41,7 +41,7 @@ TEST(OpenCensusTracerConfigTest, InvalidStackdriverConfiguration) {
                             "Opencensus stackdriver tracer only support GoogleGrpc.");
 }
 
-TEST(OpenCensusTracerConfigTest, InvalidOcagentConfiguration) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(InvalidOcagentConfiguration)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   OpenCensusTracerFactory factory;
 
@@ -64,7 +64,7 @@ TEST(OpenCensusTracerConfigTest, InvalidOcagentConfiguration) {
                             "Opencensus ocagent tracer only supports GoogleGrpc.");
 }
 
-TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracer)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
@@ -81,7 +81,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   EXPECT_NE(nullptr, tracer);
 }
 
-TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerWithTypedConfig)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
@@ -155,7 +155,7 @@ TEST(OpenCensusTracerConfigTest,
       {32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
 }
 
-TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerGrpc)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
@@ -201,7 +201,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
 #endif
 }
 
-TEST(OpenCensusTracerConfigTest, ShouldCreateAtMostOneOpenCensusTracer) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(ShouldCreateAtMostOneOpenCensusTracer)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   OpenCensusTracerFactory factory;
 
@@ -229,7 +229,8 @@ TEST(OpenCensusTracerConfigTest, ShouldCreateAtMostOneOpenCensusTracer) {
   EXPECT_EQ(tracer_two, tracer_one);
 }
 
-TEST(OpenCensusTracerConfigTest, ShouldCacheFirstCreatedTracerUsingStrongReference) {
+TEST(OpenCensusTracerConfigTest,
+     DEPRECATED_FEATURE_TEST(ShouldCacheFirstCreatedTracerUsingStrongReference)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   OpenCensusTracerFactory factory;
 
@@ -254,7 +255,7 @@ TEST(OpenCensusTracerConfigTest, ShouldCacheFirstCreatedTracerUsingStrongReferen
   EXPECT_EQ(tracer_two, tracer_one.lock());
 }
 
-TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(ShouldNotCacheInvalidConfiguration)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   OpenCensusTracerFactory factory;
 
@@ -303,7 +304,8 @@ TEST(OpenCensusTracerConfigTest, ShouldNotCacheInvalidConfiguration) {
 #endif
 }
 
-TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDifferentConfig) {
+TEST(OpenCensusTracerConfigTest,
+     DEPRECATED_FEATURE_TEST(ShouldRejectSubsequentCreateAttemptsWithDifferentConfig)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   OpenCensusTracerFactory factory;
 
@@ -343,7 +345,7 @@ TEST(OpenCensusTracerConfigTest, ShouldRejectSubsequentCreateAttemptsWithDiffere
                             "Opencensus has already been configured with a different config.");
 }
 
-TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerStackdriverGrpc)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
@@ -376,7 +378,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
 #endif
 }
 
-TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverAddress) {
+TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerStackdriverAddress)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:

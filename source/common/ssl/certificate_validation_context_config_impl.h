@@ -8,14 +8,19 @@
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Ssl {
 
 class CertificateValidationContextConfigImpl : public CertificateValidationContextConfig {
 public:
-  CertificateValidationContextConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-      Api::Api& api);
+  // Create a CertificateValidationContextConfigImpl or return an error status.
+  static absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
+  create(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
+         Api::Api& api);
+
+  absl::Status initialize();
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
@@ -52,6 +57,11 @@ public:
   bool onlyVerifyLeafCertificateCrl() const override { return only_verify_leaf_cert_crl_; }
 
   absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+
+protected:
+  CertificateValidationContextConfigImpl(
+      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
+      Api::Api& api);
 
 private:
   static std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>

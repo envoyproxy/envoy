@@ -5,6 +5,17 @@
 namespace Envoy {
 namespace Http {
 
+class RequestDecoderHandle {
+public:
+  virtual ~RequestDecoderHandle() = default;
+
+  /**
+   * @return a reference to the underlying decoder if it is still valid.
+   */
+  virtual OptRef<RequestDecoder> get() PURE;
+};
+using RequestDecoderHandlePtr = std::unique_ptr<RequestDecoderHandle>;
+
 /**
  * ApiListener that allows consumers to interact with HTTP streams via API calls.
  */
@@ -20,11 +31,11 @@ public:
    *                         response are backed by the same Stream object.
    * @param is_internally_created indicates if this stream was originated by a
    *   client, or was created by Envoy, by example as part of an internal redirect.
-   * @return RequestDecoder& supplies the decoder callbacks to fire into for stream
+   * @return RequestDecoderHandle supplies the decoder callbacks to fire into for stream
    *   decoding events.
    */
-  virtual RequestDecoder& newStream(ResponseEncoder& response_encoder,
-                                    bool is_internally_created = false) PURE;
+  virtual RequestDecoderHandlePtr newStreamHandle(ResponseEncoder& response_encoder,
+                                                  bool is_internally_created = false) PURE;
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;

@@ -5,9 +5,11 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -69,7 +71,9 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   switch (reason) {
   case Http::StreamResetReason::LocalRefusedStreamReset:
     return quic::QUIC_REFUSED_STREAM;
-  case Http::StreamResetReason::ConnectionFailure:
+  case Http::StreamResetReason::LocalConnectionFailure:
+  case Http::StreamResetReason::RemoteConnectionFailure:
+  case Http::StreamResetReason::ConnectionTimeout:
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
@@ -85,7 +89,7 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
-    return Http::StreamResetReason::ConnectionFailure;
+    return Http::StreamResetReason::LocalConnectionFailure;
   case quic::QUIC_BAD_APPLICATION_PAYLOAD:
     return Http::StreamResetReason::ProtocolError;
   default:
@@ -109,11 +113,11 @@ Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode
   switch (error) {
   case quic::QUIC_HANDSHAKE_FAILED:
   case quic::QUIC_HANDSHAKE_TIMEOUT:
-    return Http::StreamResetReason::ConnectionFailure;
+    return Http::StreamResetReason::LocalConnectionFailure;
   case quic::QUIC_PACKET_WRITE_ERROR:
   case quic::QUIC_NETWORK_IDLE_TIMEOUT:
     return connected ? Http::StreamResetReason::ConnectionTermination
-                     : Http::StreamResetReason::ConnectionFailure;
+                     : Http::StreamResetReason::LocalConnectionFailure;
   case quic::QUIC_HTTP_FRAME_ERROR:
     return Http::StreamResetReason::ProtocolError;
   default:
@@ -125,7 +129,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   switch (error) {
   case quic::QUIC_HANDSHAKE_FAILED:
   case quic::QUIC_HANDSHAKE_TIMEOUT:
-    return Http::StreamResetReason::ConnectionFailure;
+    return Http::StreamResetReason::RemoteConnectionFailure;
   default:
     return Http::StreamResetReason::ConnectionTermination;
   }
@@ -134,14 +138,26 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const bool prefer_gro) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
+  connection_socket->setDetectedTransportProtocol("quic");
+  if (!connection_socket->isOpen()) {
+    ENVOY_LOG_MISC(error, "Failed to create quic socket");
+    return connection_socket;
+  }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
+  }
+  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+  }
   if (options != nullptr) {
     connection_socket->addOptions(options);
   }
@@ -248,6 +264,13 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
   quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
   configQuicInitialFlowControlWindow(config, quic_config);
+  quic_config.SetConnectionOptionsToSend(quic::ParseQuicTagVector(config.connection_options()));
+  quic_config.SetClientConnectionOptions(
+      quic::ParseQuicTagVector(config.client_connection_options()));
+  if (config.has_idle_network_timeout()) {
+    quic_config.SetIdleNetworkTimeout(quic::QuicTimeDelta::FromSeconds(
+        DurationUtil::durationToSeconds(config.idle_network_timeout())));
+  }
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
@@ -276,13 +299,19 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
 }
 
-void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
                                      const quic::QuicConnectionId& old_connection_id) {
   char* new_connection_id_data = new_connection_id.mutable_data();
   const char* old_connection_id_ptr = old_connection_id.data();
-  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(old_connection_id_ptr);
   // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
+  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
+}
+
+quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
+  // Explicit Congestion Notification is encoded in the two least significant
+  // bits of the TOS byte of the IP header.
+  constexpr uint8_t kEcnMask = 0b00000011;
+  return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);
 }
 
 } // namespace Quic

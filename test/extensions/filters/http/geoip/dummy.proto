@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package test.extensions.filters.http.geoip;
+
+message DummyProvider {
+}

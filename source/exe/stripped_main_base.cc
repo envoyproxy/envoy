@@ -16,7 +16,7 @@
 #include "source/server/drain_manager_impl.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
+#include "source/server/options_impl_base.h"
 #include "source/server/server.h"
 
 #include "absl/debugging/symbolize.h"
@@ -46,12 +46,13 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
                                    Server::ComponentFactory& component_factory,
                                    std::unique_ptr<Server::Platform> platform_impl,
                                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                                   std::unique_ptr<ProcessContext> process_context)
+                                   std::unique_ptr<ProcessContext> process_context,
+                                   CreateInstanceFunction create_instance)
     : platform_impl_(std::move(platform_impl)), options_(options),
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
-  OptionsImpl::disableExtensions(options.disabledExtensions());
+  OptionsImplBase::disableExtensions(options.disabledExtensions());
 
   // Enable core dumps as early as possible.
   if (options_.coreDumpEnabled()) {
@@ -71,24 +72,22 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          log_lock, options_.logFormatEscaped(),
                                                          options_.enableFineGrainLogging());
 
     configureComponentLogLevels();
 
-    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a try/catch
-    // block or not.
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
+    // try/catch block or not.
     std::set_new_handler([]() { PANIC("out of memory"); });
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
-    server_ = std::make_unique<Server::InstanceImpl>(
-        *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
-        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
-
+    server_ = create_instance(*init_manager_, options_, time_system, listener_hooks, *restarter_,
+                              *stats_store_, access_log_lock, component_factory,
+                              std::move(random_generator), *tls_, platform_impl_->threadFactory(),
+                              platform_impl_->fileSystem(), std::move(process_context), nullptr);
     break;
   }
   case Server::Mode::Validate:
@@ -96,6 +95,7 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                           restarter_->logLock(), options_.logFormatEscaped());
+    process_context_ = std::move(process_context);
     break;
   }
 }
@@ -125,14 +125,15 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
         base_id = static_cast<uint32_t>(random_generator.random()) & 0x0FFFFFFF;
 
         TRY_ASSERT_MAIN_THREAD {
-          restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0, options_.socketPath(),
-                                                               options_.socketMode());
+          restarter = std::make_unique<Server::HotRestartImpl>(
+              base_id, 0, options_.socketPath(), options_.socketMode(),
+              options_.skipHotRestartOnNoParent(), options_.skipHotRestartParentStats());
         }
         END_TRY
-        catch (Server::HotRestartDomainSocketInUseException& ex) {
+        CATCH(Server::HotRestartDomainSocketInUseException & ex, {
           // No luck, try again.
           ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
-        }
+        });
       }
 
       if (restarter == nullptr) {
@@ -142,7 +143,8 @@ void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_gen
       restarter_.swap(restarter);
     } else {
       restarter_ = std::make_unique<Server::HotRestartImpl>(
-          base_id, options_.restartEpoch(), options_.socketPath(), options_.socketMode());
+          base_id, options_.restartEpoch(), options_.socketPath(), options_.socketMode(),
+          options_.skipHotRestartOnNoParent(), options_.skipHotRestartParentStats());
     }
 
     // Write the base-id to the requested path whether we selected it

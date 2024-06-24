@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.checksum.v3alpha;
+
+import "envoy/type/matcher/v3/string.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.checksum.v3alpha";
+option java_outer_classname = "ChecksumProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/checksum/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Checksum HTTP filter]
+//
+// Filter to reject responses that don't match a specified checksum.
+// To avoid holding the entire response in memory, the rejection occurs at the end of the stream.
+// [#extension: envoy.filters.http.checksum]
+
+message ChecksumConfig {
+  message Checksum {
+    oneof matcher {
+      // A matcher for a path that is expected to have a specific checksum, as specified
+      // in the ``sha256`` field.
+      type.matcher.v3.StringMatcher path_matcher = 1 [(validate.rules).message = {required: true}];
+    }
+
+    // A hex-encoded sha256 string required to match the sha256sum of the response body
+    // of the path specified in the ``path_matcher`` field.
+    string sha256 = 2 [(validate.rules).string = {pattern: "^[a-fA-F0-9]{64}"}];
+  }
+
+  // A set of matcher and checksum pairs for which, if a path matching ``path_matcher``
+  // is requested and the checksum of the response body does not match the ``sha256``, the
+  // response will be replaced with a 403 Forbidden status.
+  //
+  // If multiple matchers match the same path, the first to match takes precedence.
+  repeated Checksum checksums = 1;
+
+  // If a request doesn't match any of the specified checksum paths and reject_unmatched is
+  // true, the request is rejected immediately with 403 Forbidden.
+  bool reject_unmatched = 2;
+}

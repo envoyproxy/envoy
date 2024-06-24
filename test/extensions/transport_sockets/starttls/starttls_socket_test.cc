@@ -72,6 +72,7 @@ TEST(StartTlsTest, BasicSwitch) {
 
   // Now switch to Tls. During the switch, the new socket should register for callbacks
   // and connect.
+  EXPECT_CALL(*ssl_socket, ssl());
   EXPECT_CALL(*ssl_socket, setTransportSocketCallbacks(_));
   EXPECT_CALL(*ssl_socket, onConnected);
   // Make sure that raw socket is destructed.

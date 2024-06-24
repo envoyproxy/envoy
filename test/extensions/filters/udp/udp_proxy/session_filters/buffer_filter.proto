@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test.extensions.filters.udp.udp_proxy.session_filters;
+
+message BufferingFilterConfig {
+  uint32 downstream_datagrams_to_buffer = 1;
+  uint32 upstream_datagrams_to_buffer = 2;
+  bool continue_after_inject = 3;
+}

@@ -64,14 +64,16 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   // Compare changes in the cluster proto, and update parts of the cluster as needed.
-  void update(envoy::config::cluster::v3::Cluster cluster,
-              const envoy::config::core::v3::BindConfig& bind_config,
-              ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
+  absl::Status update(envoy::config::cluster::v3::Cluster cluster,
+                      const envoy::config::core::v3::BindConfig& bind_config,
+                      ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
   // Creates healthcheckers and adds them to the list, then does initial start.
   void initHealthchecks();
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
   std::vector<HostSharedPtr> hosts() { return *hosts_; };
+  UnitFloat dropOverload() const override { return UnitFloat(0); }
+  void setDropOverload(UnitFloat) override {}
 
 protected:
   PrioritySetImpl priority_set_;
@@ -98,7 +100,7 @@ private:
   HealthCheckerMap health_checkers_map_;
   TimeSource& time_source_;
 
-  void updateHealthchecks(
+  absl::Status updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks);
   void
   updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
@@ -157,12 +159,13 @@ private:
   void handleFailure();
   // Establishes a connection with the management server
   void establishNewStream();
-  void processMessage(std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
+  absl::Status
+  processMessage(std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
   envoy::config::cluster::v3::Cluster
   createClusterConfig(const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check);
-  void updateHdsCluster(HdsClusterPtr cluster,
-                        const envoy::config::cluster::v3::Cluster& cluster_health_check,
-                        const envoy::config::core::v3::BindConfig& bind_config);
+  absl::Status updateHdsCluster(HdsClusterPtr cluster,
+                                const envoy::config::cluster::v3::Cluster& cluster_health_check,
+                                const envoy::config::core::v3::BindConfig& bind_config);
   HdsClusterPtr createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_health_check,
                                  const envoy::config::core::v3::BindConfig& bind_config);
   HdsDelegateStats stats_;
@@ -181,7 +184,7 @@ private:
   ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
-  uint64_t specifier_hash_;
+  uint64_t specifier_hash_{0};
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;

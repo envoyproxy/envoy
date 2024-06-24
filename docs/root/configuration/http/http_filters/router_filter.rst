@@ -429,6 +429,7 @@ owning HTTP connection manager.
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
+  rq_overload_local_reply, Counter, Total requests that were load shed if downstream filter load shed point is configured
 
 .. _config_http_filters_router_vcluster_stats:
 
@@ -436,7 +437,7 @@ Virtual Clusters
 ^^^^^^^^^^^^^^^^
 
 Virtual cluster statistics are output in the
-*vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following
+``vhost.<virtual host name>.vcluster.<virtual cluster name>.`` namespace and include the following
 statistics:
 
 .. csv-table::

@@ -10,7 +10,7 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
     Server::Configuration::ServerFactoryContext& factory_context)
     : config_traits_(config_traits), proto_traits_(proto_traits), factory_context_(factory_context),
       time_source_(factory_context.timeSource()),
-      route_config_proto_(proto_traits_.createEmptyProto()), last_config_hash_(0ull),
+      route_config_proto_(proto_traits_.createEmptyProto()),
       config_(config_traits_.createNullConfig()) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(

@@ -19,7 +19,8 @@ class ShadowPolicyIntegrationTest
       public SocketInterfaceSwap {
 public:
   ShadowPolicyIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())),
+        SocketInterfaceSwap(Network::Socket::Type::Stream) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -28,7 +29,7 @@ public:
   }
 
   // Adds a mirror policy that routes to cluster_header or cluster_name, in that order. Additionally
-  // optionally registers an upstream filter on the cluster specified by
+  // optionally registers an upstream HTTP filter on the cluster specified by
   // cluster_with_custom_filter_.
   void initialConfigSetup(const std::string& cluster_name, const std::string& cluster_header) {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -69,7 +70,7 @@ public:
         });
   }
 
-  void sendRequestAndValidateResponse() {
+  void sendRequestAndValidateResponse(int times_called = 1) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response =
@@ -80,7 +81,8 @@ public:
     if (filter_name_ != "add-body-filter") {
       EXPECT_EQ(10U, response->body().size());
     }
-    test_server_->waitForCounterEq("cluster.cluster_1.internal.upstream_rq_completed", 1);
+    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed",
+                                   times_called);
 
     upstream_headers_ =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -108,6 +110,39 @@ INSTANTIATE_TEST_SUITE_P(
                                                                                        : "IPv6",
                           "_", std::get<1>(params.param) ? "streaming_shadow" : "buffered_shadow");
     });
+
+TEST_P(ShadowPolicyIntegrationTest, Basic) {
+  initialConfigSetup("cluster_1", "");
+  initialize();
+
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
+
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+}
+
+TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->set_connection_pool_per_downstream_connection(true);
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(1)
+        ->set_connection_pool_per_downstream_connection(true);
+  });
+  initialize();
+
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
+
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  // https://github.com/envoyproxy/envoy/issues/26820
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
+}
 
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
   if (!streaming_shadow_) {
@@ -459,6 +494,8 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowOnlyTimeout) {
   // Clean up.
   ASSERT_TRUE(fake_upstream_connection_main->close());
   ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
   cleanupUpstreamAndDownstream();
 
@@ -473,6 +510,11 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = true;
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // With deferred processing, a local reply is triggered so the upstream
+    // stream will be incomplete.
+    autonomous_allow_incomplete_streams_ = true;
+  }
   cluster_with_custom_filter_ = 0;
   filter_name_ = "encoder-decoder-buffer-filter";
   initialConfigSetup("cluster_1", "");
@@ -500,7 +542,13 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
+  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // With deferred processing, the encoder-decoder-buffer-filter will
+    // buffer too much data triggering a local reply.
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
+  } else {
+    test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
+  }
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -660,8 +708,8 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   EXPECT_EQ(shadow_direct_response->headers().getStatusValue(), "200");
 
   // Two requests were sent over a single connection to cluster_1.
+  test_server_->waitForCounterGe("cluster.cluster_1.upstream_rq_completed", 2);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 2);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
                 ->value(),
             1);
@@ -726,14 +774,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
 
   cleanupUpstreamAndDownstream();
 
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
-                ->value(),
-            1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_cx_total", 1);
   // Main cluster saw no reset; shadow cluster saw remote reset.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_completed", 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
 }
 
 // Test request mirroring / shadowing with the cluster name in policy.
@@ -747,7 +794,7 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
-// Test request mirroring / shadowing with upstream filters in the router.
+// Test request mirroring / shadowing with upstream HTTP filters in the router.
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters) {
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier(
@@ -775,7 +822,7 @@ TEST_P(ShadowPolicyIntegrationTest, ClusterFilterOverridesRouterFilter) {
   cluster_with_custom_filter_ = 0;
   filter_name_ = "add-body-filter";
 
-  // router filter upstream filter adds header:
+  // router filter upstream HTTP filter adds header:
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -878,6 +925,73 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.async-client.rq_total")->value());
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffix) {
+  initialConfigSetup("cluster_1", "");
+  // By default `disable_shadow_host_suffix_append` is "false".
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header has suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com-shadow");
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffixAddresses) {
+  initialConfigSetup("cluster_1", "");
+  // By default `disable_shadow_host_suffix_append` is "false".
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header has suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->getHostValue(), fake_upstreams_[0]->localAddress()->asStringView());
+  EXPECT_EQ(mirror_headers_->getHostValue(),
+            absl::StrCat(version_ == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]",
+                         "-shadow:", fake_upstreams_[0]->localAddress()->ip()->port()))
+      << mirror_headers_->getHostValue();
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffix) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_disable_shadow_host_suffix_append(true);
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header does not have suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
 }
 
 } // namespace

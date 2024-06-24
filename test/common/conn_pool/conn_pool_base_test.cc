@@ -25,6 +25,7 @@ public:
       : ActiveClient(parent, lifetime_stream_limit, concurrent_stream_limit),
         supports_early_data_(supports_early_data) {}
 
+  void initializeReadFilters() override {}
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
@@ -472,6 +473,19 @@ TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
   pool_.destructAllConnections();
 }
 
+// Verify that not fully connected active client calls
+// idle callbacks upon destruction.
+TEST_F(ConnPoolImplBaseTest, PoolIdleNotConnected) {
+  auto active_client = std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_,
+                                                                    concurrent_streams_, false);
+
+  testing::MockFunction<void()> idle_pool_callback;
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
+
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
 // Remote close simulates the peer closing the connection.
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
@@ -490,13 +504,13 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
   pool_.onStreamClosed(*clients_.back(), false);
 
   // Now that the last connection is closed, while there are no requests, the pool becomes idle.
+  // idle_pool_callback should be called once.
   testing::MockFunction<void()> idle_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call());
   pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
   dispatcher_.clearDeferredDeleteList();
   clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_CALL(idle_pool_callback, Call());
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
@@ -518,13 +532,13 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   pool_.onStreamClosed(*clients_.back(), false);
 
   // Now that the last connection is closed, while there are no requests, the pool becomes idle.
+  // idle_pool_callback should be called once.
   testing::MockFunction<void()> idle_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call());
   pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
   dispatcher_.clearDeferredDeleteList();
   clients_.back()->onEvent(Network::ConnectionEvent::LocalClose);
 
-  EXPECT_CALL(idle_pool_callback, Call());
   pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 

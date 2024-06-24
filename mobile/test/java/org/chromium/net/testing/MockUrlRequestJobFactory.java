@@ -1,7 +1,5 @@
 package org.chromium.net.testing;
 
-import static junit.framework.Assert.assertTrue;
-
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ExperimentalCronetEngine;
 
@@ -22,18 +20,12 @@ public final class MockUrlRequestJobFactory {
 
   /**
    * Sets up request filters.
-   * This optionally adds a request filter to the cronetEngine before building.
-   * JavaCronetEngine does not support these filters.
+   * This adds a request filter to the cronetEngine before building.
    */
-  public MockUrlRequestJobFactory(ExperimentalCronetEngine.Builder builder,
-                                  boolean testingJavaImpl) {
-    if (testingJavaImpl) {
-      mCronetEngine = builder.build();
-    } else {
-      // Add a filter to immediately return a response
-      mCronetEngine =
-          CronetTestUtil.getCronetEngineBuilderImpl(builder).addUrlInterceptorsForTesting().build();
-    }
+  public MockUrlRequestJobFactory(ExperimentalCronetEngine.Builder builder) {
+    // Add a filter to immediately return a response
+    mCronetEngine =
+        CronetTestUtil.getCronetEngineBuilderImpl(builder).addUrlInterceptorsForTesting().build();
   }
 
   /**

@@ -36,11 +36,22 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif
+
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/field_access.h"
 #include "eval/public/containers/field_backed_list_impl.h"
 #include "eval/public/containers/field_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "include/proxy-wasm/pairs_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
@@ -456,6 +467,11 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   // In order to delegate to the StreamActivation method, we have to set the
   // context properties to match the Wasm context properties in all callbacks
   // (e.g. onLog or onEncodeHeaders) for the duration of the call.
+  if (root_local_info_) {
+    local_info_ = root_local_info_;
+  } else if (plugin_) {
+    local_info_ = &plugin()->localInfo();
+  }
   activation_info_ = info;
   activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
   activation_response_headers_ =
@@ -716,8 +732,8 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -791,8 +807,8 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -804,8 +820,8 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -818,8 +834,8 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
-  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -979,8 +995,12 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+  auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
       service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+  if (!client_or_error.status().ok()) {
+    return WasmResult::BadArgument;
+  }
+  auto grpc_client = client_or_error.value();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1024,8 +1044,12 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+  auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
       service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+  if (!client_or_error.status().ok()) {
+    return WasmResult::BadArgument;
+  }
+  auto grpc_client = client_or_error.value();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1122,6 +1146,29 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   if (!state->setValue(toAbslStringView(value))) {
     return WasmResult::BadArgument;
   }
+  return WasmResult::Ok;
+}
+
+WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view value,
+                                        StreamInfo::FilterState::LifeSpan life_span) {
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(path);
+  if (!factory) {
+    return WasmResult::NotFound;
+  }
+
+  auto object = factory->createFromBytes(value);
+  if (!object) {
+    return WasmResult::BadArgument;
+  }
+
+  auto* stream_info = getRequestStreamInfo();
+  if (!stream_info) {
+    return WasmResult::NotFound;
+  }
+
+  stream_info->filterState()->setData(path, std::move(object),
+                                      StreamInfo::FilterState::StateType::Mutable, life_span);
   return WasmResult::Ok;
 }
 
@@ -1453,9 +1500,7 @@ void Context::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& call
   network_write_filter_callbacks_ = &callbacks;
 }
 
-void Context::log(const Http::RequestHeaderMap* request_headers,
-                  const Http::ResponseHeaderMap* response_headers,
-                  const Http::ResponseTrailerMap* response_trailers,
+void Context::log(const Formatter::HttpFormatterContext& log_context,
                   const StreamInfo::StreamInfo& stream_info) {
   // `log` may be called multiple times due to mid-request logging -- we only want to run on the
   // last call.
@@ -1472,10 +1517,10 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
   }
 
   access_log_phase_ = true;
-  access_log_request_headers_ = request_headers;
+  access_log_request_headers_ = &log_context.requestHeaders();
   // ? request_trailers  ?
-  access_log_response_headers_ = response_headers;
-  access_log_response_trailers_ = response_trailers;
+  access_log_response_headers_ = &log_context.responseHeaders();
+  access_log_response_trailers_ = &log_context.responseTrailers();
   access_log_stream_info_ = &stream_info;
 
   onLog();
@@ -1556,7 +1601,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_read_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close");
       });
     }
     return WasmResult::Ok;
@@ -1565,7 +1610,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       // We are in a reentrant call, so defer.
       wasm()->addAfterVmCallAction([this] {
         network_write_filter_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
+            Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close");
       });
     }
     return WasmResult::Ok;
@@ -1646,8 +1691,16 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       if (local_reply_sent_) {
         return;
       }
+      // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
+      // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
+      // at all.
+      absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = absl::nullopt;
+      if (grpc_status >= Grpc::Status::WellKnownGrpcStatus::Ok &&
+          grpc_status <= Grpc::Status::WellKnownGrpcStatus::MaximumKnown) {
+        grpc_status_code = Grpc::Status::WellKnownGrpcStatus(grpc_status);
+      }
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
-                                         modify_headers, grpc_status, details);
+                                         modify_headers, grpc_status_code, details);
       local_reply_sent_ = true;
     });
   }
@@ -1826,8 +1879,9 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     return;
   }
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
-  // This is the only value currently.
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   status_message_ = "reset";
   // Deferred "after VM call" actions are going to be executed upon returning from
   // ContextBase::*, which might include deleting Context object via proxy_done().

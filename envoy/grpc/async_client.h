@@ -7,7 +7,8 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/header_map.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
@@ -64,6 +65,11 @@ public:
    * limits
    */
   virtual bool isAboveWriteBufferHighWatermark() const PURE;
+
+  /**
+   * @returns the stream info object associated with this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 class RawAsyncRequestCallbacks {
@@ -169,7 +175,6 @@ public:
 
   /**
    * Start a gRPC stream asynchronously.
-   * TODO(mattklein123): Determine if tracing should be added to streaming requests.
    * @param service_full_name full name of the service (i.e. service_method.service()->full_name()).
    * @param method_name name of the method (i.e. service_method.name()).
    * @param callbacks the callbacks to be notified of stream status.

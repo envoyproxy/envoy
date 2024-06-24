@@ -59,6 +59,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "admission_control_integration_test",
+    size = "large",
     srcs = ["admission_control_integration_test.cc"],
     extension_names = ["envoy.filters.http.admission_control"],
     deps = [

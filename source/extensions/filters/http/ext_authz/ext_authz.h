@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +40,8 @@ namespace ExtAuthz {
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
   COUNTER(disabled)                                                                                \
-  COUNTER(failure_mode_allowed)
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(invalid)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -56,70 +58,8 @@ class FilterConfig {
 
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
-               const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
-      : allow_partial_message_(config.with_request_body().allow_partial_message()),
-        failure_mode_allow_(config.failure_mode_allow()),
-        clear_route_cache_(config.clear_route_cache()),
-        max_request_bytes_(config.with_request_body().max_request_bytes()),
-        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
-        status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
-        runtime_(runtime), http_context_(http_context),
-        filter_enabled_(config.has_filter_enabled()
-                            ? absl::optional<Runtime::FractionalPercent>(
-                                  Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-                            : absl::nullopt),
-        filter_enabled_metadata_(
-            config.has_filter_enabled_metadata()
-                ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
-                : absl::nullopt),
-        deny_at_disable_(config.has_deny_at_disable()
-                             ? absl::optional<Runtime::FeatureFlag>(
-                                   Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
-                             : absl::nullopt),
-        pool_(scope_.symbolTable()),
-        metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
-                                     config.metadata_context_namespaces().end()),
-        typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
-                                           config.typed_metadata_context_namespaces().end()),
-        include_peer_certificate_(config.include_peer_certificate()),
-        stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
-        ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
-        ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
-        ext_authz_failure_mode_allowed_(
-            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
-    auto labels_key_it =
-        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
-    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
-      for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
-        destination_labels_[labels_it.first] = labels_it.second.string_value();
-      }
-    }
-
-    if (config.has_allowed_headers() &&
-        config.http_service().authorization_request().has_allowed_headers()) {
-      ExceptionUtil::throwEnvoyException("Invalid duplicate configuration for allowed_headers.");
-    }
-
-    // An unset request_headers_matchers_ means that all client request headers are allowed through
-    // to the authz server; this is to preserve backwards compatibility when introducing
-    // allowlisting of request headers for gRPC authz servers. Pre-existing support is for
-    // HTTP authz servers only and defaults to blocking all but a few headers (i.e. Authorization,
-    // Method, Path and Host).
-    if (config.has_grpc_service() && config.has_allowed_headers()) {
-      request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
-          config.allowed_headers(), false);
-    } else if (config.has_http_service()) {
-      if (config.http_service().authorization_request().has_allowed_headers()) {
-        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
-            config.http_service().authorization_request().allowed_headers(), true);
-      } else {
-        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
-            config.allowed_headers(), true);
-      }
-    }
-  }
+               Stats::Scope& scope, const std::string& stats_prefix,
+               Server::Configuration::ServerFactoryContext& factory_context);
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -127,13 +67,33 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
+
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
   bool packAsBytes() const { return pack_as_bytes_; }
 
+  bool headersAsBytes() const { return encode_raw_headers_; }
+
+  Filters::Common::MutationRules::CheckResult
+  checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
+                             const Http::LowerCaseString& key, absl::string_view value) const {
+    if (!decoder_header_mutation_checker_.has_value()) {
+      return Filters::Common::MutationRules::CheckResult::OK;
+    }
+    return decoder_header_mutation_checker_->check(operation, key, value);
+  }
+
+  // Used for headers_to_remove to avoid a redundant pseudo header check.
+  bool hasDecoderHeaderMutationRules() const {
+    return decoder_header_mutation_checker_.has_value();
+  }
+
   Http::Code statusOnError() const { return status_on_error_; }
+
+  bool validateMutations() const { return validate_mutations_; }
 
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
     const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
@@ -158,6 +118,14 @@ public:
     return typed_metadata_context_namespaces_;
   }
 
+  const std::vector<std::string>& routeMetadataContextNamespaces() {
+    return route_metadata_context_namespaces_;
+  }
+
+  const std::vector<std::string>& routeTypedMetadataContextNamespaces() {
+    return route_typed_metadata_context_namespaces_;
+  }
+
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
@@ -165,10 +133,17 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
-  const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
-    return request_header_matchers_;
+  bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
+
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
+    return allowed_headers_matcher_;
+  }
+
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& disallowedHeadersMatcher() const {
+    return disallowed_headers_matcher_;
   }
 
 private:
@@ -198,11 +173,15 @@ private:
 
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
+  const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const bool pack_as_bytes_;
+  const bool encode_raw_headers_;
   const Http::Code status_on_error_;
+  const bool validate_mutations_;
   Stats::Scope& scope_;
+  const absl::optional<Filters::Common::MutationRules::Checker> decoder_header_mutation_checker_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
@@ -216,13 +195,18 @@ private:
 
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
+  const std::vector<std::string> route_metadata_context_namespaces_;
+  const std::vector<std::string> route_typed_metadata_context_namespaces_;
 
   const bool include_peer_certificate_;
+  const bool include_tls_session_;
+  const bool charge_cluster_response_stats_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
-  Filters::Common::ExtAuthz::MatcherSharedPtr request_header_matchers_;
+  Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
+  Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
@@ -230,6 +214,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_invalid_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 
@@ -248,9 +233,17 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
-        disable_request_body_buffering_(config.has_check_settings() &&
-                                        config.check_settings().disable_request_body_buffering()),
-        disabled_(config.disabled()) {}
+        check_settings_(config.has_check_settings()
+                            ? config.check_settings()
+                            : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
+        disabled_(config.disabled()) {
+    if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
+        config.check_settings().has_with_request_body()) {
+      ExceptionUtil::throwEnvoyException(
+          "Invalid configuration for check_settings. Only one of disable_request_body_buffering or "
+          "with_request_body can be set.");
+    }
+  }
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -263,13 +256,15 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings checkSettings() const {
+    return check_settings_;
+  }
 
 private:
-  // We save the context extensions as a protobuf map instead of an std::map as this allows us to
+  // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
-  bool disable_request_body_buffering_;
+  envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   bool disabled_;
 };
 
@@ -307,16 +302,28 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
+  // Convenience function for the following:
+  // 1. If `validate_mutations` is set to true, validate header key and value.
+  // 2. If `decoder_header_mutation_rules` is set, check that mutation is allowed.
+  Filters::Common::MutationRules::CheckResult
+  validateAndCheckDecoderHeaderMutation(Filters::Common::MutationRules::CheckOperation operation,
+                                        absl::string_view key, absl::string_view value) const;
+
+  // Called when the filter is configured to reject invalid responses & the authz response contains
+  // invalid header or query parameters. Sends a local response with the configured rejection status
+  // code.
+  void rejectResponse();
+
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
-  bool isBufferFull() const;
+  bool isBufferFull(uint64_t num_bytes_processing) const;
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
     const bool skip_check_;
-    const bool skip_request_body_buffering_;
+    const envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   };
   PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
 
@@ -327,7 +334,7 @@ private:
 
   // FilterReturn is used to capture what the return code should be to the filter chain.
   // if this filter is either in the middle of calling the service or the result is denied then
-  // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
+  // the filter chain should stop. Otherwise, the filter chain can continue to the next filter.
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
@@ -338,11 +345,17 @@ private:
   Http::RequestHeaderMap* request_headers_;
   Http::HeaderVector response_headers_to_add_{};
   Http::HeaderVector response_headers_to_set_{};
+  Http::HeaderVector response_headers_to_add_if_absent_{};
+  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+
+  // This is used to hold the final configs after we merge them with per-route configs.
+  bool allow_partial_message_{};
+  uint32_t max_request_bytes_{};
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};

@@ -29,7 +29,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
+  if (Utility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
@@ -61,17 +61,18 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   }
 }
 
@@ -91,6 +92,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (!Utility::isUpgrade(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
+
+    sanitizeTEHeader(request_headers);
   }
 
   // Clean proxy headers.
@@ -102,8 +105,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // Sanitize referer field if exists.
   auto result = request_headers.get(Http::CustomHeaders::get().Referer);
   if (!result.empty()) {
-    Utility::Url url;
-    if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+    if (result.size() > 1 || !Utility::isValidRefererValue(result[0]->value().getStringView())) {
       // A request header shouldn't have multiple referer field.
       request_headers.remove(Http::CustomHeaders::get().Referer);
     }
@@ -207,6 +209,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
+  request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
 
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
@@ -286,15 +289,47 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   return {final_remote_address, absl::nullopt};
 }
 
+void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
+    return;
+  }
+
+  absl::string_view te_header = request_headers.getTEValue();
+  if (te_header.empty()) {
+    return;
+  }
+
+  // If the TE header contains the "trailers" value, set the TE header to "trailers" only.
+  std::vector<absl::string_view> te_values = absl::StrSplit(te_header, ',');
+  for (const absl::string_view& te_value : te_values) {
+    bool is_trailers =
+        absl::StripAsciiWhitespace(te_value) == Http::Headers::get().TEValues.Trailers;
+
+    if (is_trailers) {
+      request_headers.setTE(Http::Headers::get().TEValues.Trailers);
+      return;
+    }
+  }
+
+  // If the TE header does not contain the "trailers" value, remove the TE header.
+  request_headers.removeTE();
+}
+
 void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
     const std::list<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
+    // Headers to be stripped from edge requests, i.e. to sanitize so
+    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+    request_headers.removeEnvoyOriginalPath();
   }
 
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();
@@ -556,11 +591,7 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
       return NormalizePathAction::Reject;
     }
     // Check runtime override and throw away fragment from URI path
-    // TODO(yanavlasov): remove this override after deprecation period.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
-      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
-    }
+    request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

@@ -11,7 +11,7 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
-    srcs = ["config.h"],
+    hdrs = ["config.h"],
     # for integration tests and bootstrap.internal_listener
     visibility = ["//visibility:public"],
     deps = [

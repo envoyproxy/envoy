@@ -1,4 +1,5 @@
-# We build upon the default config provided by https://github.com/arturbosch/detekt/blob/master/detekt-cli/src/main/resources/default-detekt-config.yml
+# We build upon the default config provided by
+# https://github.com/arturbosch/detekt/blob/master/detekt-cli/src/main/resources/default-detekt-config.yml
 build:
   maxIssues: 0
 

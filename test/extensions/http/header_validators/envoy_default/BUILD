@@ -15,17 +15,36 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "header_validator_test",
+    name = "base_header_validator_test",
     srcs = [
-        "header_validator_test.cc",
+        "base_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
-        ":header_validator_test_lib",
+        ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
         "//source/extensions/http/header_validators/envoy_default:header_validator_common",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "http_common_validation_test",
+    srcs = [
+        "http_common_validation_test.cc",
+    ],
+    extension_names = ["envoy.http.header_validators.envoy_default"],
+    deps = [
+        ":header_validator_utils_lib",
+        "//envoy/http:header_validator_errors",
+        "//source/extensions/http/header_validators/envoy_default:character_tables",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -37,9 +56,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
-        ":header_validator_test_lib",
+        ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -51,24 +72,29 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
-        ":header_validator_test_lib",
+        ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_extension_cc_test_library(
-    name = "header_validator_test_lib",
+    name = "header_validator_utils_lib",
+    srcs = [
+        "header_validator_utils.cc",
+    ],
     hdrs = [
-        "header_validator_test.h",
+        "header_validator_utils.h",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
-        "//source/extensions/http/header_validators/envoy_default:config",
-        "//test/mocks/http:header_validator_mocks",
-        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
+        "//envoy/http:header_validator_interface",
+        "//source/extensions/http/header_validators/envoy_default:character_tables",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -82,7 +108,7 @@ envoy_extension_cc_test(
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
         "//test/mocks/http:header_validator_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -96,6 +122,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -107,7 +134,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",
-        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],

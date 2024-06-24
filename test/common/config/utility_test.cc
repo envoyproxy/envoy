@@ -28,7 +28,9 @@
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using testing::ContainsRegex;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Optional;
 using testing::Ref;
 using testing::Return;
@@ -40,25 +42,6 @@ namespace {
 TEST(UtilityTest, ComputeHashedVersion) {
   EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
   EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo").first);
-}
-
-TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
-  envoy::config::core::v3::ApiConfigSource api_config_source;
-  api_config_source.mutable_refresh_delay()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
-  EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
-}
-
-TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
-  envoy::config::core::v3::ApiConfigSource api_config_source;
-  EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
-}
-
-TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
-  envoy::config::core::v3::ApiConfigSource api_config_source;
-  api_config_source.mutable_request_timeout()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
-  EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, ConfigSourceDefaultInitFetchTimeout) {
@@ -73,77 +56,34 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
-TEST(UtilityTest, TranslateApiConfigSource) {
-  envoy::config::core::v3::ApiConfigSource api_config_source_rest_legacy;
-  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, ApiType::get().Rest,
-                                    api_config_source_rest_legacy);
-  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST,
-            api_config_source_rest_legacy.api_type());
-  EXPECT_EQ(10000,
-            DurationUtil::durationToMilliseconds(api_config_source_rest_legacy.refresh_delay()));
-  EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_names(0));
-
-  envoy::config::core::v3::ApiConfigSource api_config_source_rest;
-  Utility::translateApiConfigSource("test_rest_cluster", 20000, ApiType::get().Rest,
-                                    api_config_source_rest);
-  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST, api_config_source_rest.api_type());
-  EXPECT_EQ(20000, DurationUtil::durationToMilliseconds(api_config_source_rest.refresh_delay()));
-  EXPECT_EQ("test_rest_cluster", api_config_source_rest.cluster_names(0));
-
-  envoy::config::core::v3::ApiConfigSource api_config_source_grpc;
-  Utility::translateApiConfigSource("test_grpc_cluster", 30000, ApiType::get().Grpc,
-                                    api_config_source_grpc);
-  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
-  EXPECT_EQ(30000, DurationUtil::durationToMilliseconds(api_config_source_grpc.refresh_delay()));
-  EXPECT_EQ("test_grpc_cluster",
-            api_config_source_grpc.grpc_services(0).envoy_grpc().cluster_name());
-}
-
-TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = Utility::createTagProducer(bootstrap, {});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  ASSERT_EQ(extracted_name, "http.rq_total");
-  ASSERT_EQ(tags.size(), 1);
-}
-
-TEST(UtilityTest, createTagProducerWithDefaultTgs) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = Utility::createTagProducer(bootstrap, {{"foo", "bar"}});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  EXPECT_EQ(extracted_name, "http.rq_total");
-  EXPECT_EQ(tags.size(), 2);
-}
-
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   Api::ApiPtr api = Api::createApiForTest();
 
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,
-      "paths must refer to an existing path in the system: 'foo' does not exist");
+  EXPECT_EQ(Utility::checkFilesystemSubscriptionBackingPath("foo", *api).message(),
+            "paths must refer to an existing path in the system: 'foo' does not exist");
   std::string test_path = TestEnvironment::temporaryDirectory();
-  Utility::checkFilesystemSubscriptionBackingPath(test_path, *api);
+  EXPECT_TRUE(Utility::checkFilesystemSubscriptionBackingPath(test_path, *api).ok());
 }
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(false, rate_limit_settings.enabled_);
-  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(false, rate_limit_settings->enabled_);
+  EXPECT_EQ(100, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings->fill_rate_);
 }
 
 TEST(UtilityTest, ParseEmptyRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
   api_config_source.mutable_rate_limit_settings();
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(true, rate_limit_settings.enabled_);
-  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(true, rate_limit_settings->enabled_);
+  EXPECT_EQ(100, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings->fill_rate_);
 }
 
 TEST(UtilityTest, ParseRateLimitSettings) {
@@ -152,10 +92,38 @@ TEST(UtilityTest, ParseRateLimitSettings) {
       api_config_source.mutable_rate_limit_settings();
   rate_limits->mutable_max_tokens()->set_value(500);
   rate_limits->mutable_fill_rate()->set_value(4);
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(true, rate_limit_settings.enabled_);
-  EXPECT_EQ(500, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(4, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(true, rate_limit_settings->enabled_);
+  EXPECT_EQ(500, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(4, rate_limit_settings->fill_rate_);
+}
+
+TEST(UtilityTest, ParseNanFillRateLimitSettings) {
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_FALSE(rate_limit_settings.ok());
+  EXPECT_EQ(rate_limit_settings.status().message(),
+            "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf");
+}
+
+TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::infinity());
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_FALSE(rate_limit_settings.ok());
+  EXPECT_EQ(rate_limit_settings.status().message(),
+            "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf");
 }
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
@@ -168,10 +136,11 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false),
-        EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
   }
 
   {
@@ -179,12 +148,13 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services();
     api_config_source.add_grpc_services();
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must have a single gRPC service "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must have a single gRPC service "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -192,12 +162,13 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     // this also logs a warning for setting REST cluster names for a gRPC API config.
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -205,12 +176,13 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -218,22 +190,25 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     // this also logs a warning for configuring gRPC clusters for a REST API config.
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{}, if not a gRPC type, must not have a gRPC service "
-                                        "specified:",
-                                        api_config_source.GetTypeName()));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{}, if not a gRPC type, must not have a gRPC service "
+                                          "specified:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names("foo");
-    EXPECT_THROW_WITH_REGEX(Utility::factoryForGrpcApiConfigSource(async_client_manager,
-                                                                   api_config_source, scope, false),
-                            EnvoyException,
-                            fmt::format("{} type must be gRPC:", api_config_source.GetTypeName()));
+    EXPECT_THAT(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
+                                               false)
+            .status()
+            .message(),
+        ContainsRegex(fmt::format("{} type must be gRPC:", api_config_source.GetTypeName())));
   }
 
   {
@@ -244,7 +219,9 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, false);
+    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .ok());
   }
 
   {
@@ -254,7 +231,9 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_CALL(
         async_client_manager,
         factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true);
+    EXPECT_TRUE(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true)
+            .ok());
   }
 }
 
@@ -294,6 +273,246 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
+// test that default values are used correctly when no retry configuration is provided
+TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
+  NiceMock<Random::MockRandomGenerator> random;
+  // test prepareJitteredExponentialBackOffStrategy method with only default values
+  {
+    envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+
+    // valid default base and max interval values
+    JitteredExponentialBackOffStrategyPtr strategy;
+    strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, 1000).value();
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(1000 + 1));
+
+    // only valid base interval value
+    strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+            .value();
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    // time limit will be 10 * provided default base interval
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(500 * 10 + 1));
+
+    // invalid base interval value
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+                  .status()
+                  .message(),
+              "default_base_interval_ms must be greater than zero");
+
+    // invalid max interval value < base interval value
+    EXPECT_EQ(
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 1000, 500)
+            .status()
+            .message(),
+        "default_max_interval_ms must be greater than or equal to the default_base_interval_ms");
+  }
+
+  // provide Envoy Grpc Config without any configured retry values
+  {
+    envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+    const std::string config_yaml = R"EOF(
+        cluster_name: some_xds_cluster
+    )EOF";
+
+    TestUtility::loadFromYaml(config_yaml, config);
+    EXPECT_FALSE(config.has_retry_policy());
+
+    JitteredExponentialBackOffStrategyPtr strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+            .value();
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    // time limit will be 10 * provided default base interval
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(500 * 10 + 1));
+
+    // test an invalid default base interval
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(config, random, 0, absl::nullopt)
+                  .status()
+                  .message(),
+              "default_base_interval_ms must be greater than zero");
+  }
+
+  // provide ApiConfigSource config without any configured retry values
+  {
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    const std::string config_yaml = R"EOF(
+      api_type: GRPC
+    )EOF";
+
+    TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+    JitteredExponentialBackOffStrategyPtr strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
+                                                           absl::nullopt)
+            .value();
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    // time limit will be 10 * provided default base interval
+    EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                        ->isOverTimeLimit(500 * 10 + 1));
+
+    // test an invalid default base interval
+    EXPECT_EQ(Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 0,
+                                                                 absl::nullopt)
+                  .status()
+                  .message(),
+              "default_base_interval_ms must be greater than zero");
+  }
+}
+
+// confirm that user provided values in the retry configuration are correctly used to prepare the
+// backoff strategy
+TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {
+  NiceMock<Random::MockRandomGenerator> random;
+  // Provide config values for retry
+  {
+    envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+    const std::string config_yaml = R"EOF(
+        cluster_name: some_xds_cluster
+        retry_policy:
+          retry_back_off:
+            base_interval: 0.01s
+            max_interval: 10s
+    )EOF";
+    TestUtility::loadFromYaml(config_yaml, config);
+    EXPECT_TRUE(config.has_retry_policy());
+    JitteredExponentialBackOffStrategyPtr strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+            .value();
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+    EXPECT_EQ(
+        false,
+        dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())->isOverTimeLimit(10000));
+    EXPECT_EQ(
+        true,
+        dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())->isOverTimeLimit(10001));
+  }
+
+  // Provide ApiConfigSource config values for retry
+  {
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_xds_cluster
+          retry_policy:
+            retry_back_off:
+              base_interval: 0.01s
+              max_interval: 10s
+    )EOF";
+
+    TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+    JitteredExponentialBackOffStrategyPtr strategy =
+        Utility::prepareJitteredExponentialBackOffStrategy(api_config_source, random, 500,
+                                                           absl::nullopt)
+            .value();
+
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+
+    EXPECT_EQ(
+        false,
+        dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())->isOverTimeLimit(10000));
+
+    EXPECT_EQ(
+        true,
+        dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())->isOverTimeLimit(10001));
+  }
+}
+
+// test out various retry backoff timer value scenarios (1. valid base and max intervals, 2. only
+// base interval, 3. max interval < base interval)
+TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
+  NiceMock<Random::MockRandomGenerator> random;
+  {
+    // set custom values for both base and max interval
+    {
+      uint64_t test_base_interval_ms = 5000;
+      uint64_t test_max_interval_ms = 20000;
+
+      // Provide config values for retry
+      envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+      const std::string config_yaml = R"EOF(
+        cluster_name: some_xds_cluster
+    )EOF";
+      TestUtility::loadFromYaml(config_yaml, config);
+
+      config.mutable_retry_policy()->mutable_retry_back_off()->mutable_base_interval()->set_seconds(
+          test_base_interval_ms / 1000);
+      config.mutable_retry_policy()->mutable_retry_back_off()->mutable_max_interval()->set_seconds(
+          test_max_interval_ms / 1000);
+
+      JitteredExponentialBackOffStrategyPtr strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+              .value();
+
+      // provided time limit is equal to max time limit
+      EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                           ->isOverTimeLimit(test_max_interval_ms));
+
+      // provided time limit is over max time limit
+      EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                          ->isOverTimeLimit(test_max_interval_ms + 1));
+    }
+
+    // only set base_interval
+    {
+      // Provide config values for retry
+      envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+      const std::string config_yaml = R"EOF(
+        cluster_name: some_xds_cluster
+    )EOF";
+      TestUtility::loadFromYaml(config_yaml, config);
+
+      uint64_t test_base_interval_ms = 5000;
+
+      config.mutable_retry_policy()->mutable_retry_back_off()->mutable_base_interval()->set_seconds(
+          test_base_interval_ms / 1000);
+
+      JitteredExponentialBackOffStrategyPtr strategy =
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+              .value();
+
+      // max_interval should be less than or equal test_base_interval * 10
+      EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                           ->isOverTimeLimit(test_base_interval_ms * 10));
+      EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                          ->isOverTimeLimit(test_base_interval_ms * 10 + 1));
+    }
+
+    // set max_interval < base_interval
+    {
+      uint64_t test_base_interval_ms = 10000;
+      uint64_t test_max_interval_ms = 5000;
+
+      // Provide config values for retry
+      envoy::config::core::v3::GrpcService::EnvoyGrpc config;
+      const std::string config_yaml = R"EOF(
+        cluster_name: some_xds_cluster
+    )EOF";
+      TestUtility::loadFromYaml(config_yaml, config);
+
+      config.mutable_retry_policy()->mutable_retry_back_off()->mutable_base_interval()->set_seconds(
+          test_base_interval_ms);
+      config.mutable_retry_policy()->mutable_retry_back_off()->mutable_max_interval()->set_seconds(
+          test_max_interval_ms);
+
+      EXPECT_FALSE(
+          Utility::prepareJitteredExponentialBackOffStrategy(config, random, 500, absl::nullopt)
+              .status()
+              .ok());
+    }
+  }
+}
+
 // Validate that an opaque config of the wrong type throws during conversion.
 TEST(UtilityTest, AnyWrongType) {
   ProtobufWkt::Duration source_duration;
@@ -305,7 +524,7 @@ TEST(UtilityTest, AnyWrongType) {
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
                                      out),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
@@ -323,7 +542,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
       Utility::translateAnyToFactoryConfig(typed_config,
                                            ProtobufMessage::getStrictValidationVisitor(), factory),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyToFactoryConfig) {
@@ -495,31 +714,34 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_THROW_WITH_REGEX(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
+  EXPECT_THAT(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
+      HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException,
+  EXPECT_EQ(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
       fmt::format("{} must have a statically defined non-EDS cluster: "
                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
                   api_config_source->GetTypeName()));
 
   // All ok.
   primary_clusters.insert("foo_cluster");
-  Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source);
+  EXPECT_TRUE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .ok());
 
   // API with cluster_names set should be rejected.
   api_config_source->add_cluster_names("foo_cluster");
-  EXPECT_THROW_WITH_REGEX(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException,
-      fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
-                  "specified:",
-                  api_config_source->GetTypeName()));
+  EXPECT_THAT(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
+      ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
+                                "specified:",
+                                api_config_source->GetTypeName())));
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {
@@ -530,16 +752,18 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
 
   // Non-existent cluster.
   api_config_source->add_cluster_names("foo_cluster");
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source),
-      EnvoyException,
+  EXPECT_EQ(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .message(),
       fmt::format("{} must have a statically defined non-EDS cluster: "
                   "'foo_cluster' does not exist, was added via api, or is an EDS cluster",
                   api_config_source->GetTypeName()));
 
   // All ok.
   primary_clusters.insert("foo_cluster");
-  Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source);
+  EXPECT_TRUE(
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
+          .ok());
 }
 
 // Validates CheckCluster functionality.
@@ -547,21 +771,21 @@ TEST(UtilityTest, CheckCluster) {
   NiceMock<Upstream::MockClusterManager> cm;
 
   // Validate that proper error is thrown, when cluster is not available.
-  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
-                            "prefix: unknown cluster 'foo'");
+  EXPECT_THAT(Utility::checkCluster("prefix", "foo", cm, false).status().message(),
+              ContainsRegex("prefix: unknown cluster 'foo'"));
 
   // Validate that proper error is thrown, when dynamic cluster is passed when it is not expected.
   cm.initializeClusters({"foo"}, {});
   ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
-                            "prefix: invalid cluster 'foo': currently only "
-                            "static (non-CDS) clusters are supported");
-  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
+  EXPECT_EQ(Utility::checkCluster("prefix", "foo", cm, false).status().message(),
+            "prefix: invalid cluster 'foo': currently only "
+            "static (non-CDS) clusters are supported");
+  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, true).ok());
 
   // Validate that bootstrap cluster does not throw any exceptions.
   ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(false));
-  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
-  EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, false));
+  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, true).ok());
+  EXPECT_TRUE(Utility::checkCluster("prefix", "foo", cm, false).ok());
 }
 
 // Validates getGrpcControlPlane() functionality.

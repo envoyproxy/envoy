@@ -23,10 +23,12 @@ class ExpressionDescriptor : public RateLimit::DescriptorProducer {
 public:
   ExpressionDescriptor(
       const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor& config,
-      Filters::Common::Expr::Builder& builder, const google::api::expr::v1alpha1::Expr& input_expr)
-      : input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
+      Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr& builder,
+      const google::api::expr::v1alpha1::Expr& input_expr)
+      : builder_(builder), input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
         skip_if_error_(config.skip_if_error()) {
-    compiled_expr_ = Extensions::Filters::Common::Expr::createExpression(builder, input_expr_);
+    compiled_expr_ =
+        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), input_expr_);
   }
 
   // Ratelimit::DescriptorProducer
@@ -34,7 +36,7 @@ public:
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
     ProtobufWkt::Arena arena;
-    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, info,
+    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, nullptr, info,
                                                         &headers, nullptr, nullptr);
     if (!result.has_value() || result.value().IsError()) {
       // If result is an error and if skip_if_error is true skip this descriptor,
@@ -47,6 +49,7 @@ public:
   }
 
 private:
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
   const google::api::expr::v1alpha1::Expr input_expr_;
   const std::string descriptor_key_;
   const bool skip_if_error_;
@@ -62,9 +65,11 @@ ProtobufTypes::MessagePtr ExprDescriptorFactory::createEmptyConfigProto() {
 }
 
 RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducerFromProto(
-    const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validator) {
+    const Protobuf::Message& message, Server::Configuration::CommonFactoryContext& context) {
   const auto& config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor&>(message, validator);
+      const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor&>(
+      message, context.messageValidationVisitor());
+  auto builder = Extensions::Filters::Common::Expr::getBuilder(context);
   switch (config.expr_specifier_case()) {
 #if defined(USE_CEL_PARSER)
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kText: {
@@ -73,22 +78,14 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
       throw EnvoyException("Unable to parse descriptor expression: " +
                            parse_status.status().ToString());
     }
-    return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(),
-                                                  parse_status.value().expr());
+    return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr());
   }
 #endif
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
-    return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(), config.parsed());
+    return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed());
   default:
     return nullptr;
   }
-}
-
-Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {
-  if (expr_builder_ == nullptr) {
-    expr_builder_ = Filters::Common::Expr::createBuilder(nullptr);
-  }
-  return *expr_builder_;
 }
 
 REGISTER_FACTORY(ExprDescriptorFactory, RateLimit::DescriptorProducerFactory);

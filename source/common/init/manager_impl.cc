@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Init {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
-    : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
+    : name_(fmt::format("init manager {}", name)),
       watcher_(name_, [this](absl::string_view target_name) { onTargetReady(target_name); }) {}
 
 Manager::State ManagerImpl::state() const { return state_; }

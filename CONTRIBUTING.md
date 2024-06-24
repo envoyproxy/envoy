@@ -83,7 +83,8 @@ versioning guidelines:
   conforms to the public interface documentation should continue to compile and work within the
   deprecation window. Within this window, a warning of deprecation should be carefully logged (some
   features might need rate limiting for logging this). We make no guarantees about code or deployments
-  that rely on undocumented behavior.
+  that rely on undocumented behavior. See [extension removal policy](./EXTENSION_POLICY.md#removing-existing-extensions)
+  for more information.
 * All deprecations/breaking changes will be clearly listed in the [version history](docs/root/version_history/).
 * High risk deprecations/breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
@@ -143,7 +144,7 @@ versioning guidelines:
   git checkout main
   git pull
   git checkout "$branch"
-  git pull
+  git merge main
   ```
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
@@ -236,18 +237,19 @@ Please note that if adding a runtime guarded feature, your [release notes](chang
 * Typically we try to turn around reviews within one business day.
 * See [OWNERS.md](OWNERS.md) for the current list of maintainers.
 * It is generally expected that a senior maintainer should review every PR to
-  core code. Test-only or extension-only changes need only be reviewed by a
-  maintainer, or senior extension maintainer.
+  core code. Changes which only touch tests, extensions, tools, docs or comments
+  need only be reviewed by a maintainer, or senior extension maintainer.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
   PR. This person does not necessarily need to have commit access.
-* The previous two points generally mean that every PR should have two approvals. (Exceptions can
-  be made by the senior maintainers).
-* The above rules may be waived for PRs which only update docs or comments, or trivial changes to
-  tests and tools (where trivial is decided by the maintainer in question).
-* In general, we should also attempt to make sure that at least one of the approvals is *from an
+* For new extensions (contrib or otherwise) and features, at least one of the approvals should be *from an
   organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code.
+  new HTTP/3 features are largely exempt from cross-company approvals as all of the
+  area experts work at a single company, but HTTP/3 changes which impact general
+  functionality still merit a cross-company check.
+* contrib extensions do not need senior maintainer or maintainer review only contrib owner review and
+  a maintainer stamp to merge.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
 * Please make sure that the PR title, commit message, and description are updated if the PR changes

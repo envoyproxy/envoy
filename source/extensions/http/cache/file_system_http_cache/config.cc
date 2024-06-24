@@ -99,13 +99,15 @@ public:
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& filter_config,
            Server::Configuration::FactoryContext& context) override {
     ConfigProto config;
-    MessageUtil::unpackTo(filter_config.typed_config(), config);
-    std::shared_ptr<CacheSingleton> caches = context.singletonManager().getTyped<CacheSingleton>(
-        SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
-          return std::make_shared<CacheSingleton>(
-              Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()),
-              context.api().threadFactory());
-        });
+    THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_config.typed_config(), config));
+    std::shared_ptr<CacheSingleton> caches =
+        context.serverFactoryContext().singletonManager().getTyped<CacheSingleton>(
+            SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
+              return std::make_shared<CacheSingleton>(
+                  Common::AsyncFiles::AsyncFileManagerFactory::singleton(
+                      &context.serverFactoryContext().singletonManager()),
+                  context.serverFactoryContext().api().threadFactory());
+            });
     return caches->get(caches, config, context.scope());
   }
 };

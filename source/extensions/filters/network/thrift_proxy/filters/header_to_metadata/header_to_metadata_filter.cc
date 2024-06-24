@@ -26,7 +26,7 @@ absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) c
   return value;
 }
 
-Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
   selector_ =
       std::make_shared<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
 
@@ -39,20 +39,21 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
   }
 
   if (rule.has_on_missing() && rule.on_missing().value().empty()) {
-    throw EnvoyException("Cannot specify on_missing rule without non-empty value");
+    throw EnvoyException("Cannot specify on_missing rule with empty value");
   }
 
   if (rule.has_on_present() && rule.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_present().regex_value_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 }
 
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
-                   header_to_metadata::v3::HeaderToMetadata& config) {
+                   header_to_metadata::v3::HeaderToMetadata& config,
+               Regex::Engine& regex_engine) {
   for (const auto& entry : config.request_rules()) {
-    request_rules_.emplace_back(entry);
+    request_rules_.emplace_back(entry, regex_engine);
   }
 }
 
@@ -72,7 +73,7 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
   return nspace.empty() ? headerToMetadata : nspace;
 }
 
-bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
+bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::string& meta_namespace,
                                          const std::string& key, std::string value, ValueType type,
                                          ValueEncode encode) const {
   ProtobufWkt::Value val;
@@ -122,15 +123,8 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
   }
 
-  // Have we seen this namespace before?
-  auto namespace_iter = map.find(meta_namespace);
-  if (namespace_iter == map.end()) {
-    map[meta_namespace] = ProtobufWkt::Struct();
-    namespace_iter = map.find(meta_namespace);
-  }
-
-  auto& keyval = namespace_iter->second;
-  (*keyval.mutable_fields())[key] = val;
+  auto& keyval = struct_map[meta_namespace];
+  (*keyval.mutable_fields())[key] = std::move(val);
 
   return true;
 }

@@ -11,18 +11,15 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "crc16_lib",
-    srcs = [
-        "crc16.cc",
-        "crc16.h",
-    ],
+    srcs = ["crc16.cc"],
+    hdrs = ["crc16.h"],
+    deps = ["@com_google_absl//absl/strings"],
 )
 
 envoy_cc_library(
     name = "redis_cluster_lb",
-    srcs = [
-        "redis_cluster_lb.cc",
-        "redis_cluster_lb.h",
-    ],
+    srcs = ["redis_cluster_lb.cc"],
+    hdrs = ["redis_cluster_lb.h"],
     deps = [
         ":crc16_lib",
         "//envoy/upstream:thread_local_cluster_interface",
@@ -37,10 +34,8 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "redis_cluster",
-    srcs = [
-        "redis_cluster.cc",
-        "redis_cluster.h",
-    ],
+    srcs = ["redis_cluster.cc"],
+    hdrs = ["redis_cluster.h"],
     deps = [
         "redis_cluster_lb",
         "//envoy/api:api_interface",

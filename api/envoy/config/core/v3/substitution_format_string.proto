@@ -19,9 +19,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Substitution format string]
 
+// Optional configuration options to be used with json_format.
+message JsonFormatOptions {
+  // The output JSON string properties will be sorted.
+  bool sort_properties = 1;
+}
+
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message SubstitutionFormatString {
   oneof format {
     option (validate.required) = true;
@@ -113,4 +119,7 @@ message SubstitutionFormatString {
   // See the formatters extensions documentation for details.
   // [#extension-category: envoy.formatter]
   repeated TypedExtensionConfig formatters = 6;
+
+  // If json_format is used, the options will be applied to the output JSON string.
+  JsonFormatOptions json_format_options = 7;
 }

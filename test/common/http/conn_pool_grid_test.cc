@@ -13,6 +13,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
@@ -39,17 +40,22 @@ public:
     return grid.getHttp3StatusTracker().hasHttp3FailedRecently();
   }
 
-  static absl::optional<PoolIterator> forceCreateNextPool(ConnectivityGrid& grid) {
+  static ConnectionPool::Instance* forceCreateNextPool(ConnectivityGrid& grid) {
     return grid.createNextPool();
   }
 
-  absl::optional<ConnectivityGrid::PoolIterator> createNextPool() override {
-    if (pools_.size() == 2) {
-      return absl::nullopt;
+  ConnectionPool::Instance* createNextPool() override {
+    if (http2_pool_ && http3_pool_) {
+      return nullptr;
     }
     ConnectionPool::MockInstance* instance = new NiceMock<ConnectionPool::MockInstance>();
     setupPool(*instance);
-    pools_.push_back(ConnectionPool::InstancePtr{instance});
+    if (!http3_pool_) {
+      http3_pool_.reset(instance);
+    } else {
+      http2_pool_.reset(instance);
+    }
+    pools_.push_back(instance);
     ON_CALL(*instance, newStream(_, _, _))
         .WillByDefault(
             Invoke([&, &grid = *this](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
@@ -67,33 +73,31 @@ public:
                                         "reason", host());
                 return nullptr;
               }
+              if (second_pool_immediate_success_) {
+                second_pool_immediate_success_ = false;
+                immediate_success_ = true;
+              }
               callbacks_.push_back(&callbacks);
-              return &cancel_;
+              return cancel_;
             }));
-    if (pools_.size() == 1) {
-      EXPECT_CALL(*first(), protocolDescription())
+    if (!http2_pool_) {
+      EXPECT_CALL(*http3Pool(), protocolDescription())
           .Times(AnyNumber())
-          .WillRepeatedly(Return("first"));
+          .WillRepeatedly(Return("http3"));
 
-      return pools_.begin();
+      return instance;
     }
-    EXPECT_CALL(*second(), protocolDescription())
+    EXPECT_CALL(*http2Pool(), protocolDescription())
         .Times(AnyNumber())
-        .WillRepeatedly(Return("second"));
-    return ++pools_.begin();
+        .WillRepeatedly(Return("http2"));
+    return instance;
   }
 
-  ConnectionPool::MockInstance* first() {
-    if (pools_.empty()) {
-      return nullptr;
-    }
-    return static_cast<ConnectionPool::MockInstance*>(&*pools_.front());
+  ConnectionPool::MockInstance* http3Pool() {
+    return static_cast<ConnectionPool::MockInstance*>(http3_pool_.get());
   }
-  ConnectionPool::MockInstance* second() {
-    if (pools_.size() < 2) {
-      return nullptr;
-    }
-    return static_cast<ConnectionPool::MockInstance*>(&**(++pools_.begin()));
+  ConnectionPool::MockInstance* http2Pool() {
+    return static_cast<ConnectionPool::MockInstance*>(http2_pool_.get());
   }
 
   ConnectionPool::Callbacks* callbacks(int index = 0) { return callbacks_[index]; }
@@ -111,9 +115,10 @@ public:
   NiceMock<MockRequestEncoder>* encoder_;
   void setDestroying() { destroying_ = true; }
   std::vector<ConnectionPool::Callbacks*> callbacks_;
-  NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
+  NiceMock<Envoy::ConnectionPool::MockCancellable>* cancel_;
   bool immediate_success_{};
   bool immediate_failure_{};
+  bool second_pool_immediate_success_{};
 };
 
 namespace {
@@ -126,7 +131,10 @@ public:
         options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(std::make_shared<HttpServerPropertiesCacheImpl>(
             dispatcher_, std::vector<std::string>(), nullptr, 10)),
-        quic_stat_names_(store_.symbolTable()) {}
+        quic_stat_names_(store_.symbolTable()) {
+    ON_CALL(factory_context_.server_context_, threadLocal())
+        .WillByDefault(ReturnRef(thread_local_));
+  }
 
   void initialize() {
     quic_connection_persistent_info_ =
@@ -142,6 +150,7 @@ public:
         Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
         simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
         *quic_connection_persistent_info_);
+    grid_->cancel_ = &cancel_;
     host_ = grid_->host();
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
@@ -179,6 +188,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_;
   PersistentQuicInfoPtr quic_connection_persistent_info_;
+  NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -187,19 +197,22 @@ public:
 
   StreamInfo::MockStreamInfo info_;
   NiceMock<MockRequestEncoder> encoder_;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
   EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                              {/*can_send_early_data_=*/false,
                               /*can_use_http3_=*/true}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_EQ(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_EQ(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -220,7 +233,7 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
                              {/*can_send_early_data=*/false,
                               /*can_use_http3_=*/true}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   EXPECT_FALSE(grid_->isHttp3Broken());
   EXPECT_FALSE(grid_->isHttp3Confirmed());
 }
@@ -229,14 +242,14 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
 TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
-  EXPECT_LOG_CONTAINS("trace", "first pool attempting to create a new stream to host 'hostname'",
+  EXPECT_LOG_CONTAINS("trace", "http3 pool attempting to create a new stream to host 'hostname'",
                       grid_->newStream(decoder_, callbacks_,
                                        {/*can_send_early_data=*/false,
                                         /*can_use_http3_=*/true}));
 
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should fail over to the second pool.
@@ -244,16 +257,16 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
 
   EXPECT_LOG_CONTAINS_ALL_OF(
       Envoy::ExpectedLogMessages(
-          {{"trace", "first pool failed to create connection to host 'hostname'"},
-           {"trace", "second pool attempting to create a new stream to host 'hostname'"}}),
+          {{"trace", "http3 pool failed to create connection to host 'hostname'"},
+           {"trace", "http2 pool attempting to create a new stream to host 'hostname'"}}),
       grid_->callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                         "reason", host_));
-  ASSERT_NE(grid_->second(), nullptr);
+  ASSERT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
-  EXPECT_LOG_CONTAINS("trace", "second pool successfully connected to host 'hostname'",
+  EXPECT_LOG_CONTAINS("trace", "http2 pool successfully connected to host 'hostname'",
                       grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt));
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
@@ -262,7 +275,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
@@ -272,12 +285,12 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
   grid_->newStream(decoder_, callbacks_,
                    {/*can_send_early_data_=*/false,
                     /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
 
   // Kick off the second connection.
   failover_timer->invokeCallback();
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should wait on the second pool.
@@ -296,7 +309,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnects) {
 TEST_F(ConnectivityGridTest, SrttMatters) {
   addHttp3AlternateProtocol(std::chrono::microseconds(2000));
   initialize();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed based on prior rtt.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
@@ -306,7 +319,7 @@ TEST_F(ConnectivityGridTest, SrttMatters) {
   auto cancel = grid_->newStream(decoder_, callbacks_,
                                  {/*can_send_early_data_=*/false,
                                   /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
 
   // Clean up.
@@ -317,7 +330,7 @@ TEST_F(ConnectivityGridTest, SrttMatters) {
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
@@ -325,13 +338,13 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   grid_->newStream(decoder_, callbacks_,
                    {/*can_send_early_data_=*/false,
                     /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
 
   EXPECT_TRUE(failover_timer->enabled_);
 
   // Kick off the second connection.
   failover_timer->invokeCallback();
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should wait on the other pool
@@ -351,7 +364,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
@@ -359,12 +372,12 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
   grid_->newStream(decoder_, callbacks_,
                    {/*can_send_early_data_=*/false,
                     /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
 
   // Kick off the second connection.
   failover_timer->invokeCallback();
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   EXPECT_NE(grid_->callbacks(1), nullptr);
@@ -386,7 +399,7 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
 TEST_F(ConnectivityGridTest, Http3BrokenWithExpiredHttpServerPropertiesCacheEntry) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
@@ -394,12 +407,12 @@ TEST_F(ConnectivityGridTest, Http3BrokenWithExpiredHttpServerPropertiesCacheEntr
   grid_->newStream(decoder_, callbacks_,
                    {/*can_send_early_data_=*/false,
                     /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
 
   // Kick off the second connection.
   failover_timer->invokeCallback();
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   EXPECT_NE(grid_->callbacks(1), nullptr);
@@ -439,8 +452,8 @@ TEST_F(ConnectivityGridTest, NewStreamWithHttp3Disabled) {
                              {/*can_send_early_data_=*/false,
                               /*can_use_http3_=*/false}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
@@ -455,8 +468,8 @@ TEST_F(ConnectivityGridTest, NewStreamWithAltSvcDisabledFail) {
                              {/*can_send_early_data_=*/false,
                               /*can_use_http3_=*/false}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
   EXPECT_FALSE(grid_->isHttp3Broken());
 }
 
@@ -479,11 +492,11 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_->callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                     "reason", host_);
-  ASSERT_NE(grid_->second(), nullptr);
+  ASSERT_NE(grid_->http2Pool(), nullptr);
 
   // Fail the second connection, and verify the second pool gets another newStream call.
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
-  EXPECT_CALL(*grid_->second(), newStream(_, _, _));
+  EXPECT_CALL(*grid_->http2Pool(), newStream(_, _, _));
   grid_->callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
 
@@ -509,7 +522,7 @@ TEST_F(ConnectivityGridTest, ImmediateDoubleFailure) {
 TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
@@ -517,12 +530,12 @@ TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
   grid_->newStream(decoder_, callbacks_,
                    {/*can_send_early_data_=*/false,
                     /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   EXPECT_TRUE(failover_timer->enabled_);
 
   // Kick off the second connection.
   failover_timer->invokeCallback();
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should wait on the second pool.
@@ -541,16 +554,32 @@ TEST_F(ConnectivityGridTest, TimeoutDoubleFailureParallel) {
 TEST_F(ConnectivityGridTest, TestCancel) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   auto cancel = grid_->newStream(decoder_, callbacks_,
                                  {/*can_send_early_data_=*/false,
                                   /*can_use_http3_=*/true});
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
 
   // cancel should be passed through the WrapperCallbacks to the connection pool.
-  EXPECT_CALL(grid_->cancel_, cancel(_));
+  EXPECT_CALL(*grid_->cancel_, cancel(_));
   cancel->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
+// Test tearing down the grid with active connections.
+TEST_F(ConnectivityGridTest, TestTeardown) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data_=*/false,
+                    /*can_use_http3_=*/true});
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+
+  // When the grid is reset, pool failure should be called.
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_.reset();
 }
 
 // Make sure drains get sent to all active pools.
@@ -562,16 +591,16 @@ TEST_F(ConnectivityGridTest, Drain) {
   // Synthetically create a pool.
   grid_->createNextPool();
   {
-    EXPECT_CALL(*grid_->first(),
+    EXPECT_CALL(*grid_->http3Pool(),
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 
   grid_->createNextPool();
   {
-    EXPECT_CALL(*grid_->first(),
+    EXPECT_CALL(*grid_->http3Pool(),
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
-    EXPECT_CALL(*grid_->second(),
+    EXPECT_CALL(*grid_->http2Pool(),
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
@@ -591,29 +620,27 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
 
   // The first time a drain is started, both pools should start draining.
   {
-    EXPECT_CALL(*grid_->first(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
-    EXPECT_CALL(*grid_->second(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
-    grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
+    EXPECT_CALL(*grid_->http3Pool(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*grid_->http2Pool(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 
-  // The second time, the pools will not see any change.
+  // The second time a drain is started, both pools should still be notified.
   {
-    EXPECT_CALL(*grid_->first(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-        .Times(0);
-    EXPECT_CALL(*grid_->second(),
-                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-        .Times(0);
+    EXPECT_CALL(*grid_->http3Pool(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+    EXPECT_CALL(*grid_->http2Pool(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
     grid_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
   {
     // Notify the grid the second pool has been drained. This should not be
     // passed up to the original callers.
     EXPECT_FALSE(drain_received);
-    EXPECT_CALL(*grid_->second(), isIdle()).WillRepeatedly(Return(true));
-    grid_->second()->idle_cb_();
+    EXPECT_CALL(*grid_->http2Pool(), isIdle()).WillRepeatedly(Return(true));
+    grid_->http2Pool()->idle_cb_();
     EXPECT_FALSE(drain_received);
   }
 
@@ -621,8 +648,8 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
     // Notify the grid that another pool has been drained. Now that all pools are
     // drained, the original callers should be informed.
     EXPECT_FALSE(drain_received);
-    EXPECT_CALL(*grid_->first(), isIdle()).WillRepeatedly(Return(true));
-    grid_->first()->idle_cb_();
+    EXPECT_CALL(*grid_->http3Pool(), isIdle()).WillRepeatedly(Return(true));
+    grid_->http3Pool()->idle_cb_();
     EXPECT_TRUE(drain_received);
   }
 }
@@ -642,22 +669,22 @@ TEST_F(ConnectivityGridTest, IdleCallbacks) {
 
   // Notify the grid the second pool is idle. This should not be
   // passed up to the original callers.
-  EXPECT_CALL(*grid_->second(), isIdle()).WillOnce(Return(true));
-  EXPECT_CALL(*grid_->first(), isIdle()).WillOnce(Return(false));
-  grid_->second()->idle_cb_();
+  EXPECT_CALL(*grid_->http2Pool(), isIdle()).WillOnce(Return(true));
+  EXPECT_CALL(*grid_->http3Pool(), isIdle()).WillOnce(Return(false));
+  grid_->http2Pool()->idle_cb_();
   EXPECT_FALSE(idle_received);
 
   // Notify the grid that the first pool is idle, the but second no longer is.
-  EXPECT_CALL(*grid_->first(), isIdle()).WillOnce(Return(true));
-  EXPECT_CALL(*grid_->second(), isIdle()).WillOnce(Return(false));
-  grid_->first()->idle_cb_();
+  EXPECT_CALL(*grid_->http3Pool(), isIdle()).WillOnce(Return(true));
+  EXPECT_CALL(*grid_->http2Pool(), isIdle()).WillOnce(Return(false));
+  grid_->http3Pool()->idle_cb_();
   EXPECT_FALSE(idle_received);
 
   // Notify the grid that both are now idle. This should be passed up
   // to the original caller.
-  EXPECT_CALL(*grid_->first(), isIdle()).WillOnce(Return(true));
-  EXPECT_CALL(*grid_->second(), isIdle()).WillOnce(Return(true));
-  grid_->first()->idle_cb_();
+  EXPECT_CALL(*grid_->http3Pool(), isIdle()).WillOnce(Return(true));
+  EXPECT_CALL(*grid_->http2Pool(), isIdle()).WillOnce(Return(true));
+  grid_->http3Pool()->idle_cb_();
   EXPECT_TRUE(idle_received);
 }
 
@@ -675,7 +702,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
   }
 
   grid_->setDestroying(); // Fake being in the destructor.
-  grid_->first()->idle_cb_();
+  grid_->http3Pool()->idle_cb_();
   EXPECT_FALSE(drain_received);
 }
 
@@ -686,15 +713,15 @@ TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
   alternate_protocols_
       ->getOrCreateHttp3StatusTracker(HttpServerPropertiesCache::Origin("https", "hostname", 9000))
       .markHttp3Broken();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is broken to host 'hostname', skipping.",
                       EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                                                  {/*can_send_early_data_=*/false,
                                                   /*can_use_http3_=*/true}),
                                 nullptr));
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -707,14 +734,14 @@ TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
 TEST_F(ConnectivityGridTest, SuccessWithAltSvc) {
   initialize();
   addHttp3AlternateProtocol();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                              {/*can_send_early_data_=*/false,
                               /*can_use_http3_=*/true}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_EQ(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_EQ(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -726,7 +753,7 @@ TEST_F(ConnectivityGridTest, SuccessWithAltSvc) {
 // Test that when HTTP/3 is not available then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessWithoutHttp3) {
   initialize();
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace",
                       "No alternate protocols available for host 'hostname', skipping HTTP/3.",
@@ -734,8 +761,8 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3) {
                                                  {/*can_send_early_data_=*/false,
                                                   /*can_use_http3_=*/true}),
                                 nullptr));
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -751,7 +778,7 @@ TEST_F(ConnectivityGridTest, SuccessWithExpiredHttp3) {
   alternate_protocols_->setAlternatives(origin_, protocols);
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
 
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace",
                       "No alternate protocols available for host 'hostname', skipping HTTP/3.",
@@ -759,8 +786,8 @@ TEST_F(ConnectivityGridTest, SuccessWithExpiredHttp3) {
                                                  {/*can_send_early_data_=*/false,
                                                   /*can_use_http3_=*/true}),
                                 nullptr));
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -776,15 +803,15 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingHostname) {
       {"h3-29", "otherhostname", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin_, protocols);
 
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
                       EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                                                  {/*can_send_early_data_=*/false,
                                                   /*can_use_http3_=*/true}),
                                 nullptr));
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -800,15 +827,15 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingPort) {
       {"h3-29", "", origin_.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin_, protocols);
 
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
                       EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                                                  {/*can_send_early_data_=*/false,
                                                   /*can_use_http3_=*/true}),
                                 nullptr));
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -823,15 +850,15 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingAlpn) {
       {"http/2", "", origin_.port_, simTime().monotonicTime() + Seconds(5)}};
   alternate_protocols_->setAlternatives(origin_, protocols);
 
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_LOG_CONTAINS("trace", "HTTP/3 is not available to host 'hostname', skipping.",
                       EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                                                  {/*can_send_early_data_=*/false,
                                                   /*can_use_http3_=*/true}),
                                 nullptr));
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(), nullptr);
@@ -845,7 +872,7 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenSucceeds) {
   addHttp3AlternateProtocol();
   grid_->onZeroRttHandshakeFailed();
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   // This timer will be returned and armed as the grid creates the wrapper's failover timer.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
@@ -855,9 +882,9 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenSucceeds) {
                              {/*can_send_early_data_=*/true,
                               /*can_use_http3_=*/true}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
   // The 2nd pool should be TCP pool and it should have been created together with h3 pool.
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
   EXPECT_EQ(2u, grid_->callbacks_.size());
 
   // If failover timer expires, as no more pool to try on.
@@ -868,7 +895,7 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenSucceeds) {
   ASSERT_NE(grid_->callbacks(0), nullptr);
   ASSERT_NE(grid_->callbacks(1), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
-  EXPECT_CALL(grid_->cancel_, cancel(_));
+  EXPECT_CALL(*grid_->cancel_, cancel(_));
   grid_->callbacks(0)->onPoolReady(encoder_, host_, info_, absl::nullopt);
   // Getting onPoolReady() from HTTP/3 pool doesn't change H3 status.
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
@@ -880,14 +907,14 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
   addHttp3AlternateProtocol();
   grid_->onZeroRttHandshakeFailed();
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
-  EXPECT_EQ(grid_->first(), nullptr);
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
 
   EXPECT_NE(grid_->newStream(decoder_, callbacks_,
                              {/*can_send_early_data_=*/true,
                               /*can_use_http3_=*/true}),
             nullptr);
-  EXPECT_NE(grid_->first(), nullptr);
-  EXPECT_NE(grid_->second(), nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_->callbacks(0), nullptr);
@@ -902,14 +929,29 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
+TEST_F(ConnectivityGridTest, Http3FailedH2SuceedsInline) {
+  initialize();
+  addHttp3AlternateProtocol();
+  grid_->onZeroRttHandshakeFailed();
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // Force H3 to have no immediate change, but H2 to immediately succeed.
+  grid_->second_pool_immediate_success_ = true;
+  // Because the second pool immediately succeeded, newStream should return nullptr.
+  EXPECT_EQ(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/true,
+                              /*can_use_http3_=*/true}),
+            nullptr);
+}
+
 #ifdef ENVOY_ENABLE_QUIC
 
 } // namespace
 } // namespace Http
 } // namespace Envoy
 
-#include "test/mocks/server/transport_socket_factory_context.h"
-#include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 namespace Envoy {
 namespace Http {
 namespace {
@@ -920,9 +962,8 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
+      *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
@@ -939,19 +980,19 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   EXPECT_FALSE(grid.hasActiveConnections());
 
   // Create the HTTP/3 pool.
-  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it1.has_value());
-  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+  auto pool1 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool1 != nullptr);
+  EXPECT_EQ("HTTP/3", pool1->protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
   // Create the mixed pool.
-  auto optional_it2 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it2.has_value());
-  EXPECT_EQ("HTTP/1 HTTP/2 ALPN", (**optional_it2)->protocolDescription());
+  auto pool2 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool2 != nullptr);
+  EXPECT_EQ("HTTP/1 HTTP/2 ALPN", pool2->protocolDescription());
 
   // There is no third option currently.
-  auto optional_it3 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_FALSE(optional_it3.has_value());
+  auto pool3 = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool3 == nullptr);
 }
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
@@ -962,12 +1003,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context.context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(factory_context_.context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
-      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
+      *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);
   factory->initialize();
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
@@ -982,9 +1022,9 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
-  auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
-  ASSERT_TRUE(optional_it1.has_value());
-  EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
+  auto pool = ConnectivityGridForTest::forceCreateNextPool(grid);
+  ASSERT_TRUE(pool != nullptr);
+  EXPECT_EQ("HTTP/3", pool->protocolDescription());
 
   const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
   Api::InterfaceAddressVector interfaces{};
@@ -992,7 +1032,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
     ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
   }
 
-  Api::MockOsSysCalls os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
   if (supports_getifaddrs) {
@@ -1016,8 +1056,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
-  ConnectionPool::Cancellable* cancel = (**optional_it1)
-                                            ->newStream(decoder_, callbacks_,
+  ConnectionPool::Cancellable* cancel = pool->newStream(decoder_, callbacks_,
                                                         {/*can_send_early_data_=*/false,
                                                          /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancel);

@@ -1,0 +1,30 @@
+config {
+  name: "\000\0004**-6264\000 "
+  virtual_hosts {
+    name: "0"
+    domains: "*"
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster_header: "A"
+      }
+      request_headers_to_add {
+        header {
+          key: "["
+          value: "`%START_TIME()%%REQ(T_||?|STARTO2s)%%UPSTREAM_HEADER_BYTES_RECEIVED%%PER_REQUEST_STATE(%f(%f%sRESPONSE_259462C_Swwwwww`TART_TIME()%%REQ(T_||?|STARTOC_Swwwwww`%START_TIME()%%REQ(T_||?|STARTOC_SwwwwwwUB(UB(OD)%T%START_TIME()%%REQ(T_<|?|STARTOC_SwwwwwwUB(UB(OD)%TA"
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: "x-forwarded-proto"
+    value: "2"
+  }
+  headers {
+    key: ":path"
+  }
+}

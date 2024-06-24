@@ -30,7 +30,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
@@ -50,7 +50,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidMatcherProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);

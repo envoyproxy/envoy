@@ -29,6 +29,57 @@ void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
   schedulable_->scheduleCallbackNextIteration();
 }
 
+bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
+  if (ec_key_ == nullptr) {
+    return false;
+  }
+
+  const EC_GROUP* group = EC_KEY_get0_group(ec_key_.get());
+  priv_key_ = EC_KEY_get0_private_key(ec_key_.get());
+  if (group == nullptr || priv_key_ == nullptr) {
+    return false;
+  }
+
+  const BIGNUM* order = EC_GROUP_get0_order(group);
+  if (order == nullptr) {
+    return false;
+  }
+
+  // Create an ephemeral key.
+  ctx_ = bssl::UniquePtr<BN_CTX>(BN_CTX_new());
+  if (ctx_ == nullptr) {
+    return false;
+  }
+  BN_CTX_start(ctx_.get());
+  k_ = BN_CTX_get(ctx_.get());
+  if (!k_) {
+    return false;
+  }
+  do {
+    if (!BN_rand_range(k_, order)) {
+      return false;
+    }
+  } while (BN_is_zero(k_));
+
+  // Extent with zero paddings as CryptoMB expects in_buf_ being sign length.
+  int len = BN_num_bits(order);
+  size_t buf_len = (len + 7) / 8;
+  if (8 * in_len < static_cast<unsigned long>(len)) {
+    in_buf_ = std::make_unique<uint8_t[]>(buf_len);
+    memcpy(in_buf_.get() + buf_len - in_len, in, in_len); // NOLINT(safe-memcpy)
+  } else {
+    in_buf_ = std::make_unique<uint8_t[]>(in_len);
+    memcpy(in_buf_.get(), in, in_len); // NOLINT(safe-memcpy)
+  }
+
+  sig_len_ = ECDSA_size(ec_key_.get());
+  if (sig_len_ > MAX_SIGNATURE_SIZE) {
+    return false;
+  }
+
+  return true;
+}
+
 bool CryptoMbRsaContext::rsaInit(const uint8_t* in, size_t in_len) {
   if (rsa_ == nullptr) {
     return false;
@@ -70,13 +121,11 @@ int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned
   return 1;
 }
 
-ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops,
-                                                     uint8_t* out, size_t* out_len, size_t max_out,
-                                                     uint16_t signature_algorithm,
+ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops, uint8_t*,
+                                                     size_t*, size_t, uint16_t signature_algorithm,
                                                      const uint8_t* in, size_t in_len) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  unsigned int out_len_unsigned;
 
   if (ops == nullptr) {
     return ssl_private_key_failure;
@@ -105,20 +154,17 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
     return ssl_private_key_failure;
   }
 
-  if (max_out < ECDSA_size(ec_key.get())) {
+  // Create MB context which will be used for this particular
+  // signing/decryption.
+  CryptoMbEcdsaContextSharedPtr mb_ctx =
+      std::make_shared<CryptoMbEcdsaContext>(std::move(ec_key), ops->dispatcher_, ops->cb_);
+
+  if (!mb_ctx->ecdsaInit(hash, hash_len)) {
     return ssl_private_key_failure;
   }
 
-  // Borrow "out" because it has been already initialized to the max_out size.
-  if (!ECDSA_sign(0, hash, hash_len, out, &out_len_unsigned, ec_key.get())) {
-    return ssl_private_key_failure;
-  }
-
-  if (out_len_unsigned > max_out) {
-    return ssl_private_key_failure;
-  }
-  *out_len = out_len_unsigned;
-  return ssl_private_key_success;
+  ops->addToQueue(mb_ctx);
+  return ssl_private_key_retry;
 }
 
 ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
@@ -135,6 +181,65 @@ ssl_private_key_result_t ecdsaPrivateKeyDecrypt(SSL*, uint8_t*, size_t*, size_t,
                                                 size_t) {
   // Expecting to get only signing requests.
   return ssl_private_key_failure;
+}
+
+ssl_private_key_result_t ecdsaPrivateKeyCompleteInternal(CryptoMbPrivateKeyConnection* ops,
+                                                         uint8_t* out, size_t* out_len,
+                                                         size_t max_out) {
+  if (ops == nullptr) {
+    return ssl_private_key_failure;
+  }
+
+  // Check if the MB operation is ready yet. This can happen if someone calls
+  // the top-level SSL function too early. The op status is only set from this
+  // thread.
+  if (ops->mb_ctx_->getStatus() == RequestStatus::Retry) {
+    return ssl_private_key_retry;
+  }
+
+  // If this point is reached, the MB processing must be complete.
+
+  // See if the operation failed.
+  if (ops->mb_ctx_->getStatus() != RequestStatus::Success) {
+    ops->logWarnMsg("private key operation failed.");
+    return ssl_private_key_failure;
+  }
+
+  CryptoMbEcdsaContextSharedPtr mb_ctx =
+      std::static_pointer_cast<CryptoMbEcdsaContext>(ops->mb_ctx_);
+  if (mb_ctx->sig_len_ > max_out) {
+    return ssl_private_key_failure;
+  }
+
+  ECDSA_SIG* sig = ECDSA_SIG_new();
+  if (sig == nullptr) {
+    return ssl_private_key_failure;
+  }
+  BIGNUM* sig_r = BN_bin2bn(mb_ctx->sig_r_, 32, nullptr);
+  BIGNUM* sig_s = BN_bin2bn(mb_ctx->sig_s_, 32, nullptr);
+  ECDSA_SIG_set0(sig, sig_r, sig_s);
+
+  // Marshal signature into out.
+  CBB cbb;
+  if (!CBB_init_fixed(&cbb, out, mb_ctx->sig_len_) || !ECDSA_SIG_marshal(&cbb, sig) ||
+      !CBB_finish(&cbb, nullptr, out_len)) {
+    CBB_cleanup(&cbb);
+    ECDSA_SIG_free(sig);
+    return ssl_private_key_failure;
+  }
+
+  ECDSA_SIG_free(sig);
+
+  return ssl_private_key_success;
+}
+
+ssl_private_key_result_t ecdsaPrivateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_len,
+                                                 size_t max_out) {
+  return ssl == nullptr ? ssl_private_key_failure
+                        : ecdsaPrivateKeyCompleteInternal(
+                              static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                  ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                              out, out_len, max_out);
 }
 
 ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops, uint8_t*,
@@ -291,8 +396,9 @@ ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* ou
                               out, out_len, max_out, in, in_len);
 }
 
-ssl_private_key_result_t privateKeyCompleteInternal(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
-                                                    size_t* out_len, size_t max_out) {
+ssl_private_key_result_t rsaPrivateKeyCompleteInternal(CryptoMbPrivateKeyConnection* ops,
+                                                       uint8_t* out, size_t* out_len,
+                                                       size_t max_out) {
   if (ops == nullptr) {
     return ssl_private_key_failure;
   }
@@ -312,21 +418,22 @@ ssl_private_key_result_t privateKeyCompleteInternal(CryptoMbPrivateKeyConnection
     return ssl_private_key_failure;
   }
 
-  *out_len = ops->mb_ctx_->out_len_;
+  CryptoMbRsaContextSharedPtr mb_ctx = std::static_pointer_cast<CryptoMbRsaContext>(ops->mb_ctx_);
+  *out_len = mb_ctx->out_len_;
 
   if (*out_len > max_out) {
     return ssl_private_key_failure;
   }
 
-  memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
+  memcpy(out, mb_ctx->out_buf_, *out_len); // NOLINT(safe-memcpy)
 
   return ssl_private_key_success;
 }
 
-ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_len,
-                                            size_t max_out) {
+ssl_private_key_result_t rsaPrivateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_len,
+                                               size_t max_out) {
   return ssl == nullptr ? ssl_private_key_failure
-                        : privateKeyCompleteInternal(
+                        : rsaPrivateKeyCompleteInternal(
                               static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
                                   ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
                               out, out_len, max_out);
@@ -335,9 +442,15 @@ ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_
 } // namespace
 
 // External linking, meant for testing without SSL context.
-ssl_private_key_result_t privateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
-                                                   size_t* out_len, size_t max_out) {
-  return privateKeyCompleteInternal(ops, out, out_len, max_out);
+ssl_private_key_result_t ecdsaPrivateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops,
+                                                        uint8_t* out, size_t* out_len,
+                                                        size_t max_out) {
+  return ecdsaPrivateKeyCompleteInternal(ops, out, out_len, max_out);
+}
+ssl_private_key_result_t rsaPrivateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops,
+                                                      uint8_t* out, size_t* out_len,
+                                                      size_t max_out) {
+  return rsaPrivateKeyCompleteInternal(ops, out, out_len, max_out);
 }
 ssl_private_key_result_t ecdsaPrivateKeySignForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
                                                     size_t* out_len, size_t max_out,
@@ -386,10 +499,16 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 }
 
 void CryptoMbQueue::processRequests() {
-  if (type_ == KeyType::Rsa) {
+  switch (type_) {
+  case KeyType::Rsa:
     // Record queue size statistic value for histogram.
     stats_.rsa_queue_sizes_.recordValue(request_queue_.size());
     processRsaRequests();
+    break;
+  case KeyType::Ec:
+    // Record queue size statistic value for histogram.
+    stats_.ecdsa_queue_sizes_.recordValue(request_queue_.size());
+    processEcdsaRequests();
   }
   request_queue_.clear();
 }
@@ -466,6 +585,51 @@ void CryptoMbQueue::processRsaRequests() {
   }
 }
 
+void CryptoMbQueue::processEcdsaRequests() {
+  uint8_t* pa_sig_r[MULTIBUFF_BATCH] = {};
+  uint8_t* pa_sig_s[MULTIBUFF_BATCH] = {};
+  const unsigned char* digest[MULTIBUFF_BATCH] = {nullptr};
+  const BIGNUM* eph_key[MULTIBUFF_BATCH] = {nullptr};
+  const BIGNUM* priv_key[MULTIBUFF_BATCH] = {nullptr};
+
+  /* Build arrays of pointers for call */
+  for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
+    CryptoMbEcdsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
+    pa_sig_r[req_num] = mb_ctx->sig_r_;
+    pa_sig_s[req_num] = mb_ctx->sig_s_;
+    digest[req_num] = mb_ctx->in_buf_.get();
+    eph_key[req_num] = mb_ctx->k_;
+    priv_key[req_num] = mb_ctx->priv_key_;
+  }
+
+  ENVOY_LOG(debug, "Multibuffer ECDSA process {} requests", request_queue_.size());
+
+  uint32_t ecdsa_sts =
+      ipp_->mbxNistp256EcdsaSignSslMb8(pa_sig_r, pa_sig_s, digest, eph_key, priv_key);
+
+  enum RequestStatus status[MULTIBUFF_BATCH] = {RequestStatus::Retry};
+
+  for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
+    CryptoMbEcdsaContextSharedPtr mb_ctx =
+        std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
+    enum RequestStatus ctx_status;
+    if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
+      status[req_num] = RequestStatus::Success;
+    } else {
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} failure", req_num);
+      status[req_num] = RequestStatus::Error;
+    }
+
+    ctx_status = status[req_num];
+    mb_ctx->scheduleCallback(ctx_status);
+
+    // End context to invalid the ephemeral key.
+    BN_CTX_end(mb_ctx->ctx_.get());
+  }
+}
+
 CryptoMbPrivateKeyConnection::CryptoMbPrivateKeyConnection(Ssl::PrivateKeyConnectionCallbacks& cb,
                                                            Event::Dispatcher& dispatcher,
                                                            bssl::UniquePtr<EVP_PKEY> pkey,
@@ -499,6 +663,8 @@ bool CryptoMbPrivateKeyMethodProvider::checkFips() {
   return false;
 }
 
+bool CryptoMbPrivateKeyMethodProvider::isAvailable() { return initialized_; }
+
 Ssl::BoringSslPrivateKeyMethodSharedPtr
 CryptoMbPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
   return method_;
@@ -516,19 +682,21 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
-    : api_(factory_context.api()),
-      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
-      stats_(generateCryptoMbStats("cryptomb", factory_context.scope())) {
+    : api_(factory_context.serverFactoryContext().api()),
+      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(
+          factory_context.serverFactoryContext().threadLocal())),
+      stats_(generateCryptoMbStats("cryptomb", factory_context.statsScope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
-    throw EnvoyException("Multi-buffer CPU instructions not available.");
+    ENVOY_LOG(warn, "Multi-buffer CPU instructions not available.");
+    return;
   }
 
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 200));
 
   std::string private_key =
-      Config::DataSource::read(conf.private_key(), false, factory_context.api());
+      THROW_OR_RETURN_VALUE(Config::DataSource::read(conf.private_key(), false, api_), std::string);
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
@@ -548,7 +716,7 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
 
     method_->sign = rsaPrivateKeySign;
     method_->decrypt = rsaPrivateKeyDecrypt;
-    method_->complete = privateKeyComplete;
+    method_->complete = rsaPrivateKeyComplete;
 
     RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
     switch (RSA_bits(rsa)) {
@@ -565,7 +733,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
       key_size = 4096;
       break;
     default:
-      throw EnvoyException("Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+      ENVOY_LOG(warn, "Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
+      return;
     }
 
     // If longer keys are ever supported, remember to change the signature buffer to be larger.
@@ -591,7 +760,7 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
 
     method_->sign = ecdsaPrivateKeySign;
     method_->decrypt = ecdsaPrivateKeyDecrypt;
-    method_->complete = privateKeyComplete;
+    method_->complete = ecdsaPrivateKeyComplete;
 
     const EC_GROUP* ecdsa_group = EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pkey.get()));
     if (ecdsa_group == nullptr) {
@@ -619,6 +788,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     ENVOY_LOG(debug, "Created CryptoMb Queue for thread {}", d.name());
     return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d, stats_);
   });
+
+  initialized_ = true;
 }
 
 namespace {

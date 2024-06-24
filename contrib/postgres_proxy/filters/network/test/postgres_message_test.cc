@@ -1010,6 +1010,41 @@ TEST(PostgresMessage, ArraySet6) {
   ASSERT_TRUE(out.find("114") != std::string::npos);
 }
 
+TEST(PostgresMessage, ArraySet7) {
+  // Array of Sequences
+  std::unique_ptr<Message> msg = createMsgBodyReader<Array<Sequence<String, Int16>>>();
+
+  Buffer::OwnedImpl data;
+  // There will be 3 sequences in the array.
+  data.writeBEInt<int16_t>(3);
+
+  // 1st sequence.
+  data.add("seq1");
+  data.writeBEInt<uint8_t>(0);
+  data.writeBEInt<uint16_t>(111);
+
+  // 2nd sequence.
+  data.add("seq2");
+  data.writeBEInt<uint8_t>(0);
+  data.writeBEInt<uint16_t>(222);
+
+  // 3rd sequence.
+  data.add("seq3");
+  data.writeBEInt<uint8_t>(0);
+  data.writeBEInt<uint16_t>(333);
+
+  const uint64_t length = 2 + 3 * (5 + 2);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
+  auto out = msg->toString();
+  ASSERT_TRUE(out.find("seq1") != std::string::npos);
+  ASSERT_TRUE(out.find("seq2") != std::string::npos);
+  ASSERT_TRUE(out.find("seq3") != std::string::npos);
+  ASSERT_TRUE(out.find("111") != std::string::npos);
+  ASSERT_TRUE(out.find("222") != std::string::npos);
+  ASSERT_TRUE(out.find("333") != std::string::npos);
+}
+
 TEST(PostgresMessage, Repeated1) {
   std::unique_ptr<Message> msg = createMsgBodyReader<Repeated<String>>();
 

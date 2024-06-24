@@ -13,6 +13,9 @@ envoy_cc_extension(
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
     extra_visibility = [
+        "//source/common/listener_manager:__subpackages__",
+        "//source/common/router:__subpackages__",
+        "//test:__subpackages__",
     ],
     deps = [
         "//envoy/http:filter_interface",

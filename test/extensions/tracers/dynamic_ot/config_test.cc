@@ -22,7 +22,9 @@ namespace Tracers {
 namespace DynamicOt {
 namespace {
 
-TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
+// TODO(https://github.com/envoyproxy/envoy/issues/34321)
+#if !__has_feature(address_sanitizer)
+TEST(DynamicOtTracerConfigTest, DEPRECATED_FEATURE_TEST(DynamicOpentracingHttpTracer)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_.cluster_manager_,
               getThreadLocalCluster(Eq("fake_cluster")))
@@ -52,6 +54,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
+#endif
 
 } // namespace
 } // namespace DynamicOt

@@ -40,21 +40,6 @@ class UpstreamCodecFilter;
 
 /* The Upstream request is the base class for forwarding HTTP upstream.
  *
- * This supports both classic forwarding, and upstream filter mode, dictated by
- * allow_upstream_filters_ which is set via envoy.reloadable_features.allow_upstream_filters.
- *
- * In 'classic' mode, the UpstreamRequest requests a new stream, internally
- * buffers data and trailers in |buffered_request_body_| and |downstream_metadata_map_vector_|
- * and forwards the router's headers, buffered body, buffered metadata, and
- * router's trailers to the |upstream_| once the stream is established.
- *
- * In 'classic' mode, when the stream is established, the UpstreamRequest
- * handles upstream data by directly implementing UpstreamToDownstream. As
- * upstream headers/body/metadata/trailers are received, they are forwarded
- * directly to the router via the RouterFilterInterface |parent_|
- *
- * For upstream filter mode, things are more involved.
- *
  * On the new request path, payload (headers/body/metadata/data) still arrives via
  * the accept[X]fromRouter functions. Said data is immediately passed off to the
  * UpstreamFilterManager, which passes each item through the filter chain until
@@ -76,6 +61,7 @@ class UpstreamCodecFilter;
  * There is some required communication between the UpstreamRequest and
  * UpstreamCodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
  * interface, with the UpstreamFilterManager acting as intermediary.
+ *
  */
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public UpstreamToDownstream,
@@ -84,27 +70,22 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3);
+                  bool can_send_early_data, bool can_use_http3, bool enable_half_close);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  void acceptHeadersFromRouter(bool end_stream);
-  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  virtual void acceptHeadersFromRouter(bool end_stream);
+  virtual void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
   void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
   void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
 
-  void acceptHeadersFromRouterOld(bool end_stream);
-  void acceptDataFromRouterOld(Buffer::Instance& data, bool end_stream);
-  void acceptTrailersFromRouterOld(Http::RequestTrailerMap& trailers);
-  void acceptMetadataFromRouterOld(Http::MetadataMapPtr&& metadata_map_ptr);
-
-  void resetStream();
+  virtual void resetStream();
   void setupPerTryTimeout();
   void maybeEndDecode(bool end_stream);
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host, bool pool_success);
 
   // Http::StreamDecoder
   void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -193,12 +174,10 @@ private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
   }
-  bool shouldSendEndStream() {
-    // Only encode end stream if the full request has been received, the body
-    // has been sent, and any trailers or metadata have also been sent.
-    return router_sent_end_stream_ && !buffered_request_body_ && !encode_trailers_ &&
-           downstream_metadata_map_vector_.empty();
-  }
+  // Records the latency from when the upstream request was first created to
+  // when the pool callback fires. This latency can be useful to track excessive
+  // queuing.
+  void recordConnectionPoolCallbackLatency();
 
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
@@ -206,10 +185,11 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
+  void upstreamLog(AccessLog::AccessLogType access_log_type);
+  void resetUpstreamLogFlushTimer();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
-  bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
   Event::TimerPtr per_try_idle_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
@@ -229,6 +209,27 @@ private:
   OptRef<UpstreamToDownstream> upstream_interface_;
   std::list<Http::UpstreamCallbacks*> upstream_callbacks_;
 
+  Event::TimerPtr max_stream_duration_timer_;
+
+  // Per-stream access log flush duration. This timer is enabled once when the stream is created
+  // and will log to all access logs once per trigger.
+  Event::TimerPtr upstream_log_flush_timer_;
+
+  std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
+  std::unique_ptr<Http::FilterManager> filter_manager_;
+
+  // The number of outstanding readDisable to be called with parameter value true.
+  // When downstream send buffers get above high watermark before response headers arrive, we
+  // increment this counter instead of immediately calling readDisable on upstream stream. This is
+  // to avoid the upstream request from being spuriously retried or reset because of upstream
+  // timeouts while upstream stream is readDisabled by downstream but the response has actually
+  // arrived from upstream. See https://github.com/envoyproxy/envoy/issues/25901. During the
+  // deferring period, if the downstream buffer gets below low watermark, this counter gets
+  // decremented. Once the response headers arrive, call readDisable the number of times as the
+  // remaining value of this counter.
+  size_t deferred_read_disabling_count_{0};
+
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   // Tracks the number of times the flow of data from downstream has been disabled.
   uint32_t downstream_data_disabled_{};
   bool calling_encode_headers_ : 1;
@@ -244,6 +245,7 @@ private:
   // True if the CONNECT headers have been sent but proxying payload is paused
   // waiting for response headers.
   bool paused_for_connect_ : 1;
+  bool paused_for_websocket_ : 1;
   bool reset_stream_ : 1;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
@@ -252,28 +254,10 @@ private:
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1;
   bool had_upstream_ : 1;
-  bool allow_upstream_filters_ : 1;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
-  Event::TimerPtr max_stream_duration_timer_;
-
-  std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
-  std::unique_ptr<Http::FilterManager> filter_manager_;
-
-  // TODO(alyssawilk) remove these with allow_upstream_filters_
-  Buffer::InstancePtr buffered_request_body_;
-  Http::MetadataMapVector downstream_metadata_map_vector_;
-
+  bool grpc_rq_success_deferred_ : 1;
   bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
-  // The number of outstanding readDisable to be called with parameter value true.
-  // When downstream send buffers get above high watermark before response headers arrive, we
-  // increment this counter instead of immediately calling readDisable on upstream stream. This is
-  // to avoid the upstream request from being spuriously retried or reset because of upstream
-  // timeouts while upstream stream is readDisabled by downstream but the response has actually
-  // arrived from upstream. See https://github.com/envoyproxy/envoy/issues/25901. During the
-  // deferring period, if the downstream buffer gets below low watermark, this counter gets
-  // decremented. Once the response headers arrive, call readDisable the number of times as the
-  // remaining value of this counter.
-  size_t deferred_read_disabling_count_{0};
+  bool enable_half_close_ : 1;
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
@@ -361,10 +345,10 @@ public:
 
   // Unsupported functions.
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
-    IS_ENVOY_BUG("recreateStream called from upstream filter");
+    IS_ENVOY_BUG("recreateStream called from upstream HTTP filter");
   }
   void upgradeFilterChainCreated() override {
-    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream filter");
+    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream HTTP filter");
   }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
 
@@ -378,6 +362,14 @@ public:
   }
   bool pausedForConnect() const override { return upstream_request_.paused_for_connect_; }
   void setPausedForConnect(bool value) override { upstream_request_.paused_for_connect_ = value; }
+
+  bool pausedForWebsocketUpgrade() const override {
+    return upstream_request_.paused_for_websocket_;
+  }
+  void setPausedForWebsocketUpgrade(bool value) override {
+    upstream_request_.paused_for_websocket_ = value;
+  }
+
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return upstream_request_.upstreamStreamOptions();
   }
@@ -387,7 +379,7 @@ public:
   void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
     upstream_request_.upstream_interface_ = upstream_to_downstream_interface;
   }
-
+  bool isHalfCloseEnabled() override { return upstream_request_.enable_half_close_; }
   Http::RequestTrailerMapPtr trailers_;
   Http::ResponseHeaderMapPtr informational_headers_;
   Http::ResponseHeaderMapPtr response_headers_;

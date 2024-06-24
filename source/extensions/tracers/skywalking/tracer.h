@@ -6,6 +6,7 @@
 
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
+#include "source/common/tracing/trace_context_impl.h"
 #include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "cpp2sky/tracing_context.h"
@@ -19,7 +20,7 @@ namespace SkyWalking {
 using cpp2sky::TracingContextPtr;
 using cpp2sky::TracingSpanPtr;
 
-const Http::LowerCaseString& skywalkingPropagationHeaderKey();
+const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey();
 
 class Tracer {
 public:
@@ -81,13 +82,14 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr& upstream) override;
+                     const Tracing::UpstreamContext& upstream) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool do_sample) override;
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+  std::string getTraceId() const override { return tracing_context_->traceId(); }
+  std::string getSpanId() const override { return EMPTY_STRING; }
 
   const TracingContextPtr tracingContext() { return tracing_context_; }
   const TracingSpanPtr spanEntity() { return span_entity_; }

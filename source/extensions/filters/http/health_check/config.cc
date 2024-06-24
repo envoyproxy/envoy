@@ -24,7 +24,8 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
 
   auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderDataPtr>>();
-  *header_match_data = Http::HeaderUtility::buildHeaderDataVector(proto_config.headers());
+  *header_match_data = Http::HeaderUtility::buildHeaderDataVector(proto_config.headers(),
+                                                                  context.serverFactoryContext());
 
   if (!pass_through_mode && cache_time_ms) {
     throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");
@@ -33,7 +34,8 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   HealthCheckCacheManagerSharedPtr cache_manager;
   if (cache_time_ms > 0) {
     cache_manager = std::make_shared<HealthCheckCacheManager>(
-        context.mainThreadDispatcher(), std::chrono::milliseconds(cache_time_ms));
+        context.serverFactoryContext().mainThreadDispatcher(),
+        std::chrono::milliseconds(cache_time_ms));
   }
 
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages;
@@ -47,9 +49,9 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
 
   return [&context, pass_through_mode, cache_manager, header_match_data,
           cluster_min_healthy_percentages](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(context, pass_through_mode,
-                                                                  cache_manager, header_match_data,
-                                                                  cluster_min_healthy_percentages));
+    callbacks.addStreamFilter(std::make_shared<HealthCheckFilter>(
+        context.serverFactoryContext(), pass_through_mode, cache_manager, header_match_data,
+        cluster_min_healthy_percentages));
   };
 }
 

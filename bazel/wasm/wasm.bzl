@@ -52,7 +52,7 @@ def _wasm_attrs(transition):
         "precompile": attr.bool(default = False),
         # This is deliberately in target configuration to avoid compiling v8 twice.
         "_compile_tool": attr.label(default = "@envoy//test/tools/wee8_compile:wee8_compile_tool", executable = True, cfg = "target"),
-        "_whitelist_function_transition": attr.label(default = "@bazel_tools//tools/whitelists/function_transition_whitelist"),
+        "_allowlist_function_transition": attr.label(default = "@bazel_tools//tools/allowlists/function_transition_allowlist"),
     }
 
 wasm_rust_binary_rule = rule(

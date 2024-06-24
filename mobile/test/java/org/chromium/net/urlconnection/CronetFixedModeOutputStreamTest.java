@@ -7,7 +7,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -16,7 +15,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import org.chromium.net.CronetEngine;
 import org.chromium.net.NetworkException;
-import org.chromium.net.impl.CallbackExceptionImpl;
+import org.chromium.net.impl.CronvoyCallbackExceptionImpl;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestRule.CompareDefaultWithCronet;
 import org.chromium.net.testing.CronetTestRule.OnlyRunCronetHttpURLConnection;
@@ -31,6 +30,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests {@code getOutputStream} when {@code setFixedLengthStreamingMode} is
@@ -41,7 +41,7 @@ import org.junit.runner.RunWith;
  * {@code OnlyRunCronetHttpURLConnection} only run Cronet's implementation.
  * See {@link CronetTestRule#runBase()} ()} for details.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetFixedModeOutputStreamTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
@@ -392,7 +392,7 @@ public class CronetFixedModeOutputStreamTest {
     // (largeData.length % 17384 = 9448, largeData.length % 18384 = 16752).
     int[] bufferLengths = new int[] {17384, 18384};
     for (int length : bufferLengths) {
-      CronetFixedModeOutputStream.setDefaultBufferLengthForTesting(length);
+      CronvoyFixedModeOutputStream.setDefaultBufferLengthForTesting(length);
       // Run the following three tests with this custom buffer size.
       testFixedLengthStreamingModeLargeDataWriteOneByte();
       testFixedLengthStreamingModeLargeData();
@@ -450,7 +450,7 @@ public class CronetFixedModeOutputStreamTest {
     connection.setDoOutput(true);
     connection.setRequestMethod("POST");
     connection.setFixedLengthStreamingMode(TestUtil.UPLOAD_DATA.length);
-    thrown.expect(instanceOf(CallbackExceptionImpl.class));
+    thrown.expect(instanceOf(CronvoyCallbackExceptionImpl.class));
     thrown.expectMessage("Exception received from UploadDataProvider");
     thrown.expectCause(
         new CauseMatcher(HttpRetryException.class, "Cannot retry streamed Http body"));

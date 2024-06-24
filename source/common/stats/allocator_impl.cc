@@ -85,6 +85,7 @@ public:
   // Metric
   SymbolTable& symbolTable() final { return alloc_.symbolTable(); }
   bool used() const override { return flags_ & Metric::Flags::Used; }
+  bool hidden() const override { return flags_ & Metric::Flags::Hidden; }
 
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
@@ -183,6 +184,10 @@ public:
       // an alternate scope. See
       // https://github.com/envoyproxy/envoy/issues/7227.
       break;
+    case ImportMode::HiddenAccumulate:
+      flags_ |= Flags::Hidden;
+      flags_ |= Flags::LogicAccumulate;
+      break;
     }
   }
 
@@ -210,15 +215,19 @@ public:
   }
   uint64_t value() const override { return child_value_ + parent_value_; }
 
+  // TODO(diazalan): Rename importMode and to more generic name
   ImportMode importMode() const override {
     if (flags_ & Flags::NeverImport) {
       return ImportMode::NeverImport;
+    } else if ((flags_ & Flags::Hidden) && (flags_ & Flags::LogicAccumulate)) {
+      return ImportMode::HiddenAccumulate;
     } else if (flags_ & Flags::LogicAccumulate) {
       return ImportMode::Accumulate;
     }
     return ImportMode::Uninitialized;
   }
 
+  // TODO(diazalan): Rename mergeImportMode and to more generic name
   void mergeImportMode(ImportMode import_mode) override {
     ImportMode current = importMode();
     if (current == import_mode) {
@@ -242,6 +251,11 @@ public:
       parent_value_ = 0;
       flags_ &= ~Flags::Used;
       flags_ |= Flags::NeverImport;
+      break;
+    case ImportMode::HiddenAccumulate:
+      ASSERT(current == ImportMode::Uninitialized);
+      flags_ |= Flags::Hidden;
+      flags_ |= Flags::LogicAccumulate;
       break;
     }
   }
@@ -405,7 +419,11 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
       f_stat(*gauge);
     }
   } else {
-    forEachGauge(f_size, f_stat);
+    forEachGauge(f_size, [&f_stat](Gauge& gauge) {
+      if (!gauge.hidden()) {
+        f_stat(gauge);
+      }
+    });
   }
 }
 

@@ -202,6 +202,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
+  lua_state_.registerType<ConnectionStreamInfoWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -263,16 +266,16 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
         Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
-    coroutine_.resume(1, yield_callback_);
+    resumeCoroutine(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
     ENVOY_LOG(debug, "resuming body due to end stream");
     callbacks_.addData(data);
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   } else if (state_ == State::WaitForTrailers && end_stream_) {
     ENVOY_LOG(debug, "resuming nil trailers due to end stream");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   }
 
   if (state_ == State::HttpCall || state_ == State::WaitForBody) {
@@ -294,17 +297,17 @@ Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trai
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(debug, "resuming nil body chunk due to trailers");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(debug, "resuming body due to trailers");
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   }
 
   if (state_ == State::WaitForTrailers) {
     // Mimic a call to trailers which will push the trailers onto the stack and then resume.
     state_ = State::Running;
-    coroutine_.resume(luaTrailers(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
   }
 
   Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
@@ -353,6 +356,12 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
   StreamHandleWrapper::HttpCallOptions options;
+  options.request_options_
+      .setParentSpan(callbacks_.activeSpan())
+      // By default, do not enforce a sampling decision on this `httpCall`'s span.
+      // Instead, reuse the parent span's sampling decision. Callers can override
+      // this default with the `trace_sampled` flag in the table argument below.
+      .setSampled(absl::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -372,7 +381,6 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     options.is_async_request_ = lua_toboolean(state, AsyncFlagIndex);
   }
 
-  options.request_options_.setParentSpan(callbacks_.activeSpan());
   return doHttpCall(state, options);
 }
 
@@ -456,12 +464,11 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     state_ = State::Running;
     markLive();
 
-    try {
-      coroutine_.resume(2, yield_callback_);
+    TRY_NEEDS_AUDIT {
+      resumeCoroutine(2, yield_callback_);
       markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      filter_.scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { filter_.scriptError(e); }
 
     if (state_ == State::Running) {
       headers_continued_ = true;
@@ -618,6 +625,17 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
     stream_info_wrapper_.pushStack();
   } else {
     stream_info_wrapper_.reset(StreamInfoWrapper::create(state, callbacks_.streamInfo()), true);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (connection_stream_info_wrapper_.get() != nullptr) {
+    connection_stream_info_wrapper_.pushStack();
+  } else {
+    connection_stream_info_wrapper_.reset(
+        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
   }
   return 1;
 }
@@ -809,15 +827,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            "for the Lua filter.");
     }
 
-    const std::string code =
-        Config::DataSource::read(proto_config.default_source_code(), true, api);
+    const std::string code = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
   } else if (!proto_config.inline_code().empty()) {
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
   }
 
   for (const auto& source : proto_config.source_codes()) {
-    const std::string code = Config::DataSource::read(source.second, true, api);
+    const std::string code =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
     auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
     if (!per_lua_code_setup_ptr) {
       continue;
@@ -835,7 +854,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     return;
   }
   // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
+  const std::string code_str = THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
 }
 
@@ -864,12 +884,11 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
-  try {
+  TRY_NEEDS_AUDIT {
     status = handle.get()->start(function_ref);
     handle.markDead();
-  } catch (const Filters::Common::Lua::LuaException& e) {
-    scriptError(e);
   }
+  END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
 
   return status;
 }
@@ -878,13 +897,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onData(data, end_stream);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
@@ -893,13 +911,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onTrailers(trailers);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;

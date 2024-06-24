@@ -1,6 +1,6 @@
 load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
-load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,9 +15,8 @@ envoy_cc_test(
         "//source/common/api:api_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/common/tls:context_lib",
         "//source/server/config_validation:cluster_manager_lib",
-        "//source/server/config_validation:dns_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
@@ -59,8 +58,10 @@ envoy_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/server/admin:admin_filter_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
@@ -76,7 +77,6 @@ envoy_cc_test(
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/server/config_validation:api_lib",
-        "//source/server/config_validation:dns_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_lib",
@@ -86,6 +86,7 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "config_fuzz_test",
+    size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
     deps = [
@@ -113,6 +114,7 @@ envoy_cc_test_library(
     hdrs = ["xds_verifier.h"],
     deps = [
         ":xds_fuzz_proto_cc_proto",
+        "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -155,6 +157,7 @@ envoy_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "xds_fuzz_test",
+    size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
     deps = [

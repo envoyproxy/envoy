@@ -1,5 +1,9 @@
-FROM debian:bullseye-slim@sha256:77f46c1cf862290e750e913defffb2828c889d291a93bdd10a7a0597720948fc as os-base
-FROM golang:1.20.1-bullseye@sha256:63ed3bc6b428713c2bb1980e534d70e8ab82a4484ec044183df9caca6e9d82cb as golang-base
+FROM debian:bookworm-slim@sha256:804194b909ef23fb995d9412c9378fb3505fe2427b70f3cc425339e48a828fca as os-base
+RUN rm -f /etc/apt/apt.conf.d/docker-clean \
+    && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache
+
+
+FROM golang:1.22.4-bookworm@sha256:aec47843e52fee4436bdd3ce931417fa980e9055658b5142140925eea3044bea as golang-base
 
 
 FROM golang-base as golang-control-plane-builder
@@ -12,11 +16,10 @@ WORKDIR /go/go-control-plane
 
 FROM os-base as golang-control-plane
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get -qq update \
-    && apt-get -qq install --no-install-recommends -y netcat \
-    && apt-get -qq autoremove -y \
-    && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get -qq update \
+    && apt-get -qq install --no-install-recommends -y netcat-traditional
 COPY --from=golang-control-plane-builder /go/go-control-plane/bin/example /usr/local/bin/example
 
 
@@ -41,7 +44,6 @@ WORKDIR /build
 # Resolve and build Go dependencies as Docker cache
 COPY go.mod /build/go.mod
 COPY go.sum /build/go.sum
-COPY kv/go.mod /build/kv/go.mod
 ENV GO111MODULE=on
 RUN go mod download
 COPY service.go /build/main.go

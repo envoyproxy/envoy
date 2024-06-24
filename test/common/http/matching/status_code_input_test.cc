@@ -21,10 +21,11 @@ std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
 }
 
 StreamInfo::StreamInfoImpl createStreamInfo() {
-  CONSTRUCT_ON_FIRST_USE(StreamInfo::StreamInfoImpl,
-                         StreamInfo::StreamInfoImpl(Http::Protocol::Http2,
-                                                    Event::GlobalTimeSystem().timeSystem(),
-                                                    connectionInfoProvider()));
+  CONSTRUCT_ON_FIRST_USE(
+      StreamInfo::StreamInfoImpl,
+      StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
+                                 connectionInfoProvider(),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain));
 }
 TEST(MatchingData, HttpResponseStatusCodeInput) {
   HttpResponseStatusCodeInput input;
@@ -37,14 +38,14 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(200);
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "200");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "200");
   }
 
   {
@@ -53,7 +54,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -67,14 +68,14 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(100);
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "1xx");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "1xx");
   }
 
   {
@@ -82,28 +83,28 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     response_headers.setStatus(200);
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "2xx");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "2xx");
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(300);
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "3xx");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "3xx");
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(400);
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "4xx");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "4xx");
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(500);
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "5xx");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "5xx");
   }
 
   {
@@ -112,7 +113,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
   {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
@@ -121,7 +122,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
   {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
@@ -130,7 +131,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 

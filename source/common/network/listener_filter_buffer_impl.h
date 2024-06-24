@@ -49,7 +49,7 @@ public:
   void resetCapacity(uint64_t size);
 
 private:
-  void onFileEvent(uint32_t events);
+  absl::Status onFileEvent(uint32_t events);
 
   IoHandle& io_handle_;
   Event::Dispatcher& dispatcher_;

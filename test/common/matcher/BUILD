@@ -65,6 +65,7 @@ envoy_cc_test(
     srcs = ["value_input_matcher_test.cc"],
     deps = [
         "//source/common/matcher:value_input_matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -80,7 +81,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:registry_lib",
-        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

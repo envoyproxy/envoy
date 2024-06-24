@@ -1,6 +1,6 @@
 #ifdef ENVOY_PERFETTO
 
-#include "perf_tracing.h"
+#include "source/common/common/perf_tracing.h"
 
 // NOLINT(namespace-envoy)
 

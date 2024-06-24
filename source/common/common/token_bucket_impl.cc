@@ -4,9 +4,14 @@
 
 namespace Envoy {
 
+namespace {
+// The minimal fill rate will be one second every year.
+constexpr double kMinFillRate = 1.0 / (365 * 24 * 60 * 60);
+} // namespace
+
 TokenBucketImpl::TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate)
-    : max_tokens_(max_tokens), fill_rate_(std::abs(fill_rate)), tokens_(max_tokens),
-      last_fill_(time_source.monotonicTime()), time_source_(time_source) {}
+    : max_tokens_(max_tokens), fill_rate_(std::max(std::abs(fill_rate), kMinFillRate)),
+      tokens_(max_tokens), last_fill_(time_source.monotonicTime()), time_source_(time_source) {}
 
 uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
   if (tokens_ < max_tokens_) {

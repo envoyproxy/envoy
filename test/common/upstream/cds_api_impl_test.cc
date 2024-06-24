@@ -91,7 +91,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -105,7 +104,8 @@ resources:
 
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
-  cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ("0", cds_->versionInfo());
 
   const std::string response2_yaml = R"EOF(
@@ -118,7 +118,8 @@ resources:
   EXPECT_CALL(cm_, removeCluster("cluster1")).WillOnce(Return(true));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
-  cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
@@ -134,10 +135,9 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
-  EXPECT_THROW_WITH_MESSAGE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "Error adding/updating cluster(s) duplicate_cluster: duplicate cluster "
-                            "duplicate_cluster found");
+  EXPECT_EQ(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
+            "Error adding/updating cluster(s) duplicate_cluster: duplicate cluster "
+            "duplicate_cluster found");
 }
 
 TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
@@ -148,7 +148,7 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
 
-  cds_callbacks_->onConfigUpdate({}, "");
+  EXPECT_TRUE(cds_callbacks_->onConfigUpdate({}, "").ok());
 }
 
 TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
@@ -169,7 +169,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   expectAdd("cluster_2");
 
   const auto decoded_resources = TestUtility::decodeResources({cluster_1, cluster_2});
-  cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+  EXPECT_TRUE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 }
 
 TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
@@ -201,7 +201,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     }
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
-    cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1");
+    EXPECT_TRUE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
   }
 
   {
@@ -220,7 +220,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"))).WillOnce(Return(true));
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
-    cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed, "v2");
+    EXPECT_TRUE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed, "v2").ok());
   }
 }
 
@@ -246,8 +246,8 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   expectAddToThrow("cluster_3", "Another exception");
 
   const auto decoded_resources = TestUtility::decodeResources({cluster_1, cluster_2, cluster_3});
-  EXPECT_THROW_WITH_MESSAGE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""), EnvoyException,
+  EXPECT_EQ(
+      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").message(),
       "Error adding/updating cluster(s) cluster_1: An exception, cluster_3: Another exception");
 }
 
@@ -264,7 +264,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -272,7 +271,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -286,7 +284,8 @@ resources:
   EXPECT_EQ("", cds_->versionInfo());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
-  cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ("0", cds_->versionInfo());
 
   const std::string response2_yaml = R"EOF(
@@ -297,7 +296,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -305,7 +303,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -318,7 +315,8 @@ resources:
   EXPECT_CALL(cm_, removeCluster("cluster2"));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
-  cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
+  EXPECT_TRUE(
+      cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
 
   EXPECT_EQ("1", cds_->versionInfo());
 }
@@ -337,7 +335,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -345,7 +342,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: eds path
 )EOF";
@@ -356,8 +352,8 @@ resources:
   EXPECT_CALL(initialized_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
-  EXPECT_THROW(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-               EnvoyException);
+  EXPECT_FALSE(
+      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
   EXPECT_EQ("", cds_->versionInfo());
 }
 

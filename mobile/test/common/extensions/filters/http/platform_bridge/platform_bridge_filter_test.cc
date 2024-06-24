@@ -5,7 +5,7 @@
 
 #include "gtest/gtest.h"
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/filter.h"
 #include "library/common/extensions/filters/http/platform_bridge/filter.pb.h"
 
@@ -28,8 +28,8 @@ envoy_headers make_envoy_headers(std::vector<std::pair<std::string, std::string>
   new_headers.entries = headers;
 
   for (const auto& pair : pairs) {
-    envoy_data key = Data::Utility::copyToBridgeData(pair.first);
-    envoy_data value = Data::Utility::copyToBridgeData(pair.second);
+    envoy_data key = Bridge::Utility::copyToBridgeData(pair.first);
+    envoy_data value = Bridge::Utility::copyToBridgeData(pair.second);
 
     new_headers.entries[new_headers.length] = {key, value};
     new_headers.length++;
@@ -40,10 +40,10 @@ envoy_headers make_envoy_headers(std::vector<std::pair<std::string, std::string>
 
 class PlatformBridgeFilterTest : public testing::Test {
 public:
-  void setUpFilter(std::string&& yaml, envoy_http_filter* platform_filter) {
+  void setUpFilter(std::string name, envoy_http_filter* platform_filter) {
     envoymobile::extensions::filters::http::platform_bridge::PlatformBridge config;
-    TestUtility::loadFromYaml(yaml, config);
-    Api::External::registerApi(config.platform_filter_name(), platform_filter);
+    config.set_platform_filter_name(name);
+    Api::External::registerApi(std::string(config.platform_filter_name()), platform_filter);
 
     config_ = std::make_shared<PlatformBridgeFilterConfig>(context_, config);
     filter_ = std::make_shared<PlatformBridgeFilter>(config_, dispatcher_);
@@ -62,7 +62,7 @@ public:
     std::stringstream ss;
     filter_->dumpState(ss, 0);
 
-    std::string expected_state_template =
+    constexpr absl::string_view expected_state_template =
         R"EOF(PlatformBridgeFilter, filter_name_: {}, error_response_: {}
   Request Filter, state_.iteration_state_: {}, state_.on_headers_called_: {}, state_.headers_forwarded_: {}, state_.on_data_called_: {}, state_.data_forwarded_: {}, state_.on_trailers_called_: {}, state_.trailers_forwarded_: {}, state_.on_resume_called_: {}, pending_headers_: {}, buffer: {}, pending_trailers_: {}, state_.stream_complete_: {}
   Response Filter, state_.iteration_state_: {}, state_.on_headers_called_: {}, state_.headers_forwarded_: {}, state_.on_data_called_: {}, state_.data_forwarded_: {}, state_.on_trailers_called_: {}, state_.trailers_forwarded_: {}, state_.on_resume_called_: {}, pending_headers_: {}, buffer: {}, pending_trailers_: {}, state_.stream_complete_: {}
@@ -110,7 +110,7 @@ public:
 TEST_F(PlatformBridgeFilterTest, NullImplementation) {
   envoy_http_filter* null_filter =
       static_cast<envoy_http_filter*>(safe_calloc(1, sizeof(envoy_http_filter)));
-  setUpFilter("platform_filter_name: NullImplementation\n", null_filter);
+  setUpFilter("NullImplementation", null_filter);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -155,7 +155,7 @@ TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     invocations->release_filter_calls++;
   };
-  setUpFilter("platform_filter_name: PartialNullImplementation\n", noop_filter);
+  setUpFilter("PartialNullImplementation", noop_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -198,17 +198,14 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestHeaders) {
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_TRUE(end_stream);
     invocations->on_request_headers_calls++;
     return {kEnvoyFilterHeadersStatusContinue, c_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnRequestHeaders
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnRequestHeaders", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -233,8 +230,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnData) {
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -243,7 +240,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnData) {
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(Data::Utility::copyToString(c_data), "request body");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data), "request body");
     EXPECT_TRUE(end_stream);
     invocations->on_request_data_calls++;
     envoy_headers* modified_headers =
@@ -252,10 +249,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnData) {
     return {kEnvoyFilterDataStatusResumeIteration, c_data, modified_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -291,8 +285,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding)
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -303,8 +297,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding)
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
     EXPECT_EQ(pending_data, nullptr);
     EXPECT_EQ(pending_trailers, nullptr);
     EXPECT_FALSE(end_stream);
@@ -317,10 +311,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding)
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -330,7 +321,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
@@ -358,8 +351,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -370,8 +363,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
     EXPECT_EQ(pending_data, nullptr);
     EXPECT_EQ(pending_trailers, nullptr);
     EXPECT_FALSE(end_stream);
@@ -384,14 +377,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
 
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
-    *modified_data = Data::Utility::toBridgeData(final_buffer);
+    *modified_data = Bridge::Utility::toBridgeData(final_buffer);
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, modified_data, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -401,7 +391,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
@@ -429,8 +421,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -441,8 +433,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
     EXPECT_EQ(pending_data, nullptr);
     EXPECT_EQ(pending_trailers, nullptr);
     EXPECT_FALSE(end_stream);
@@ -460,10 +452,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingW
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, nullptr, modified_trailers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -473,7 +462,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(trailers));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -507,8 +498,8 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -517,7 +508,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(Data::Utility::copyToString(c_data), "request body");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data), "request body");
     EXPECT_TRUE(end_stream);
     invocations->on_request_data_calls++;
     envoy_headers* modified_headers =
@@ -532,10 +523,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
     return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: AsyncResumeDecodingIsNoopAfterPreviousResume
-)EOF",
-              &platform_filter);
+  setUpFilter("AsyncResumeDecodingIsNoopAfterPreviousResume", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -555,7 +543,9 @@ platform_filter_name: AsyncResumeDecodingIsNoopAfterPreviousResume
       "12");
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   filter_->resumeDecoding();
   resume_post_cb();
@@ -576,16 +566,13 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestData) {
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(Data::Utility::copyToString(c_data), "request body");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data), "request body");
     EXPECT_TRUE(end_stream);
     invocations->on_request_data_calls++;
     return {kEnvoyFilterDataStatusContinue, c_data, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -609,7 +596,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[3] = {"A", "AB", "ABC"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls++]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -626,10 +613,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -683,15 +667,12 @@ TEST_F(PlatformBridgeFilterTest, BasicError) {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     invocations->on_error_calls++;
     EXPECT_EQ(c_error.error_code, ENVOY_UNDEFINED_ERROR);
-    EXPECT_EQ(Data::Utility::copyToString(c_error.message), "busted");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_error.message), "busted");
     EXPECT_EQ(c_error.attempt_count, 1);
     release_envoy_error(c_error);
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicError
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicError", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -726,17 +707,17 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
     envoy_filter_data_status return_status;
 
     if (invocations->on_request_data_calls == 0) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "A");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "A");
       EXPECT_FALSE(end_stream);
 
       return_status.status = kEnvoyFilterDataStatusStopIterationAndBuffer;
       return_status.data = envoy_nodata;
       return_status.pending_headers = nullptr;
     } else {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "AB");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "AB");
       EXPECT_FALSE(end_stream);
       Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
-      envoy_data final_data = Data::Utility::toBridgeData(final_buffer);
+      envoy_data final_data = Bridge::Utility::toBridgeData(final_buffer);
 
       return_status.status = kEnvoyFilterDataStatusResumeIteration;
       return_status.data = final_data;
@@ -758,10 +739,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferThenResumeOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferThenResumeOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -795,8 +773,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -808,17 +786,17 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
     envoy_filter_data_status return_status;
 
     if (invocations->on_request_data_calls == 0) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "A");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "A");
       EXPECT_FALSE(end_stream);
 
       return_status.status = kEnvoyFilterDataStatusStopIterationAndBuffer;
       return_status.data = envoy_nodata;
       return_status.pending_headers = nullptr;
     } else {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "AB");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "AB");
       EXPECT_TRUE(end_stream);
       Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
-      envoy_data final_data = Data::Utility::toBridgeData(final_buffer);
+      envoy_data final_data = Bridge::Utility::toBridgeData(final_buffer);
       envoy_headers* modified_headers =
           static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
       *modified_headers =
@@ -844,10 +822,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -892,17 +867,14 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnRequestData) {
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[3] = {"A", "B", "C"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls++]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopNoBufferOnRequestData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopNoBufferOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -934,16 +906,13 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestTrailers) {
                                            const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
     invocations->on_request_trailers_calls++;
     return {kEnvoyFilterTrailersStatusContinue, c_trailers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnRequestTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnRequestTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "test trailer"}};
@@ -968,8 +937,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -979,7 +948,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[2] = {"A", "AB"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -990,12 +959,12 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
                                            const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
 
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
-    *modified_data = Data::Utility::toBridgeData(final_buffer);
+    *modified_data = Bridge::Utility::toBridgeData(final_buffer);
     envoy_headers* modified_headers =
         static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
     *modified_headers = make_envoy_headers({{":authority", "test.code"}, {"content-length", "1"}});
@@ -1014,10 +983,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -1071,8 +1037,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1082,7 +1048,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[2] = {"A", "AB"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -1093,8 +1059,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
                                            const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
     release_envoy_headers(c_trailers);
     invocations->on_request_trailers_calls++;
     return {kEnvoyFilterTrailersStatusStopIteration, envoy_noheaders, nullptr, nullptr};
@@ -1104,12 +1070,12 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
-    EXPECT_EQ(Data::Utility::copyToString(*pending_data), "AB");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(*pending_data), "AB");
     EXPECT_EQ(pending_trailers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_trailers->entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(pending_trailers->entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_trailers->entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_trailers->entries[0].value), "test trailer");
     EXPECT_TRUE(end_stream);
 
     envoy_headers* modified_headers =
@@ -1119,7 +1085,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
     release_envoy_headers(*pending_headers);
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
-    *modified_data = Data::Utility::toBridgeData(final_buffer);
+    *modified_data = Bridge::Utility::toBridgeData(final_buffer);
     release_envoy_data(*pending_data);
     envoy_headers* modified_trailers =
         static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
@@ -1142,10 +1108,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -1174,7 +1137,9 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_trailers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
@@ -1212,8 +1177,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1223,7 +1188,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[2] = {"A", "AB"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -1234,8 +1199,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
                                            const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
     release_envoy_headers(c_trailers);
     invocations->on_request_trailers_calls++;
     return {kEnvoyFilterTrailersStatusStopIteration, envoy_noheaders, nullptr, nullptr};
@@ -1245,12 +1210,12 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
-    EXPECT_EQ(Data::Utility::copyToString(*pending_data), "AB");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(*pending_data), "AB");
     EXPECT_EQ(pending_trailers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_trailers->entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(pending_trailers->entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_trailers->entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_trailers->entries[0].value), "test trailer");
     EXPECT_TRUE(end_stream);
 
     release_envoy_headers(*pending_headers);
@@ -1271,10 +1236,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
         callback(decoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -1303,7 +1265,9 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_trailers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   filter_->resumeDecoding();
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
@@ -1327,17 +1291,14 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseHeaders) {
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_TRUE(end_stream);
     invocations->on_response_headers_calls++;
     return {kEnvoyFilterHeadersStatusContinue, c_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnResponseHeaders
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnResponseHeaders", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1362,8 +1323,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnData) {
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1372,7 +1333,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnData) {
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(Data::Utility::copyToString(c_data), "response body");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data), "response body");
     EXPECT_TRUE(end_stream);
     invocations->on_response_data_calls++;
     envoy_headers* modified_headers =
@@ -1381,10 +1342,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnData) {
     return {kEnvoyFilterDataStatusResumeIteration, c_data, modified_headers};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1420,8 +1378,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1432,8 +1390,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
     EXPECT_EQ(pending_data, nullptr);
     EXPECT_EQ(pending_trailers, nullptr);
     EXPECT_FALSE(end_stream);
@@ -1446,10 +1404,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding
     return {kEnvoyFilterResumeStatusResumeIteration, modified_headers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenResumeOnResumeEncoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1459,7 +1414,9 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
   EXPECT_EQ(invocations.on_response_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   filter_->resumeEncoding();
   resume_post_cb();
@@ -1487,8 +1444,8 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1497,7 +1454,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(Data::Utility::copyToString(c_data), "response body");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data), "response body");
     EXPECT_TRUE(end_stream);
     invocations->on_response_data_calls++;
     envoy_headers* modified_headers =
@@ -1512,10 +1469,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
     return {kEnvoyFilterResumeStatusResumeIteration, nullptr, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
-)EOF",
-              &platform_filter);
+  setUpFilter("AsyncResumeEncodingIsNoopAfterPreviousResume", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1535,7 +1489,9 @@ platform_filter_name: AsyncResumeEncodingIsNoopAfterPreviousResume
       "13");
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
   filter_->resumeEncoding();
   resume_post_cb();
@@ -1558,8 +1514,8 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterFilterIsPendingDe
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1576,10 +1532,7 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterFilterIsPendingDe
     invocations->release_filter_calls++;
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction
-)EOF",
-              &platform_filter);
+  setUpFilter("AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1592,7 +1545,9 @@ platform_filter_name: AsyncResumeEncodingIsNoopAfterFilterIsPendingDestruction
 
   // Simulate posted resume call.
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
   filter_->resumeEncoding();
 
@@ -1621,16 +1576,13 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream, envoy_stream_intel,
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(Data::Utility::copyToString(c_data), "response body");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data), "response body");
     EXPECT_TRUE(end_stream);
     invocations->on_response_data_calls++;
     return {kEnvoyFilterDataStatusContinue, c_data, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl response_data = Buffer::OwnedImpl("response body");
@@ -1654,7 +1606,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[3] = {"A", "AB", "ABC"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls++]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -1671,10 +1623,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -1713,17 +1662,17 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
     envoy_filter_data_status return_status;
 
     if (invocations->on_response_data_calls == 0) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "A");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "A");
       EXPECT_FALSE(end_stream);
 
       return_status.status = kEnvoyFilterDataStatusStopIterationAndBuffer;
       return_status.data = envoy_nodata;
       return_status.pending_headers = nullptr;
     } else {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "AB");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "AB");
       EXPECT_FALSE(end_stream);
       Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
-      envoy_data final_data = Data::Utility::toBridgeData(final_buffer);
+      envoy_data final_data = Bridge::Utility::toBridgeData(final_buffer);
 
       return_status.status = kEnvoyFilterDataStatusResumeIteration;
       return_status.data = final_data;
@@ -1745,10 +1694,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopAndBufferThenResumeOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopAndBufferThenResumeOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -1782,8 +1728,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1795,17 +1741,17 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
     envoy_filter_data_status return_status;
 
     if (invocations->on_response_data_calls == 0) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "A");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "A");
       EXPECT_FALSE(end_stream);
 
       return_status.status = kEnvoyFilterDataStatusStopIterationAndBuffer;
       return_status.data = envoy_nodata;
       return_status.pending_headers = nullptr;
     } else {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "AB");
+      EXPECT_EQ(Bridge::Utility::copyToString(c_data), "AB");
       EXPECT_TRUE(end_stream);
       Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
-      envoy_data final_data = Data::Utility::toBridgeData(final_buffer);
+      envoy_data final_data = Bridge::Utility::toBridgeData(final_buffer);
       envoy_headers* modified_headers =
           static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
       *modified_headers = make_envoy_headers({{":status", "test.code"}, {"content-length", "1"}});
@@ -1830,10 +1776,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -1878,17 +1821,14 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnResponseData) {
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[3] = {"A", "B", "C"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls++]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopNoBufferOnResponseData
-)EOF",
-              &platform_filter);
+  setUpFilter("StopNoBufferOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Buffer::OwnedImpl first_chunk = Buffer::OwnedImpl("A");
@@ -1920,16 +1860,13 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseTrailers) {
                                             const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
     invocations->on_response_trailers_calls++;
     return {kEnvoyFilterTrailersStatusContinue, c_trailers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: BasicContinueOnResponseTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("BasicContinueOnResponseTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test trailer"}};
@@ -1954,8 +1891,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -1965,7 +1902,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[2] = {"A", "AB"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -1976,12 +1913,12 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
                                             const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
 
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
-    *modified_data = Data::Utility::toBridgeData(final_buffer);
+    *modified_data = Bridge::Utility::toBridgeData(final_buffer);
     envoy_headers* modified_headers =
         static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
     *modified_headers = make_envoy_headers({{":status", "test.code"}, {"content-length", "1"}});
@@ -2000,10 +1937,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnTrailers
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -2057,8 +1991,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_response_headers_calls++;
     release_envoy_headers(c_headers);
@@ -2068,7 +2002,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     std::string expected_data[2] = {"A", "AB"};
-    EXPECT_EQ(Data::Utility::copyToString(c_data),
+    EXPECT_EQ(Bridge::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls]);
     EXPECT_FALSE(end_stream);
     release_envoy_data(c_data);
@@ -2079,8 +2013,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
                                             const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_trailers.entries[0].value), "test trailer");
     release_envoy_headers(c_trailers);
     invocations->on_response_trailers_calls++;
     return {kEnvoyFilterTrailersStatusStopIteration, envoy_noheaders, nullptr, nullptr};
@@ -2090,12 +2024,12 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
          bool end_stream, envoy_stream_intel, const void* context) -> envoy_filter_resume_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(pending_headers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].key), ":status");
-    EXPECT_EQ(Data::Utility::copyToString(pending_headers->entries[0].value), "test.code");
-    EXPECT_EQ(Data::Utility::copyToString(*pending_data), "AB");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].key), ":status");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_headers->entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(*pending_data), "AB");
     EXPECT_EQ(pending_trailers->length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(pending_trailers->entries[0].key), "x-test-trailer");
-    EXPECT_EQ(Data::Utility::copyToString(pending_trailers->entries[0].value), "test trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_trailers->entries[0].key), "x-test-trailer");
+    EXPECT_EQ(Bridge::Utility::copyToString(pending_trailers->entries[0].value), "test trailer");
     EXPECT_TRUE(end_stream);
 
     envoy_headers* modified_headers =
@@ -2105,7 +2039,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
     release_envoy_headers(*pending_headers);
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
-    *modified_data = Data::Utility::toBridgeData(final_buffer);
+    *modified_data = Bridge::Utility::toBridgeData(final_buffer);
     release_envoy_data(*pending_data);
     envoy_headers* modified_trailers =
         static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
@@ -2128,10 +2062,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
         callback(encoding_buffer);
       }));
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
@@ -2160,7 +2091,9 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
   EXPECT_EQ(invocations.on_response_trailers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   filter_->resumeEncoding();
   resume_post_cb();
@@ -2198,8 +2131,8 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingP
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].key), ":authority");
-    EXPECT_EQ(Data::Utility::copyToString(c_headers.entries[0].value), "test.code");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].key), ":authority");
+    EXPECT_EQ(Bridge::Utility::copyToString(c_headers.entries[0].value), "test.code");
     EXPECT_FALSE(end_stream);
     invocations->on_request_headers_calls++;
     release_envoy_headers(c_headers);
@@ -2213,10 +2146,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecodingP
     return {kEnvoyFilterResumeStatusResumeIteration, pending_headers, nullptr, nullptr};
   };
 
-  setUpFilter(R"EOF(
-platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
-)EOF",
-              &platform_filter);
+  setUpFilter("StopOnRequestHeadersThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
@@ -2226,7 +2156,9 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
   EXPECT_EQ(invocations.on_request_headers_calls, 1);
 
   Event::PostCb resume_post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&resume_post_cb](Event::PostCb cb) {
+    resume_post_cb = std::move(cb);
+  });
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();

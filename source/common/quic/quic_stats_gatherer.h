@@ -17,10 +17,15 @@ namespace Quic {
 class QuicStatsGatherer : public quic::QuicAckListenerInterface {
 public:
   explicit QuicStatsGatherer(Envoy::TimeSource* time_source) : time_source_(time_source) {}
+  ~QuicStatsGatherer() override {
+    if (!logging_done_) {
+      maybeDoDeferredLog(false);
+    }
+  }
 
   // QuicAckListenerInterface
   void OnPacketAcked(int acked_bytes, quic::QuicTime::Delta delta_largest_observed) override;
-  void OnPacketRetransmitted(int /* retransmitted_bytes */) override {}
+  void OnPacketRetransmitted(int retransmitted_bytes) override;
 
   // Add bytes sent for this stream, for internal tracking of bytes acked.
   void addBytesSent(uint64_t bytes_sent, bool end_stream) {
@@ -58,6 +63,8 @@ private:
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   Envoy::TimeSource* time_source_ = nullptr;
   bool logging_done_ = false;
+  uint64_t retransmitted_packets_ = 0;
+  uint64_t retransmitted_bytes_ = 0;
 };
 
 } // namespace Quic

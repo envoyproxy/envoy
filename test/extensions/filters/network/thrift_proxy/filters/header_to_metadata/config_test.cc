@@ -118,7 +118,7 @@ request_rules:
       type: STRING
   )EOF";
 
-  testForbiddenConfig(yaml, "Cannot specify on_missing rule without non-empty value");
+  testForbiddenConfig(yaml, "Cannot specify on_missing rule with empty value");
 }
 
 } // namespace HeaderToMetadataFilter

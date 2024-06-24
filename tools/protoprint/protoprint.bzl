@@ -20,7 +20,7 @@ protoprint_aspect = api_proto_plugin_aspect(
     "//tools/protoprint",
     _protoprint_impl,
     use_type_db = True,
-    extra_inputs = ["//:.clang-format"],
+    extra_inputs = ["//:.clang-format", "//tools/clang-format"],
 )
 
 def _protoprint_rule_impl(ctx):

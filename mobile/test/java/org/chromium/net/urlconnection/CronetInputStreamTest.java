@@ -2,7 +2,6 @@ package org.chromium.net.urlconnection;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,21 +17,22 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Test for {@link CronetInputStream}.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetInputStreamTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
-  private CronetHttpURLConnection mMockConnection;
+  private CronvoyHttpURLConnection mMockConnection;
 
   @Before
   public void setUp() throws Exception {
     // Disable StrictMode constraints for mock initialization.
     try (StrictModeContext ignored = StrictModeContext.allowAllVmPolicies()) {
-      mMockConnection = Mockito.mock(CronetHttpURLConnection.class);
+      mMockConnection = Mockito.mock(CronvoyHttpURLConnection.class);
     }
   }
 
@@ -133,7 +133,7 @@ public class CronetInputStreamTest {
   }
 
   private void runTestCase(CronetInputStreamTestCase testCase) throws Exception {
-    try (CronetInputStream underTest = new CronetInputStream(mMockConnection)) {
+    try (CronvoyInputStream underTest = new CronvoyInputStream(mMockConnection)) {
       testCase.runTestCase(underTest);
     }
   }
@@ -162,7 +162,7 @@ public class CronetInputStreamTest {
     throw new AssertionError("No exception was thrown!");
   }
 
-  private static interface CronetInputStreamTestCase {
-    void runTestCase(CronetInputStream underTest) throws Exception;
+  private interface CronetInputStreamTestCase {
+    void runTestCase(CronvoyInputStream underTest) throws Exception;
   }
 }

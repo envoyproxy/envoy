@@ -3,9 +3,12 @@
 #include "envoy/tracing/trace_config.h"
 #include "envoy/tracing/tracer.h"
 
+#include "contrib/generic_proxy/filters/network/source/access_log.h"
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
+#include "contrib/generic_proxy/filters/network/source/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +25,7 @@ public:
    * @param request request.
    * @return RouteEntryConstSharedPtr route entry.
    */
-  virtual RouteEntryConstSharedPtr routeEntry(const Request& request) const PURE;
+  virtual RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const PURE;
 
   /**
    * Get codec factory for  decoding/encoding of request/response.
@@ -45,6 +48,21 @@ public:
    * @return connection manager tracing config.
    */
   virtual OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const PURE;
+
+  /**
+   * @return stats to use.
+   */
+  virtual GenericFilterStats& stats() PURE;
+
+  /**
+   * @return code or flags stats name to use.
+   */
+  virtual const CodeOrFlags& codeOrFlags() const PURE;
+
+  /**
+   * @return const std::vector<AccessLogInstanceSharedPtr>& access logs.
+   */
+  virtual const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const PURE;
 };
 
 } // namespace GenericProxy

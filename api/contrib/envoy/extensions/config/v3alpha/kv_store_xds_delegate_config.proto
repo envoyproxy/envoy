@@ -9,7 +9,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.config.v3alpha";
 option java_outer_classname = "KvStoreXdsDelegateConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/config/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/config/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#extension: envoy.xds_delegates.kv_store]

@@ -19,7 +19,6 @@ health_check_config {
   no_traffic_interval {
     seconds: 1
   }
-  event_log_path: "200"
   initial_jitter {
     seconds: 1
   }

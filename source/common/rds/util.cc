@@ -5,18 +5,19 @@ namespace Rds {
 
 ProtobufTypes::MessagePtr cloneProto(ProtoTraits& proto_traits, const Protobuf::Message& rc) {
   auto clone = proto_traits.createEmptyProto();
-  clone->CopyFrom(rc);
+  clone->CheckTypeAndMergeFrom(rc);
   return clone;
 }
 
 std::string resourceName(ProtoTraits& proto_traits, const Protobuf::Message& rc) {
-  const Protobuf::FieldDescriptor* field =
-      rc.GetDescriptor()->FindFieldByNumber(proto_traits.resourceNameFieldNumber());
+  Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(rc);
+  const Protobuf::FieldDescriptor* field = reflectable_message->GetDescriptor()->FindFieldByNumber(
+      proto_traits.resourceNameFieldNumber());
   if (!field) {
     return {};
   }
-  const Protobuf::Reflection* reflection = rc.GetReflection();
-  return reflection->GetString(rc, field);
+  const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
+  return reflection->GetString(*reflectable_message, field);
 }
 
 } // namespace Rds

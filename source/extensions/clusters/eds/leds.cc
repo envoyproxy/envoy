@@ -17,22 +17,25 @@ LedsSubscription::LedsSubscription(
     Stats::Scope& cluster_stats_scope, const UpdateCb& callback)
     : Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::LbEndpoint>(
           factory_context.messageValidationVisitor(), leds_config.leds_collection_name()),
-      local_info_(factory_context.localInfo()), cluster_name_(cluster_name),
+      local_info_(factory_context.serverFactoryContext().localInfo()), cluster_name_(cluster_name),
       stats_scope_(cluster_stats_scope.createScope("leds.")),
       stats_({ALL_LEDS_STATS(POOL_COUNTER(*stats_scope_))}), callback_(callback) {
-  const xds::core::v3::ResourceLocator leds_resource_locator =
-      Config::XdsResourceIdentifier::decodeUrl(leds_config.leds_collection_name());
+  const xds::core::v3::ResourceLocator leds_resource_locator = THROW_OR_RETURN_VALUE(
+      Config::XdsResourceIdentifier::decodeUrl(leds_config.leds_collection_name()),
+      xds::core::v3::ResourceLocator);
   const auto resource_name = getResourceName();
-  subscription_ =
+  subscription_ = THROW_OR_RETURN_VALUE(
       factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
           leds_resource_locator, leds_config.leds_config(), resource_name, *stats_scope_, *this,
-          resource_decoder_);
+          resource_decoder_),
+      Config::SubscriptionPtr);
   subscription_->start({});
 }
 
-void LedsSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
+absl::Status
+LedsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                 const std::string&) {
   // At least one resource must be added or removed.
   if (added_resources.empty() && removed_resources.empty()) {
     ENVOY_LOG(debug, "No added or removed LbEndpoint entries for cluster {} in onConfigUpdate()",
@@ -44,7 +47,7 @@ void LedsSubscription::onConfigUpdate(
       initial_update_attempt_complete_ = true;
       callback_();
     }
-    return;
+    return absl::OkStatus();
   }
 
   ENVOY_LOG(info, "{}: add {} endpoint(s), remove {} endpoints(s)", cluster_name_,
@@ -70,6 +73,7 @@ void LedsSubscription::onConfigUpdate(
   // Notify the callbacks that the host list has been modified.
   initial_update_attempt_complete_ = true;
   callback_();
+  return absl::OkStatus();
 }
 
 void LedsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

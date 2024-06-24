@@ -37,11 +37,11 @@ open class Stream(
 
   /**
    * For sending data to an associated stream. By default, the length sent is the
-   * **[ByteBuffer.capacity]**. However, the length will rather be **[ByteBuffer.position]**
-   * if the Stream was configured to do so - see **[StreamPrototype.useByteBufferPosition]**.
+   * **[ByteBuffer.capacity]**. However, the length will rather be **[ByteBuffer.position]** if the
+   * Stream was configured to do so - see **[StreamPrototype.useByteBufferPosition]**.
    *
-   * Note: the provided ByteBuffer won't be mutated in any case. On the other hand, until the
-   *       stream is closed, any further mutations may lead to an unpredictable outcome.
+   * Note: the provided ByteBuffer won't be mutated in any case. On the other hand, until the stream
+   * is closed, any further mutations may lead to an unpredictable outcome.
    *
    * @param data Data to send over the stream.
    * @return This stream, for chaining syntax.
@@ -63,11 +63,11 @@ open class Stream(
 
   /**
    * Close the stream with a data frame. By default, the length sent is the
-   * **[ByteBuffer.capacity]**. However, the length will rather be **[ByteBuffer.position]**
-   * if the Stream was configured to do so - see **[StreamPrototype.useByteBufferPosition]**.
+   * **[ByteBuffer.capacity]**. However, the length will rather be **[ByteBuffer.position]** if the
+   * Stream was configured to do so - see **[StreamPrototype.useByteBufferPosition]**.
    *
-   * Note: the provided ByteBuffer won't be mutated in any case. On the other hand, until the
-   *       stream is closed, any further mutations may lead to an unpredictable outcome.
+   * Note: the provided ByteBuffer won't be mutated in any case. On the other hand, until the stream
+   * is closed, any further mutations may lead to an unpredictable outcome.
    *
    * @param data Data with which to close the stream.
    */
@@ -76,9 +76,7 @@ open class Stream(
     underlyingStream.sendData(data, length, true)
   }
 
-  /**
-   * Cancel the stream.
-   */
+  /** Cancel the stream. */
   open fun cancel() {
     underlyingStream.cancel()
   }

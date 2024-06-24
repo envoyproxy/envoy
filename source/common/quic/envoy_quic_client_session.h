@@ -7,6 +7,7 @@
 #include "source/common/quic/envoy_quic_client_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
@@ -26,13 +27,13 @@ public:
   EnvoyQuicClientSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
       std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
-      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-      quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
+      std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
       uint32_t send_buffer_limit,
       EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
       QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
       Stats::Scope& scope,
-      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      OptRef<Network::UpstreamTransportSocketFactory> transport_socket_factory);
 
   ~EnvoyQuicClientSession() override;
 
@@ -63,6 +64,9 @@ public:
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
+
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
+  std::vector<std::string> GetAlpnsToOffer() const override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -119,6 +123,9 @@ private:
   Stats::Scope& scope_;
   bool disable_keepalive_{false};
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  OptRef<QuicTransportSocketFactoryBase> transport_socket_factory_;
+  std::vector<std::string> configured_alpns_;
+  quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
 };
 
 } // namespace Quic

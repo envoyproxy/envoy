@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 #include <string>
 
@@ -41,8 +43,7 @@ struct BufferedStreamState {
 
 class FileSystemBufferFilter : public Http::StreamFilter,
                                public Http::DownstreamWatermarkCallbacks,
-                               public Logger::Loggable<Logger::Id::http2>,
-                               public std::enable_shared_from_this<FileSystemBufferFilter> {
+                               public Logger::Loggable<Logger::Id::http2> {
 public:
   explicit FileSystemBufferFilter(std::shared_ptr<FileSystemBufferFilterConfig> base_config);
 
@@ -67,6 +68,12 @@ public:
   void onDestroy() override;
 
 private:
+  // This is captured so that callbacks can alter their behavior (and avoid nullptr)
+  // if the filter has been destroyed since the callback was queued.
+  // We use this rather than shared_from_this because onDestroy happens potentially
+  // significantly earlier than the destructor, and we want to abort callbacks after
+  // onDestroy.
+  std::shared_ptr<bool> is_destroyed_ = std::make_shared<bool>(false);
   // Merges any per-route config with the default config. Returns false if the config lacked
   // a file manager.
   bool initPerRouteConfig();

@@ -156,9 +156,10 @@ protected:
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
-  virtual IntegrationCodecClientPtr makeRawHttpConnection(
-      Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
+  virtual IntegrationCodecClientPtr
+  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
+                        absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+                        bool wait_till_connected = true);
   // Makes a downstream network connection object based on client codec version.
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override;
@@ -304,9 +305,10 @@ protected:
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
 
   // Test sending and receiving large request and response bodies with autonomous upstream.
-  void testGiantRequestAndResponse(
-      uint64_t request_size, uint64_t response_size, bool set_content_length_header,
-      std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+  void testGiantRequestAndResponse(uint64_t request_size, uint64_t response_size,
+                                   bool set_content_length_header,
+                                   std::chrono::milliseconds timeout = 2 *
+                                                                       TestUtility::DefaultTimeout);
 
   struct BytesCountExpectation {
     BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
@@ -359,6 +361,10 @@ protected:
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   bool enable_quic_early_data_{true};
+  std::vector<absl::string_view> custom_alpns_;
+  // Set this to true when sending malformed requests to avoid test client codec rejecting it.
+  // This flag is only valid when UHV build flag is enabled.
+  bool disable_client_header_validation_{false};
 #ifdef ENVOY_ENABLE_QUIC
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
@@ -379,5 +385,9 @@ protected:
 
   IntegrationTcpClientPtr tcp_client_;
 };
+
+absl::string_view upstreamToString(Http::CodecType type);
+absl::string_view downstreamToString(Http::CodecType type);
+absl::string_view http2ImplementationToString(Http2Impl impl);
 
 } // namespace Envoy

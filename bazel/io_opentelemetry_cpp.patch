@@ -1,0 +1,13 @@
+# TODO: Remove once https://github.com/open-telemetry/opentelemetry-cpp/issues/2556 is merged
+
+--- a/api/include/opentelemetry/trace/span_context.h
++++ b/api/include/opentelemetry/trace/span_context.h
+@@ -30,7 +30,7 @@ class SpanContext final
+   SpanContext(bool sampled_flag, bool is_remote) noexcept
+       : trace_id_(),
+         span_id_(),
+-        trace_flags_(trace::TraceFlags((uint8_t)sampled_flag)),
++        trace_flags_(trace::TraceFlags(static_cast<uint8_t>(sampled_flag))),
+         is_remote_(is_remote),
+         trace_state_(TraceState::GetDefault())
+   {}

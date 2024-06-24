@@ -22,8 +22,9 @@ DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::DogStatsdSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Address::resolveProtoAddress(sink_config.address());
+  auto address_or_error = Network::Address::resolveProtoAddress(sink_config.address());
+  THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+  Network::Address::InstanceConstSharedPtr address = address_or_error.value();
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   absl::optional<uint64_t> max_bytes;
   if (sink_config.has_max_bytes_per_datagram()) {

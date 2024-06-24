@@ -17,11 +17,5 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
                                                              transport_options);
 }
 
-Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks&,
-                                                          Runtime::Loader&, bool, bool) {
-  return nullptr;
-}
-
 } // namespace Event
 } // namespace Envoy

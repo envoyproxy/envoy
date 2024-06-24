@@ -139,6 +139,14 @@ public:
     return atomic_ref.load();
   }
 
+  /**
+   * Returns whether the underlying pointer at the index is null.
+   *
+   * @param index the Index to look up.
+   * @return true if the underlying pointer at the index is null.
+   */
+  bool isNull(uint32_t index) const { return data_[index].load() == nullptr; }
+
 private:
   std::atomic<T*> data_[size];
   absl::Mutex mutex_;
@@ -166,6 +174,11 @@ public:
    * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
+
+  /**
+   * @return true if the underlying pointer is null.
+   */
+  bool isNull() const { return BaseClass::isNull(0); }
 };
 
 // We use platform-specific functions to determine whether the current thread is
@@ -237,9 +250,34 @@ public:
 
 #define END_TRY }
 
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+#define TRY_NEEDS_AUDIT {
+#else
 // TODO(chaoqinli-1123): Remove this macros after we have removed all the exceptions from data
 // plane.
-#define TRY_NEEDS_AUDIT try
+#define TRY_NEEDS_AUDIT try {
+#endif
+
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+#define CATCH(ExceptionType, Handler)
+#else
+#define CATCH(Exception, Handler)                                                                  \
+  catch (Exception) {                                                                              \
+    Handler                                                                                        \
+  }
+#endif
+
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+#define MULTI_CATCH(ExceptionType, Handler, Handler2)
+#else
+#define MULTI_CATCH(Exception, Handler, Handler2)                                                  \
+  catch (Exception) {                                                                              \
+    Handler                                                                                        \
+  }                                                                                                \
+  catch (...) {                                                                                    \
+    Handler2                                                                                       \
+  }
+#endif
 
 // These convenience macros assert properties of the threading system, when
 // feasible. There is a platform-specific mechanism for determining whether the
@@ -277,6 +315,9 @@ public:
 
 #endif
 
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+#define TRY_ASSERT_MAIN_THREAD {
+#else
 /**
  * To improve exception safety in data plane, we plan to forbid the use of raw
  * try in the core code base. This macros uses main thread assertion to make
@@ -285,6 +326,7 @@ public:
 #define TRY_ASSERT_MAIN_THREAD                                                                     \
   try {                                                                                            \
     ASSERT_IS_MAIN_OR_TEST_THREAD();
+#endif
 
 /**
  * RAII class to override thread assertions checks in the macros:

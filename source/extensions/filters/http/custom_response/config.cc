@@ -49,7 +49,7 @@ FilterConfig::FilterConfig(
     Server::Configuration::ServerFactoryContext& context, Stats::StatName stats_prefix)
     : stats_prefix_(stats_prefix), matcher_{createMatcher(config, context, stats_prefix)} {}
 
-PolicySharedPtr FilterConfig::getPolicy(::Envoy::Http::ResponseHeaderMap& headers,
+PolicySharedPtr FilterConfig::getPolicy(const ::Envoy::Http::ResponseHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info) const {
   if (!matcher_) {
     return PolicySharedPtr{};

@@ -83,9 +83,9 @@ public:
    * Creates a list of filter factories.
    * @param filters supplies the proto configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Network::FilterFactoryCb> the list of filter factories.
+   * @return Filter::NetworkFilterFactoriesList the list of filter factories.
    */
-  virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  virtual Filter::NetworkFilterFactoriesList createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
@@ -106,6 +106,16 @@ public:
    * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
+   * Creates a list of QUIC listener filter factories.
+   * @param filters supplies the JSON configuration.
+   * @param context supplies the factory creation context.
+   * @return Filter::ListenerFilterFactoriesList the list of filter factories.
+   */
+  virtual Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
@@ -166,11 +176,13 @@ public:
    *        listener is not modifiable, future calls to this function or removeListener() on behalf
    *        of this listener will return false.
    * @return TRUE if a listener was added or FALSE if the listener was not updated because it is
-   *         a duplicate of the existing listener. This routine will throw an EnvoyException if
-   *         there is a fundamental error preventing the listener from being added or updated.
+   *         a duplicate of the existing listener. This routine will return
+   *         absl::InvalidArgumentError if there is a fundamental error preventing the listener
+   *         from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
-                                   const std::string& version_info, bool modifiable) PURE;
+  virtual absl::StatusOr<bool>
+  addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                      const std::string& version_info, bool modifiable) PURE;
 
   /**
    * Instruct the listener manager to create an LDS API provider. This is a separate operation
@@ -209,18 +221,20 @@ public:
 
   /**
    * Start all workers accepting new connections on all added listeners.
-   * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param callback supplies the callback to complete server initialization.
    */
-  virtual void startWorkers(GuardDog& guard_dog, std::function<void()> callback) PURE;
+  virtual void startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
    * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
    * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
    * @param stop_listeners_type indicates listeners to stop.
+   * @param options additional options passed through to shutdownListener.
    */
-  virtual void stopListeners(StopListenersType stop_listeners_type) PURE;
+  virtual void stopListeners(StopListenersType stop_listeners_type,
+                             const Network::ExtraShutdownListenerOptions& options) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

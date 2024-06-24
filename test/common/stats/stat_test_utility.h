@@ -13,6 +13,11 @@
 
 namespace Envoy {
 namespace Stats {
+
+// Helper methods to facilitate using testing::ElementsAre with bucket vectors.
+bool operator==(const ParentHistogram::Bucket& a, const ParentHistogram::Bucket& b);
+std::ostream& operator<<(std::ostream& out, const ParentHistogram::Bucket& bucket);
+
 namespace TestUtil {
 
 class TestSymbolTableHelper {
@@ -144,6 +149,12 @@ public:
   GaugeOptConstRef findGaugeByString(const std::string& name) const;
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
   std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
+  // Returns whether the given histogram has recorded any value since it was
+  // created.
+  bool histogramRecordedValues(const std::string& name) const;
+  const TagVector& fixedTags() override { return fixed_tags_; }
+
+  TagVector fixed_tags_;
 
 protected:
   ScopeSharedPtr makeScope(StatName name) override;

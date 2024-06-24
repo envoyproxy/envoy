@@ -7,5 +7,5 @@ public interface EnvoyNativeResourceReleaser {
    *
    * @param @nativeHandle, JNI identifier for the native resource.
    */
-  public void release(long nativeHandle);
+  void release(long nativeHandle);
 }

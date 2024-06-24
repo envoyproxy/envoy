@@ -293,7 +293,7 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -376,15 +376,16 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
   }
 }
 
-// Regression tests that header-only responses do not get the content-length
-// adjusted (https://github.com/envoyproxy/envoy/issues/11099)
+// Regression tests that header-only responses get the gRPC frame appended and
+// content-length header adjusted, as well as trailers added.
+// (https://github.com/envoyproxy/envoy/issues/29989).
 TEST_F(ReverseBridgeTest, GrpcRequestHeaderOnlyResponse) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
@@ -424,11 +425,17 @@ TEST_F(ReverseBridgeTest, GrpcRequestHeaderOnlyResponse) {
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   }
 
+  // call should prefix the buffer with the gRPC frame header and insert the
+  // gRPC status into trailers.
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false));
+  Http::TestResponseTrailerMapImpl trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
   Http::TestResponseHeaderMapImpl headers(
       {{":status", "200"}, {"content-length", "0"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "0"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "5"));
 }
 
 // Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
@@ -474,6 +481,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
       {{":status", "400"}, {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
 
   {
     // First few calls should drain the buffer
@@ -501,7 +509,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -714,7 +722,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(1, frames.size());
     EXPECT_EQ(12, frames[0].length_);
@@ -791,7 +799,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
 
     EXPECT_EQ(4, trailers.size());
     EXPECT_EQ(1, frames.size());

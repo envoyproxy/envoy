@@ -8,6 +8,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
@@ -64,7 +65,7 @@ private:
   envoy::extensions::wasm::v3::WasmService config_;
   Server::Configuration::ServerFactoryContext& context_;
   WasmServicePtr wasm_service_;
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

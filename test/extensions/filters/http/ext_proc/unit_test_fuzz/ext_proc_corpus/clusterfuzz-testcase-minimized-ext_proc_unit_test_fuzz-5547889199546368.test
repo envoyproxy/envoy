@@ -1,0 +1,34 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+      retry_policy {
+      }
+    }
+    timeout {
+    }
+  }
+  processing_mode {
+    request_header_mode: SKIP
+    request_body_mode: BUFFERED
+  }
+  request_attributes: "\022."
+}
+request {
+  trailers {
+    headers {
+      key: "."
+    }
+  }
+}
+response {
+  response_body {
+    response {
+      header_mutation {
+      }
+    }
+  }
+  mode_override {
+    request_header_mode: SKIP
+  }
+}

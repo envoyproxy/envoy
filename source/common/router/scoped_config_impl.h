@@ -55,14 +55,10 @@ private:
 /**
  * Base class for ScopeKeyBuilder implementations.
  */
-class ScopeKeyBuilderBase {
+class ScopeKeyBuilderBase : public ScopeKeyBuilder {
 public:
   explicit ScopeKeyBuilderBase(ScopedRoutes::ScopeKeyBuilder&& config)
       : config_(std::move(config)) {}
-  virtual ~ScopeKeyBuilderBase() = default;
-
-  // Computes scope key for given headers, returns nullptr if a key can't be computed.
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder config_;
@@ -111,12 +107,9 @@ using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
  */
 class ScopedConfigImpl : public ScopedConfig {
 public:
-  explicit ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
-      : scope_key_builder_(std::move(scope_key_builder)) {}
+  ScopedConfigImpl() = default;
 
-  ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder,
-                   const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos)
-      : scope_key_builder_(std::move(scope_key_builder)) {
+  ScopedConfigImpl(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos) {
     addOrUpdateRoutingScopes(scoped_route_infos);
   }
 
@@ -126,12 +119,9 @@ public:
   void removeRoutingScopes(const std::vector<std::string>& scope_names);
 
   // Envoy::Router::ScopedConfig
-  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
-  // The return value is not null only if the scope corresponding to the header exists.
-  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
+  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr& scope_key) const override;
 
 private:
-  ScopeKeyBuilderImpl scope_key_builder_;
   // From scope name to cached ScopedRouteInfo.
   absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
   // Hash by ScopeKey hash to lookup in constant time.
@@ -143,7 +133,7 @@ private:
  */
 class NullScopedConfigImpl : public ScopedConfig {
 public:
-  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap&) const override {
+  Router::ConfigConstSharedPtr getRouteConfig(const ScopeKeyPtr&) const override {
     return std::make_shared<const NullConfigImpl>();
   }
 };

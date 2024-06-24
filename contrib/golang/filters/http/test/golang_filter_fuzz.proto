@@ -1,9 +1,7 @@
 syntax = "proto3";
 package envoy.extensions.filters.http.golang;
 
-import "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto";
 import "test/fuzz/common.proto";
-import "envoy/config/core/v3/base.proto";
 import "validate/validate.proto";
 
 // We only fuzz a single request per iteration.

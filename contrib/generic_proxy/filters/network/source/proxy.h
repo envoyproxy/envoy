@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -7,11 +8,13 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
 #include "source/common/tracing/tracer_impl.h"
@@ -26,6 +29,8 @@
 #include "contrib/generic_proxy/filters/network/source/rds.h"
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
+#include "contrib/generic_proxy/filters/network/source/stats.h"
+#include "contrib/generic_proxy/filters/network/source/tracing.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,20 +49,34 @@ struct NamedFilterFactoryCb {
   FilterFactoryCb callback_;
 };
 
+enum class DownstreamStreamResetReason : uint32_t {
+  // The stream was reset because of the connection was closed.
+  ConnectionTermination,
+  // The stream was reset because of the connection was closed locally.
+  LocalConnectionTermination,
+  // Protocol error.
+  ProtocolError,
+};
+
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
+                   std::vector<AccessLogInstanceSharedPtr>&& access_logs,
+                   const CodeOrFlags& code_or_flags,
                    Envoy::Server::Configuration::FactoryContext& context)
-      : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
+      : stat_prefix_(stat_prefix),
+        stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
+        code_or_flags_(code_or_flags), codec_factory_(std::move(codec)),
         route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
         drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
-        tracing_config_(std::move(tracing_config)) {}
+        tracing_config_(std::move(tracing_config)), access_logs_(std::move(access_logs)),
+        time_source_(context.serverFactoryContext().timeSource()) {}
 
   // FilterConfig
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
+  RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const override {
     auto config = std::static_pointer_cast<const RouteMatcher>(route_config_provider_->config());
     return config->routeEntry(request);
   }
@@ -68,6 +87,11 @@ public:
   }
   OptRef<const Tracing::ConnectionManagerTracingConfig> tracingConfig() const override {
     return makeOptRefFromPtr<const Tracing::ConnectionManagerTracingConfig>(tracing_config_.get());
+  }
+  GenericFilterStats& stats() override { return stats_; }
+  const CodeOrFlags& codeOrFlags() const override { return code_or_flags_; }
+  const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const override {
+    return access_logs_;
   }
 
   // FilterChainFactory
@@ -82,6 +106,8 @@ private:
   friend class Filter;
 
   const std::string stat_prefix_;
+  GenericFilterStats stats_;
+  const CodeOrFlags& code_or_flags_;
 
   CodecFactoryPtr codec_factory_;
 
@@ -93,12 +119,15 @@ private:
 
   Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
+  std::vector<AccessLogInstanceSharedPtr> access_logs_;
+
+  TimeSource& time_source_;
 };
 
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
-                     public ResponseEncoderCallback,
+                     public EncodingContext,
                      public Tracing::Config,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -109,11 +138,10 @@ public:
 
     // StreamFilterCallbacks
     Envoy::Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
-    const CodecFactory& downstreamCodec() override { return parent_.downstreamCodec(); }
-    void resetStream() override { parent_.resetStream(); }
-    const RouteEntry* routeEntry() const override { return parent_.routeEntry(); }
+    const CodecFactory& codecFactory() override { return parent_.codecFactory(); }
+    const RouteEntry* routeEntry() const override { return parent_.routeEntry().ptr(); }
     const RouteSpecificFilterConfig* perFilterConfig() const override {
-      if (const auto* entry = parent_.routeEntry(); entry != nullptr) {
+      if (const auto entry = parent_.routeEntry(); entry.has_value()) {
         return entry->perFilterConfig(context_.config_name);
       }
       return nullptr;
@@ -122,6 +150,8 @@ public:
     StreamInfo::StreamInfo& streamInfo() override { return parent_.stream_info_; }
     Tracing::Span& activeSpan() override { return parent_.activeSpan(); }
     OptRef<const Tracing::Config> tracingConfig() const override { return parent_.tracingConfig(); }
+    const Network::Connection* connection() const override;
+    absl::string_view filterConfigName() const override { return context_.config_name; }
 
     bool isDualFilter() const { return is_dual_; }
 
@@ -139,14 +169,23 @@ public:
     }
 
     // DecoderFilterCallback
-    void sendLocalReply(Status status, ResponseUpdateFunction&& func) override {
-      parent_.sendLocalReply(status, std::move(func));
+    void sendLocalReply(Status status, absl::string_view data,
+                        ResponseUpdateFunction func) override {
+      parent_.sendLocalReply(status, data, std::move(func));
     }
     void continueDecoding() override { parent_.continueDecoding(); }
-    void upstreamResponse(ResponsePtr response) override {
-      parent_.upstreamResponse(std::move(response));
+    void onResponseHeaderFrame(ResponseHeaderFramePtr frame) override {
+      parent_.onResponseHeaderFrame(std::move(frame));
     }
-    void completeDirectly() override { parent_.completeDirectly(); }
+    void onResponseCommonFrame(ResponseCommonFramePtr frame) override {
+      parent_.onResponseCommonFrame(std::move(frame));
+    }
+    void setRequestFramesHandler(RequestFramesHandler* handler) override {
+      ASSERT(parent_.request_stream_frames_handler_ == nullptr,
+             "request frames handler is already set");
+      parent_.request_stream_frames_handler_ = handler;
+    }
+    void completeDirectly() override { parent_.completeStream(); }
 
     DecoderFilterSharedPtr filter_;
   };
@@ -193,7 +232,7 @@ public:
     FilterContext context_;
   };
 
-  ActiveStream(Filter& parent, RequestPtr request);
+  ActiveStream(Filter& parent, RequestHeaderFramePtr request, absl::optional<StartTime> start_time);
 
   void addDecoderFilter(ActiveDecoderFilterPtr filter) {
     decoder_filters_.emplace_back(std::move(filter));
@@ -202,18 +241,19 @@ public:
     encoder_filters_.emplace_back(std::move(filter));
   }
 
-  void initializeFilterChain(FilterChainFactory& factory);
+  bool initializeFilterChain(FilterChainFactory& factory);
 
   Envoy::Event::Dispatcher& dispatcher();
-  const CodecFactory& downstreamCodec();
-  void resetStream();
-  const RouteEntry* routeEntry() const { return cached_route_entry_.get(); }
+  const CodecFactory& codecFactory();
+  void resetStream(DownstreamStreamResetReason reason);
+  StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
 
-  void sendLocalReply(Status status, ResponseUpdateFunction&&);
+  void sendLocalReply(Status status, absl::string_view data, ResponseUpdateFunction func);
   void continueDecoding();
-  void upstreamResponse(ResponsePtr response);
-  void completeDirectly();
+  void onRequestCommonFrame(RequestCommonFramePtr request_common_frame);
 
+  void onResponseHeaderFrame(ResponseHeaderFramePtr response_header_frame);
+  void onResponseCommonFrame(ResponseCommonFramePtr response_common_frame);
   void continueEncoding();
 
   // FilterChainManager
@@ -222,13 +262,10 @@ public:
     factory(callbacks);
   }
 
-  // ResponseEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) override;
-
-  std::vector<ActiveDecoderFilterPtr>& decoderFiltersForTest() { return decoder_filters_; }
-  std::vector<ActiveEncoderFilterPtr>& encoderFiltersForTest() { return encoder_filters_; }
-  size_t nextDecoderFilterIndexForTest() { return next_decoder_filter_index_; }
-  size_t nextEncoderFilterIndexForTest() { return next_encoder_filter_index_; }
+  // EncodingContext
+  OptRef<const RouteEntry> routeEntry() const override {
+    return makeOptRefFromPtr<const RouteEntry>(cached_route_entry_.get());
+  }
 
   Tracing::Span& activeSpan() {
     if (active_span_) {
@@ -245,7 +282,17 @@ public:
     return {};
   }
 
-  void completeRequest();
+  void deferredDelete();
+  void completeStream(absl::optional<DownstreamStreamResetReason> reason = {});
+
+  uint64_t requestStreamId() const { return request_header_frame_->frameFlags().streamId(); }
+
+  auto& decoderFiltersForTest() { return decoder_filters_; }
+  auto& encoderFiltersForTest() { return encoder_filters_; }
+  auto nextDecoderHeaderFilterForTest() { return decoder_filter_iter_header_; }
+  auto nextDecoderCommonFilterForTest() { return decoder_filter_iter_common_; }
+  auto nextEncoderHeaderFilterForTest() { return encoder_filter_iter_header_; }
+  auto nextEncoderCommonFilterForTest() { return encoder_filter_iter_common_; }
 
 private:
   // Keep these methods private to ensure that these methods are only called by the reference
@@ -255,21 +302,50 @@ private:
   const Tracing::CustomTagMap* customTags() const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
+  bool spawnUpstreamSpan() const override;
 
-  bool active_stream_reset_{false};
+  void sendRequestFrameToUpstream();
+
+  bool sendFrameToDownstream(const StreamFrame& frame, bool header_frame);
+
+  void processRequestHeaderFrame();
+  void processRequestCommonFrame();
+  void processResponseHeaderFrame();
+  void processResponseCommonFrame();
+
+  bool stream_reset_or_complete_{false};
+  bool waiting_request_frames_{false};
 
   Filter& parent_;
 
-  RequestPtr downstream_request_stream_;
-  ResponsePtr local_or_upstream_response_stream_;
+  RequestHeaderFramePtr request_header_frame_;
+  std::list<RequestCommonFramePtr> request_common_frames_;
+
+  // The request common frame that is being processed.
+  RequestCommonFramePtr request_common_frame_;
+  RequestFramesHandler* request_stream_frames_handler_{nullptr};
+
+  ResponseHeaderFramePtr response_header_frame_;
+  std::list<ResponseCommonFramePtr> response_common_frames_;
+  bool local_reply_{false};
+
+  // The response common frame that is being processed.
+  ResponseCommonFramePtr response_common_frame_;
 
   RouteEntryConstSharedPtr cached_route_entry_;
 
-  std::vector<ActiveDecoderFilterPtr> decoder_filters_;
-  size_t next_decoder_filter_index_{0};
+  using DecoderFilters = absl::InlinedVector<ActiveDecoderFilterPtr, 8>;
+  using EncoderFilters = absl::InlinedVector<ActiveEncoderFilterPtr, 8>;
 
-  std::vector<ActiveEncoderFilterPtr> encoder_filters_;
-  size_t next_encoder_filter_index_{0};
+  DecoderFilters decoder_filters_;
+  DecoderFilters::iterator decoder_filter_iter_header_{};
+  DecoderFilters::iterator decoder_filter_iter_common_{};
+  bool stop_decoder_filter_chain_{};
+
+  EncoderFilters encoder_filters_;
+  EncoderFilters::iterator encoder_filter_iter_header_{};
+  EncoderFilters::iterator encoder_filter_iter_common_{};
+  bool stop_encoder_filter_chain_{};
 
   StreamInfo::StreamInfoImpl stream_info_;
 
@@ -281,15 +357,17 @@ using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 class Filter : public Envoy::Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
-               public RequestDecoderCallback {
+               public ServerCodecCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, TimeSource& time_source, Runtime::Loader& runtime)
-      : config_(std::move(config)), drain_decision_(config_->drainDecision()),
-        time_source_(time_source), runtime_(runtime) {
-    decoder_ = config_->codecFactory().requestDecoder();
-    decoder_->setDecoderCallback(*this);
-    response_encoder_ = config_->codecFactory().responseEncoder();
-    creator_ = config_->codecFactory().messageCreator();
+  Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
+      : config_(std::move(config)),
+        stats_helper_(config_->codeOrFlags(), config_->stats(), context.scope()),
+        drain_decision_(config_->drainDecision()),
+        time_source_(context.serverFactoryContext().timeSource()),
+        runtime_(context.serverFactoryContext().runtime()),
+        cluster_manager_(context.serverFactoryContext().clusterManager()) {
+    server_codec_ = config_->codecFactory().createServerCodec();
+    server_codec_->setCodecCallbacks(*this);
   }
 
   // Envoy::Network::ReadFilter
@@ -302,38 +380,52 @@ public:
     callbacks_->connection().addConnectionCallbacks(*this);
   }
 
-  // RequestDecoderCallback
-  void onDecodingSuccess(RequestPtr request) override;
-  void onDecodingFailure() override;
+  // ServerCodecCallbacks
+  void onDecodingSuccess(RequestHeaderFramePtr header_frame,
+                         absl::optional<StartTime> start_time = {}) override;
+  void onDecodingSuccess(RequestCommonFramePtr common_frame) override;
+  void onDecodingFailure(absl::string_view reason = {}) override;
+  void writeToConnection(Buffer::Instance& buffer) override;
+  OptRef<Network::Connection> connection() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
-    if (event == Network::ConnectionEvent::Connected) {
+    ENVOY_LOG(debug, "generic proxy: downstream connection event {}", static_cast<uint32_t>(event));
+    if (event == Network::ConnectionEvent::Connected ||
+        event == Network::ConnectionEvent::ConnectedZeroRtt) {
       return;
     }
     downstream_connection_closed_ = true;
-    resetStreamsForUnexpectedError();
+    resetDownstreamAllStreams(event == Network::ConnectionEvent::LocalClose
+                                  ? DownstreamStreamResetReason::LocalConnectionTermination
+                                  : DownstreamStreamResetReason::ConnectionTermination);
   }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  void sendReplyDownstream(Response& response, ResponseEncoderCallback& callback);
-
-  Network::Connection& connection() {
+  Network::Connection& downstreamConnection() {
     ASSERT(callbacks_ != nullptr);
     return callbacks_->connection();
   }
 
-  void newDownstreamRequest(RequestPtr request);
-  void deferredStream(ActiveStream& stream);
+  /**
+   * Create a new active stream and add it to the active stream list.
+   * @param request the request to be processed.
+   * @param start_time the start time of the request.
+   */
+  void newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time = {});
 
   static const std::string& name() {
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.generic_proxy");
   }
 
   std::list<ActiveStreamPtr>& activeStreamsForTest() { return active_streams_; }
+  const auto& frameHandlersForTest() { return frame_handlers_; }
 
-  void resetStreamsForUnexpectedError();
+  // This may be called multiple times in some scenarios. But it is safe.
+  void resetDownstreamAllStreams(DownstreamStreamResetReason reason);
+  // This may be called multiple times in some scenarios. But it is safe.
+  void closeDownstreamConnection();
 
   void mayBeDrainClose();
 
@@ -346,21 +438,28 @@ protected:
 
 private:
   friend class ActiveStream;
+  friend class UpstreamManagerImpl;
+
+  void registerFrameHandler(uint64_t stream_id, ActiveStream* stream);
+  void unregisterFrameHandler(uint64_t stream_id);
 
   bool downstream_connection_closed_{};
 
   FilterConfigSharedPtr config_{};
+  GenericFilterStatsHelper stats_helper_;
+
   const Network::DrainDecision& drain_decision_;
+  bool stream_drain_decision_{};
   TimeSource& time_source_;
   Runtime::Loader& runtime_;
+  Upstream::ClusterManager& cluster_manager_;
 
-  RequestDecoderPtr decoder_;
-  ResponseEncoderPtr response_encoder_;
-  MessageCreatorPtr creator_;
+  ServerCodecPtr server_codec_;
 
   Buffer::OwnedImpl response_buffer_;
 
   std::list<ActiveStreamPtr> active_streams_;
+  absl::flat_hash_map<uint64_t, ActiveStream*> frame_handlers_;
 };
 
 } // namespace GenericProxy

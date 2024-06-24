@@ -44,42 +44,27 @@ convertPriority(const envoy::config::endpoint::v3::ClusterLoadAssignment& load_a
 }
 } // namespace
 
-LogicalDnsCluster::LogicalDnsCluster(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-    Network::DnsResolverSharedPtr dns_resolver,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(server_context, cluster, runtime, factory_context, std::move(stats_scope),
-                      added_via_api, factory_context.mainThreadDispatcher().timeSource()),
-      dns_resolver_(dns_resolver),
+LogicalDnsCluster::LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                     ClusterFactoryContext& context,
+                                     Network::DnsResolverSharedPtr dns_resolver)
+    : ClusterImplBase(cluster, context), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
-      resolve_timer_(
-          factory_context.mainThreadDispatcher().createTimer([this]() -> void { startResolve(); })),
-      local_info_(factory_context.localInfo()),
+      resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
+          [this]() -> void { startResolve(); })),
+      local_info_(context.serverFactoryContext().localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
-
-  const auto& locality_lb_endpoints = load_assignment_.endpoints();
-  if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
-    if (cluster.has_load_assignment()) {
-      throw EnvoyException(
-          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
-    } else {
-      throw EnvoyException("LOGICAL_DNS clusters must have a single host");
-    }
-  }
+          cluster, dns_refresh_rate_ms_.count(),
+          context.serverFactoryContext().api().randomGenerator());
 
   const envoy::config::core::v3::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();
 
-  if (!socket_address.resolver_name().empty()) {
-    throw EnvoyException("LOGICAL_DNS clusters must NOT have a custom resolver name set");
-  }
+  // Checked by factory;
+  ASSERT(socket_address.resolver_name().empty());
   dns_address_ = socket_address.address();
   dns_port_ = socket_address.port_value();
 
@@ -105,15 +90,15 @@ LogicalDnsCluster::~LogicalDnsCluster() {
 }
 
 void LogicalDnsCluster::startResolve() {
-  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address_);
+  ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   info_->configUpdateStats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address_, dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
-        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 
@@ -136,14 +121,14 @@ void LogicalDnsCluster::startResolve() {
                                                           lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+            PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
             priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
 
             const uint32_t priority = locality_lb_endpoint.priority();
             priority_state_manager.updateClusterPrioritySet(
                 priority, std::move(priority_state_manager.priorityState()[priority].first),
-                absl::nullopt, absl::nullopt, absl::nullopt);
+                absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
           }
 
           if (!current_resolved_address_ ||
@@ -178,17 +163,32 @@ void LogicalDnsCluster::startResolve() {
       });
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-LogicalDnsClusterFactory::createClusterImpl(
-    Server::Configuration::ServerFactoryContext& server_context,
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopeSharedPtr&& stats_scope) {
-  auto selected_dns_resolver = selectDnsResolver(cluster, context);
+absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                                            ClusterFactoryContext& context) {
+  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
+  THROW_IF_NOT_OK(dns_resolver_or_error.status());
 
-  return std::make_pair(std::make_shared<LogicalDnsCluster>(
-                            server_context, cluster, context.runtime(), selected_dns_resolver,
-                            socket_factory_context, std::move(stats_scope), context.addedViaApi()),
+  const auto& load_assignment = cluster.load_assignment();
+  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
+    if (cluster.has_load_assignment()) {
+      return absl::InvalidArgumentError(
+          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+    } else {
+      return absl::InvalidArgumentError("LOGICAL_DNS clusters must have a single host");
+    }
+  }
+
+  const envoy::config::core::v3::SocketAddress& socket_address =
+      locality_lb_endpoints[0].lb_endpoints()[0].endpoint().address().socket_address();
+  if (!socket_address.resolver_name().empty()) {
+    return absl::InvalidArgumentError(
+        "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  }
+
+  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(new LogicalDnsCluster(
+                            cluster, context, std::move(dns_resolver_or_error.value()))),
                         nullptr);
 }
 

@@ -151,7 +151,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           : stream_info.start_time() / 1000;
   test_stream_info->start_time_ = SystemTime(std::chrono::microseconds(start_time));
   if (stream_info.has_response_code()) {
-    test_stream_info->response_code_ = stream_info.response_code().value();
+    test_stream_info->setResponseCode(stream_info.response_code().value());
   }
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
@@ -170,15 +170,22 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           replaceInvalidHostCharacters(
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
-      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      auto address_or_error = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      address = address_or_error.value();
     }
   } else {
-    address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+    address = *Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   }
-  auto upstream_local_address =
-      stream_info.has_upstream_local_address()
-          ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
-          : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  Envoy::Network::Address::InstanceConstSharedPtr upstream_local_address;
+  if (stream_info.has_upstream_local_address()) {
+    auto upstream_local_address_or_error =
+        Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address());
+    THROW_IF_STATUS_NOT_OK(upstream_local_address_or_error, throw);
+    upstream_local_address = upstream_local_address_or_error.value();
+  } else {
+    upstream_local_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  }
   test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);

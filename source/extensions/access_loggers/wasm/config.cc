@@ -16,31 +16,24 @@ namespace Wasm {
 
 using Common::Wasm::PluginHandleSharedPtrThreadLocal;
 
-AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      proto_config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+AccessLog::InstanceSharedPtr
+WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_config,
+                                              AccessLog::FilterPtr&& filter,
+                                              Server::Configuration::FactoryContext& context) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
 
   auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
-      nullptr /* listener_metadata */);
+      config.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
+      context.serverFactoryContext().localInfo(), nullptr /* listener_metadata */);
 
   auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
 
   auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot =
-        ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal>::makeUnique(context.threadLocal());
+    auto tls_slot = ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal>::makeUnique(
+        context.serverFactoryContext().threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
       return std::make_shared<PluginHandleSharedPtrThreadLocal>(
           Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
@@ -48,15 +41,16 @@ AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
     access_log->setTlsSlot(std::move(tls_slot));
   };
 
-  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
-                                context.initManager(), context.mainThreadDispatcher(),
-                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
-                                std::move(callback))) {
+  if (!Common::Wasm::createWasm(
+          plugin, context.scope().createScope(""), context.serverFactoryContext().clusterManager(),
+          context.initManager(), context.serverFactoryContext().mainThreadDispatcher(),
+          context.serverFactoryContext().api(), context.serverFactoryContext().lifecycleNotifier(),
+          remote_data_provider_, std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm access log {}", plugin->name_));
   }
 
-  context.api().customStatNamespaces().registerStatNamespace(
+  context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);
   return access_log;
 }
@@ -71,7 +65,7 @@ std::string WasmAccessLogFactory::name() const { return "envoy.access_loggers.wa
 /**
  * Static registration for the wasm access log. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(WasmAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+LEGACY_REGISTER_FACTORY(WasmAccessLogFactory, Envoy::AccessLog::AccessLogInstanceFactory,
                         "envoy.wasm_access_log");
 
 } // namespace Wasm

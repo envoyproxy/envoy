@@ -15,19 +15,7 @@ Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::string(transport_protocol)};
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-}
-
-Matcher::DataInputGetResult FilterStateInput::get(const MatchingData& data) const {
-  const auto* filter_state_object =
-      data.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(filter_state_key_);
-
-  if (filter_state_object != nullptr) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            filter_state_object->serializeAsString()};
-  }
-
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
 }
 
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};
@@ -78,7 +66,11 @@ REGISTER_FACTORY(SourceTypeInputFactory, Matcher::DataInputFactory<MatchingData>
 REGISTER_FACTORY(HttpSourceTypeInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
 REGISTER_FACTORY(TransportProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);
+
+class FilterStateInputFactory : public FilterStateInputBaseFactory<MatchingData> {};
+class HttpFilterStateInputFactory : public FilterStateInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(HttpFilterStateInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
 } // namespace Matching
 } // namespace Network

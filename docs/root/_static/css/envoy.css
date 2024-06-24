@@ -46,6 +46,11 @@ table.docutils div.line-block {
     border: solid #eee 1px;
 }
 
+/* restore margin bottom on aligned images */
+.rst-content img.align-center {
+    margin-bottom: 24px
+}
+
 /* suppress errs on pseudo-json code highlights */
 .highlight-json .highlight .err {
     border: inherit;

@@ -35,6 +35,7 @@ protected:
 };
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
+  EXPECT_TRUE(store_->fixedTags().empty());
   ScopeSharedPtr scope1 = scope_->createScope("scope1.");
   Counter& c1 = scope_->counterFromString("c1");
   Counter& c2 = scope1->counterFromString("c2");

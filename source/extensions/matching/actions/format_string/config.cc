@@ -15,10 +15,7 @@ namespace FormatString {
 const Network::FilterChain*
 ActionImpl::get(const Server::Configuration::FilterChainsByName& filter_chains_by_name,
                 const StreamInfo::StreamInfo& info) const {
-  const std::string name =
-      formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
-                         *Http::StaticEmptyHeaders::get().response_headers,
-                         *Http::StaticEmptyHeaders::get().response_trailers, info, "");
+  const std::string name = formatter_->formatWithContext({}, info);
   const auto chain_match = filter_chains_by_name.find(name);
   if (chain_match != filter_chains_by_name.end()) {
     return chain_match->second.get();
@@ -33,8 +30,10 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& proto_config,
   const auto& config =
       MessageUtil::downcastAndValidate<const envoy::config::core::v3::SubstitutionFormatString&>(
           proto_config, validator);
+
+  Server::GenericFactoryContextImpl generic_context(context, validator);
   Formatter::FormatterConstSharedPtr formatter =
-      Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context);
+      Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, generic_context);
   return [formatter]() { return std::make_unique<ActionImpl>(formatter); };
 }
 

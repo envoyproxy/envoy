@@ -32,7 +32,7 @@ void H1FuzzIntegrationTest::initialize() {
 DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
   RELEASE_ASSERT(!TestEnvironment::getIpVersionsForTest().empty(), "");
   const auto ip_version = TestEnvironment::getIpVersionsForTest()[0];
-  PERSISTENT_FUZZ_VAR H1FuzzIntegrationTest h1_fuzz_integration_test(ip_version);
+  PERSISTENT_FUZZ_VAR(H1FuzzIntegrationTest, h1_fuzz_integration_test, (ip_version));
   h1_fuzz_integration_test.replay(input, true);
 }
 

@@ -15,23 +15,31 @@ ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBas
 Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
                                                    Buffer::Instance& response,
                                                    AdminStream& admin_query) {
-  const Http::Utility::QueryParams params = admin_query.queryParams();
+  const Http::Utility::QueryParamsMulti params = admin_query.queryParams();
 
   ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
+      params.getFirstValue("inboundonly").has_value()
+          ? ListenerManager::StopListenersType::InboundOnly
+          : ListenerManager::StopListenersType::All;
 
-  const bool graceful = params.find("graceful") != params.end();
+  const bool graceful = params.getFirstValue("graceful").has_value();
+  const bool skip_exit = params.getFirstValue("skip_exit").has_value();
+  if (skip_exit && !graceful) {
+    response.add("skip_exit requires graceful\n");
+    return Http::Code::BadRequest;
+  }
   if (graceful) {
     // Ignore calls to /drain_listeners?graceful if the drain sequence has
     // already started.
     if (!server_.drainManager().draining()) {
-      server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
-        server_.listenerManager().stopListeners(stop_listeners_type);
+      server_.drainManager().startDrainSequence([this, stop_listeners_type, skip_exit]() {
+        if (!skip_exit) {
+          server_.listenerManager().stopListeners(stop_listeners_type, {});
+        }
       });
     }
   } else {
-    server_.listenerManager().stopListeners(stop_listeners_type);
+    server_.listenerManager().stopListeners(stop_listeners_type, {});
   }
 
   response.add("OK\n");
@@ -41,7 +49,7 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
 Http::Code ListenersHandler::handlerListenerInfo(Http::ResponseHeaderMap& response_headers,
                                                  Buffer::Instance& response,
                                                  AdminStream& admin_query) {
-  const Http::Utility::QueryParams query_params = admin_query.queryParams();
+  const Http::Utility::QueryParamsMulti query_params = admin_query.queryParams();
   const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {

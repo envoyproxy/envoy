@@ -355,7 +355,7 @@ static int instance_count = 0;
 // will march forward only by calling advanceTimeAndRun() or advanceTimeWait().
 SimulatedTimeSystemHelper::SimulatedTimeSystemHelper()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
-      system_time_(real_time_source_.systemTime()), pending_updates_(0) {
+      system_time_(real_time_source_.systemTime()) {
   ++instance_count;
   ASSERT(instance_count <= 1);
 }

@@ -202,7 +202,7 @@ The gradient controller uses the namespace
   rq_blocked, Counter, Total requests that were blocked by the filter.
   min_rtt_calculation_active, Gauge, Set to 1 if the controller is in the process of a minRTT calculation. 0 otherwise.
   concurrency_limit, Gauge, The current concurrency limit.
-  gradient, Gauge, The current gradient value.
+  gradient, Gauge, The current gradient value multiplied by 1000 (values will range between 500 and 2000).
   burst_queue_size, Gauge, The current headroom value in the concurrency limit calculation.
   min_rtt_msecs, Gauge, The current measured minRTT value.
   sample_rtt_msecs, Gauge, The current measured sampleRTT aggregate.

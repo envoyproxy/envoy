@@ -23,7 +23,8 @@ UpstreamIpPortMatcher::UpstreamIpPortMatcher(
   }
 
   if (proto.has_upstream_ip()) {
-    cidr_ = Network::Address::CidrRange::create(proto.upstream_ip());
+    cidr_ = THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(proto.upstream_ip()),
+                                  Network::Address::CidrRange);
   }
   if (proto.has_upstream_port_range()) {
     port_ = proto.upstream_port_range();
@@ -60,10 +61,10 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
   if (port_) {
     const auto port = address_obj->address_->ip()->port();
     if (port >= port_->start() && port <= port_->end()) {
-      ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: true",
+      ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: [{}, {}] evaluated to: true",
                 port_->start(), port_->end());
     } else {
-      ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: false",
+      ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: [{}, {}] evaluated to: false",
                 port_->start(), port_->end());
       return false;
     }

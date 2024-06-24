@@ -27,6 +27,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(ThriftHealthCheckerFactory);
+
 } // namespace ThriftHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions

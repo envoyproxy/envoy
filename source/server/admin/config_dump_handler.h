@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/admin/v3/config_dump.pb.h"

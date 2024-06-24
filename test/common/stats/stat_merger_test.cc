@@ -309,15 +309,23 @@ protected:
   ThreadLocalStoreImpl store_{alloc_};
 };
 
-TEST_F(StatMergerThreadLocalTest, FilterOutUninitializedGauges) {
+TEST_F(StatMergerThreadLocalTest, DontFilterOutUninitializedGauges) {
   Gauge& g1 = store_.gaugeFromString("newgauge1", Gauge::ImportMode::Uninitialized);
   Gauge& g2 = store_.gaugeFromString("newgauge2", Gauge::ImportMode::Accumulate);
   std::vector<GaugeSharedPtr> gauges = store_.gauges();
-  ASSERT_EQ(1, gauges.size());
-  EXPECT_EQ(&g2, gauges[0].get());
+  ASSERT_EQ(2, gauges.size());
+  auto gauge1_it = std::find_if(gauges.begin(), gauges.end(), [](const GaugeSharedPtr& gauge) {
+    return gauge->name().compare("newgauge1") == 0;
+  });
+  ASSERT_TRUE(gauge1_it != gauges.end());
+  EXPECT_EQ(&g1, gauge1_it->get());
+  auto gauge2_it = std::find_if(gauges.begin(), gauges.end(), [](const GaugeSharedPtr& gauge) {
+    return gauge->name().compare("newgauge2") == 0;
+  });
+  ASSERT_TRUE(gauge2_it != gauges.end());
+  EXPECT_EQ(&g2, gauge2_it->get());
 
-  // We don't get "newgauge1" in the aggregated list, but we *do* get it if we try to
-  // find it by name.
+  // We get "newgauge1" in the aggregated list and if we try to find it by name.
   GaugeOptConstRef find = store_.rootScope()->findGauge(g1.statName());
   ASSERT_TRUE(find);
   EXPECT_EQ(&g1, &(find->get()));

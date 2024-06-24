@@ -18,44 +18,16 @@
 package http
 
 import (
-	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
 type passThroughFilter struct {
+	api.PassThroughStreamFilter
 	callbacks api.FilterCallbackHandler
 }
 
-func (f *passThroughFilter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *passThroughFilter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *passThroughFilter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
-	return api.Continue
-}
-
-func (f *passThroughFilter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *passThroughFilter) EncodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	return api.Continue
-}
-
-func (f *passThroughFilter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType {
-	return api.Continue
-}
-
-func (f *passThroughFilter) OnDestroy(reason api.DestroyReason) {
-}
-
-func PassThroughFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &passThroughFilter{
-			callbacks: callbacks,
-		}
+func PassThroughFactory(config interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
+	return &passThroughFilter{
+		callbacks: callbacks,
 	}
 }

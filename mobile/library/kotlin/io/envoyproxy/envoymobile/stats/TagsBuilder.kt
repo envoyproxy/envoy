@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile
 /*
  * Builder class used to construct `Tags` instances.
  */
-public class TagsBuilder {
+class TagsBuilder {
   protected val tags: MutableMap<String, String>
 
   /**
@@ -11,23 +11,22 @@ public class TagsBuilder {
    *
    * @param Tags: The Tags to start with.
    */
-  public constructor(tags: MutableMap<String, String>) {
+  constructor(tags: MutableMap<String, String>) {
     this.tags = tags
   }
 
-  public constructor() {
+  constructor() {
     this.tags = mutableMapOf<String, String>()
   }
 
   /**
    * Append a value to the Tag name.
    *
-   * @param name:  The Tag name.
+   * @param name: The Tag name.
    * @param value: The value associated to the Tag name.
-   *
    * @return TagsBuilder, This builder.
    */
-  public fun add(name: String, value: String): TagsBuilder {
+  fun add(name: String, value: String): TagsBuilder {
     tags.getOrPut(name) { value }
     return this
   }
@@ -37,10 +36,9 @@ public class TagsBuilder {
    *
    * @param name: The Tag name.
    * @param value: The value associated to the Tag name.
-   *
    * @return TagsBuilder, This builder.
    */
-  public fun set(name: String, value: String): TagsBuilder {
+  fun set(name: String, value: String): TagsBuilder {
     tags[name] = value
     return this
   }
@@ -49,10 +47,9 @@ public class TagsBuilder {
    * Remove all Tags with this name.
    *
    * @param name: The Tag name to remove.
-   *
    * @return TagsBuilder, This builder.
    */
-  public fun remove(name: String): TagsBuilder {
+  fun remove(name: String): TagsBuilder {
     tags.remove(name)
     return this
   }
@@ -61,10 +58,9 @@ public class TagsBuilder {
    * Adds all tags from map to this builder.
    *
    * @param tags: A map of tags.
-   *
    * @return TagsBuilder, This builder.
    */
-  public fun putAll(tags: Map<String, String>): TagsBuilder {
+  fun putAll(tags: Map<String, String>): TagsBuilder {
     this.tags.putAll(tags)
     return this
   }
@@ -74,7 +70,7 @@ public class TagsBuilder {
    *
    * @return Tags, New instance of Tags.
    */
-  public fun build(): Tags {
+  fun build(): Tags {
     return Tags(tags)
   }
 }

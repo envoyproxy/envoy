@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package test.extensions.filters.udp.udp_proxy.session_filters;
+
+message DrainerUdpSessionReadFilterConfig {
+  uint32 downstream_bytes_to_drain = 1;
+  bool stop_iteration_on_new_session = 2;
+  bool stop_iteration_on_first_read = 3;
+  bool continue_filter_chain = 4;
+}
+
+message DrainerUdpSessionWriteFilterConfig {
+  uint32 upstream_bytes_to_drain = 1;
+  bool stop_iteration_on_first_write = 2;
+}
+
+message DrainerUdpSessionFilterConfig {
+  uint32 downstream_bytes_to_drain = 1;
+  uint32 upstream_bytes_to_drain = 2;
+  bool stop_iteration_on_new_session = 3;
+  bool stop_iteration_on_first_read = 4;
+  bool continue_filter_chain = 5;
+  bool stop_iteration_on_first_write = 6;
+}

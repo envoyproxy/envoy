@@ -4,7 +4,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/grpc/codec.h"
@@ -36,7 +38,12 @@ public:
                            const Http::AsyncClient::StreamOptions& options) override;
   absl::string_view destination() override { return remote_cluster_name_; }
 
+  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() {
+    return retry_policy_;
+  }
+
 private:
+  const uint32_t max_recv_message_length_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
@@ -44,6 +51,8 @@ private:
   std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
   Router::HeaderParserPtr metadata_parser_;
+  // Default per service retry policy.
+  absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
 
   friend class AsyncRequestImpl;
   friend class AsyncStreamImpl;
@@ -59,8 +68,6 @@ public:
                   const Http::AsyncClient::StreamOptions& options);
 
   virtual void initialize(bool buffer_body_for_retry);
-
-  void sendMessage(const Protobuf::Message& request, bool end_stream);
 
   // Http::AsyncClient::StreamCallbacks
   void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
@@ -78,6 +85,10 @@ public:
   }
 
   bool hasResetStream() const { return http_reset_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
+
+protected:
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
 
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
@@ -87,11 +98,16 @@ private:
   void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
+  // Deliver notification and update span when the connection closes.
+  void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
+  Tracing::SpanPtr current_span_;
+
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};

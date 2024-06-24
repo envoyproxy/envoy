@@ -13,6 +13,7 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "dynamic_opentracing_driver_impl_test",
+    size = "large",
     srcs = [
         "dynamic_opentracing_driver_impl_test.cc",
     ],
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/dynamic_ot:dynamic_opentracing_driver_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/test_common:environment_lib",
     ],
@@ -34,6 +36,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "config_test",
+    size = "large",
     srcs = ["config_test.cc"],
     data = [
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",

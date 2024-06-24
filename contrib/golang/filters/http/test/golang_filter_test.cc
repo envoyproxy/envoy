@@ -18,7 +18,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -39,9 +38,6 @@ namespace {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
-  void onDestroy() override {
-    // do nothing
-  }
 };
 
 class GolangHttpFilterTest : public testing::Test {
@@ -76,7 +72,12 @@ public:
     EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
   }
 
-  ~GolangHttpFilterTest() override { filter_->onDestroy(); }
+  ~GolangHttpFilterTest() override {
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
+  }
 
   void setup(const std::string& lib_id, const std::string& lib_path,
              const std::string& plugin_name) {
@@ -84,13 +85,13 @@ public:
     library_id: %s
     library_path: %s
     plugin_name: %s
-    merge_policy: MERGE_VIRTUALHOST_ROUTER_FILTER
     plugin_config:
-      "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
       type_url: typexx
       value:
           key: value
           int: 10
+          invalid: "invalid"
     )EOF";
 
     auto yaml_string = absl::StrFormat(yaml_fmt, lib_id, lib_path, plugin_name);
@@ -98,9 +99,9 @@ public:
     TestUtility::loadFromYaml(yaml_string, proto_config);
 
     envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute per_route_proto_config;
-    setupDso();
-    setupConfig(proto_config, per_route_proto_config);
-    setupFilter(lib_id);
+    setupDso(lib_id, lib_path, plugin_name);
+    setupConfig(proto_config, per_route_proto_config, plugin_name);
+    setupFilter(plugin_name);
   }
 
   std::string genSoPath(std::string name) {
@@ -108,24 +109,30 @@ public:
         "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
   }
 
-  void setupDso() { Dso::DsoManager::load(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
+  void setupDso(std::string id, std::string path, std::string plugin_name) {
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(id, path, plugin_name);
+  }
 
   void setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-      envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config) {
+      envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config,
+      std::string plugin_name) {
     // Setup filter config for Golang filter.
     config_ = std::make_shared<FilterConfig>(
-        proto_config, Dso::DsoManager::getDsoByID(proto_config.library_id()));
+        proto_config, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), "",
+        context_);
+    config_->newGoPluginConfig();
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
   }
 
-  void setupFilter(const std::string& so_id) {
+  void setupFilter(const std::string& plugin_name) {
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
-    filter_ = std::make_unique<TestFilter>(config_, Dso::DsoManager::getDsoByID(so_id));
+    filter_ = std::make_unique<TestFilter>(
+        config_, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), 0);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -135,6 +142,7 @@ public:
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -152,6 +160,7 @@ public:
   Stats::TestUtil::TestStore stats_store_;
 
   const std::string PASSTHROUGH{"passthrough"};
+  const std::string ROUTECONFIG{"routeconfig"};
 };
 
 // request that is headers only.
@@ -168,8 +177,18 @@ TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
 TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   InSequence s;
   setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+  auto req = new HttpRequestInternal(*filter_);
 
-  EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar", HeaderSet));
+  EXPECT_EQ(CAPINotInGo, filter_->setHeader(req->decodingState(), "foo", "bar", HeaderSet));
+
+  delete req;
+}
+
+// invalid config for routeconfig filter
+TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
+  InSequence s;
+  EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(ROUTECONFIG), ROUTECONFIG), EnvoyException,
+                          "golang filter failed to parse plugin config");
 }
 
 } // namespace

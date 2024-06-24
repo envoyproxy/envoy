@@ -3,20 +3,27 @@
 #include "source/common/common/fmt.h"
 #include "source/common/filesystem/directory_iterator_impl.h"
 
+#include "absl/strings/strip.h"
+
 namespace Envoy {
 namespace Filesystem {
 
 DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
     : DirectoryIterator(), find_handle_(INVALID_HANDLE_VALUE) {
+  absl::string_view path = absl::StripSuffix(directory_path, "/");
+  path = absl::StripSuffix(path, "\\");
   WIN32_FIND_DATA find_data;
-  const std::string glob = directory_path + "\\*";
+  const std::string glob = absl::StrCat(path, "\\*");
   find_handle_ = ::FindFirstFile(glob.c_str(), &find_data);
   if (find_handle_ == INVALID_HANDLE_VALUE) {
-    throw EnvoyException(
-        fmt::format("unable to open directory {}: {}", directory_path, ::GetLastError()));
+    status_ =
+        absl::UnknownError(fmt::format("unable to open directory {}: {}", path, ::GetLastError()));
   }
-
-  entry_ = makeEntry(find_data);
+  if (status_.ok()) {
+    entry_ = makeEntry(find_data);
+  } else {
+    entry_ = {"", FileType::Other, absl::nullopt};
+  }
 }
 
 DirectoryIteratorImpl::~DirectoryIteratorImpl() {
@@ -29,12 +36,12 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
   WIN32_FIND_DATA find_data;
   const BOOL ret = ::FindNextFile(find_handle_, &find_data);
   const DWORD err = ::GetLastError();
-  if (ret == 0 && err != ERROR_NO_MORE_FILES) {
-    throw EnvoyException(fmt::format("unable to iterate directory: {}", err));
-  }
 
   if (ret == 0) {
     entry_ = {"", FileType::Other, absl::nullopt};
+    if (err != ERROR_NO_MORE_FILES) {
+      status_ = absl::UnknownError(fmt::format("unable to iterate directory: {}", err));
+    }
   } else {
     entry_ = makeEntry(find_data);
   }

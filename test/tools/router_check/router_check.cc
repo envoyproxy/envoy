@@ -23,8 +23,6 @@ bool hasFailures(
 
 int main(int argc, char* argv[]) {
   Envoy::Options options(argc, argv);
-  Envoy::ScopedInjectableLoader<Envoy::Regex::Engine> engine(
-      std::make_unique<Envoy::Regex::GoogleReEngine>());
 
   const bool enforce_coverage = options.failUnder() != 0.0;
   // We need this to ensure WSAStartup is called on Windows
@@ -42,6 +40,10 @@ int main(int argc, char* argv[]) {
 
     if (options.onlyShowFailures()) {
       checktool.setOnlyShowFailures();
+    }
+
+    if (options.detailedCoverageReport()) {
+      checktool.setDetailedCoverageReport();
     }
 
     const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =

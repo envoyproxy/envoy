@@ -68,6 +68,7 @@ public:
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString CacheStatus{"cache-status"};
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString ConnectAcceptEncoding{"connect-accept-encoding"};
@@ -141,6 +142,7 @@ public:
 
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
+  const LowerCaseString CapsuleProtocol{"capsule-protocol"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
@@ -168,12 +170,14 @@ public:
   // filter. We need to figure out if we can remove this header from the set of headers that
   // participate in prefix overrides.
   const LowerCaseString EnvoyIpTags{absl::StrCat(prefix(), "-ip-tags")};
+  const LowerCaseString EnvoyLocalOverloaded{absl::StrCat(prefix(), "-local-overloaded")};
   const LowerCaseString EnvoyMaxRetries{absl::StrCat(prefix(), "-max-retries")};
   const LowerCaseString EnvoyNotForwarded{absl::StrCat(prefix(), "-not-forwarded")};
   const LowerCaseString EnvoyOriginalDstHost{absl::StrCat(prefix(), "-original-dst-host")};
   const LowerCaseString EnvoyOriginalMethod{absl::StrCat(prefix(), "-original-method")};
   const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
   const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
+  const LowerCaseString EnvoyDropOverload{absl::StrCat(prefix(), "-drop-overload")};
   const LowerCaseString EnvoyRateLimited{absl::StrCat(prefix(), "-ratelimited")};
   const LowerCaseString EnvoyRetryOn{absl::StrCat(prefix(), "-retry-on")};
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
@@ -245,6 +249,7 @@ public:
   struct {
     const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
+    const std::string ConnectUdp{"connect-udp"};
   } UpgradeValues;
 
   struct {
@@ -262,6 +267,7 @@ public:
     const std::string Json{"application/json"};
     const std::string Protobuf{"application/x-protobuf"};
     const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
+    const std::string Thrift{"application/x-thrift"};
   } ContentTypeValues;
 
   struct {
@@ -275,6 +281,10 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyOverloadedValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyDropOverloadValues;
 
   struct {
     const std::string True{"true"};

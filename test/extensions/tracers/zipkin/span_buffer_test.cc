@@ -34,10 +34,10 @@ enum class IpType { V4, V6 };
 
 Endpoint createEndpoint(const IpType ip_type) {
   Endpoint endpoint;
-  endpoint.setAddress(ip_type == IpType::V6
-                          ? Envoy::Network::Utility::parseInternetAddress(
-                                "2001:db8:85a3::8a2e:370:4444", 7334, true)
-                          : Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false));
+  endpoint.setAddress(ip_type == IpType::V6 ? Envoy::Network::Utility::parseInternetAddressNoThrow(
+                                                  "2001:db8:85a3::8a2e:370:4444", 7334, true)
+                                            : Envoy::Network::Utility::parseInternetAddressNoThrow(
+                                                  "1.2.3.4", 8080, false));
   endpoint.setServiceName("service1");
   return endpoint;
 }
@@ -138,7 +138,7 @@ template <typename Type> std::string serializedMessageToJson(const std::string& 
   Type message;
   message.ParseFromString(serialized);
   std::string json;
-  Protobuf::util::MessageToJsonString(message, &json);
+  Protobuf::util::MessageToJsonString(message, &json).IgnoreError();
   return json;
 }
 
@@ -327,7 +327,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   EXPECT_EQ(withDefaultTimestampAndDuration("{"
                                             R"("spans":[{)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"CLIENT",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -346,7 +350,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                 "{"
                 R"("spans":[{)"
                 R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                R"("id":"AAAAAAAAAAE=",)"
+#else
                 R"("id":"AQAAAAAAAAA=",)"
+#endif
                 R"("kind":"CLIENT",)"
                 R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                 R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -365,7 +373,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   EXPECT_EQ(withDefaultTimestampAndDuration("{"
                                             R"("spans":[{)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"CLIENT",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -377,7 +389,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                                             R"("response_size":"DEFAULT_TEST_DURATION"}},)"
                                             R"({)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"SERVER",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -396,7 +412,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   EXPECT_EQ(withDefaultTimestampAndDuration("{"
                                             R"("spans":[{)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"CLIENT",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -408,7 +428,11 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                                             R"("response_size":"DEFAULT_TEST_DURATION"}},)"
                                             R"({)"
                                             R"("traceId":"AAAAAAAAAAE=",)"
+#ifdef ABSL_IS_BIG_ENDIAN
+                                            R"("id":"AAAAAAAAAAE=",)"
+#else
                                             R"("id":"AQAAAAAAAAA=",)"
+#endif
                                             R"("kind":"SERVER",)"
                                             R"("timestamp":"ANNOTATION_TEST_TIMESTAMP",)"
                                             R"("duration":"DEFAULT_TEST_DURATION",)"
@@ -428,7 +452,7 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   (*objectWithScientificNotationFields)["timestamp"] = ValueUtil::numberValue(
       DEFAULT_TEST_TIMESTAMP); // the value of DEFAULT_TEST_TIMESTAMP is 1584324295476870.
   const auto objectWithScientificNotationJson =
-      MessageUtil::getJsonStringFromMessageOrDie(objectWithScientificNotation, false, true);
+      MessageUtil::getJsonStringFromMessageOrError(objectWithScientificNotation, false, true);
   // Since we use ValueUtil::numberValue to set the timestamp, we expect to
   // see the value is rendered with scientific notation (1.58432429547687e+15).
   EXPECT_EQ(R"({"timestamp":1.58432429547687e+15})", objectWithScientificNotationJson);
@@ -438,8 +462,8 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   Util::Replacements replacements;
   (*objectFields)["timestamp"] =
       Util::uint64Value(DEFAULT_TEST_TIMESTAMP, "timestamp", replacements);
-  const auto objectJson = MessageUtil::getJsonStringFromMessageOrDie(object, false, true);
-  // We still have "1584324295476870" from MessageUtil::getJsonStringFromMessageOrDie here.
+  const auto objectJson = MessageUtil::getJsonStringFromMessageOrError(object, false, true);
+  // We still have "1584324295476870" from MessageUtil::getJsonStringFromMessageOrError here.
   EXPECT_EQ(R"({"timestamp":"1584324295476870"})", objectJson);
   // However, then the replacement correctly replaces "1584324295476870" with 1584324295476870
   // (without quotes).

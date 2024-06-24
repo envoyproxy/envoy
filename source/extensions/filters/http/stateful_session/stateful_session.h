@@ -26,22 +26,25 @@ using PerRouteProtoConfig =
 class StatefulSessionConfig {
 public:
   StatefulSessionConfig(const ProtoConfig& config,
-                        Server::Configuration::CommonFactoryContext& context);
+                        Server::Configuration::GenericFactoryContext& context);
 
   Http::SessionStatePtr createSessionState(const Http::RequestHeaderMap& headers) const {
     ASSERT(factory_ != nullptr);
     return factory_->create(headers);
   }
 
+  bool isStrict() const { return strict_; }
+
 private:
   Http::SessionStateFactorySharedPtr factory_;
+  bool strict_{false};
 };
 using StatefulSessionConfigSharedPtr = std::shared_ptr<StatefulSessionConfig>;
 
 class PerRouteStatefulSession : public Router::RouteSpecificFilterConfig {
 public:
   PerRouteStatefulSession(const PerRouteProtoConfig& config,
-                          Server::Configuration::CommonFactoryContext& context);
+                          Server::Configuration::GenericFactoryContext& context);
 
   bool disabled() const { return disabled_; }
   StatefulSessionConfig* statefuleSessionConfig() const { return config_.get(); }

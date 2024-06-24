@@ -22,6 +22,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )

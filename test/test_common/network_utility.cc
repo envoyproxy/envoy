@@ -15,8 +15,6 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/runtime/runtime_impl.h"
 
-#include "test/test_common/utility.h"
-
 namespace Envoy {
 namespace Network {
 namespace Test {
@@ -62,7 +60,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Socket::Type type) {
-  auto instance = Utility::parseInternetAddressAndPort(addr_port);
+  auto instance = Utility::parseInternetAddressAndPortNoThrow(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
   } else {
@@ -73,37 +71,37 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
 
 std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("[::1]");
+    return {"[::1]"};
   }
-  return std::string("127.0.0.1");
+  return {"127.0.0.1"};
 }
 
 std::string getLoopbackAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("::1");
+    return {"::1"};
   }
-  return std::string("127.0.0.1");
+  return {"127.0.0.1"};
 }
 
 std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("[::]");
+    return {"[::]"};
   }
-  return std::string("0.0.0.0");
+  return {"0.0.0.0"};
 }
 
 std::string getAnyAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return std::string("::");
+    return {"::"};
   }
-  return std::string("0.0.0.0");
+  return {"0.0.0.0"};
 }
 
 std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
-    return std::string("v4");
+    return {"v4"};
   }
-  return std::string("v6");
+  return {"v6"};
 }
 
 Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion version) {
@@ -208,9 +206,9 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override {
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
     Network::UdpRecvData datagram{
-        {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+        {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time, tos};
     data_.push_back(std::move(datagram));
   }
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
@@ -228,8 +226,13 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
                                        std::list<UdpRecvData>& data,
                                        uint64_t max_rx_datagram_size) {
   SyncPacketProcessor processor(data, max_rx_datagram_size);
+  UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;
+  if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
+    recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
+  }
   return Network::Utility::readFromSocket(handle, local_address, processor,
-                                          MonotonicTime(std::chrono::seconds(0)), false, nullptr);
+                                          MonotonicTime(std::chrono::seconds(0)), recv_msg_method,
+                                          nullptr, nullptr);
 }
 
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)

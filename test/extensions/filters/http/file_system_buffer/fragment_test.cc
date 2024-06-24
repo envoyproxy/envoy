@@ -19,7 +19,6 @@ using Extensions::Common::AsyncFiles::CancelFunction;
 using Extensions::Common::AsyncFiles::MockAsyncFileContext;
 using Extensions::Common::AsyncFiles::MockAsyncFileHandle;
 using StatusHelpers::HasStatusMessage;
-using StatusHelpers::IsOk;
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::HasSubstr;

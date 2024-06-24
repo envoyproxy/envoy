@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -124,6 +124,10 @@ generate_x509_cert upstreamlocalhost upstreamca
 # Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
 generate_rsa_key expired_
 generate_x509_cert expired_ ca -365
+
+# Generate cert has keyUsage extension that is incompatible with the TLS usage
+generate_rsa_key bad_rsa_key_usage
+generate_x509_cert bad_rsa_key_usage ca
 
 rm ./*.csr
 rm ./*.srl

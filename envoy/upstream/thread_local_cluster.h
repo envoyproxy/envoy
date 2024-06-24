@@ -151,6 +151,16 @@ public:
   virtual Tcp::AsyncTcpClientPtr
   tcpAsyncClient(LoadBalancerContext* context,
                  Tcp::AsyncTcpClientOptionsConstSharedPtr options) PURE;
+
+  /**
+   * @return the thread local cluster drop_overload configuration.
+   */
+  virtual UnitFloat dropOverload() const PURE;
+
+  /**
+   * Set up the drop_overload value for the thread local cluster.
+   */
+  virtual void setDropOverload(UnitFloat drop_overload) PURE;
 };
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;

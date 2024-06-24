@@ -37,6 +37,7 @@
 #include "source/common/rds/route_config_provider_manager.h"
 #include "source/common/rds/route_config_update_receiver_impl.h"
 #include "source/common/rds/static_route_config_provider_impl.h"
+#include "source/common/router/route_provider_manager.h"
 #include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
@@ -47,48 +48,6 @@ namespace Router {
 
 // For friend class declaration in RdsRouteConfigSubscription.
 class ScopedRdsConfigSubscription;
-
-/**
- * Route configuration provider utilities.
- */
-class RouteConfigProviderUtil {
-public:
-  /**
-   * @return RouteConfigProviderSharedPtr a new route configuration provider based on the supplied
-   * proto configuration. Notes the provider object could be shared among multiple listeners.
-   */
-  static RouteConfigProviderSharedPtr create(
-      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-          config,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-      const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager);
-};
-
-/**
- * Implementation of RouteConfigProvider that holds a static route configuration.
- */
-class StaticRouteConfigProviderImpl : public RouteConfigProvider {
-public:
-  StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
-                                Rds::ConfigTraits& config_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                Rds::RouteConfigProviderManager& route_config_provider_manager);
-  ~StaticRouteConfigProviderImpl() override;
-
-  // Router::RouteConfigProvider
-  Rds::ConfigConstSharedPtr config() const override { return base_.config(); }
-  const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
-  SystemTime lastUpdated() const override { return base_.lastUpdated(); }
-  void onConfigUpdate() override { base_.onConfigUpdate(); }
-  ConfigConstSharedPtr configCast() const override;
-  void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
-
-private:
-  Rds::StaticRouteConfigProviderImpl base_;
-  Rds::RouteConfigProviderManager& route_config_provider_manager_;
-};
 
 /**
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
@@ -113,11 +72,12 @@ public:
                               std::unique_ptr<Cleanup>& resume_rds);
 
 private:
-  void beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
-                            std::unique_ptr<Cleanup>& resume_rds) override;
+  absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
+                                    std::unique_ptr<Cleanup>& resume_rds) override;
   void afterProviderUpdate() override;
 
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()> callback) {
     return update_callback_manager_.add(callback);
   }
 
@@ -154,7 +114,7 @@ public:
   const absl::optional<ConfigInfo>& configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
 
-  void onConfigUpdate() override;
+  absl::Status onConfigUpdate() override;
   ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
@@ -173,38 +133,17 @@ private:
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
-using ProtoTraitsImpl =
-    Rds::Common::ProtoTraitsImpl<envoy::config::route::v3::RouteConfiguration, 1>;
-
-class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
-                                       public Singleton::Instance {
+class RdsFactoryImpl : public RdsFactory {
 public:
-  RouteConfigProviderManagerImpl(OptRef<Server::Admin> admin);
-
-  std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
-  dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const {
-    return manager_.dumpRouteConfigs(name_matcher);
-  }
-
-  // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
+  std::string name() const override { return "envoy.rds_factory.default"; }
+  virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      const OptionalHttpFilters& optional_http_filters,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      Init::Manager& init_manager) override;
-
-  RouteConfigProviderPtr
-  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
-                                  const OptionalHttpFilters& optional_http_filters,
-                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                  ProtobufMessage::ValidationVisitor& validator) override;
-
-private:
-  ProtoTraitsImpl proto_traits_;
-  Rds::RouteConfigProviderManager manager_;
+      Init::Manager& init_manager, ProtoTraitsImpl& proto_traits,
+      Rds::RouteConfigProviderManager& manager) override;
 };
 
-using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;
+DECLARE_FACTORY(RdsFactoryImpl);
 
 } // namespace Router
 } // namespace Envoy

@@ -81,6 +81,7 @@ class ModifyRequestHeadersAction {
 public:
   virtual ~ModifyRequestHeadersAction() = default;
   virtual void modifyRequestHeaders(::Envoy::Http::RequestHeaderMap& request_headers,
+                                    const ::Envoy::Http::ResponseHeaderMap& response_headers,
                                     Envoy::StreamInfo::StreamInfo& stream_info,
                                     const RedirectPolicy&) PURE;
 };

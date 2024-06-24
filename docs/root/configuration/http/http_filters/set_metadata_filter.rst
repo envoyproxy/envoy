@@ -8,13 +8,14 @@ Set Metadata
 
 This filters adds or updates dynamic metadata with static data.
 
-Dynamic metadata values are updated with the following scheme. If a key
-does not exists, it's just copied into the current metadata. If the key exists
-but has a different type, it is replaced by the new value. Otherwise:
+Dynamic metadata values are updated with the following rules. If a key does not exist, it is copied into the current metadata. If the key exists, then following rules will be used:
 
- * for scalar values (null, string, number, boolean) are replaced with the new value
- * for lists: new values are added to the current list
- * for structures: recursively apply this scheme
+* if :ref:`typed metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.typed_value>` is used, it will overwrite existing values iff :ref:`allow_overwrite <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.allow_overwrite>` is set to true, otherwise nothing is done.
+* if :ref:`untyped metadata value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Metadata.value>` is used and ``allow_overwrite`` is set to true, or if deprecated :ref:`value <envoy_v3_api_field_extensions.filters.http.set_metadata.v3.Config.value>` field is used, the values are updated with the following scheme:
+  - existing value with different type: the existing value is replaced.
+  - scalar values (null, string, number, boolean): the existing value is replaced.
+  - lists: new values are appended to the current list.
+  - structures: recursively apply this scheme.
 
 For instance, if the namespace already contains this structure:
 
@@ -50,4 +51,12 @@ After applying this filter, the namespace will contain:
 Statistics
 ----------
 
-Currently, this filter generates no statistics.
+The ``set_metadata`` filter outputs statistics in the ``http.<stat_prefix>.set_metadata.`` namespace. The :ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
+owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  overwrite_denied, Counter, Total number of denied attempts to overwrite an existing metadata value

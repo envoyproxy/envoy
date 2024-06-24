@@ -6,7 +6,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.validate.h"
 
-#include "source/common/config/xds_source_id.h"
+#include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -81,7 +81,7 @@ protected:
     EXPECT_EQ(expected_resources.size(), retrieved_resources.size());
     for (size_t i = 0; i < expected_resources.size(); ++i) {
       Resource unpacked_resource;
-      MessageUtil::unpackTo(retrieved_resources[i].resource(), unpacked_resource);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(retrieved_resources[i].resource(), unpacked_resource));
       TestUtility::protoEqual(expected_resources[i].get().resource(), unpacked_resource);
     }
   }

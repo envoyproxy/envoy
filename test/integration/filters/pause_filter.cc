@@ -66,8 +66,8 @@ class TestPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpF
 public:
   TestPauseFilterConfig() : EmptyHttpFilterConfig("pause-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // ABSL_GUARDED_BY insists the lock be held when the guarded variables are passed by
       // reference.

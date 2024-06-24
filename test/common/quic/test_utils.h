@@ -1,15 +1,18 @@
 #pragma once
 
 #include "envoy/common/optref.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -49,7 +52,7 @@ public:
             &writer, /*owns_writer=*/false, supported_versions,
             createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
                                          "example.com", "h3-29"),
-            generator) {}
+            generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -58,7 +61,27 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(quic::MessageStatus, SendMessage,
+              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+};
+
+class MockEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
+public:
+  MockEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
+                                quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter* writer, bool owns_writer,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Event::Dispatcher& dispatcher,
+                                Network::ConnectionSocketPtr&& connection_socket,
+                                quic::ConnectionIdGeneratorInterface& generator)
+      : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
+                                  supported_versions, dispatcher, std::move(connection_socket),
+                                  generator, /*prefer_gro=*/true) {}
+
+  MOCK_METHOD(quic::MessageStatus, SendMessage,
+              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
@@ -80,7 +103,8 @@ public:
             *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
-                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+                StreamInfo::FilterState::LifeSpan::Connection)),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -119,6 +143,9 @@ public:
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    return quic::HttpDatagramSupport::kRfc;
+  }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
     return initialized_ ? connection() : nullptr;
@@ -139,6 +166,7 @@ public:
                                      proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
+  quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
@@ -177,8 +205,8 @@ public:
                                quic::QuicServerId("example.com", 443, false),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
-                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
+                               dispatcher, send_buffer_limit, crypto_stream_factory,
+                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr, {}) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
@@ -208,6 +236,9 @@ public:
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
+    return quic::HttpDatagramSupport::kRfc;
+  }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
     return initialized_ ? connection() : nullptr;
@@ -243,7 +274,8 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
 std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
-  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
+  auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
+                                                            quic::HuffmanEncoding::kEnabled);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.
@@ -291,6 +323,46 @@ public:
   MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
               extraValidationContext, (), (const));
 };
+
+class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
+public:
+  MockQuicConnectionDebugVisitor(quic::QuicSession* session,
+                                 const StreamInfo::StreamInfo& stream_info)
+      : session_(session), stream_info_(stream_info) {}
+
+  MOCK_METHOD(void, OnConnectionClosed,
+              (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
+  MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
+
+  quic::QuicSession* session_;
+  const StreamInfo::StreamInfo& stream_info_;
+};
+
+class TestEnvoyQuicConnectionDebugVisitorFactory
+    : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
+public:
+  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
+
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<::test::common::config::DummyConfig>();
+  }
+  std::unique_ptr<quic::QuicConnectionDebugVisitor>
+  createQuicConnectionDebugVisitor(quic::QuicSession* session,
+                                   const StreamInfo::StreamInfo& stream_info) override {
+    auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session, stream_info);
+    mock_debug_visitor_ = debug_visitor.get();
+    return debug_visitor;
+  }
+
+  Envoy::ProcessContextOptRef processContext() const { return context_; }
+
+  MockQuicConnectionDebugVisitor* mock_debug_visitor_;
+};
+
+DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory);
+
+REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory,
+                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface);
 
 } // namespace Quic
 } // namespace Envoy

@@ -18,7 +18,9 @@ namespace Envoy {
 
 class TestStreamInfo : public StreamInfo::StreamInfoImpl {
 public:
-  TestStreamInfo(TimeSource& time_source) : StreamInfoImpl(time_source, nullptr) {
+  TestStreamInfo(TimeSource& time_source)
+      : StreamInfoImpl(time_source, nullptr,
+                       Envoy::StreamInfo::FilterState::LifeSpan::FilterChain) {
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
@@ -41,6 +43,10 @@ public:
   }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
+
+  absl::optional<std::chrono::nanoseconds> currentDuration() const override {
+    return duration(end_time_);
+  }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);

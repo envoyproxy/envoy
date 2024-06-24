@@ -1,8 +1,8 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_mobile_package()
 
 envoy_cc_library(
     name = "provisional_dispatcher_lib",
@@ -11,7 +11,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     repository = "@envoy",
     deps = [
-        "//library/common/thread:lock_guard_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/event:deferred_deletable",
         "@envoy//envoy/event:dispatcher_interface",

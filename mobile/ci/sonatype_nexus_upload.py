@@ -21,7 +21,6 @@ BASE64_ENCODED_CREDENTIALS = base64.b64encode("{}:{}".format(_USER_CREDS,
 
 _ARTIFACT_HOST_URL = "https://oss.sonatype.org/service/local/staging"
 _GROUP_ID = "io.envoyproxy.envoymobile"
-_ARTIFACT_ID = "envoy"
 _LOCAL_INSTALL_PATH = os.path.expanduser(
     "~/.m2/repository/{directory}/envoy".format(directory=_GROUP_ID.replace(".", "/")))
 
@@ -52,7 +51,7 @@ def _resolve_name(file):
             return "", extension
 
 
-def _install_locally(version, files):
+def _install_locally(artifact_id, version, files):
     path = "{}/{}".format(_LOCAL_INSTALL_PATH, version)
 
     if os.path.exists(path):
@@ -63,7 +62,7 @@ def _install_locally(version, files):
     for file in files:
         suffix, file_extension = _resolve_name(file)
         basename = "{name}-{version}{suffix}.{extension}".format(
-            name=_ARTIFACT_ID, version=version, suffix=suffix, extension=file_extension)
+            name=artifact_id, version=version, suffix=suffix, extension=file_extension)
 
         shutil.copyfile(file, os.path.join(path, basename))
         print("{file_name}\n{sha}\n".format(file_name=file, sha=_sha256(file)))
@@ -116,7 +115,7 @@ def _create_staging_repository(profile_id):
         raise e
 
 
-def _upload_files(staging_id, version, files, ascs, sha256):
+def _upload_files(staging_id, artifact_id, version, files, ascs, sha256):
     uploaded_file_count = 0
 
     # aggregate all the files for uploading
@@ -126,11 +125,11 @@ def _upload_files(staging_id, version, files, ascs, sha256):
         print("Uploading file {}".format(file))
         suffix, file_extension = _resolve_name(file)
         basename = "{name}-{version}{suffix}.{extension}".format(
-            name=_ARTIFACT_ID, version=version, suffix=suffix, extension=file_extension)
+            name=artifact_id, version=version, suffix=suffix, extension=file_extension)
 
         artifact_url = os.path.join(
             _ARTIFACT_HOST_URL, "deployByRepositoryId/{}".format(staging_id),
-            _GROUP_ID.replace('.', "/"), _ARTIFACT_ID, version, basename)
+            _GROUP_ID.replace('.', "/"), artifact_id, version, basename)
 
         try:
             with open(file, "rb") as f:
@@ -234,6 +233,12 @@ def _build_parser():
                         https://oss.sonatype.org//nexus/service/local/staging/profile_repositories
                         """)
     parser.add_argument(
+        "--artifact_id",
+        required=True,
+        help="""
+                        The artifact ID to be published.
+                        """)
+    parser.add_argument(
         "--version",
         default="LOCAL-SNAPSHOT",
         help="""
@@ -285,7 +290,7 @@ if __name__ == "__main__":
 
     version = args.version
     if args.local:
-        _install_locally(version, args.files)
+        _install_locally(args.artifact_id, version, args.files)
     else:
         staging_id = ""
 
@@ -301,7 +306,7 @@ if __name__ == "__main__":
             print("Uploading files...")
             sha256_files = _create_sha256_files(args.files)
             uploaded_file_count = _upload_files(
-                staging_id, version, args.files, args.signed_files, sha256_files)
+                staging_id, args.artifact_id, version, args.files, args.signed_files, sha256_files)
             if uploaded_file_count > 0:
                 print("Uploading files complete!")
                 print("Closing staging repository...")

@@ -16,7 +16,7 @@ class RateLimitQuotaFilterFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig,
           envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride>,
-      public Logger::Loggable<Logger::Id::filter> {
+      public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitQuotaFilterFactory() : FactoryBase(std::string(FilterName)) {}
 

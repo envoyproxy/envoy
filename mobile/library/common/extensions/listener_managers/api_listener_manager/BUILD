@@ -22,5 +22,6 @@ envoy_cc_extension(
         "@envoy//envoy/server:listener_manager_interface",
         "@envoy//source/server:api_listener_lib",
         "@envoy//source/server:listener_manager_factory_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

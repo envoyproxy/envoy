@@ -3,7 +3,7 @@ package io.envoyproxy.envoymobile.utilities;
 import static org.junit.Assert.assertEquals;
 
 import android.content.Context;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.nio.charset.StandardCharsets;
@@ -23,9 +23,11 @@ import org.robolectric.RobolectricTestRunner;
 @RunWith(RobolectricTestRunner.class)
 public final class CertificateVerificationTest {
   static {
-    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.loadTestLibrary();
     Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-    AndroidJniLibrary.load(context.getApplicationContext());
+    if (ContextUtils.getApplicationContext() == null) {
+      ContextUtils.initApplicationContext(context.getApplicationContext());
+    }
   }
 
   private static final byte[] host =

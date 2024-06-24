@@ -45,12 +45,15 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/tap:tap_config_impl",
         "//test/extensions/common/tap:common",
         "//test/mocks:common_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_extension_cc_test(
     name = "tap_filter_integration_test",
+    size = "large",
     srcs = envoy_select_admin_functionality(["tap_filter_integration_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     deps = [

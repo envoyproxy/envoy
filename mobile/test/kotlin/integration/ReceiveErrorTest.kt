@@ -1,6 +1,7 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -8,6 +9,7 @@ import io.envoyproxy.envoymobile.FilterHeadersStatus
 import io.envoyproxy.envoymobile.FilterTrailersStatus
 import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
@@ -16,14 +18,16 @@ import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-private const val filterName = "error_validation_filter"
+private const val LOCAL_ERROR_FILTER_TYPE =
+  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+private const val FILTER_NAME = "error_validation_filter"
 
+@RunWith(RobolectricTestRunner::class)
 class ReceiveErrorTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -63,6 +67,7 @@ class ReceiveErrorTest {
     override fun onError(error: EnvoyError, finalStreamIntel: FinalStreamIntel) {
       receivedError.countDown()
     }
+
     override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 
     override fun onCancel(finalStreamIntel: FinalStreamIntel) {
@@ -72,25 +77,29 @@ class ReceiveErrorTest {
 
   @Test
   fun `errors on stream call onError callback`() {
-    val requestHeader = GRPCRequestHeadersBuilder(
-      scheme = "https",
-      authority = "doesnotexist.example.com",
-      path = "/test"
-    ).build()
+    val requestHeader =
+      GRPCRequestHeadersBuilder(
+          scheme = "https",
+          authority = "doesnotexist.example.com",
+          path = "/test"
+        )
+        .build()
 
-    val engine = EngineBuilder(Standard())
-      .addPlatformFilter(
-        name = filterName,
-        factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
-      )
-      .setOnEngineRunning {}
-      .addNativeFilter("envoy.filters.http.platform_bridge", "{'@type': $pbfType, platform_filter_name: $filterName}")
-      .addNativeFilter("envoy.filters.http.local_error", "{'@type': $localErrorFilterType}")
-      .build()
+    val engine =
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .addPlatformFilter(
+          name = FILTER_NAME,
+          factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
+        )
+        .addNativeFilter("envoy.filters.http.local_error", "[$LOCAL_ERROR_FILTER_TYPE]{}")
+        .build()
 
     var errorCode: Int? = null
 
-    engine.streamClient()
+    engine
+      .streamClient()
       .newStreamPrototype()
       .setOnResponseHeaders { _, _, _ -> fail("Headers received instead of expected error") }
       .setOnResponseData { _, _, _ -> fail("Data received instead of expected error") }
@@ -100,9 +109,7 @@ class ReceiveErrorTest {
         errorCode = error.errorCode
         callbackReceivedError.countDown()
       }
-      .setOnCancel { _ ->
-        fail("Unexpected call to onCancel response callback")
-      }
+      .setOnCancel { _ -> fail("Unexpected call to onCancel response callback") }
       .start()
       .sendHeaders(requestHeader, true)
 
@@ -111,16 +118,16 @@ class ReceiveErrorTest {
     callbackReceivedError.await(10, TimeUnit.SECONDS)
     engine.terminate()
 
-    assertThat(filterReceivedError.count)
-      .withFailMessage("Missing call to onError filter callback")
+    assertWithMessage("Missing call to onError filter callback")
+      .that(filterReceivedError.count)
       .isEqualTo(0)
 
-    assertThat(filterNotCancelled.count)
-      .withFailMessage("Unexpected call to onCancel filter callback")
+    assertWithMessage("Unexpected call to onCancel filter callback")
+      .that(filterNotCancelled.count)
       .isEqualTo(1)
 
-    assertThat(callbackReceivedError.count)
-      .withFailMessage("Missing call to onError response callback")
+    assertWithMessage("Missing call to onError response callback")
+      .that(callbackReceivedError.count)
       .isEqualTo(0)
 
     assertThat(errorCode).isEqualTo(2) // 503/Connection Failure

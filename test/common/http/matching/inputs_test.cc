@@ -6,7 +6,9 @@
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/matching/network/common/inputs.h"
 
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -23,10 +25,11 @@ std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
 }
 
 StreamInfo::StreamInfoImpl createStreamInfo() {
-  CONSTRUCT_ON_FIRST_USE(StreamInfo::StreamInfoImpl,
-                         StreamInfo::StreamInfoImpl(Http::Protocol::Http2,
-                                                    Event::GlobalTimeSystem().timeSystem(),
-                                                    connectionInfoProvider()));
+  CONSTRUCT_ON_FIRST_USE(
+      StreamInfo::StreamInfoImpl,
+      StreamInfo::StreamInfoImpl(Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(),
+                                 connectionInfoProvider(),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain));
 }
 
 TEST(MatchingData, HttpRequestHeadersDataInput) {
@@ -37,7 +40,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
     data.onRequestHeaders(request_headers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "bar");
   }
 
   {
@@ -46,7 +49,7 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -58,7 +61,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     TestRequestTrailerMapImpl request_trailers({{"header", "bar"}});
     data.onRequestTrailers(request_trailers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "bar");
   }
 
   {
@@ -67,7 +70,7 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -82,7 +85,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     data.onResponseHeaders(response_headers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "bar");
   }
 
   {
@@ -91,7 +94,7 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -106,7 +109,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     TestResponseTrailerMapImpl response_trailers({{"header", "bar"}});
     data.onResponseTrailers(response_trailers);
 
-    EXPECT_EQ(input.get(data).data_, "bar");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "bar");
   }
 
   {
@@ -115,7 +118,7 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 }
 
@@ -130,7 +133,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -138,7 +141,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     TestRequestHeaderMapImpl request_headers({{":path", "/test?user%20name=foo%20bar"}});
     data.onRequestHeaders(request_headers);
 
-    EXPECT_EQ(input.get(data).data_, "foo bar");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "foo bar");
   }
 
   {
@@ -146,7 +149,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
     TestRequestHeaderMapImpl request_headers({{":path", "/test?username=fooA&username=fooB"}});
     data.onRequestHeaders(request_headers);
 
-    EXPECT_EQ(input.get(data).data_, "fooA");
+    EXPECT_EQ(absl::get<std::string>(input.get(data).data_), "fooA");
   }
 
   {
@@ -158,7 +161,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
   }
 
   {
@@ -170,7 +173,44 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.data_, absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+}
+
+TEST(MatchingData, FilterStateInput) {
+  StreamInfo::StreamInfoImpl stream_info(createStreamInfo());
+  HttpMatchingDataImpl data(stream_info);
+
+  {
+    Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+
+  stream_info.filterState()->setData(
+      "unknown_key", std::make_shared<Router::StringAccessorImpl>("some_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+
+  stream_info.filterState()->setData(
+      "filter_state_key", std::make_shared<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    Network::Matching::FilterStateInput<HttpMatchingData> input("filter_state_key");
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "filter_state_value");
   }
 }
 

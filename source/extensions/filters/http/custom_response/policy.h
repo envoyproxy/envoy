@@ -19,10 +19,9 @@ namespace CustomResponse {
 class CustomResponseFilter;
 
 // Base class for custom response policies.
-class Policy : public std::enable_shared_from_this<Policy>, public StreamInfo::FilterState::Object {
+class Policy : public std::enable_shared_from_this<Policy> {
 public:
-  ~Policy() override = default;
-
+  virtual ~Policy() = default;
   virtual Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
                                                   CustomResponseFilter&) const PURE;
 
@@ -31,6 +30,17 @@ protected:
 };
 
 using PolicySharedPtr = std::shared_ptr<const Policy>;
+
+struct CustomResponseFilterState : public std::enable_shared_from_this<CustomResponseFilterState>,
+                                   public StreamInfo::FilterState::Object {
+
+  CustomResponseFilterState(PolicySharedPtr a_policy, absl::optional<::Envoy::Http::Code> code)
+      : policy(a_policy), original_response_code(code) {}
+
+  PolicySharedPtr policy;
+  absl::optional<::Envoy::Http::Code> original_response_code;
+  static constexpr absl::string_view kFilterStateName = "envoy.filters.http.custom_response";
+};
 
 struct CustomResponseMatchAction : public Matcher::ActionBase<ProtobufWkt::Any> {
   explicit CustomResponseMatchAction(PolicySharedPtr policy) : policy_(policy) {}

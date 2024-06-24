@@ -11,14 +11,15 @@ ProfilingHandler::ProfilingHandler(const std::string& profile_path) : profile_pa
 Http::Code ProfilingHandler::handlerCpuProfiler(Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
-  Http::Utility::QueryParams query_params = admin_stream.queryParams();
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
+  Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
+  const auto enableVal = query_params.getFirstValue("enable");
+  if (query_params.data().size() != 1 || !enableVal.has_value() ||
+      (enableVal.value() != "y" && enableVal.value() != "n")) {
     response.add("?enable=<y|n>\n");
     return Http::Code::BadRequest;
   }
 
-  bool enable = query_params.begin()->second == "y";
+  bool enable = enableVal.value() == "y";
   if (enable && !Profiler::Cpu::profilerEnabled()) {
     if (!Profiler::Cpu::startProfiler(profile_path_)) {
       response.add("failure to start the profiler");
@@ -41,15 +42,16 @@ Http::Code ProfilingHandler::handlerHeapProfiler(Http::ResponseHeaderMap&,
     return Http::Code::NotImplemented;
   }
 
-  Http::Utility::QueryParams query_params = admin_stream.queryParams();
-  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
-      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
+  Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
+  const auto enableVal = query_params.getFirstValue("enable");
+  if (query_params.data().size() != 1 || !enableVal.has_value() ||
+      (enableVal.value() != "y" && enableVal.value() != "n")) {
     response.add("?enable=<y|n>\n");
     return Http::Code::BadRequest;
   }
 
   Http::Code res = Http::Code::OK;
-  bool enable = query_params.begin()->second == "y";
+  bool enable = enableVal.value() == "y";
   if (enable) {
     if (Profiler::Heap::isProfilerStarted()) {
       response.add("Fail to start heap profiler: already started");

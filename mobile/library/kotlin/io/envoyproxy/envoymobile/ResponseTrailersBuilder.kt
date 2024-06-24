@@ -1,12 +1,8 @@
 package io.envoyproxy.envoymobile
 
-/**
- * Builder used for constructing instances of `ResponseTrailers`.
- */
+/** Builder used for constructing instances of `ResponseTrailers`. */
 class ResponseTrailersBuilder : HeadersBuilder {
-  /**
-   * Initialize a new instance of the builder.
-   */
+  /** Initialize a new instance of the builder. */
   constructor() : super(HeadersContainer(mapOf()))
 
   /**
@@ -15,8 +11,9 @@ class ResponseTrailersBuilder : HeadersBuilder {
    *
    * @param trailers: The trailers to start with.
    */
-  internal constructor(trailers: MutableMap<String, MutableList<String>>)
-    : super(HeadersContainer(trailers))
+  internal constructor(
+    trailers: MutableMap<String, MutableList<String>>
+  ) : super(HeadersContainer(trailers))
 
   internal constructor(container: HeadersContainer) : super(container)
 
