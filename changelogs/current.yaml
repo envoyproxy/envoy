@@ -240,6 +240,9 @@ removed_config_or_runtime:
 - area: jwt
   change: |
     Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
+- area: outlier detection
+  change: |
+    Removed ``envoy.reloadable_features.check_mep_on_first_eject`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` runtime flag and legacy code paths.
@@ -335,6 +338,10 @@ new_features:
     to listen to file changes and dynamically update the response when :ref:`watched_directory
     <envoy_v3_api_field_config.core.v3.datasource.watched_directory>`
     is configured in :ref:`DataSource <envoy_v3_api_msg_config.core.v3.datasource>`.
+- area: outlier detection
+  change: |
+    Added :ref:`always_eject_one_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.always_eject_one_host>`
+    to optionally override the :ref:`max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`.
 - area: listener
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
