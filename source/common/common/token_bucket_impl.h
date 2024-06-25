@@ -61,9 +61,9 @@ public:
   uint64_t consume(uint64_t tokens, bool allow_partial, double factor = 1.0);
 
 private:
-  const double max_tokens_{};
-  const double fill_rate_{};
-  std::atomic<double> last_time_in_second_{};
+  const double max_tokens_;
+  const double fill_rate_;
+  std::atomic<MonotonicTime> time_in_nanoseconds_{};
   TimeSource& time_source_;
 };
 
