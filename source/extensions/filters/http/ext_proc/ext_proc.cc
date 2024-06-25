@@ -354,6 +354,7 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
+    // TODO(tyxia) Switch to address of stream
     stream_ = config_->threadLocalStreamManager().store(decoder_callbacks_->streamId(),
                                                         std::move(stream_object), config_->stats());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
