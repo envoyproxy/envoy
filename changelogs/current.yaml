@@ -94,6 +94,11 @@ minor_behavior_changes:
     This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.consistent_header_validation`` to false.
 - area: quic
   change: |
+    Cache source/destination address instances in a LUR cache for packet read to improve performance.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read`` to false.
+- area: quic
+  change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
 - area: config
   change: |
