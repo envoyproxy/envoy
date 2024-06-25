@@ -168,7 +168,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    *
    * @param timeout The stream idle timeout, in seconds.
    */
-  public NativeCronvoyEngineBuilderImpl setStreamIdleTimeoutSeconds(int timeout) {
+  public NativeCronvoyEngineBuilderImpl setPerTryIdleTimeoutSeconds(int timeout) {
     mPerTryIdleTimeoutSeconds = timeout;
     return this;
   }
