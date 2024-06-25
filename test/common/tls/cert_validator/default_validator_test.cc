@@ -47,6 +47,11 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// All OtherName SAN tests below are matched against an expected OID
+// and an expected SAN value
+
+// Test to check if the cert has an OtherName SAN
+// of UTF8String type with value containing "example.com"
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -61,6 +66,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameMatched) {
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a Boolean type value "true"
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBooleanTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -75,6 +82,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBooleanTypeMatche
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an Enumerated type value "5"
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameEnumeratedTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -89,6 +98,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameEnumeratedTypeMat
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an Integer type value "5464".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIntegerTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -103,6 +114,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIntegerTypeMatche
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an Object type value "1.3.6.1.4.1.311.20.2.3".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameObjectTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -117,6 +130,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameObjectTypeMatched
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN with a NULL type.
+// NULL value is matched against an empty string since matcher is required.
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameNullTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -131,6 +146,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameNullTypeMatched) 
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a BitString type value "01010101".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBitStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -145,6 +162,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBitStringTypeMatc
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an OctetString type value "48656C6C6F20576F726C64".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameOctetStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -159,6 +178,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameOctetStringTypeMa
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a PrintableString type value "PrintableStringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNamePrintableStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -173,6 +194,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNamePrintableStringTy
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a T61String type value "T61StringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameT61StringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -187,6 +210,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameT61StringTypeMatc
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a IA5String type value "IA5StringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIA5StringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -201,6 +226,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIA5StringTypeMatc
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a GeneralStringExample type value "GeneralStringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -215,6 +242,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralStringType
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an UniversalStringExample type value "UniversalStringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUniversalStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -229,6 +258,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUniversalStringTy
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an UTCTime type value "230616120000Z".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUtcTimeTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -243,6 +274,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUtcTimeTypeMatche
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a GeneralizedTime type value "20230616120000Z".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralizedTimeTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -257,6 +290,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralizedTimeTy
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a VisibleString type value "VisibleStringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameVisibleStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -271,6 +306,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameVisibleStringType
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with an UTF8 String type value "UTF8StringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -285,6 +322,9 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMat
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN with a SET type
+// containing select values "test1" and "test2".
+// SET is a non-primitive type containing multiple values and is DER-encoded.
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSetTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -299,6 +339,9 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSetTypeMatched) {
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN with a SEQUENCE type
+// containing select values "test3" and "test4".
+// SEQUENCE is a non-primitive type containing multiple values and is DER-encoded.
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSequenceTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
