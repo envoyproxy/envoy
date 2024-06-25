@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
 
 namespace Envoy {
@@ -307,6 +308,61 @@ public:
 
 DECLARE_FACTORY(FilterStateInputFactory);
 DECLARE_FACTORY(HttpFilterStateInputFactory);
+
+template <class MatchingDataType>
+class DynamicMetadataInput : public Matcher::DataInput<MatchingDataType> {
+public:
+  DynamicMetadataInput(
+      const envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput&
+          inputConfig)
+      : filter_(inputConfig.filter()) {
+    for (const auto& seg : inputConfig.path()) {
+      path_.push_back(seg.key());
+    }
+  }
+
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& value_at_path =
+        Envoy::Config::Metadata::metadataValue(&data.metadata(), filter_, path_);
+    auto str = value_at_path.string_value();
+    if (!str.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, str};
+    } else {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  }
+
+private:
+  const std::string filter_;
+  const std::string metadata_key_;
+  std::vector<std::string> path_;
+};
+
+template <class MatchingDataType>
+class DynamicMetadataInputBaseFactory : public Matcher::DataInputFactory<MatchingDataType> {
+public:
+  std::string name() const override { return "envoy.matching.inputs.dynamic_metadata"; }
+
+  Matcher::DataInputFactoryCb<MatchingDataType>
+  createDataInputFactoryCb(const Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput&>(
+        message, validation_visitor);
+
+    return [input = typed_config] {
+      return std::make_unique<DynamicMetadataInput<MatchingDataType>>(input);
+    };
+  };
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput>();
+  }
+};
+
+DECLARE_FACTORY(HttpDymanicMetadataInputFactory);
 
 } // namespace Matching
 } // namespace Network
