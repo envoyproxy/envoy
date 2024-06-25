@@ -13,11 +13,17 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "contrib/golang/filters/http/source/golang_filter.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
+class GolangWebsocketIntegrationTest : public WebsocketIntegrationTest {
+public:
+  void cleanup() { Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, GolangWebsocketIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
@@ -51,7 +57,7 @@ typed_config:
   return absl::StrFormat(yaml_fmt, name, genSoPath(name), name);
 }
 
-TEST_P(WebsocketIntegrationTest, WebsocketGolangFilterChain) {
+TEST_P(GolangWebsocketIntegrationTest, WebsocketGolangFilterChain) {
   if (downstreamProtocol() != Http::CodecType::HTTP1 ||
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
@@ -108,6 +114,8 @@ TEST_P(WebsocketIntegrationTest, WebsocketGolangFilterChain) {
   ASSERT_TRUE(absl::StrContains(tcp_client->data(), "Bye_bar foo"));
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  cleanup();
 }
 
 } // namespace Envoy

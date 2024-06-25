@@ -40,7 +40,6 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailFormatString = ";path=/;Max-Age={};secure";
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
@@ -174,11 +173,7 @@ std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_vi
 std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
                        absl::string_view expires, absl::string_view token = "",
                        absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hmac_base64_encoding_only")) {
-    return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
-  } else {
-    return encodeHmacHexBase64(secret, host, expires, token, id_token, refresh_token);
-  }
+  return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
 }
 
 } // namespace
@@ -547,6 +542,7 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
   refresh_token_ = refresh_token;
   expires_in_ = std::to_string(expires_in.count());
   expires_refresh_token_in_ = getExpiresTimeForRefreshToken(refresh_token, expires_in);
+  expires_id_token_in_ = getExpiresTimeForIdToken(id_token, expires_in);
 
   const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
@@ -572,24 +568,50 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
   if (config_->useRefreshToken()) {
     ::google::jwt_verify::Jwt jwt;
     if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
-      const std::chrono::seconds expirationFromJwt = std::chrono::seconds{jwt.exp_};
+      const std::chrono::seconds expiration_from_jwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
               .time_since_epoch();
 
-      if (now < expirationFromJwt) {
-        const auto expiration_epoch = expirationFromJwt - now;
+      if (now < expiration_from_jwt) {
+        const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_LOG(debug, "An expiration time in the refresh token is less of the current time");
+        ENVOY_LOG(debug, "The expiration time in the refresh token is less than the current time");
         return "0";
       }
     }
-    ENVOY_LOG(debug, "The refresh token is not JWT or exp claim is ommited. The lifetime of the "
-                     "refresh token is taken from filter configuration");
+    ENVOY_LOG(debug, "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
+                     "refresh token will be taken from filter configuration");
     const std::chrono::seconds default_refresh_token_expires_in =
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
+  }
+  return std::to_string(expires_in.count());
+}
+
+std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
+                                                   const std::chrono::seconds& expires_in) const {
+  if (!id_token.empty()) {
+    ::google::jwt_verify::Jwt jwt;
+    if (jwt.parseFromString(id_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
+      const std::chrono::seconds expiration_from_jwt = std::chrono::seconds{jwt.exp_};
+      const std::chrono::seconds now =
+          std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
+              .time_since_epoch();
+
+      if (now < expiration_from_jwt) {
+        const auto expiration_epoch = expiration_from_jwt - now;
+        return std::to_string(expiration_epoch.count());
+      } else {
+        ENVOY_LOG(debug, "The expiration time in the id token is less than the current time");
+        return "0";
+      }
+    }
+    ENVOY_LOG(debug, "The id token is not a JWT or exp claim is omitted, even though it is "
+                     "required by the OpenID Connect 1.0 specification. "
+                     "The lifetime of the id token will be aligned with the access token");
+    return std::to_string(expires_in.count());
   }
   return std::to_string(expires_in.count());
 }
@@ -674,17 +696,9 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
-  std::string max_age;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.oauth_use_standard_max_age_value")) {
-    max_age = expires_in_;
-  } else {
-    max_age = new_expires_;
-  }
-
   // We use HTTP Only cookies.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
-  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
+  const std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(
@@ -697,23 +711,21 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    std::string cookie_attribute_httponly =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_make_token_cookie_httponly")
-            ? cookie_tail_http_only
-            : cookie_tail;
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_attribute_httponly));
+        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
+
     if (!id_token_.empty()) {
+      const std::string id_token_cookie_tail_http_only =
+          fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
       headers.addReferenceKey(
           Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_attribute_httponly));
+          absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
     }
 
     if (!refresh_token_.empty()) {
       const std::string refresh_token_cookie_tail_http_only =
           fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
-
       headers.addReferenceKey(Http::Headers::get().SetCookie,
                               absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
                                            refresh_token_cookie_tail_http_only));

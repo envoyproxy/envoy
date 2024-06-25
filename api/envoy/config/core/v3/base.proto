@@ -303,6 +303,59 @@ message RuntimeFeatureFlag {
   string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
+message KeyValue {
+  // The key of the key/value pair.
+  string key = 1 [(validate.rules).string = {min_len: 1 max_bytes: 16384}];
+
+  // The value of the key/value pair.
+  bytes value = 2;
+}
+
+// Key/value pair plus option to control append behavior. This is used to specify
+// key/value pairs that should be appended to a set of existing key/value pairs.
+message KeyValueAppend {
+  // Describes the supported actions types for key/value pair append action.
+  enum KeyValueAppendAction {
+    // If the key already exists, this action will result in the following behavior:
+    //
+    // - Comma-concatenated value if multiple values are not allowed.
+    // - New value added to the list of values if multiple values are allowed.
+    //
+    // If the key doesn't exist then this will add pair with specified key and value.
+    APPEND_IF_EXISTS_OR_ADD = 0;
+
+    // This action will add the key/value pair if it doesn't already exist. If the
+    // key already exists then this will be a no-op.
+    ADD_IF_ABSENT = 1;
+
+    // This action will overwrite the specified value by discarding any existing
+    // values if the key already exists. If the key doesn't exist then this will add
+    // the pair with specified key and value.
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing
+    // values if the key already exists. If the key doesn't exist then this will
+    // be no-op.
+    OVERWRITE_IF_EXISTS = 3;
+  }
+
+  // Key/value pair entry that this option to append or overwrite.
+  KeyValue entry = 1 [(validate.rules).message = {required: true}];
+
+  // Describes the action taken to append/overwrite the given value for an existing
+  // key or to only add this key if it's absent.
+  KeyValueAppendAction action = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Key/value pair to append or remove.
+message KeyValueMutation {
+  // Key/value pair to append or overwrite. Only one of ``append`` or ``remove`` can be set.
+  KeyValueAppend append = 1;
+
+  // Key to remove. Only one of ``append`` or ``remove`` can be set.
+  string remove = 2 [(validate.rules).string = {max_bytes: 16384}];
+}
+
 // Query parameter name/value pair.
 message QueryParameter {
   // The key of the query parameter. Case sensitive.

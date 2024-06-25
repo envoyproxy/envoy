@@ -282,7 +282,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
     if (!host.has_value() || !host.value()->address()) {
-      onDnsResolutionFail();
+      onDnsResolutionFail((host.has_value() && *host) ? ((*host)->details()) : "no_host");
       return Http::FilterHeadersStatus::StopIteration;
     }
     addHostAddressToFilterState(host.value()->address());
@@ -387,7 +387,7 @@ void ProxyFilter::onClusterInitTimeout() {
                                      absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);
 }
 
-void ProxyFilter::onDnsResolutionFail() {
+void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
   if (isProxying()) {
     decoder_callbacks_->continueDecoding();
     return;
@@ -395,9 +395,14 @@ void ProxyFilter::onDnsResolutionFail() {
 
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
-                                     ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                     absl::nullopt, RcDetails::get().DnsResolutionFailure);
+  std::string details_str = "";
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_details")) {
+    details_str = StringUtil::replaceAllEmptySpace(details);
+    ASSERT(details_str != "not_resolved");
+  }
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::ServiceUnavailable, ResponseStrings::get().DnsResolutionFailure, nullptr,
+      absl::nullopt, absl::StrCat(RcDetails::get().DnsResolutionFailure, "{", details_str, "}"));
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
@@ -409,7 +414,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   circuit_breaker_.reset();
 
   if (!host_info->address()) {
-    onDnsResolutionFail();
+    onDnsResolutionFail(host_info->details());
     return;
   }
   addHostAddressToFilterState(host_info->address());

@@ -370,15 +370,6 @@ struct httpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
 };
 
-class GoStringFilterState : public StreamInfo::FilterState::Object {
-public:
-  GoStringFilterState(absl::string_view value) : value_(value) {}
-  const std::string& value() const { return value_; }
-
-private:
-  const std::string value_;
-};
-
 } // namespace Golang
 } // namespace HttpFilters
 } // namespace Extensions
