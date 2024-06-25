@@ -482,7 +482,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   bool should_eject = (ejected_percent <= max_ejection_percent);
-  if (config_.mayAlwaysEjectOne()) {
+  if (config_.alwaysEjectOneHost()) {
     should_eject = (ejections_active_helper_.value() == 0) || should_eject;
   }
   if (should_eject) {
