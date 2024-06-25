@@ -379,6 +379,10 @@ new_features:
     The RBAC filter will now log the enforced rule to the dynamic metadata field
     "enforced_effective_policy_id" and the result to the dynamic metadata field
     "enforced_engine_result". These are only populated if a non-shadow engine exists.
+- area: rbac
+  change: |
+    Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
+    the configured duration.
 
 deprecated:
 - area: tracing

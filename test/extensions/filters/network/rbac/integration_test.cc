@@ -133,6 +133,32 @@ typed_config:
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
 }
 
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDenied) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+  delay_deny: 1s
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  std::string buff(16 * 1024 * 1024, 'a');
+  // Write 16MB of data in 500ms. This should complete if the RBAC filter does not pause the read.
+  ASSERT_TRUE(tcp_client->partialWrite(buff, false, std::chrono::milliseconds(500)));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {
   useListenerAccessLog("%CONNECTION_TERMINATION_DETAILS%");
   initializeFilter(R"EOF(

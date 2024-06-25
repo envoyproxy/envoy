@@ -174,6 +174,46 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
   return AssertionSuccess();
 }
 
+AssertionResult IntegrationTcpClient::partialWrite(const std::string& data, bool end_stream,
+                                                   std::chrono::milliseconds timeout) {
+  Buffer::OwnedImpl buffer(data);
+  EXPECT_CALL(*client_write_buffer_, move(_));
+  if (!data.empty()) {
+    EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AtLeast(1));
+  }
+
+  uint64_t bytes_expected = client_write_buffer_->bytesDrained() + data.size();
+
+  connection_->write(buffer, end_stream);
+  bool timed_out = false;
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this, &timed_out]() -> void {
+        timed_out = true;
+        ENVOY_LOG_MISC(debug, "timed_out {}", timed_out);
+        connection_->dispatcher().exit();
+      });
+  timeout_timer.get()->enableTimer(timeout);
+  do {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+    if (client_write_buffer_->bytesDrained() == bytes_expected || disconnected_ || timed_out) {
+      break;
+    }
+  } while (!timed_out);
+
+  if (!timed_out) {
+    if (disconnected_) {
+      return AssertionFailure() << "Early partial write: unexpected disconnect";
+    } else {
+      return AssertionFailure() << "Unknown early partial write."
+                                << " bytes_drained: " << client_write_buffer_->bytesDrained()
+                                << " bytes_expected: " << bytes_expected;
+    }
+  }
+  // Expected timeout.
+  ENVOY_LOG_MISC(debug, "bytes drained {}", client_write_buffer_->bytesDrained());
+  return AssertionSuccess();
+}
+
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;

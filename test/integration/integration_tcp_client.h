@@ -45,6 +45,13 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult
   write(const std::string& data, bool end_stream = false, bool verify = true,
         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  // Write the data and expect the data is not completely on the wire within timeout.
+  // The typical case is the read side is blocked.
+  // Return failure if the write completes early.
+  ABSL_MUST_USE_RESULT AssertionResult partialWrite(const std::string& data, bool end_stream,
+                                                    std::chrono::milliseconds timeout);
+
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
