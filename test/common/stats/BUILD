@@ -124,6 +124,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:global_lib",
     ],
 )
@@ -165,6 +166,7 @@ envoy_cc_test(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:symbol_table_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
@@ -351,6 +353,7 @@ envoy_cc_test(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:server_factory_context_mocks",
