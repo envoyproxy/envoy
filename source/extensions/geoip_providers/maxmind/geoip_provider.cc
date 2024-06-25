@@ -328,6 +328,9 @@ MaxmindDbSharedPtr GeoipProvider::getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mut
 
 void GeoipProvider::updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(&mmdb_mutex_);
+  if (city_db_) {
+    MMDB_close(city_db_.get());
+  }
   city_db_ = city_db;
 }
 
@@ -338,6 +341,9 @@ MaxmindDbSharedPtr GeoipProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mute
 
 void GeoipProvider::updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(&mmdb_mutex_);
+  if (isp_db_) {
+    MMDB_close(isp_db_.get());
+  }
   isp_db_ = isp_db;
 }
 
@@ -348,6 +354,9 @@ MaxmindDbSharedPtr GeoipProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mut
 
 void GeoipProvider::updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
   absl::MutexLock lock(&mmdb_mutex_);
+  if (anon_db_) {
+    MMDB_close(anon_db_.get());
+  }
   anon_db_ = anon_db;
 }
 
