@@ -63,10 +63,10 @@ envoy_cc_test(
         "config_test.cc",
     ],
     deps = [
-        "//source/extensions/filters/network/generic_proxy/router:config",
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy:config",
+        "//source/extensions/filters/network/generic_proxy/router:config",
         "//source/extensions/tracers/zipkin:config",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
@@ -90,7 +90,6 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
-        "//source/extensions/filters/network/generic_proxy/router:config",
         ":fake_codec_lib",
         "//envoy/event:timer_interface",
         "//source/common/buffer:buffer_lib",
@@ -99,6 +98,7 @@ envoy_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/generic_proxy:config",
         "//source/extensions/filters/network/generic_proxy:proxy_lib",
+        "//source/extensions/filters/network/generic_proxy/router:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",

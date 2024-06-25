@@ -1,6 +1,6 @@
-#include <memory>
-
 #include "test/extensions/filters/network/generic_proxy/fake_codec.h"
+
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {

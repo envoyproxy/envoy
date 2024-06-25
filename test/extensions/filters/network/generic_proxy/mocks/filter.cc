@@ -1,8 +1,8 @@
+#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
+
 #include <cstdint>
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 
 using testing::_;
 using testing::Invoke;

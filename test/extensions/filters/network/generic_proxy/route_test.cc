@@ -4,14 +4,14 @@
 #include "source/extensions/filters/network/generic_proxy/match.h"
 #include "source/extensions/filters/network/generic_proxy/route_impl.h"
 
+#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
+#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
+#include "test/extensions/filters/network/generic_proxy/mocks/route.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
-#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
-#include "test/extensions/filters/network/generic_proxy/mocks/route.h"
 #include "gtest/gtest.h"
 
 using testing::Invoke;

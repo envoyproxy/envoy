@@ -2,9 +2,9 @@
 
 #include "source/extensions/filters/network/generic_proxy/match.h"
 
+#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "test/mocks/server/factory_context.h"
 
-#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;

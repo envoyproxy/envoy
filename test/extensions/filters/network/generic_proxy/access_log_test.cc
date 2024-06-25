@@ -1,8 +1,8 @@
 #include "source/extensions/filters/network/generic_proxy/access_log.h"
 
+#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "test/mocks/stream_info/mocks.h"
 
-#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

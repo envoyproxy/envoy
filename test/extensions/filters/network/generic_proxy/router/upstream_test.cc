@@ -3,14 +3,14 @@
 #include "source/common/tracing/common_values.h"
 #include "source/extensions/filters/network/generic_proxy/router/router.h"
 
-#include "test/mocks/server/factory_context.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/utility.h"
-
 #include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/route.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -1,8 +1,8 @@
 #include "source/extensions/filters/network/generic_proxy/router/config.h"
 
+#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/mocks/server/factory_context.h"
 
-#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
