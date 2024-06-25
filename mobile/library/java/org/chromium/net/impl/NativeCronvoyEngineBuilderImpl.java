@@ -161,7 +161,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    * Set the per-try stream idle timeout, in seconds, which is defined as the period in which
    * there are no active requests. When the idle timeout is reached, the connection is closed.
    * This setting is the same as the stream idle timeout, except it's applied per-retry attempt.
-   * See https://github.com/envoyproxy/envoy/blob/f15ec821d6a70a1d132f53f50970595efd1b84ee/api/envoy/config/route/v3/route_components.proto#L1570.
+   * See
+   * https://github.com/envoyproxy/envoy/blob/f15ec821d6a70a1d132f53f50970595efd1b84ee/api/envoy/config/route/v3/route_components.proto#L1570.
    *
    * The default is 15s.
    *
