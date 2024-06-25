@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/http/codes.h"
+#include "envoy/router/string_accessor.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
@@ -18,6 +19,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/context.h"
 
 #include "eval/public/cel_value.h"
@@ -1054,13 +1056,13 @@ CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view
 
   if (isThreadSafe()) {
     streamInfo().filterState()->setData(
-        key, std::make_shared<GoStringFilterState>(value),
+        key, std::make_shared<Router::StringAccessorImpl>(value),
         static_cast<StreamInfo::FilterState::StateType>(state_type),
         static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
         static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
   } else {
     auto key_str = std::string(key);
-    auto filter_state = std::make_shared<GoStringFilterState>(value);
+    auto filter_state = std::make_shared<Router::StringAccessorImpl>(value);
     auto weak_ptr = weak_from_this();
     getDispatcher().post(
         [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
@@ -1087,9 +1089,9 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, uint64_t* value_d
   }
 
   if (isThreadSafe()) {
-    auto go_filter_state = streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key);
+    auto go_filter_state = streamInfo().filterState()->getDataReadOnly<Router::StringAccessor>(key);
     if (go_filter_state) {
-      req_->strValue = go_filter_state->value();
+      req_->strValue = go_filter_state->asString();
       *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
       *value_len = req_->strValue.length();
     }
@@ -1099,9 +1101,9 @@ CAPIStatus Filter::getStringFilterState(absl::string_view key, uint64_t* value_d
     getDispatcher().post([this, weak_ptr, key_str, value_data, value_len] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         auto go_filter_state =
-            streamInfo().filterState()->getDataReadOnly<GoStringFilterState>(key_str);
+            streamInfo().filterState()->getDataReadOnly<Router::StringAccessor>(key_str);
         if (go_filter_state) {
-          req_->strValue = go_filter_state->value();
+          req_->strValue = go_filter_state->asString();
           *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
           *value_len = req_->strValue.length();
         }
