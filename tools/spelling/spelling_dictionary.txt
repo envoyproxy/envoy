@@ -696,6 +696,8 @@ deleter
 delim
 denylist
 deque
+dep
+deps
 deprecations
 dereference
 dereferences
