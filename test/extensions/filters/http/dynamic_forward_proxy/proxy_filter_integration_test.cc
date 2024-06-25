@@ -981,6 +981,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
+#if defined(ENVOY_ENABLE_QUIC)
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
   upstream_cert_name_ = ""; // Force standard TLS
   dns_hostname_ = "sni.lyft.com";
@@ -1011,6 +1012,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
+#endif
 
 TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_
