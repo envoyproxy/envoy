@@ -98,7 +98,7 @@ private:
   static datadog::tracing::TracerConfig
   makeConfig(const std::shared_ptr<datadog::tracing::Collector>& collector) {
     datadog::tracing::TracerConfig config;
-    config.defaults.service = "testsvc";
+    config.service = "testsvc";
     config.collector = collector;
     config.logger = std::make_shared<NullLogger>();
     // Drop all spans. Equivalently, we could keep all spans.

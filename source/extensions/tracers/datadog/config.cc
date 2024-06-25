@@ -22,13 +22,17 @@ DatadogTracerFactory::DatadogTracerFactory() : FactoryBase("envoy.tracers.datado
 datadog::tracing::TracerConfig
 DatadogTracerFactory::makeConfig(const envoy::config::trace::v3::DatadogConfig& proto_config) {
   datadog::tracing::TracerConfig config;
-  config.defaults.version = "envoy " + Envoy::VersionInfo::version();
-  config.defaults.name = "envoy.proxy";
+  config.version = "envoy " + Envoy::VersionInfo::version();
+  config.name = "envoy.proxy";
   if (proto_config.service_name().empty()) {
-    config.defaults.service = "envoy";
+    config.service = "envoy";
   } else {
-    config.defaults.service = proto_config.service_name();
+    config.service = proto_config.service_name();
   }
+
+  config.integration_name = "envoy";
+  config.integration_version = Envoy::VersionInfo::version();
+
   return config;
 }
 
