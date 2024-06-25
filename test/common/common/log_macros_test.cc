@@ -440,11 +440,28 @@ TEST(FineGrainLog, Iteration) {
   FINE_GRAIN_LOG(info, "Info: iteration test begins.");
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
   std::string output = getFineGrainLogContext().listFineGrainLoggers();
-  EXPECT_THAT(output, HasSubstr("  " __FILE__ ": 2"));
+  EXPECT_THAT(output, HasSubstr("  " __FILE__ ": info"));
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
 
   FINE_GRAIN_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
   FINE_GRAIN_LOG(warn, getFineGrainLogContext().listFineGrainLoggers());
+}
+
+TEST(FineGrainLog, ListIteration) {
+  FINE_GRAIN_LOG(info, "Info: iteration test begins.");
+  const absl::flat_hash_map<spdlog::level::level_enum, std::string> log_level_strings = {
+      {spdlog::level::trace, "trace"}, {spdlog::level::debug, "debug"},
+      {spdlog::level::info, "info"},   {spdlog::level::warn, "warn"},
+      {spdlog::level::err, "error"},   {spdlog::level::critical, "critical"},
+      {spdlog::level::off, "off"},
+  };
+
+  std::string output;
+  for (const auto& [level, level_str] : log_level_strings) {
+    getFineGrainLogContext().setAllFineGrainLoggers(level);
+    output = getFineGrainLogContext().listFineGrainLoggers();
+    EXPECT_THAT(output, HasSubstr("  " __FILE__ ": " + level_str));
+  }
 }
 
 TEST(FineGrainLog, Context) {
