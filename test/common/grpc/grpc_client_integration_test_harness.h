@@ -330,6 +330,10 @@ public:
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr, nullptr);
+    if (connection_buffer_limits_ != 0) {
+      client_connection_->setBufferLimits(connection_buffer_limits_);
+    }
+
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
@@ -533,6 +537,8 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
+  // Connection buffer limits, 0 means default limit from config is used.
+  uint32_t connection_buffer_limits_{0};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.
