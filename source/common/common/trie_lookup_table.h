@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "source/common/common/assert.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -51,6 +53,7 @@ template <class Value> class TrieLookupTable {
    * @param char_key the one-byte key of the branch to be followed.
    */
   int32_t getChildIndex(int32_t current, uint8_t char_key) const {
+    ASSERT(current >= 0 && static_cast<size_t>(current) < nodes_.size());
     const TrieNode& node = nodes_[current];
     if (node.min_child_key_ > char_key || node.min_child_key_ + node.children_.size() <= char_key) {
       return NoNode;
@@ -69,6 +72,8 @@ template <class Value> class TrieLookupTable {
    * @param child_index the index of the node the branch will lead to.
    */
   void setChildIndex(int32_t current, uint8_t char_key, int32_t child_index) {
+    ASSERT(current >= 0 && static_cast<size_t>(current) < nodes_.size());
+    ASSERT(child_index >= 0 && static_cast<size_t>(child_index) < nodes_.size());
     TrieNode& node = nodes_[current];
     if (node.children_.empty()) {
       node.children_.reserve(1);
