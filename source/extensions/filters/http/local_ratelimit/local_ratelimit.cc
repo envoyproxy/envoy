@@ -23,7 +23,8 @@ const std::string& PerConnectionRateLimiter::key() {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+    Upstream::ClusterManager& cm, Singleton::Manager& singleton_manager, Stats::Scope& scope,
     Runtime::Loader& runtime, const bool per_route)
     : dispatcher_(dispatcher), status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
@@ -37,9 +38,6 @@ FilterConfig::FilterConfig(
           config.has_always_consume_default_token_bucket()
               ? config.always_consume_default_token_bucket().value()
               : true),
-      rate_limiter_(new Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
-          always_consume_default_token_bucket_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
@@ -74,6 +72,31 @@ FilterConfig::FilterConfig(
   if (per_route && !config.has_token_bucket()) {
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
+
+  Filters::Common::LocalRateLimit::ShareProviderSharedPtr share_provider;
+  if (config.has_local_cluster_rate_limit()) {
+    if (rate_limit_per_connection_) {
+      throw EnvoyException("local_cluster_rate_limit is set and "
+                           "local_rate_limit_per_downstream_connection is set to true");
+    }
+    if (!cm.localClusterName().has_value()) {
+      throw EnvoyException("local_cluster_rate_limit is set but no local cluster name is present");
+    }
+
+    // If the local cluster name is set then the relevant cluster must exist or the cluster
+    // manager will fail to initialize.
+    share_provider_manager_ = Filters::Common::LocalRateLimit::ShareProviderManager::singleton(
+        dispatcher, cm, singleton_manager);
+    if (!share_provider_manager_) {
+      throw EnvoyException("local_cluster_rate_limit is set but no local cluster is present");
+    }
+
+    share_provider = share_provider_manager_->getShareProvider(config.local_cluster_rate_limit());
+  }
+
+  rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
+      always_consume_default_token_bucket_, std::move(share_provider));
 }
 
 bool FilterConfig::requestAllowed(

@@ -85,7 +85,9 @@ public:
     TestEnvironment::writeStringToFileForTest("file_direct_updated.txt", "dummy-updated");
     TestEnvironment::renameFile(TestEnvironment::temporaryPath("file_direct_updated.txt"),
                                 TestEnvironment::temporaryPath("file_direct.txt"));
-
+    // This is needed to avoid a race between file rename, and the file being reloaded by data
+    // source provider.
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder_updated = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
         {":method", "POST"},

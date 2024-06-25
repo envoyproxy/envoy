@@ -123,6 +123,7 @@ private:
     // onDNSServiceGetAddrInfoReply callback.
     struct PendingResponse {
       ResolutionStatus status_ = ResolutionStatus::Success;
+      std::string details_ = "not_set";
       // `v4_response_received_` and `v6_response_received_` denote whether a callback from the
       // `DNSServiceGetAddrInfo` call has been received for the IPv4 address family and IPv6
       // address family, respectively. If the query protocol is set to kDNSServiceProtocol_IPv4 or

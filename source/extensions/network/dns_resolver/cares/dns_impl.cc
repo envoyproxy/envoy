@@ -210,6 +210,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
   if (status == ARES_SUCCESS) {
     pending_response_.status_ = ResolutionStatus::Success;
+    pending_response_.details_ = "cares_success";
 
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       bool can_process_v4 =
@@ -258,7 +259,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success to populate back the
     // "empty records" response.
     pending_response_.status_ = ResolutionStatus::Success;
+    pending_response_.details_ = "cares_norecords";
     ASSERT(addrinfo == nullptr);
+  } else {
+    pending_response_.details_ = "cares_failure";
   }
 
   if (timeouts > 0) {
@@ -305,7 +309,8 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
     // exception in fuzz tests.
     TRY_NEEDS_AUDIT {
-      callback_(pending_response_.status_, std::move(pending_response_.address_list_));
+      callback_(pending_response_.status_, std::move(pending_response_.details_),
+                std::move(pending_response_.address_list_));
     }
     END_TRY
     MULTI_CATCH(
