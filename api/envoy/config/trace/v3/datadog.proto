@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -15,6 +17,19 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.trace
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Datadog tracer]
+
+// Remote Configuration
+message DatadogRemoteConfig {
+  // Allows to configure and change the tracer behaviour from Datadog's UI.
+  // Default value is `false`, which disable the feature.
+  // [#comment: This feature can drastically increase the number of connections to the Datadog Agent.
+  // This is the consequence of each tracer regularly polling for configuration updates, and the number
+  // of tracer is the product of the number of listeners and worker threads.]
+  bool enabled = 1;
+
+  // Frequency at which new configuration updates are queried.
+  google.protobuf.Duration polling_interval = 2;
+}
 
 // Configuration for the Datadog tracer.
 // [#extension: envoy.tracers.datadog]
@@ -31,4 +46,7 @@ message DatadogConfig {
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_cluster>` above.
   string collector_hostname = 3;
+
+  // Remote Configuration.
+  DatadogRemoteConfig remote_config = 4;
 }

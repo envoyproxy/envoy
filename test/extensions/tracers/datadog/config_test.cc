@@ -94,6 +94,11 @@ public:
   Event::SimulatedTimeSystem time_;
 };
 
+TEST_F(DatadogConfigTest, DefaultConfiguration) {
+  envoy::config::trace::v3::DatadogConfig datadog_config;
+  EXPECT_EQ(datadog_config.remote_config().enabled(), false);
+}
+
 TEST_F(DatadogConfigTest, ConfigureTracer) {
   {
     envoy::config::trace::v3::DatadogConfig datadog_config;
@@ -110,8 +115,14 @@ TEST_F(DatadogConfigTest, ConfigureTracer) {
   }
 
   {
-    auto datadog_config =
-        makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
+    const std::string yaml_conf = R"EOF(
+      collector_cluster: fake_cluster
+      remote_config:
+        enabled: true
+    )EOF";
+
+    auto datadog_config = makeConfig<envoy::config::trace::v3::DatadogConfig>(yaml_conf);
+
     cm_.initializeClusters({"fake_cluster"}, {});
 
     EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
@@ -155,6 +166,9 @@ TEST_F(DatadogConfigTest, ConfigureViaFactory) {
       "@type": type.googleapis.com/envoy.config.trace.v3.DatadogConfig
       collector_cluster: fake_cluster
       service_name: fake_file
+      remote_config:
+        enabled: true
+        polling_interval: "10s"
    )EOF");
 
   DatadogTracerFactory factory;
@@ -171,7 +185,7 @@ TEST_F(DatadogConfigTest, AllowCollectorClusterToBeAddedViaApi) {
   auto datadog_config =
       makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
 
-  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
+  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -209,7 +223,7 @@ TEST_F(DatadogConfigTest, CollectorHostname) {
   )EOF");
   cm_.initializeClusters({"fake_cluster"}, {});
 
-  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
+  EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))

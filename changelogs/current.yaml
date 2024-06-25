@@ -46,6 +46,10 @@ behavior_changes:
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
+- area: tracing
+  change: |
+    Datadog: Disabled remote configuration by default.
+    To enable this feature, use the :ref:`remote_config <envoy_v3_api_field_config.trace.v3.DatadogConfig.remote_config` field.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
