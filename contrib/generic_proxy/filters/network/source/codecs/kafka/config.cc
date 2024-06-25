@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/generic_proxy/codecs/kafka/config.h"
+#include "contrib/generic_proxy/filters/network/source/codecs/kafka/config.h"
 
 namespace Envoy {
 namespace Extensions {
