@@ -79,7 +79,7 @@ TEST(FactoryTest, FactoryTest) {
   ProxyConfig proto_config;
   TestUtility::loadFromYaml(yaml_config, proto_config);
 
-  EXPECT_NE(nullptr, factory.createFilterFactoryFromProto(proto_config, factory_context));
+  EXPECT_NE(nullptr, factory.createFilterFactoryFromProto(proto_config, factory_context).value());
 }
 
 TEST(FactoryTest, GenericRds) {
@@ -96,7 +96,7 @@ TEST(FactoryTest, GenericRds) {
         type_url: envoy.generic_proxy.codecs.fake.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     )EOF";
 
@@ -119,7 +119,8 @@ resources:
   TestUtility::loadFromYaml(config_yaml, config);
 
   Matchers::UniversalStringMatcher universal_name_matcher;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, factory_context).value();
   auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
@@ -151,8 +152,7 @@ TEST(FactoryTest, GenericRdsApiConfigSource) {
         value: {}
     generic_rds:
       config_source:
-        resource_api_version: V3
-        api_config_source: { api_type: GRPC, transport_api_version: V3 }
+        api_config_source: { api_type: GRPC }
       route_config_name: test_route
     )EOF";
 
@@ -166,9 +166,9 @@ TEST(FactoryTest, GenericRdsApiConfigSource) {
   envoy::extensions::filters::network::generic_proxy::v3::GenericProxy config;
   TestUtility::loadFromYaml(config_yaml, config);
 
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, factory_context),
-                          EnvoyException,
-                          "genericrds supports only aggregated api_type in api_config_source");
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(config, factory_context).IgnoreError(), EnvoyException,
+      "genericrds supports only aggregated api_type in api_config_source");
 }
 
 TEST(FactoryTest, CustomReadFilterFactory) {
@@ -185,7 +185,7 @@ TEST(FactoryTest, CustomReadFilterFactory) {
         type_url: envoy.generic_proxy.codecs.mock.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     )EOF";
 
@@ -211,14 +211,15 @@ TEST(FactoryTest, CustomReadFilterFactory) {
 
   auto mock_proxy_factory = std::make_unique<MockProxyFactory>();
   auto raw_mock_proxy_factory = mock_proxy_factory.get();
-  EXPECT_CALL(*raw_mock_proxy_factory, createProxy(_, _));
+  EXPECT_CALL(*raw_mock_proxy_factory, createProxy(_, _, _));
 
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
   EXPECT_CALL(codec_factory_config, createProxyFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_proxy_factory))));
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, factory_context).value();
   EXPECT_NE(nullptr, cb);
   Network::MockFilterManager filter_manager;
   cb(filter_manager);
@@ -364,7 +365,7 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
         type_url: envoy.generic_proxy.codecs.mock.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     tracing:
       max_path_tag_length: 128
@@ -397,7 +398,8 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, factory_context).value();
   EXPECT_NE(nullptr, cb);
   NiceMock<Network::MockFilterManager> filter_manager;
   cb(filter_manager);
@@ -417,7 +419,7 @@ TEST(BasicFilterConfigTest, TestConfigurationWithAccessLog) {
         type_url: envoy.generic_proxy.codecs.mock.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     access_log:
     - name: envoy.generic_proxy.access_loggers.file
@@ -444,7 +446,8 @@ TEST(BasicFilterConfigTest, TestConfigurationWithAccessLog) {
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, factory_context).value();
   EXPECT_NE(nullptr, cb);
   NiceMock<Network::MockFilterManager> filter_manager;
   cb(filter_manager);

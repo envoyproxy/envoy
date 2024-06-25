@@ -23,6 +23,7 @@ envoy_cc_library(
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
+        "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//source/common/upstream:default_local_address_selector_factory",
         "@envoy//source/common/watchdog:abort_action_config",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
@@ -42,8 +43,7 @@ envoy_cc_library(
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
-        "@envoy//source/extensions/transport_sockets/tls:config",
-        "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "@envoy//source/extensions/transport_sockets/tls:upstream_config",
         "@envoy//source/extensions/upstreams/http/generic:config",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:config",
@@ -72,7 +72,10 @@ envoy_cc_library(
             "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         ],
         "@envoy",
-    ),
+    ) + select({
+        "@envoy//bazel:apple": [],
+        "//conditions:default": ["@envoy//source/extensions/network/dns_resolver/cares:config"],
+    }),
 )
 
 envoy_cc_library(

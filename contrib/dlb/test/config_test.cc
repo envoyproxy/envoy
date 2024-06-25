@@ -32,7 +32,7 @@ protected:
     EXPECT_EQ(typed_config.typed_config().type_url(),
               "type.googleapis.com/"
               "envoy.extensions.network.connection_balance.dlb.v3alpha.Dlb");
-    ASSERT_OK(MessageUtil::unpackToNoThrow(typed_config.typed_config(), dlb));
+    ASSERT_OK(MessageUtil::unpackTo(typed_config.typed_config(), dlb));
   }
 };
 

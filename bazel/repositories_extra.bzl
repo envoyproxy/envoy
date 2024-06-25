@@ -9,7 +9,7 @@ def _python_minor_version(python_version):
     return "_".join(python_version.split(".")[:-1])
 
 # Python version for `rules_python`
-PYTHON_VERSION = "3.11.3"
+PYTHON_VERSION = "3.11.9"
 PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().

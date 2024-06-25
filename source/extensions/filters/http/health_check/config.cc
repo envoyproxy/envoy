@@ -24,7 +24,8 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
 
   auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderDataPtr>>();
-  *header_match_data = Http::HeaderUtility::buildHeaderDataVector(proto_config.headers());
+  *header_match_data = Http::HeaderUtility::buildHeaderDataVector(proto_config.headers(),
+                                                                  context.serverFactoryContext());
 
   if (!pass_through_mode && cache_time_ms) {
     throw EnvoyException("cache_time_ms must not be set when path_through_mode is disabled");

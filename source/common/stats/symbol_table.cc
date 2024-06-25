@@ -620,20 +620,29 @@ StatNameStorage::~StatNameStorage() {
 }
 
 void StatNameStorage::free(SymbolTable& table) {
+  // nolint: https://github.com/llvm/llvm-project/issues/81597
+  // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
   table.free(statName());
   clear();
 }
 
 void StatNamePool::clear() {
   for (StatNameStorage& storage : storage_vector_) {
+    // nolint: https://github.com/llvm/llvm-project/issues/81597
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     storage.free(symbol_table_);
   }
   storage_vector_.clear();
 }
 
 const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
-  storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
+  storage_vector_.emplace_back(str, symbol_table_);
   return storage_vector_.back().bytes();
+}
+
+StatName StatNamePool::add(StatName name) {
+  storage_vector_.emplace_back(name, symbol_table_);
+  return storage_vector_.back().statName();
 }
 
 StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
@@ -733,6 +742,8 @@ void StatNameList::iterate(const std::function<bool(StatName)>& f) const {
 
 void StatNameList::clear(SymbolTable& symbol_table) {
   iterate([&symbol_table](StatName stat_name) -> bool {
+    // nolint: https://github.com/llvm/llvm-project/issues/81597
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     symbol_table.free(stat_name);
     return true;
   });

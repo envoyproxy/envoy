@@ -59,7 +59,10 @@ envoy_objc_library(
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib",
         "//library/common/api:c_types",
+        "//library/common/bridge:utility_lib",
+        "//library/common/http:header_utility_lib",
         "//library/common/network:apple_platform_cert_verifier",
+        "//library/common/network:apple_proxy_resolution_lib",
     ],
 )
 

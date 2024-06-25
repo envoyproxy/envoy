@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -18,6 +19,7 @@
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/route.pb.validate.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,6 +31,7 @@ using ProtoRouteAction =
 using ProtoRouteConfiguration =
     envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration;
 using ProtoVirtualHost = envoy::extensions::filters::network::generic_proxy::v3::VirtualHost;
+using ProtoRetryPolicy = envoy::config::core::v3::RetryPolicy;
 
 class RouteEntryImpl : public RouteEntry {
 public:
@@ -46,6 +49,9 @@ public:
 
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; };
 
+  const std::chrono::milliseconds timeout() const override { return timeout_; };
+  const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                                   Server::Configuration::ServerFactoryContext& factory_context,
@@ -59,6 +65,9 @@ private:
 
   const envoy::config::core::v3::Metadata metadata_;
   const Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
+
+  const std::chrono::milliseconds timeout_;
+  const RetryPolicy retry_policy_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };
@@ -79,9 +88,9 @@ private:
   RouteEntryConstSharedPtr route_;
 };
 
-class RouteActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<Request> {
+class RouteActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<MatchInput> {
 public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Request>&,
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<MatchInput>&,
                                           absl::string_view) override {
     return absl::OkStatus();
   }
@@ -102,7 +111,7 @@ public:
 class NullRouteMatcherImpl : public RouteMatcher {
 public:
   // RouteMatcher
-  RouteEntryConstSharedPtr routeEntry(const Request&) const override { return nullptr; }
+  RouteEntryConstSharedPtr routeEntry(const MatchInput&) const override { return nullptr; }
 };
 
 class VirtualHostImpl : Logger::Loggable<Envoy::Logger::Id::filter> {
@@ -111,12 +120,12 @@ public:
                   Envoy::Server::Configuration::ServerFactoryContext& context,
                   bool validate_clusters_default = false);
 
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const;
+  RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const;
   absl::string_view name() const { return name_; }
 
 private:
   std::string name_;
-  Matcher::MatchTreeSharedPtr<Request> matcher_;
+  Matcher::MatchTreeSharedPtr<MatchInput> matcher_;
 };
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 
@@ -126,7 +135,7 @@ public:
                    Envoy::Server::Configuration::ServerFactoryContext& context,
                    bool validate_clusters_default = false);
 
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const override;
+  RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const override;
 
   absl::string_view name() const { return name_; }
 
@@ -138,7 +147,7 @@ private:
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
-  const VirtualHostImpl* findVirtualHost(const Request& request) const;
+  const VirtualHostImpl* findVirtualHost(const MatchInput& request) const;
 
   std::string name_;
 

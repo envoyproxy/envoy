@@ -8,6 +8,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -40,7 +41,7 @@ absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) c
   return absl::nullopt;
 }
 
-Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
   // Ensure only one of header and cookie is specified.
   // TODO(radha13): remove this once we are on v4 and these fields are folded into a oneof.
   if (!rule.cookie().empty() && !rule.header().empty()) {
@@ -83,15 +84,15 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 
   if (rule.on_header_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 }
 
 Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
-               const bool per_route) {
-  request_set_ = Config::configToVector(config.request_rules(), request_rules_);
-  response_set_ = Config::configToVector(config.response_rules(), response_rules_);
+               Regex::Engine& regex_engine, const bool per_route) {
+  request_set_ = Config::configToVector(config.request_rules(), request_rules_, regex_engine);
+  response_set_ = Config::configToVector(config.response_rules(), response_rules_, regex_engine);
 
   // Note: empty configs are fine for the global config, which would be the case for enabling
   //       the filter globally without rules and then applying them at the virtual host or
@@ -103,15 +104,15 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
   }
 }
 
-bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
-                            HeaderToMetadataRules& vector) {
+bool Config::configToVector(const ProtobufRepeatedRule& proto_rules, HeaderToMetadataRules& vector,
+                            Regex::Engine& regex_engine) {
   if (proto_rules.empty()) {
     ENVOY_LOG(debug, "no rules provided");
     return false;
   }
 
   for (const auto& entry : proto_rules) {
-    vector.emplace_back(entry);
+    vector.emplace_back(entry, regex_engine);
   }
 
   return true;
@@ -203,8 +204,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
 }
 
 const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& nspace) const {
-  static const std::string& headerToMetadata = "envoy.filters.http.header_to_metadata";
-  return nspace.empty() ? headerToMetadata : nspace;
+  return nspace.empty() ? HttpFilterNames::get().HeaderToMetadata : nspace;
 }
 
 // add metadata['key']= value depending on header present or missing case

@@ -85,6 +85,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
@@ -249,6 +250,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/common/network:listener_impl_test_base_lib",
+        "//test/mocks/network:mock_parent_drained_callback_registrar",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -430,6 +432,37 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "io_uring_socket_handle_impl_test",
+    srcs = select({
+        "//bazel:linux": ["io_uring_socket_handle_impl_test.cc"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/io:io_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "io_uring_socket_handle_impl_integration_test",
+    srcs = select({
+        "//bazel:linux": ["io_uring_socket_handle_impl_integration_test.cc"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ] + select({
+        "//bazel:linux": ["//source/common/io:io_uring_worker_factory_impl_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_test(

@@ -6,8 +6,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/http_server_properties_cache_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -41,20 +41,6 @@ protected:
 name: alternate_protocols_cache
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
-  alternate_protocols_cache_options:
-    name: default_alternate_protocols_cache
-    key_value_store_config:
-      name: "envoy.common.key_value"
-      typed_config:
-        "@type": type.googleapis.com/envoy.config.common.key_value.v3.KeyValueStoreConfig
-        config:
-          name: envoy.key_value.file_based
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
-            filename: {}
-            flush_interval:
-              nanos: 0
-
 )EOF",
                                            filename);
     config_helper_.prependFilter(filter);

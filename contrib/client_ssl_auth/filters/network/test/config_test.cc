@@ -46,7 +46,7 @@ ip_white_list:
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -65,7 +65,7 @@ ip_white_list:
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -87,7 +87,7 @@ ip_white_list:
           factory.createEmptyConfigProto().get());
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -96,8 +96,10 @@ ip_white_list:
 TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(
-      ClientSslAuthConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth(), context),
+      ClientSslAuthConfigFactory()
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth(), context)
+          .IgnoreError(),
       ProtoValidationException);
 }
 

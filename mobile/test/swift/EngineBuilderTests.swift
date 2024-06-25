@@ -11,13 +11,12 @@ final class EngineBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
-    MockEnvoyEngine.onRunWithYAML = nil
   }
 
-  func testSetRuntimeGuard() {
+  func testAddRuntimeGuard() {
     let bootstrapDebugDescription = EngineBuilder()
-      .setRuntimeGuard("test_feature_false", true)
-      .setRuntimeGuard("test_feature_true", false)
+      .addRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_true", false)
       .bootstrapDebugDescription()
     XCTAssertTrue(
       bootstrapDebugDescription.contains(#""test_feature_false" value { bool_value: true }"#)
@@ -40,19 +39,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertEqual(builder.monitoringMode, .reachability)
   }
 
-  func testCustomConfigYAMLUsesSpecifiedYAMLWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithYAML = { yaml, _, _ in
-      XCTAssertEqual("foobar", yaml)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder(yaml: "foobar")
-      .addEngineType(MockEnvoyEngine.self)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { _, logLevel in
@@ -62,7 +48,7 @@ final class EngineBuilderTests: XCTestCase {
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addLogLevel(.trace)
+      .setLogLevel(.trace)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

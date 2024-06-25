@@ -351,6 +351,64 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "disable_http3_on_linux_ppc",
+    match_all = [
+        ":disable_http3",
+        ":linux_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_http3_on_windows_x86_64",
+    match_all = [
+        ":disable_http3",
+        ":windows_x86_64",
+    ],
+)
+
+bool_flag(
+    name = "enabled",
+    build_setting_default = True,
+    visibility = ["//visibility:private"],
+)
+
+bool_flag(
+    name = "disabled",
+    build_setting_default = False,
+    visibility = ["//visibility:private"],
+)
+
+# Alias equal to "not(":disable_http3")" (if "not()" existed).
+alias(
+    name = "enable_http3_setting",
+    actual = select({
+        ":disable_http3": ":disabled",
+        "//conditions:default": ":enabled",
+    }),
+)
+
+config_setting(
+    name = "enable_http3",
+    flag_values = {":enable_http3_setting": "True"},
+)
+
+selects.config_setting_group(
+    name = "enable_http3_on_linux_ppc",
+    match_all = [
+        ":enable_http3",
+        ":linux_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "enable_http3_on_windows_x86_64",
+    match_all = [
+        ":enable_http3",
+        ":windows_x86_64",
+    ],
+)
+
 config_setting(
     name = "disable_admin_html",
     values = {"define": "admin_html=disabled"},
@@ -481,18 +539,20 @@ config_setting(
     values = {"define": "boringssl=disabled"},
 )
 
+selects.config_setting_group(
+    name = "boringssl_fips_x86",
+    match_all = [
+        ":boringssl_fips",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
 config_setting(
     name = "zlib_ng",
     constraint_values = [
         "@platforms//os:linux",
     ],
     values = {"define": "zlib=ng"},
-)
-
-# TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
-config_setting(
-    name = "wasm_wavm",
-    values = {"define": "wasm=wavm"},
 )
 
 config_setting(

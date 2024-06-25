@@ -47,12 +47,12 @@ protected:
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
   }
 
-  void waitForCounterEq(const std::string& name, uint64_t value) {
-    TestUtility::waitForCounterEq(store_, name, value, time_system_);
+  AssertionResult waitForCounterEq(const std::string& name, uint64_t value) {
+    return TestUtility::waitForCounterEq(store_, name, value, time_system_);
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value) {
-    TestUtility::waitForGaugeEq(store_, name, value, time_system_);
+  AssertionResult waitForGaugeEq(const std::string& name, uint64_t value) {
+    return TestUtility::waitForGaugeEq(store_, name, value, time_system_);
   }
 
   NiceMock<Api::MockApi> api_;
@@ -122,10 +122,10 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
 
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 1));
 
-  waitForCounterEq("filesystem.write_completed", 1);
+  EXPECT_TRUE(waitForCounterEq("filesystem.write_completed", 1));
   EXPECT_EQ(1UL, store_.counter("filesystem.write_buffered").value());
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
-  waitForGaugeEq("filesystem.write_total_buffered", 0);
+  EXPECT_TRUE(waitForGaugeEq("filesystem.write_total_buffered", 0));
 
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
@@ -146,11 +146,11 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
 
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 2));
 
-  waitForCounterEq("filesystem.write_completed", 2);
+  EXPECT_TRUE(waitForCounterEq("filesystem.write_completed", 2));
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
   EXPECT_EQ(1UL, store_.counter("filesystem.flushed_by_timer").value());
   EXPECT_EQ(2UL, store_.counter("filesystem.write_buffered").value());
-  waitForGaugeEq("filesystem.write_total_buffered", 0);
+  EXPECT_TRUE(waitForGaugeEq("filesystem.write_total_buffered", 0));
 
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
@@ -195,7 +195,7 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   expected_writes++;
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, expected_writes));
 
-  waitForCounterEq("filesystem.write_completed", 2);
+  EXPECT_TRUE(waitForCounterEq("filesystem.write_completed", 2));
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
 
   EXPECT_CALL(*file_, write_(_))
@@ -235,7 +235,7 @@ TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
   log_file->write("test");
 
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 1));
-  waitForCounterEq("filesystem.write_failed", 1);
+  EXPECT_TRUE(waitForCounterEq("filesystem.write_failed", 1));
   EXPECT_EQ(0UL, store_.counter("filesystem.write_completed").value());
 
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -406,8 +406,8 @@ TEST_F(AccessLogManagerImplTest, ReopenRetry) {
 
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   EXPECT_TRUE(file_->waitForEventCount(file_->num_writes_, 3));
-  waitForCounterEq("filesystem.reopen_failed", 2);
-  waitForGaugeEq("filesystem.write_total_buffered", 0);
+  EXPECT_TRUE(waitForCounterEq("filesystem.reopen_failed", 2));
+  EXPECT_TRUE(waitForGaugeEq("filesystem.write_total_buffered", 0));
 }
 
 TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {

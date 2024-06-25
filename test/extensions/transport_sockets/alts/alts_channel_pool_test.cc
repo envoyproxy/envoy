@@ -31,7 +31,6 @@ using ::grpc::gcp::HandshakerReq;
 using ::grpc::gcp::HandshakerResp;
 using ::grpc::gcp::HandshakerService;
 using ::testing::NotNull;
-using ::testing::Test;
 
 class FakeHandshakerService final : public HandshakerService::Service {
 public:

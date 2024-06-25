@@ -15,8 +15,9 @@ ThriftProxy::ThriftFilters::FilterFactoryCb
 PayloadToMetadataFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
         PayloadToMetadata& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
-  ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  ConfigSharedPtr filter_config(
+      std::make_shared<Config>(proto_config, context.serverFactoryContext().regexEngine()));
   return
       [filter_config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addDecoderFilter(std::make_shared<PayloadToMetadataFilter>(filter_config));

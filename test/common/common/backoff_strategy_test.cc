@@ -114,4 +114,29 @@ TEST(FixedBackOffStrategyTest, FixedBackOffBasicReset) {
   EXPECT_EQ(20, fixed_back_off.nextBackOffMs());
 }
 
+TEST(BackOffStrategyUtilsTest, InvalidConfig) {
+  {
+    // Valid config.
+    envoy::config::core::v3::BackoffStrategy backoff_strategy;
+    backoff_strategy.mutable_base_interval()->set_seconds(2);
+    backoff_strategy.mutable_max_interval()->set_seconds(3);
+    EXPECT_TRUE(BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10).ok());
+  }
+
+  {
+    // Max interval is lower than base interval.
+    envoy::config::core::v3::BackoffStrategy backoff_strategy;
+    backoff_strategy.mutable_base_interval()->set_seconds(3);
+    backoff_strategy.mutable_max_interval()->set_seconds(2);
+    EXPECT_TRUE(!BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10).ok());
+  }
+
+  {
+    // Max interval is lower than base interval.
+    envoy::config::core::v3::BackoffStrategy backoff_strategy;
+    backoff_strategy.mutable_max_interval()->set_nanos(2000000);
+    EXPECT_TRUE(!BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 3, 10).ok());
+  }
+}
+
 } // namespace Envoy

@@ -63,9 +63,10 @@ protected:
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
+        server_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -483,7 +484,6 @@ TEST_P(EdsTest, ShouldMergeAddingHosts) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -555,7 +555,6 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -628,7 +627,6 @@ TEST_P(EdsTest, ShouldNotHaveRemovedHosts) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -701,7 +699,6 @@ TEST_P(EdsTest, ShouldHaveHostThatWasAddedAfterRemoval) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -778,7 +775,6 @@ TEST_P(EdsTest, MultiplePrioritiesShouldMergeCorrectly) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -851,7 +847,6 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
         eds_config:
           api_config_source:
             api_type: REST
-            transport_api_version: V3
             cluster_names:
             - eds
             refresh_delay: 1s

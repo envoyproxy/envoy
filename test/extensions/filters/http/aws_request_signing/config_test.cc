@@ -93,7 +93,92 @@ match_excluded_headers:
   cb(filter_callbacks);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, SimpleConfigWithQueryString) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+host_rewrite: new-host
+query_string: {}
+use_unsigned_payload: true
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  expected_config.set_host_rewrite("new-host");
+  expected_config.mutable_query_string();
+  expected_config.set_use_unsigned_payload(true);
+  expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
+  expected_config.add_match_excluded_headers()->set_exact("foo");
+  expected_config.add_match_excluded_headers()->set_exact("bar");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, SimpleConfigWithQueryStringAndExpiration) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+host_rewrite: new-host
+query_string:
+  expiration_time: 100s
+use_unsigned_payload: true
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  expected_config.set_host_rewrite("new-host");
+  expected_config.set_use_unsigned_payload(true);
+  expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
+  expected_config.add_match_excluded_headers()->set_exact("foo");
+  expected_config.add_match_excluded_headers()->set_exact("bar");
+  expected_config.mutable_query_string()->mutable_expiration_time()->set_seconds(100);
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionExplicitSigningAlgorithm) {
+  // This region string is a sigv4a region set - sigv4 should not allow multiple regions to be
+  // specified
+
   const std::string yaml = R"EOF(
 service_name: s3
 signing_algorithm: AWS_SIGV4
@@ -122,6 +207,8 @@ match_excluded_headers:
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
+  // valid sigv4 configuration
+
   const std::string yaml = R"EOF(
 service_name: s3
 region: '*'
@@ -374,8 +461,6 @@ aws_request_signing:
 stat_prefix: foo_prefix
   )EOF";
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-
   TestEnvironment::unsetEnvVar("HOME");
   TestEnvironment::unsetEnvVar("AWS_CONFIG");
   TestEnvironment::unsetEnvVar("AWS_PROFILE");
@@ -430,6 +515,44 @@ match_excluded_headers:
         cb(filter_callbacks);
       },
       EnvoyException);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, InvalidLowExpirationTime) {
+  const std::string yaml = R"EOF(
+service_name: s3
+signing_algorithm: AWS_SIGV4
+query_string:
+  expiration_time: 0s
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+
+  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
+                          EnvoyException, "Proto constraint validation failed");
+}
+
+TEST(AwsRequestSigningFilterConfigTest, InvalidHighExpirationTime) {
+  const std::string yaml = R"EOF(
+service_name: s3
+signing_algorithm: AWS_SIGV4
+query_string:
+  expiration_time: 9999s
+host_rewrite: new-host
+match_excluded_headers:
+  - prefix: x-envoy
+  - exact: foo
+  - exact: bar
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+
+  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
+                          EnvoyException, "Proto constraint validation failed");
 }
 
 } // namespace AwsRequestSigningFilter

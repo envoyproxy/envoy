@@ -37,11 +37,7 @@ public:
     )EOF");
   }
 
-  void initializeConfig(bool legacy_api = false, bool disable_lagacy_api_conversion = false) {
-    if (disable_lagacy_api_conversion) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.convert_legacy_lb_config",
-                                        "false");
-    }
+  void initializeConfig(bool legacy_api = false) {
 
     // Update endpoints of default cluster `cluster_0` to 3 different fake upstreams.
     config_helper_.addConfigModifier(
@@ -181,11 +177,6 @@ TEST_P(SubsetIntegrationTest, NormalLoadBalancing) {
 
 TEST_P(SubsetIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
   initializeConfig(true);
-  runNormalLoadBalancing();
-}
-
-TEST_P(SubsetIntegrationTest, NormalLoadBalancingWithLegacyAPIAndDisableAPIConversion) {
-  initializeConfig(true, true);
   runNormalLoadBalancing();
 }
 

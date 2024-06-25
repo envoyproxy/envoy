@@ -1,6 +1,7 @@
 abstracts>=0.0.12
 aio.api.bazel
 aio.api.github>=0.2.5
+aio.core>=0.10.2
 aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
@@ -8,10 +9,10 @@ clang-format==14.0.6
 clang-tidy==14.0.6
 colorama
 coloredlogs
-cryptography>=41.0.1
+cryptography>=42.0.0
 dependatool>=0.2.2
 envoy.base.utils>=0.5.0
-envoy.code.check>=0.5.8
+envoy.code.check>=0.5.12
 envoy.dependency.check>=0.1.10
 envoy.distribution.release>=0.0.9
 envoy.distribution.repo>=0.0.8
@@ -37,7 +38,7 @@ pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7,<7.2
+sphinx>=7,<7.4
 sphinxcontrib-applehelp>=1.0.8
 sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics

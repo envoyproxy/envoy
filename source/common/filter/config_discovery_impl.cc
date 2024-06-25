@@ -78,8 +78,11 @@ FilterConfigSubscription::FilterConfigSubscription(
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
   const auto resource_name = getResourceName();
-  subscription_ = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
-      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  subscription_ =
+      THROW_OR_RETURN_VALUE(cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
+                                config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+                                resource_decoder_, {}),
+                            Config::SubscriptionPtr);
 }
 
 void FilterConfigSubscription::start() {
@@ -155,7 +158,7 @@ absl::Status FilterConfigSubscription::onConfigUpdate(
     Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
-          provider->onConfigRemoved([cleanup] {});
+          THROW_IF_NOT_OK(provider->onConfigRemoved([cleanup] {}));
         },
         [me = shared_from_this()]() { me->updateComplete(); });
   } else if (!added_resources.empty()) {
@@ -244,19 +247,20 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
 
   // Apply the default config if none has been applied.
   if (!last_config_valid) {
-    provider.applyDefaultConfiguration();
+    THROW_IF_NOT_OK(provider.applyDefaultConfiguration());
   }
 }
 
-void FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
+absl::Status FilterConfigProviderManagerImplBase::validateProtoConfigDefaultFactory(
     const bool null_default_factory, const std::string& filter_config_name,
     absl::string_view type_url) const {
   if (null_default_factory) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("Error: cannot find filter factory {} for default filter "
                     "configuration with type URL {}.",
                     filter_config_name, type_url));
   }
+  return absl::OkStatus();
 }
 
 void FilterConfigProviderManagerImplBase::validateProtoConfigTypeUrl(

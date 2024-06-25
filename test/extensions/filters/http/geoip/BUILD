@@ -49,7 +49,6 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],
 )
@@ -59,6 +58,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = select({
         "//bazel:linux": ["geoip_filter_integration_test.cc"],
+        "//bazel:darwin_any": ["geoip_filter_integration_test.cc"],
         "//conditions:default": [],
     }),
     data = [

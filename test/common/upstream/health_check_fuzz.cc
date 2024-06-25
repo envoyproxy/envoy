@@ -93,14 +93,13 @@ makeBufferListToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respon
 void HttpHealthCheckFuzz::allocHttpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *cluster_, config, dispatcher_, runtime_, random_,
-      HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      *cluster_, config, context_, HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Http Health Checker");
 }
 
 void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocHttpHealthCheckerFromProto(input.health_check_config());
-  ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  ON_CALL(context_.runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -116,7 +115,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
         Host::HealthFlag::FAILED_ACTIVE_HC);
   }
   health_checker_->start();
-  ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  ON_CALL(context_.runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
   // If has an initial jitter, this calls onIntervalBase and finishes startup
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
@@ -210,8 +209,8 @@ void HttpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type,
 void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-      *cluster_, config, dispatcher_, runtime_, random_,
-      HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
+      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Tcp Health Checker");
 }
 
@@ -327,8 +326,8 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
 void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
-      *cluster_, config, dispatcher_, runtime_, random_,
-      HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
+      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
 }
 
@@ -342,7 +341,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
     cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   }
   expectSessionCreate();
-  ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+  ON_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillByDefault(testing::InvokeWithoutArgs(
           [&]() -> Network::ClientConnection* { return test_session_->client_connection_; }));
 
@@ -362,7 +361,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
           }));
   expectStreamCreate();
   health_checker_->start();
-  ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  ON_CALL(context_.runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
 
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
@@ -513,8 +512,8 @@ void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
 }
 
 void GrpcHealthCheckFuzz::expectSessionCreate() {
-  test_session_->timeout_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  test_session_->interval_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  test_session_->timeout_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  test_session_->interval_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   test_session_->request_encoder_.stream_.callbacks_.clear();
   expectClientCreate();
 }

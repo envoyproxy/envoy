@@ -31,4 +31,9 @@ public:
   void send(const std::string& data);
 };
 
+class ProxyProtoDisallowedVersionsIntegrationTest : public ProxyProtoTcpIntegrationTest {
+public:
+  ProxyProtoDisallowedVersionsIntegrationTest();
+};
+
 } // namespace Envoy

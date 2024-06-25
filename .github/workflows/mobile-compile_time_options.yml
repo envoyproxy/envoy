@@ -50,29 +50,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: Running C++ test with YAML disabled
-          target: cc-test-no-yaml
-          args: >-
-            build
-            --config=mobile-remote-ci-cc-no-yaml
-            //test/common/integration:client_integration_test
         - name: Running C++ build with exceptions disabled
           target: cc-no-build-exceptions
           args: >-
             build
             --config=mobile-remote-ci-cc-no-exceptions
             //test/performance:test_binary_size //library/cc/...
-        - name: Running C++ test
-          target: cc-test
+        - name: Running C++ tests with xDS enabled
+          target: cc-tests-xds-enabled
           args: >-
             test
-            --config=mobile-remote-ci-cc-test
-          entrypoint: |
-            #!/bin/bash -e
-            export PATH=/opt/llvm/bin:$PATH
-            cd /source/mobile
-            EXTRA_ARGS=$(bazel query //test/cc/... + //test/common/... except //test/common/integration:client_integration_test)
-            exec "$@" $EXTRA_ARGS
+            --config=mobile-remote-ci-cc-xds-enabled
+            //test/common/integration/...
+        - name: Running C++ tests with full protos enabled
+          target: cc-tests-full-protos-enabled
+          args: >-
+            test
+            --config=mobile-remote-ci-cc-full-protos-enabled
+            //test/common/... //test/cc/...
 
   build:
     permissions:
@@ -103,10 +98,7 @@ jobs:
             --config=mobile-remote-ci-macos-swift
             //library/swift:ios_framework
           source: |
-            # TODO(fredyw): A workaround since mobile/WORKSPACE requires Android SDK to be available
-            # and the GitHub Action runner image no longer includes Android SDK 30:
-            # https://github.com/actions/runner-images/issues/8952
-            ./ci/mac_ci_setup.sh --android
+            source ./ci/mac_ci_setup.sh
             ./bazelw shutdown
 
   request:

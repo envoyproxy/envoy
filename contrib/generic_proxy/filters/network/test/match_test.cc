@@ -22,12 +22,14 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
       factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(match_input).data_));
 }
 
 TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
@@ -38,12 +40,14 @@ TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
       factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(match_input).data_));
 }
 
 TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
@@ -54,12 +58,14 @@ TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
       factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
 
   request.path_ = "fake_path";
 
-  EXPECT_EQ("fake_path", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("fake_path", absl::get<std::string>(input->get(match_input).data_));
 }
 
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
@@ -70,12 +76,14 @@ TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
       factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
 
   request.method_ = "fake_method";
 
-  EXPECT_EQ("fake_method", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("fake_method", absl::get<std::string>(input->get(match_input).data_));
 }
 
 TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
@@ -91,12 +99,14 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
       factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(input->get(request).data_));
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(input->get(match_input).data_));
 
   request.data_["key_0"] = "value_0";
 
-  EXPECT_EQ("value_0", absl::get<std::string>(input->get(request).data_));
+  EXPECT_EQ("value_0", absl::get<std::string>(input->get(match_input).data_));
 }
 
 TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
@@ -107,12 +117,15 @@ TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
       factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ(
-      &request,
-      &dynamic_cast<const RequestMatchData*>(
-           absl::get<std::shared_ptr<Matcher::CustomMatchData>>(input->get(request).data_).get())
-           ->request());
+  EXPECT_EQ(&request,
+            &dynamic_cast<const RequestMatchData*>(
+                 absl::get<std::shared_ptr<Matcher::CustomMatchData>>(input->get(match_input).data_)
+                     .get())
+                 ->data()
+                 .requestHeader());
 }
 
 TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
@@ -134,16 +147,20 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
 
   {
     FakeStreamCodecFactory::FakeRequest request;
-    Matcher::MatchingDataType input = std::make_shared<RequestMatchData>(request);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    MatchInput match_input(request, stream_info, MatchAction::RouteAction);
+
+    Matcher::MatchingDataType input = std::make_shared<RequestMatchData>(match_input);
     EXPECT_TRUE(matcher->match(input));
   }
 }
 
 TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   // Empty matcher.
   {
     RequestMatcherProto matcher_proto;
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     EXPECT_TRUE(matcher.match(request));
@@ -160,7 +177,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "another_fake_host";
@@ -180,7 +197,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
@@ -203,7 +220,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
@@ -231,7 +248,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
@@ -260,7 +277,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
 
     TestUtility::loadFromYaml(config_yaml, matcher_proto);
 
-    RequestMatchInputMatcher matcher(matcher_proto);
+    RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";

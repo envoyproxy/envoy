@@ -1,10 +1,14 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include <cstdint>
+#include <limits>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -229,20 +233,47 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
   });
 }
 
+/**
+ * This function generates an STS Endpoint from a region string.
+ * If a SigV4A region set has been provided, it will use the first region in region set, and if
+ * that region still contains a wildcard, the STS Endpoint will be set to us-east-1 global endpoint
+ * (or FIPS if compiled for FIPS support)
+ */
 std::string Utility::getSTSEndpoint(absl::string_view region) {
-  if (region == "cn-northwest-1" || region == "cn-north-1") {
-    return fmt::format("sts.{}.amazonaws.com.cn", region);
+  std::string single_region;
+
+  // If we contain a comma or asterisk it looks like a region set.
+  if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
+    // Use the first element from a region set if we have multiple regions specified.
+    const std::vector<std::string> region_v = absl::StrSplit(region, ',');
+    // If we still have a * in the first element, then send them to us-east-1 fips or global
+    // endpoint.
+    if (absl::StrContains(region_v[0], '*')) {
+#ifdef ENVOY_SSL_FIPS
+      return "sts-fips.us-east-1.amazonaws.com";
+#else
+      return "sts.amazonaws.com";
+#endif
+    }
+    single_region = region_v[0];
+  } else {
+    // Otherwise it's a standard region, so use that.
+    single_region = region;
+  }
+
+  if (single_region == "cn-northwest-1" || single_region == "cn-north-1") {
+    return fmt::format("sts.{}.amazonaws.com.cn", single_region);
   }
 #ifdef ENVOY_SSL_FIPS
   // Use AWS STS FIPS endpoints in FIPS mode https://docs.aws.amazon.com/general/latest/gr/sts.html.
   // Note: AWS GovCloud doesn't have separate fips endpoints.
   // TODO(suniltheta): Include `ca-central-1` when sts supports a dedicated FIPS endpoint.
-  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
-      region == "us-west-2") {
-    return fmt::format("sts-fips.{}.amazonaws.com", region);
+  if (single_region == "us-east-1" || single_region == "us-east-2" ||
+      single_region == "us-west-1" || single_region == "us-west-2") {
+    return fmt::format("sts-fips.{}.amazonaws.com", single_region);
   }
 #endif
-  return fmt::format("sts.{}.amazonaws.com", region);
+  return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
 static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
@@ -323,69 +354,46 @@ absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message
   return buffer.empty() ? absl::nullopt : absl::optional<std::string>(buffer);
 }
 
-bool Utility::addInternalClusterStatic(
-    Upstream::ClusterManager& cm, absl::string_view cluster_name,
+envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(
+    absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
   // Check if local cluster exists with that name.
-  if (cm.getThreadLocalCluster(cluster_name) == nullptr) {
-    // Make sure we run this on main thread.
-    TRY_ASSERT_MAIN_THREAD {
-      envoy::config::cluster::v3::Cluster cluster;
-      absl::string_view host_port;
-      absl::string_view path;
-      Http::Utility::extractHostPathFromUri(uri, host_port, path);
-      const auto host_attributes = Http::Utility::parseAuthority(host_port);
-      const auto host = host_attributes.host_;
-      const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
 
-      cluster.set_name(cluster_name);
-      cluster.set_type(cluster_type);
-      cluster.mutable_connect_timeout()->set_seconds(5);
-      cluster.mutable_load_assignment()->set_cluster_name(cluster_name);
-      auto* endpoint = cluster.mutable_load_assignment()
-                           ->add_endpoints()
-                           ->add_lb_endpoints()
-                           ->mutable_endpoint();
-      auto* addr = endpoint->mutable_address();
-      addr->mutable_socket_address()->set_address(host);
-      addr->mutable_socket_address()->set_port_value(port);
-      cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
-      envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
-      auto* http_protocol_options =
-          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
-      http_protocol_options->set_accept_http_10(true);
-      (*cluster.mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
+  envoy::config::cluster::v3::Cluster cluster;
+  absl::string_view host_port;
+  absl::string_view path;
+  Http::Utility::extractHostPathFromUri(uri, host_port, path);
+  const auto host_attributes = Http::Utility::parseAuthority(host_port);
+  const auto host = host_attributes.host_;
+  const auto port = host_attributes.port_ ? host_attributes.port_.value() : 80;
 
-      // Add tls transport socket if cluster supports https over port 443.
-      if (port == 443) {
-        auto* socket = cluster.mutable_transport_socket();
-        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
-        socket->set_name("envoy.transport_sockets.tls");
-        socket->mutable_typed_config()->PackFrom(tls_socket);
-      }
+  cluster.set_name(cluster_name);
+  cluster.set_type(cluster_type);
+  cluster.mutable_connect_timeout()->set_seconds(5);
+  cluster.mutable_load_assignment()->set_cluster_name(cluster_name);
+  auto* endpoint =
+      cluster.mutable_load_assignment()->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* addr = endpoint->mutable_address();
+  addr->mutable_socket_address()->set_address(host);
+  addr->mutable_socket_address()->set_port_value(port);
+  cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+  envoy::extensions::upstreams::http::v3::HttpProtocolOptions protocol_options;
+  auto* http_protocol_options =
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+  http_protocol_options->set_accept_http_10(true);
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(protocol_options);
 
-      // TODO(suniltheta): use random number generator here for cluster version.
-      // While adding multiple clusters make sure that change in random version number across
-      // multiple clusters won't make Envoy delete/replace previously registered internal cluster.
-      cm.addOrUpdateCluster(cluster, "12345");
-
-      const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
-                                        ->FindValueByNumber(cluster_type)
-                                        ->name();
-      ENVOY_LOG_MISC(info,
-                     "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
-                     "credentials",
-                     cluster_type_str, cluster_name, host_port);
-    }
-    END_TRY
-    CATCH(const EnvoyException& e, {
-      ENVOY_LOG_MISC(error, "Failed to add internal cluster {}: {}", cluster_name, e.what());
-      return false;
-    });
+  // Add tls transport socket if cluster supports https over port 443.
+  if (port == 443) {
+    auto* socket = cluster.mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
+    socket->set_name("envoy.transport_sockets.tls");
+    socket->mutable_typed_config()->PackFrom(tls_socket);
   }
-  return true;
+
+  return cluster;
 }
 
 std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable_name,
@@ -474,6 +482,44 @@ std::string Utility::getConfigProfileName() {
     return profile_name;
   } else {
     return "profile " + profile_name;
+  }
+}
+
+std::string Utility::getStringFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                                const std::string& string_value,
+                                                const std::string& string_default) {
+  absl::StatusOr<Envoy::Json::ValueType> value_or_error;
+  value_or_error = json_object->getValue(string_value);
+  if ((!value_or_error.ok()) || (!absl::holds_alternative<std::string>(value_or_error.value()))) {
+
+    ENVOY_LOG_MISC(error, "Unable to retrieve string value from json: {}", string_value);
+    return string_default;
+  }
+  return absl::get<std::string>(value_or_error.value());
+}
+
+int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                             const std::string& integer_value,
+                                             const int64_t integer_default) {
+  absl::StatusOr<Envoy::Json::ValueType> value_or_error;
+  value_or_error = json_object->getValue(integer_value);
+  if (!value_or_error.ok() || ((!absl::holds_alternative<double>(value_or_error.value())) &&
+                               (!absl::holds_alternative<int64_t>(value_or_error.value())))) {
+    ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
+    return integer_default;
+  }
+  auto json_integer = value_or_error.value();
+  // Handle double formatted integers IE exponent format such as 1.714449238E9
+  if (auto* double_integer = absl::get_if<double>(&json_integer)) {
+    if (*double_integer < 0) {
+      ENVOY_LOG_MISC(error, "Integer {} less than 0: {}", integer_value, *double_integer);
+      return integer_default;
+    } else {
+      return int64_t(*double_integer);
+    }
+  } else {
+    // Standard integer
+    return absl::get<int64_t>(json_integer);
   }
 }
 

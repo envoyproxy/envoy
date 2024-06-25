@@ -9,6 +9,8 @@
 #include <atomic>
 #include <string>
 
+#include "source/common/quic/platform/quiche_flags_constants.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/flags/declare.h"
 #include "absl/flags/flag.h"
@@ -19,10 +21,6 @@
   quiche::TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(#flag, value, help);
 
 namespace quiche {
-
-const std::string EnvoyQuicheReloadableFlagPrefix =
-    "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
-const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 
 using ReloadableFlag = absl::Flag<bool>;
 
@@ -59,15 +57,14 @@ namespace quiche {
 
 #define SetQuicheFlagImpl(flag, value) absl::SetFlag(&FLAGS_envoy_##flag, value)
 
-#define GetQuicheReloadableFlagImpl(module, flag)                                                  \
-  absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
+#define GetQuicheReloadableFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
 
-#define SetQuicheReloadableFlagImpl(module, flag, value)                                           \
+#define SetQuicheReloadableFlagImpl(flag, value)                                                   \
   absl::SetFlag(&FLAGS_envoy_quic_reloadable_flag_##flag, value)
 
-#define GetQuicheRestartFlagImpl(module, flag) absl::GetFlag(FLAGS_envoy_quic_restart_flag_##flag)
+#define GetQuicheRestartFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quic_restart_flag_##flag)
 
-#define SetQuicheRestartFlagImpl(module, flag, value)                                              \
+#define SetQuicheRestartFlagImpl(flag, value)                                                      \
   absl::SetFlag(&FLAGS_envoy_quic_restart_flag_##flag, value)
 
 } // namespace quiche

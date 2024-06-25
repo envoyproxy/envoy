@@ -57,7 +57,8 @@ private:
 };
 
 std::vector<Matchers::StringMatcherPtr>
-initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list);
+initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_list,
+                   Server::Configuration::CommonFactoryContext& context);
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

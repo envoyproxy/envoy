@@ -82,7 +82,7 @@ Envoy::Compression::Compressor::CompressorPtr QatzipCompressorFactory::createCom
 }
 
 QatzipCompressorFactory::QatzipThreadLocal::QatzipThreadLocal(QzSessionParams_T params)
-    : params_(params), session_{}, initialized_(false) {}
+    : params_(params), session_{} {}
 
 QatzipCompressorFactory::QatzipThreadLocal::~QatzipThreadLocal() {
   if (initialized_) {

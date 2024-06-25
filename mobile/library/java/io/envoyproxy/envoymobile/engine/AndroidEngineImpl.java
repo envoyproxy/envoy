@@ -26,7 +26,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
     if (ContextUtils.getApplicationContext() == null) {
       ContextUtils.initApplicationContext(context.getApplicationContext());
     }
-    AndroidJniLibrary.load(context);
     AndroidNetworkMonitor.load(context, envoyEngine);
     if (enableProxying) {
       AndroidProxyMonitor.load(context, envoyEngine);
@@ -41,11 +40,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
   @Override
   public void performRegistration(EnvoyConfiguration envoyConfiguration) {
     envoyEngine.performRegistration(envoyConfiguration);
-  }
-
-  @Override
-  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
-    return envoyEngine.runWithYaml(configurationYAML, logLevel);
   }
 
   @Override

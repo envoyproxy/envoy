@@ -8,6 +8,7 @@
 #include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
@@ -35,11 +36,12 @@ public:
                      bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
                      QuicStatNames& quic_stat_names,
-                     uint32_t packets_to_read_to_connection_count_ratio,
+                     uint32_t packets_to_read_to_connection_count_ratio, bool receive_ecn,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
                      QuicConnectionIdGeneratorPtr&& cid_generator,
-                     QuicConnectionIdWorkerSelector worker_selector);
+                     QuicConnectionIdWorkerSelector worker_selector,
+                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
 
   ~ActiveQuicListener() override;
 
@@ -140,6 +142,7 @@ private:
       crypto_server_stream_factory_;
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
+  EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;
@@ -147,6 +150,7 @@ private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
   QuicStatNames& quic_stat_names_;
   const uint32_t packets_to_read_to_connection_count_ratio_;
+  bool receive_ecn_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};

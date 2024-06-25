@@ -33,7 +33,7 @@ message Cors {
 
 // Per route configuration for the CORS filter. This configuration should be configured in the ``RouteConfiguration`` as ``typed_per_filter_config`` at some level to
 // make the filter work.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message CorsPolicy {
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
@@ -79,4 +79,8 @@ message CorsPolicy {
   //
   // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
   google.protobuf.BoolValue allow_private_network_access = 9;
+
+  // Specifies if preflight requests not matching the configured allowed origin should be forwarded
+  // to the upstream. Default is true.
+  google.protobuf.BoolValue forward_not_matching_preflights = 10;
 }

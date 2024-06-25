@@ -9,6 +9,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
@@ -57,6 +58,7 @@ public:
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         stat_names_(scope_->symbolTable()) {
 
+    ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto* google_grpc = config_.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
@@ -70,7 +72,7 @@ public:
 
   virtual void initialize() {
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, stub_factory_,
-                                                           scope_, config_, *api_, stat_names_);
+                                                           scope_, config_, context_, stat_names_);
   }
 
   envoy::config::core::v3::GrpcService config_;
@@ -78,6 +80,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientThreadLocalPtr tls_;
   MockStubFactory stub_factory_;
@@ -105,13 +108,30 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
 TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   initialize();
 
+  Tracing::MockSpan parent_span;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+
+  EXPECT_CALL(parent_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("fake_address")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(*child_span, injectContext(_, _));
+  EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+
   EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
-  auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  Http::AsyncClient::StreamOptions stream_options;
+  stream_options.setParentSpan(parent_span).setSampled(true);
+
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
   EXPECT_TRUE(grpc_stream == nullptr);
 }
 
@@ -137,7 +157,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
   // Prepare the parent context of this call.
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider};
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;
@@ -180,7 +201,7 @@ class EnvoyGoogleLessMockedAsyncClientImplTest : public EnvoyGoogleAsyncClientIm
 public:
   void initialize() override {
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *tls_, real_stub_factory_,
-                                                           scope_, config_, *api_, stat_names_);
+                                                           scope_, config_, context_, stat_names_);
   }
 
   GoogleGenericStubFactory real_stub_factory_;

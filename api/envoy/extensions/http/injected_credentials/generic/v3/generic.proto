@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.extensions.http.injected_credentials.generic.v3;
+
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.injected_credentials.generic.v3";
+option java_outer_classname = "GenericProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/injected_credentials/generic/v3;genericv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Generic Credential]
+// [#extension: envoy.http.injected_credentials.generic]
+
+// Generic extension can be used to inject HTTP Basic Auth, Bearer Token, or any arbitrary credential
+// into the proxied requests.
+// The credential will be injected into the specified HTTP request header.
+// Refer to [RFC 6750: The OAuth 2.0 Authorization Framework: Bearer Token Usage](https://www.rfc-editor.org/rfc/rfc6750) for details.
+//
+message Generic {
+  // The SDS configuration for the credential that will be injected to the specified HTTP request header.
+  // It must be a generic secret.
+  transport_sockets.tls.v3.SdsSecretConfig credential = 1
+      [(validate.rules).message = {required: true}];
+
+  // The header that will be injected to the HTTP request with the provided credential.
+  // If not set, filter will default to: ``Authorization``
+  string header = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+}

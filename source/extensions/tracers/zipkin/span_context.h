@@ -77,7 +77,7 @@ public:
   bool sampled() const { return sampled_; }
 
   /**
-   * @return the inner context flag.
+   * @return the inner context flag. True if this context is created base on the inner span.
    */
   bool innerContext() const { return inner_context_; }
 

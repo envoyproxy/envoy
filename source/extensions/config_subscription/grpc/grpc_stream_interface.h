@@ -11,7 +11,7 @@ namespace Config {
 template <class RequestProto, class ResponseProto>
 class GrpcStreamInterface : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
-  virtual ~GrpcStreamInterface() = default;
+  ~GrpcStreamInterface() override = default;
 
   // Attempt to establish a new gRPC stream to the xDS server.
   virtual void establishNewStream() PURE;
@@ -32,6 +32,10 @@ public:
   // Returns true if a message can be sent from the rate-limiting perspective.
   // The rate-limiting counters may be updated by this method.
   virtual bool checkRateLimitAllowsDrain() PURE;
+
+  // Intentionally close the gRPC stream and reset to the pre-establishNewStream() state.
+  // Prevents the retry timer from reconnecting.
+  virtual void closeStream() PURE;
 };
 
 template <class RequestProto, class ResponseProto>

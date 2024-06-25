@@ -12,11 +12,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stats/stats_matcher.h"
-#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
@@ -24,7 +19,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -161,12 +155,12 @@ public:
   template <class Proto> static absl::Status checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-    if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
+    if (transport_api_version != envoy::config::core::v3::ApiVersion::AUTO &&
+        transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
       const std::string& warning = fmt::format(
-          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "V2 xDS transport protocol version is deprecated in {}. "
           "The v2 xDS major version has been removed and is no longer supported. "
-          "You may be missing explicit V3 configuration of the transport API version, "
-          "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
+          "See the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
       return absl::InvalidArgumentError(warning);
@@ -178,9 +172,10 @@ public:
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
-   * @return RateLimitSettings.
+   * @return absl::StatusOr<RateLimitSettings> - returns an error when an
+   *         invalid RateLimit config settings are provided.
    */
-  static RateLimitSettings
+  static absl::StatusOr<RateLimitSettings>
   parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
@@ -313,12 +308,12 @@ public:
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
@@ -390,17 +385,6 @@ public:
    * Truncates the message to a length less than default GRPC trailers size limit (by default 8KiB).
    */
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
-
-  /**
-   * Create TagProducer instance. Check all tag names for conflicts to avoid
-   * unexpected tag name overwriting.
-   * @param bootstrap bootstrap proto.
-   * @param cli_tags tags that are provided by the cli
-   * @throws EnvoyException when the conflict of tag names is found.
-   */
-  static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                    const Stats::TagVector& cli_tags);
 
   /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
@@ -490,7 +474,6 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms) {
-
     auto& grpc_services = api_config_source.grpc_services();
     if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       return prepareJitteredExponentialBackOffStrategy(

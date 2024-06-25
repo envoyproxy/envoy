@@ -49,7 +49,8 @@ struct FaultFilterStats {
  */
 class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault);
+  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
+                Server::Configuration::CommonFactoryContext& context);
 
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
@@ -119,8 +120,8 @@ private:
 class FaultFilterConfig {
 public:
   FaultFilterConfig(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
-                    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-                    TimeSource& time_source);
+                    const std::string& stats_prefix, Stats::Scope& scope,
+                    Server::Configuration::CommonFactoryContext& context);
 
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }

@@ -64,11 +64,18 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
     throw EnvoyException("invalid HMAC secret configuration");
   }
 
-  auto secret_reader =
-      std::make_shared<SDSSecretReader>(secret_provider_token_secret, secret_provider_hmac_secret,
-                                        context.serverFactoryContext().api());
-  auto config = std::make_shared<FilterConfig>(proto_config, cluster_manager, secret_reader,
-                                               context.scope(), stats_prefix);
+  if (proto_config.preserve_authorization_header() && proto_config.forward_bearer_token()) {
+    throw EnvoyException(
+        "invalid combination of forward_bearer_token and preserve_authorization_header "
+        "configuration. If forward_bearer_token is set to true, then "
+        "preserve_authorization_header must be false");
+  }
+
+  auto secret_reader = std::make_shared<SDSSecretReader>(
+      std::move(secret_provider_token_secret), std::move(secret_provider_hmac_secret),
+      context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api());
+  auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(),
+                                               secret_reader, context.scope(), stats_prefix);
 
   return
       [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {

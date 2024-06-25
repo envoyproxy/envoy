@@ -38,6 +38,13 @@ public:
    * @return A string suitable for inclusion in a JSON stream, including double-quotes.
    */
   static std::string serialize(absl::string_view str);
+
+  /*
+   * Serializes a JSON string to a byte vector using the MessagePack serialization format.
+   * If the provided JSON string is invalid, an empty vector will be returned.
+   * See: https://github.com/msgpack/msgpack/blob/master/spec.md
+   */
+  static std::vector<uint8_t> jsonToMsgpack(const std::string& json);
 };
 
 } // namespace Nlohmann

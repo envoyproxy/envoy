@@ -48,9 +48,7 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
 
 class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AccessLogImplTest()
-      : stream_info_(time_source_), file_(new MockAccessLogFile()),
-        engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  AccessLogImplTest() : stream_info_(time_source_), file_(new MockAccessLogFile()) {
     ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_.server_factory_context_, accessLogManager())
         .WillByDefault(ReturnRef(log_manager_));
@@ -73,7 +71,6 @@ protected:
   TestStreamInfo stream_info_;
   std::shared_ptr<MockAccessLogFile> file_;
   StringViewSaver output_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -1069,6 +1066,7 @@ filter:
       - OM
       - DF
       - DO
+      - DR
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1651,7 +1649,7 @@ public:
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
-    return std::make_unique<HeaderFilter>(header_config);
+    return std::make_unique<HeaderFilter>(header_config, context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

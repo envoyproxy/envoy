@@ -40,6 +40,12 @@ is used as a region set. A region set is a single region, or comma seperated lis
 such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
 multi-region implementations.
 
+Signing can be added to the query string, rather than in the headers, by enabling :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>`
+Query string signing adds an additional parameter :ref:`expiration_time <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString.expiration_time>` which determines the
+length of time after which this URL becomes invalid, starting from the time the URL is signed.
+The default expiration time is 5 seconds, with a maximum of 3600 seconds. It is recommended to keep this value as small as practicable,
+as the generated URL is replayable before this time expires.
+
 Example configuration
 ---------------------
 
@@ -61,7 +67,7 @@ This filter also supports per route configuration. Below is an example of route-
     :linenos:
     :caption: :download:`aws-request-signing-filter-route-level-override.yaml <_include/aws-request-signing-filter-route-level-override.yaml>`
 
-An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to an Amazon VPC Lattice service:
+An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildcarded region set, to an Amazon VPC Lattice service, using query string signing and a 3 second expiration:
 
 .. literalinclude:: _include/aws-request-signing-filter-sigv4a.yaml
     :language: yaml
@@ -74,8 +80,8 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
 Configuration as an upstream HTTP filter
 ----------------------------------------
 SigV4 or SigV4A request signatures are calculated using the HTTP host, URL and payload as input. Depending on the configuration, Envoy may modify one or more of
-these prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers. Modifying fields in a SigV4 or SigV4A
-signed request will result in an invalid signature.
+these prior to forwarding to the Cluster subsystem, but after the signature has been calculated and inserted into the HTTP headers or query string.
+Modifying fields in a SigV4 or SigV4A signed request will result in an invalid signature.
 
 To avoid invalid signatures, the AWS Request Signing Filter can be configured as an upstream HTTP filter. This allows signatures to be
 calculated as a final step before the HTTP request is forwarded upstream, ensuring signatures are correctly calculated over the updated
@@ -112,3 +118,17 @@ comes from the owning HTTP connection manager.
   signing_failed, Counter, Total requests for which signing failed (includes payload_signing_failed)
   payload_signing_added, Counter, Total requests for which the payload was buffered signing succeeded
   payload_signing_failed, Counter, Total requests for which the payload was buffered but signing failed
+
+In addition, when using the ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` reloadable feature, the following
+statistics are output under the ``aws.metadata_credentials_provider`` namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :escape: '
+  :widths: 1, 1, 2
+
+  <provider_cluster>.credential_refreshes_performed, Counter, Total credential refreshes performed by this cluster
+  <provider_cluster>.credential_refreshes_failed, Counter, Total credential refreshes failed by this cluster. For example', this would be incremented if a WebIdentity token was expired
+  <provider_cluster>.credential_refreshes_succeeded, Counter, Total successful credential refreshes for this cluster. Successful refresh would indicate credentials are available for signing
+  <provider_cluster>.metadata_refresh_state, Gauge, 0 means the cluster is in initial refresh state', ie no successful credential refreshes have been performed. In 0 state the cluster will attempt credential refresh up to a maximum of once every 30 seconds. 1 means the cluster is in normal credential expiration based refresh state
+

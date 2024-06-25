@@ -399,7 +399,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(
       callbacks_.details(),
-      "upstream_reset_before_response_started{remote_connection_failure,tls_version_mismatch}");
+      "upstream_reset_before_response_started{remote_connection_failure|tls_version_mismatch}");
 }
 
 TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
@@ -431,7 +431,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{connection_timeout,connect_timeout}");
+            "upstream_reset_before_response_started{connection_timeout|connect_timeout}");
 }
 
 TEST_F(RouterTest, Http1Upstream) {
@@ -760,6 +760,16 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(), "no_healthy_upstream");
+}
+
+TEST_F(RouterTest, RouterLoadShedTest) {
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  ON_CALL(callbacks_, shouldLoadShed()).WillByDefault(Return(true));
+  router_->decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(callbacks_.details(), "overload");
+  EXPECT_EQ(1UL, router_->stats().rq_overload_local_reply_.value());
 }
 
 TEST_F(RouterTest, MaintenanceMode) {
@@ -2737,6 +2747,69 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Test when the upstream request gets reset while the client is sending the body
+// with more data arriving but not buffering any data.
+TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request", "true"}});
+
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}, {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  const std::string body1("body1");
+  Buffer::OwnedImpl buf1(body1);
+
+  // Send data while the upstream request is reset, should not have any failure.
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  router_->decodeData(buf1, false);
+
+  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started");
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Test the original branch when local_reply_when_no_buffer_and_upstream_request runtime is false.
+TEST_F(RouterTest, NormalPathUpstreamResetDuringBodyDataTransferNotBuffering) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request",
+        "false"}});
+
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}, {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  const std::string body1("body1");
+  Buffer::OwnedImpl buf1(body1);
+  router_->decodeData(buf1, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
 // Test retrying a request, when the first attempt fails while the client
 // is sending the body, with the rest of the request arriving in between upstream
 // request attempts.
@@ -4499,7 +4572,7 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
   }
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
-  return std::make_shared<ShadowPolicyImpl>(policy);
+  return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy), std::shared_ptr<ShadowPolicyImpl>);
 }
 
 } // namespace
@@ -4510,12 +4583,12 @@ public:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     // Recreate router filter so it latches the correct value of streaming shadow.
-    router_ = std::make_unique<RouterTestFilter>(config_, config_.default_stats_);
+    router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
   }
 
 protected:
@@ -5119,7 +5192,8 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_EQ(nullptr, stream_info.upstreamInfo());
 
@@ -5173,7 +5247,8 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
 
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   // Check that upstream timing is updated after the first request.
@@ -5242,7 +5317,8 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   expectResponseTimerCreate();
@@ -5730,15 +5806,28 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   TestScopedRuntime scoped_runtime;
 
-  // With no scheme and x-forwarded-proto, set scheme based on encryption level
+  // With upstream scheme, set scheme based on upstream encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, false, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With no scheme and x-forwarded-proto, set scheme based on downstream
+  // encryption level
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, false, false);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5746,7 +5835,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5754,7 +5843,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
@@ -5763,7 +5852,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
@@ -6248,7 +6337,7 @@ TEST_F(RouterTest, RequestResponseSize) { testRequestResponse(false); }
 TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponse(true); }
 
 TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
-  auto address = Network::Utility::parseInternetAddressAndPort("127.0.0.1:20");
+  auto address = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:20");
   std::string hostname = "www.lyft.com";
   callbacks_.stream_info_.filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),
@@ -6561,6 +6650,27 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
 
   router_->onDestroy();
+}
+
+TEST_F(RouterTest, OverwriteSchemeWithUpstreamTransportProtocol) {
+  EXPECT_CALL(callbacks_.stream_info_, shouldSchemeMatchUpstream()).WillRepeatedly(Return(true));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setScheme("https");
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(headers.getSchemeValue(), "http");
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel(_));
+  router_->onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(0U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 } // namespace Router

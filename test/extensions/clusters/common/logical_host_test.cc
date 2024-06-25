@@ -1,11 +1,13 @@
 #include "source/extensions/clusters/common/logical_host.h"
 
+#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -37,9 +39,26 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
-  std::vector<Network::Address::InstanceConstSharedPtr> address_list;
-  EXPECT_CALL(*mock_host_, addressList()).WillOnce(ReturnRef(address_list));
-  description_.addressList();
+  EXPECT_CALL(*mock_host_, addressListOrNull())
+      .WillOnce(Return(std::make_shared<Upstream::HostDescription::AddressVector>()));
+  description_.addressListOrNull();
+
+  const envoy::config::core::v3::Metadata metadata;
+  const envoy::config::cluster::v3::Cluster cluster;
+  Network::MockTransportSocketFactory socket_factory;
+  EXPECT_CALL(*mock_host_, resolveTransportSocketFactory(_, _)).WillOnce(ReturnRef(socket_factory));
+  description_.resolveTransportSocketFactory(address_, &metadata);
+
+  description_.canary(false);
+  description_.priority(0);
+  description_.metadata(nullptr);
+  description_.setLastHcPassTime(MonotonicTime());
+
+  Upstream::HealthCheckHostMonitorPtr heath_check_monitor;
+  description_.setHealthChecker(std::move(heath_check_monitor));
+
+  Upstream::Outlier::DetectorHostMonitorPtr detector_host;
+  description_.setOutlierDetector(std::move(detector_host));
 }
 
 } // namespace Clusters

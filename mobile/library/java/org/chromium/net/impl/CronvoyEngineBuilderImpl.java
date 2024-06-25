@@ -62,6 +62,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mQuicClientConnectionOptions = "";
   private boolean mHttp2Enabled;
   private boolean mBrotiEnabled;
+  private boolean mPortMigrationEnabled;
   private boolean mDisableCache;
   private int mHttpCacheMode;
   private long mHttpCacheMaxSize;
@@ -238,6 +239,13 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   }
 
   List<String> quicCanonicalSuffixes() { return mQuicCanonicalSuffixes; }
+
+  public CronvoyEngineBuilderImpl enablePortMigration(boolean enablePortMigration) {
+    mPortMigrationEnabled = enablePortMigration;
+    return this;
+  }
+
+  boolean portMigrationEnabled() { return mPortMigrationEnabled; }
 
   @Override
   public CronvoyEngineBuilderImpl addPublicKeyPins(String hostName, Set<byte[]> pinsSha256,

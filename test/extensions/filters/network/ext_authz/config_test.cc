@@ -28,7 +28,6 @@ void expectCorrectProto() {
       stat_prefix: google
   failure_mode_allow: false
   stat_prefix: name
-  transport_api_version: V3
 )EOF";
 
   ExtAuthzConfigFactory factory;
@@ -41,7 +40,8 @@ void expectCorrectProto() {
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -52,7 +52,7 @@ TEST(ExtAuthzFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz config;
   config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(config, context),
+  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(config, context).IgnoreError(),
                ProtoValidationException);
 }
 

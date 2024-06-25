@@ -34,6 +34,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -113,6 +114,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_time_lib",
@@ -179,6 +181,7 @@ envoy_cc_test(
         ":grpc_client_integration_test_harness_lib",
         "//source/common/grpc:async_client_lib",
         "//source/extensions/grpc_credentials/example:config",
+        "//test/test_common:test_runtime_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
 
@@ -226,6 +229,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

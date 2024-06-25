@@ -226,7 +226,7 @@ public:
 
 class MockConnectionManager : public ConnectionManager {
 public:
-  MockConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+  MockConnectionManager(const ConfigSharedPtr& config, Random::RandomGenerator& random_generator,
                         TimeSource& time_system, Server::Configuration::FactoryContext& context,
                         std::shared_ptr<Router::TransactionInfos> transaction_infos)
       : ConnectionManager(config, random_generator, time_system, context, transaction_infos) {}

@@ -281,6 +281,11 @@ public:
    * Closes the listening socket for the admin.
    */
   virtual void closeSocket() PURE;
+
+  /**
+   * Creates a streaming request context from the url path in the admin stream.
+   */
+  virtual RequestPtr makeRequest(AdminStream& admin_stream) const PURE;
 };
 
 } // namespace Server

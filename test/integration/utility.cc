@@ -142,11 +142,13 @@ private:
 Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
+                                                          ThreadLocal::Instance& threadlocal,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
   ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
+  ON_CALL(context.server_context_, threadLocal()).WillByDefault(testing::ReturnRef(threadlocal));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -164,7 +166,7 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
-  return config_factory.createTransportSocketFactory(quic_transport_socket_config, context);
+  return config_factory.createTransportSocketFactory(quic_transport_socket_config, context).value();
 }
 
 BufferingStreamDecoderPtr
@@ -219,7 +221,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Upstream::HostDescriptionConstSharedPtr host_description =
       std::make_shared<Upstream::HostDescriptionImpl>(
           cluster, "",
-          Network::Utility::resolveUrl(
+          *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
           nullptr, envoy::config::core::v3::Locality().default_instance(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
@@ -236,9 +238,11 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   }
 
 #ifdef ENVOY_ENABLE_QUIC
-  Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
+  testing::NiceMock<ThreadLocal::MockInstance> threadlocal;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  Extensions::TransportSockets::Tls::ContextManagerImpl manager(server_factory_context);
   Network::UpstreamTransportSocketFactoryPtr transport_socket_factory =
-      createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
+      createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager, threadlocal,
                                                "spiffe://lyft.com/backend-team");
   auto& quic_transport_socket_factory =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
@@ -276,7 +280,7 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
                                    const std::string& body, Http::CodecType type,
                                    Network::Address::IpVersion ip_version, const std::string& host,
                                    const std::string& content_type) {
-  auto addr = Network::Utility::resolveUrl(
+  auto addr = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
   return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
@@ -311,7 +315,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   }
 
   client_ = dispatcher_.createClientConnection(
-      Network::Utility::resolveUrl(
+      *Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
       Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   // ConnectionCallbacks will call write_request_callback from the connect and low-watermark

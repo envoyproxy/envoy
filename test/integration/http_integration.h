@@ -386,4 +386,8 @@ protected:
   IntegrationTcpClientPtr tcp_client_;
 };
 
+absl::string_view upstreamToString(Http::CodecType type);
+absl::string_view downstreamToString(Http::CodecType type);
+absl::string_view http2ImplementationToString(Http2Impl impl);
+
 } // namespace Envoy

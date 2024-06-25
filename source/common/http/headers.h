@@ -170,6 +170,7 @@ public:
   // filter. We need to figure out if we can remove this header from the set of headers that
   // participate in prefix overrides.
   const LowerCaseString EnvoyIpTags{absl::StrCat(prefix(), "-ip-tags")};
+  const LowerCaseString EnvoyLocalOverloaded{absl::StrCat(prefix(), "-local-overloaded")};
   const LowerCaseString EnvoyMaxRetries{absl::StrCat(prefix(), "-max-retries")};
   const LowerCaseString EnvoyNotForwarded{absl::StrCat(prefix(), "-not-forwarded")};
   const LowerCaseString EnvoyOriginalDstHost{absl::StrCat(prefix(), "-original-dst-host")};
@@ -266,6 +267,7 @@ public:
     const std::string Json{"application/json"};
     const std::string Protobuf{"application/x-protobuf"};
     const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
+    const std::string Thrift{"application/x-thrift"};
   } ContentTypeValues;
 
   struct {

@@ -202,6 +202,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
+  lua_state_.registerType<ConnectionStreamInfoWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -353,6 +356,12 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
   StreamHandleWrapper::HttpCallOptions options;
+  options.request_options_
+      .setParentSpan(callbacks_.activeSpan())
+      // By default, do not enforce a sampling decision on this `httpCall`'s span.
+      // Instead, reuse the parent span's sampling decision. Callers can override
+      // this default with the `trace_sampled` flag in the table argument below.
+      .setSampled(absl::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -372,7 +381,6 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     options.is_async_request_ = lua_toboolean(state, AsyncFlagIndex);
   }
 
-  options.request_options_.setParentSpan(callbacks_.activeSpan());
   return doHttpCall(state, options);
 }
 
@@ -621,6 +629,17 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (connection_stream_info_wrapper_.get() != nullptr) {
+    connection_stream_info_wrapper_.pushStack();
+  } else {
+    connection_stream_info_wrapper_.reset(
+        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaConnection(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (connection_wrapper_.get() != nullptr) {
@@ -808,15 +827,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            "for the Lua filter.");
     }
 
-    const std::string code =
-        Config::DataSource::read(proto_config.default_source_code(), true, api);
+    const std::string code = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
   } else if (!proto_config.inline_code().empty()) {
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
   }
 
   for (const auto& source : proto_config.source_codes()) {
-    const std::string code = Config::DataSource::read(source.second, true, api);
+    const std::string code =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
     auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
     if (!per_lua_code_setup_ptr) {
       continue;
@@ -834,7 +854,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     return;
   }
   // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
+  const std::string code_str = THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
 }
 

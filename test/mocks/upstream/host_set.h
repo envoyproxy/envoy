@@ -17,7 +17,7 @@ public:
   ~MockHostSet() override;
 
   void runCallbacks(const HostVector added, const HostVector removed) {
-    member_update_cb_helper_.runCallbacks(priority(), added, removed);
+    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(priority(), added, removed));
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr

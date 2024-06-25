@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/api_version.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -31,8 +32,10 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                                               time_source_.systemTime()} {
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
-  subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  subscription_ = THROW_OR_RETURN_VALUE(
+      subscription_factory_.subscriptionFromConfigSource(
+          sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {}),
+      Config::SubscriptionPtr);
 }
 
 void SdsApi::resolveDataSource(const FileContentMap& files,
@@ -68,7 +71,7 @@ void SdsApi::onWatchUpdate() {
     const uint64_t new_hash = next_hash;
     if (new_hash != files_hash_) {
       resolveSecret(files);
-      update_callback_manager_.runCallbacks();
+      THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
       files_hash_ = new_hash;
     }
   }
@@ -81,7 +84,7 @@ void SdsApi::onWatchUpdate() {
 
 absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string& version_info) {
-  const absl::Status status = validateUpdateSize(resources.size());
+  const absl::Status status = validateUpdateSize(resources.size(), 0);
   if (!status.ok()) {
     return status;
   }
@@ -102,14 +105,17 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     const auto files = loadFiles();
     files_hash_ = getHashForFiles(files);
     resolveSecret(files);
-    update_callback_manager_.runCallbacks();
+    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 
     auto* watched_directory = getWatchedDirectory();
     // Either we have a watched path and can defer the watch monitoring to a
     // WatchedDirectory object, or we need to implement per-file watches in the else
     // clause.
     if (watched_directory != nullptr) {
-      watched_directory->setCallback([this]() { onWatchUpdate(); });
+      watched_directory->setCallback([this]() {
+        onWatchUpdate();
+        return absl::OkStatus();
+      });
     } else {
       // List DataSources that refer to files
       auto files = getDataSourceFilenames();
@@ -121,9 +127,12 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
           // on directory level (e.g. Kubernetes secret update).
           const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
           RETURN_IF_STATUS_NOT_OK(result_or_error);
-          watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
-                             Filesystem::Watcher::Events::MovedTo,
-                             [this](uint32_t) { onWatchUpdate(); });
+          RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(result_or_error.value().directory_, "/"),
+                                              Filesystem::Watcher::Events::MovedTo,
+                                              [this](uint32_t) {
+                                                onWatchUpdate();
+                                                return absl::OkStatus();
+                                              }));
         }
       } else {
         watcher_.reset(); // Destroy the old watch if any
@@ -136,12 +145,28 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   return absl::OkStatus();
 }
 
-absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                    const Protobuf::RepeatedPtrField<std::string>&,
-                                    const std::string&) {
-  const absl::Status status = validateUpdateSize(added_resources.size());
+absl::Status
+SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                       const std::string&) {
+  const absl::Status status = validateUpdateSize(added_resources.size(), removed_resources.size());
   if (!status.ok()) {
     return status;
+  }
+
+  if (removed_resources.size() == 1) {
+    // SDS is a singleton (e.g. single-resource) resource subscription, so it should never be
+    // removed except by the modification of the referenced cluster/listener. Therefore, since the
+    // server indicates a removal, ignore it (via an ACK).
+    ENVOY_LOG_MISC(
+        trace,
+        "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
+        removed_resources[0]);
+
+    // Even if we ignore this resource, the owning resource (LDS/CDS) should still complete
+    // warming.
+    init_target_.ready();
+    return absl::OkStatus();
   }
   return onConfigUpdate(added_resources, added_resources[0].get().version());
 }
@@ -153,14 +178,22 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   init_target_.ready();
 }
 
-absl::Status SdsApi::validateUpdateSize(int num_resources) {
-  if (num_resources == 0) {
+absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
+                                        uint32_t removed_resources_num) const {
+  if (added_resources_num == 0 && removed_resources_num == 0) {
     return absl::InvalidArgumentError(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
   }
-  if (num_resources != 1) {
+
+  // This conditional technically allows a response with added=1 removed=1
+  // which is nonsensical since SDS is a singleton resource subscription.
+  // It is, however, preferred to ignore these nonsensical responses rather
+  // than NACK them, so it is allowed here.
+  if (added_resources_num > 1 || removed_resources_num > 1) {
     return absl::InvalidArgumentError(
-        fmt::format("Unexpected SDS secrets length: {}", num_resources));
+        fmt::format("Unexpected SDS secrets length for {}, number of added resources "
+                    "{}, number of removed resources {}. Expected sum is 1",
+                    sds_config_name_, added_resources_num, removed_resources_num));
   }
   return absl::OkStatus();
 }

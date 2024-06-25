@@ -18,8 +18,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
-      cluster_(cluster), dispatcher_(dispatcher),
-      timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
+      always_log_health_check_success_(config.always_log_health_check_success()), cluster_(cluster),
+      dispatcher_(dispatcher), timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
@@ -40,8 +40,9 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       transport_socket_options_(initTransportSocketOptions(config)),
       transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)),
       member_update_cb_{cluster_.prioritySet().addMemberUpdateCb(
-          [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+          [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> absl::Status {
             onClusterMemberUpdate(hosts_added, hosts_removed);
+            return absl::OkStatus();
           })} {}
 
 std::shared_ptr<const Network::TransportSocketOptionsImpl>
@@ -186,9 +187,10 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
   }
 }
 
-void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
+void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state,
+                                         HealthState current_check_result) {
   for (const HostStatusCb& cb : callbacks_) {
-    cb(host, changed_state);
+    cb(host, changed_state, current_check_result);
   }
 }
 
@@ -258,12 +260,14 @@ HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
+  HealthState state = HealthState::Unhealthy;
   // The session is about to be deferred deleted. Make sure all timers are gone and any
   // implementation specific state is destroyed.
   interval_timer_.reset();
   timeout_timer_.reset();
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent_.decHealthy();
+    state = HealthState::Healthy;
   }
   if (host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
     parent_.decDegraded();
@@ -272,7 +276,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
 
   // Run callbacks in case something is waiting for health checks to run which will now never run.
   if (first_check_) {
-    parent_.runCallbacks(host_, HealthTransition::Unchanged);
+    parent_.runCallbacks(host_, HealthTransition::Unchanged, state);
   }
 }
 
@@ -305,6 +309,11 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     host_->setLastHcPassTime(time_source_.monotonicTime());
   }
 
+  if (changed_state != HealthTransition::Changed && parent_.always_log_health_check_success_ &&
+      parent_.event_logger_) {
+    parent_.event_logger_->logSuccessfulHealthCheck(parent_.healthCheckerType(), host_);
+  }
+
   changed_state = clearPendingFlag(changed_state);
 
   if (degraded != host_->healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
@@ -331,7 +340,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 
   parent_.stats_.success_.inc();
   first_check_ = false;
-  parent_.runCallbacks(host_, changed_state);
+  parent_.runCallbacks(host_, changed_state, HealthState::Healthy);
 
   timeout_timer_->disableTimer();
   interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
@@ -389,7 +398,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   }
 
   first_check_ = false;
-  parent_.runCallbacks(host_, changed_state);
+  parent_.runCallbacks(host_, changed_state, HealthState::Unhealthy);
   return changed_state;
 }
 

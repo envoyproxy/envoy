@@ -69,4 +69,3 @@ static_resources:
               socket_address:
                 address: "metadata.google.internal"
                 port_value: 80
-

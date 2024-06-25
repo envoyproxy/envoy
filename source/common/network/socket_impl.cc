@@ -36,6 +36,12 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
     return;
   }
 
+  if (!io_handle_) {
+    // This can happen iff system socket creation fails.
+    ENVOY_LOG_MISC(warn, "Created socket with null io handle");
+    return;
+  }
+
   // Should not happen but some tests inject -1 fds
   if (!io_handle_->isOpen()) {
     return;

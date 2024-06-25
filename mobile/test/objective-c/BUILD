@@ -11,7 +11,6 @@ envoy_mobile_objc_test(
         "EnvoyBridgeUtilityTest.m",
     ],
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_objc_bridge_lib",
@@ -24,7 +23,6 @@ envoy_mobile_objc_test(
         "EnvoyKeyValueStoreBridgeImplTest.m",
     ],
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
@@ -43,5 +41,19 @@ envoy_objc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//test/common/integration:test_server_interface_lib",
+    ],
+)
+
+envoy_objc_library(
+    name = "envoy_test_api",
+    testonly = True,
+    srcs = [
+        "EnvoyTestApi.mm",
+    ],
+    hdrs = ["EnvoyTestApi.h"],
+    module_name = "EnvoyTestApi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//test/common/proxy:test_apple_proxy_settings_lib",
     ],
 )

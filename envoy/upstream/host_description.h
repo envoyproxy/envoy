@@ -91,6 +91,9 @@ class ClusterInfo;
  */
 class HostDescription {
 public:
+  using AddressVector = std::vector<Network::Address::InstanceConstSharedPtr>;
+  using SharedConstAddressVector = std::shared_ptr<const AddressVector>;
+
   virtual ~HostDescription() = default;
 
   /**
@@ -130,9 +133,24 @@ public:
   virtual Outlier::DetectorHostMonitor& outlierDetector() const PURE;
 
   /**
+   * Set the host's outlier detector monitor. Outlier detector monitors are assumed to be thread
+   * safe, however a new outlier detector monitor must be installed before the host is used across
+   * threads. Thus, this routine should only be called on the main thread before the host is used
+   * across threads.
+   */
+  virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
+
+  /**
    * @return the host's health checker monitor.
    */
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
+
+  /**
+   * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
+   * a new monitor must be installed before the host is used across threads. Thus,
+   * this routine should only be called on the main thread before the host is used across threads.
+   */
+  virtual void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) PURE;
 
   /**
    * @return The hostname used as the host header for health checking.
@@ -156,10 +174,19 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
-   * @return a optional list of additional addresses which the host resolved to. These addresses
-   *         may be used to create upstream connections if the primary address is unreachable.
+   * @return nullptr, or a optional list of additional addresses which the host
+   *         resolved to. These addresses may be used to create upstream
+   *         connections if the primary address is unreachable.
+   *
+   * The address-list is returned as a shared_ptr<const vector<...>> because in
+   * some implements of HostDescription, the address-list can be mutated
+   * asynchronously. Those implementations must use a lock to ensure this is
+   * safe. However this is not sufficient when returning the addressList by
+   * reference.
+   *
+   * Caller must check return-value for nullptr before accessing the vector.
    */
-  virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
+  virtual SharedConstAddressVector addressListOrNull() const PURE;
 
   /**
    * @return host specific stats.
@@ -202,6 +229,16 @@ public:
    *         healthy state via an active healthchecking.
    */
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+
+  /**
+   * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
+   * active health checking.
+   */
+  virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
+
+  virtual Network::UpstreamTransportSocketFactory&
+  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
+                                const envoy::config::core::v3::Metadata* metadata) const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

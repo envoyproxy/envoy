@@ -7,6 +7,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -30,51 +31,75 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    quic::ConnectionIdGeneratorInterface& generator)
+    quic::ConnectionIdGeneratorInterface& generator, const bool prefer_gro)
     : EnvoyQuicClientConnection(
           server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
-          createConnectionSocket(initial_peer_address, local_addr, options), generator) {}
+          createConnectionSocket(initial_peer_address, local_addr, options, prefer_gro), generator,
+          prefer_gro) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
     Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket,
-    quic::ConnectionIdGeneratorInterface& generator)
+    quic::ConnectionIdGeneratorInterface& generator, const bool prefer_gro)
     : EnvoyQuicClientConnection(
           server_connection_id, helper, alarm_factory,
           new EnvoyQuicPacketWriter(
               std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
           /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
-          generator) {}
+          generator, prefer_gro) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
     Network::ConnectionSocketPtr&& connection_socket,
-    quic::ConnectionIdGeneratorInterface& generator)
+    quic::ConnectionIdGeneratorInterface& generator, const bool prefer_gro)
     : quic::QuicConnection(server_connection_id, quic::QuicSocketAddress(),
                            envoyIpAddressToQuicSocketAddress(
                                connection_socket->connectionInfoProvider().remoteAddress()->ip()),
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions, generator),
-      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
+      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher),
+      prefer_gro_(prefer_gro), disallow_mmsg_(Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.disallow_quic_client_udp_mmsg")) {}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time) {
+    MonotonicTime receive_time, uint8_t tos) {
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(
           std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
+  ASSERT(peer_address != nullptr && buffer != nullptr);
   ASSERT(buffer->getRawSlices().size() == 1);
+  if (local_address == nullptr) {
+    // Quic doesn't know how to handle packets without destination address. Drop them here.
+    if (buffer->length() > 0) {
+      ++num_packets_with_unknown_dst_address_;
+      std::string error_message = fmt::format(
+          "Unable to get destination address. Address family {}. Have{} pending path validation. "
+          "self_address is{} initialized.",
+          (peer_address->ip()->version() == Network::Address::IpVersion::v4 ? "v4" : "v6"),
+          (HasPendingPathValidation() ? "" : " no"),
+          (self_address().IsInitialized() ? "" : " not"));
+      ENVOY_CONN_LOG(error, "{}", *this, error_message);
+      if (num_packets_with_unknown_dst_address_ > 10) {
+        // If too many packets are without destination addresses, close the connection.
+        CloseConnection(quic::QUIC_PACKET_READ_ERROR, error_message,
+                        quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+      }
+    }
+    return;
+  }
   Buffer::RawSlice slice = buffer->frontSlice();
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false);
+                                  /*owns_header_buffer*/ false,
+                                  getQuicEcnCodepointFromTosByte(tos));
   ProcessUdpPacket(envoyIpAddressToQuicSocketAddress(local_address->ip()),
                    envoyIpAddressToQuicSocketAddress(peer_address->ip()), packet);
 }
@@ -87,11 +112,12 @@ uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
 void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
                                                       OptRef<PacketsToReadDelegate> delegate) {
   delegate_ = delegate;
-  if (connection_socket.ioHandle().isOpen()) {
+  if (connection_socket.isOpen()) {
     connection_socket.ioHandle().initializeFileEvent(
         dispatcher_,
-        [this, &connection_socket](uint32_t events) -> void {
+        [this, &connection_socket](uint32_t events) {
           onFileEvent(events, connection_socket);
+          return absl::OkStatus();
         },
         Event::PlatformDefaultTriggerType,
         Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -102,7 +128,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
       connection_socket.close();
     }
   }
-  if (!connection_socket.ioHandle().isOpen()) {
+  if (!connection_socket.isOpen()) {
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
@@ -146,16 +172,16 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
   Network::Address::InstanceConstSharedPtr new_local_address;
   if (current_local_address->ip()->version() == Network::Address::IpVersion::v4) {
     new_local_address = std::make_shared<Network::Address::Ipv4Instance>(
-        current_local_address->ip()->addressAsString());
+        current_local_address->ip()->addressAsString(), &current_local_address->socketInterface());
   } else {
     new_local_address = std::make_shared<Network::Address::Ipv6Instance>(
-        current_local_address->ip()->addressAsString());
+        current_local_address->ip()->addressAsString(), &current_local_address->socketInterface());
   }
 
   // The probing socket will have the same host but a different port.
   auto probing_socket =
       createConnectionSocket(connectionSocket()->connectionInfoProvider().remoteAddress(),
-                             new_local_address, connectionSocket()->options());
+                             new_local_address, connectionSocket()->options(), prefer_gro_);
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
@@ -229,7 +255,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
-        *this, dispatcher_.timeSource(), /*prefer_gro=*/false, packets_dropped_);
+        *this, dispatcher_.timeSource(), prefer_gro_, !disallow_mmsg_, packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.

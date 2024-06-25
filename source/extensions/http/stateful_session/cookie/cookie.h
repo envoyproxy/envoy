@@ -69,17 +69,19 @@ private:
     envoy::Cookie cookie;
     if (cookie.ParseFromString(decoded_value)) {
       address = cookie.address();
-      if (address.empty() || (cookie.expires() == 0)) {
+      if (address.empty()) {
         return absl::nullopt;
       }
 
-      std::chrono::seconds expiry_time(cookie.expires());
-      auto now = std::chrono::duration_cast<std::chrono::seconds>(
-          (time_source_.monotonicTime()).time_since_epoch());
-      if (now > expiry_time) {
-        // Ignore the address extracted from the cookie. This will cause
-        // upstream cluster to select a new host and new cookie will be generated.
-        return absl::nullopt;
+      if (cookie.expires() != 0) {
+        const std::chrono::seconds expiry_time(cookie.expires());
+        const auto now = std::chrono::duration_cast<std::chrono::seconds>(
+            (time_source_.monotonicTime()).time_since_epoch());
+        if (now > expiry_time) {
+          // Ignore the address extracted from the cookie. This will cause
+          // upstream cluster to select a new host and new cookie will be generated.
+          return absl::nullopt;
+        }
       }
     } else {
       ENVOY_LOG_ONCE_MISC(

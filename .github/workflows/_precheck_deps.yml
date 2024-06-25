@@ -50,9 +50,9 @@ jobs:
     if: ${{ inputs.dependency-review }}
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
       with:
         ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@4901385134134e04cec5fbe5ddfe3b2c5bd5d976  # v4.0.0
+      uses: actions/dependency-review-action@72eb03d02c7872a771aacd928f3123ac62ad6d3a  # v4.3.3

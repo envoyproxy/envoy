@@ -11,8 +11,9 @@ namespace HttpFilters {
 namespace Assertion {
 
 AssertionFilterConfig::AssertionFilterConfig(
-    const envoymobile::extensions::filters::http::assertion::Assertion& proto_config) {
-  Common::Matcher::buildMatcher(proto_config.match_config(), matchers_);
+    const envoymobile::extensions::filters::http::assertion::Assertion& proto_config,
+    Server::Configuration::CommonFactoryContext& context) {
+  Common::Matcher::buildMatcher(proto_config.match_config(), matchers_, context);
 }
 
 Extensions::Common::Matcher::Matcher& AssertionFilterConfig::rootMatcher() const {

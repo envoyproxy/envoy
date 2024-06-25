@@ -36,6 +36,8 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "safe_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom:
+    return "custom";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
     return "match_pattern_not_set";
   }
@@ -135,8 +137,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
-  auto config = std::make_unique<Router::ConfigImpl>(
-      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
+  auto config = *Router::ConfigImpl::create(route_config, *factory_context,
+                                            ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
@@ -214,7 +216,7 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
@@ -250,7 +252,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(
         Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
-        connection_info_provider);
+        connection_info_provider, StreamInfo::FilterState::LifeSpan::FilterChain);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
@@ -528,7 +530,7 @@ bool RouterCheckTool::matchHeaderField(
     const HeaderMap& header_map, const envoy::config::route::v3::HeaderMatcher& header,
     const std::string test_type,
     envoy::RouterCheckToolSchema::HeaderMatchFailure& header_match_failure) {
-  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header};
+  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header, *factory_context_};
   if (Envoy::Http::HeaderUtility::matchHeaders(header_map, expected_header_data)) {
     return true;
   }

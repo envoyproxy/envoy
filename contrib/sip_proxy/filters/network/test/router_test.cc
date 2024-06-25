@@ -73,7 +73,6 @@ public:
                  envoy_grpc:
                    cluster_name: tra_service
                timeout: 2s
-               transport_api_version: V3
 )EOF";
       TestUtility::loadFromYaml(sip_proxy_yaml1, sip_proxy_config_);
     } else {
@@ -113,9 +112,10 @@ public:
     context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {cluster_name_});
 
-    StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
+    StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Connection};
     SipFilterStats stat = SipFilterStats::generateStats("test.", *store_.rootScope());
-    EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
+    EXPECT_CALL(*config_, stats()).WillRepeatedly(ReturnRef(stat));
 
     filter_ =
         new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr);
@@ -332,7 +332,7 @@ public:
   Buffer::OwnedImpl buffer_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<MockConnectionManager>* filter_{};
-  NiceMock<MockConfig> config_;
+  std::shared_ptr<NiceMock<MockConfig>> config_{std::make_shared<NiceMock<MockConfig>>()};
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore store_;
 

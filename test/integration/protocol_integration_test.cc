@@ -809,6 +809,52 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
   EXPECT_EQ("", upstream_headers->getTEValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailers) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
+
+  default_request_headers_.setTE("trailers");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ("trailers", upstream_headers->getTEValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailersMultipleValuesAndWeigthted) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
+
+  default_request_headers_.setTE("chunked;q=0.8  ,  trailers  ,deflate  ");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ("trailers", upstream_headers->getTEValue());
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
 TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
   // Header with at least 20kb of spaces surrounded by non-whitespace characters to ensure that
@@ -1376,6 +1422,33 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"}},
       1024 * 65);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  // With HTTP/1 there's a possible race where if the connection backs up early,
+  // the 413-and-connection-close may be sent while the body is still being
+  // sent, resulting in a write error and the connection being closed before the
+  // response is read.
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->complete());
+  }
+  if (response->complete()) {
+    EXPECT_EQ("413", response->headers().getStatusValue());
+  }
+}
+
+// Test hitting the decoder buffer filter with too many request bytes to buffer without end stream.
+// Ensure the connection manager sends a 413.
+TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimitNoEndStream) {
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
 
   ASSERT_TRUE(response->waitForEndStream());
   // With HTTP/1 there's a possible race where if the connection backs up early,
@@ -3064,17 +3137,23 @@ TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
 }
 
 TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
-  if (downstream_protocol_ != Http::CodecType::HTTP2 ||
-      upstreamProtocol() != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "Metadata is not enabled for HTTP1 protocols.";
   }
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->set_allow_metadata(true);
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->set_allow_metadata(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->set_allow_metadata(true);
+    }
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
@@ -3115,17 +3194,23 @@ TEST_P(ProtocolIntegrationTest, ContinueAllFromDecodeMetadata) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContinueAllFromDecodeMetadataFollowedByLocalReply) {
-  if (downstream_protocol_ != Http::CodecType::HTTP2 ||
-      upstreamProtocol() != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "Metadata is not enabled for HTTP1 protocols.";
   }
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->set_allow_metadata(true);
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->set_allow_metadata(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->set_allow_metadata(true);
+    }
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
@@ -3159,16 +3244,22 @@ TEST_P(DownstreamProtocolIntegrationTest, ContinueAllFromDecodeMetadataFollowedB
 }
 
 TEST_P(ProtocolIntegrationTest, ContinueAllFromEncodeMetadata) {
-  if (upstreamProtocol() != Http::CodecType::HTTP2 ||
-      downstream_protocol_ != Http::CodecType::HTTP2) {
-    GTEST_SKIP() << "Metadata is not enabled for non HTTP2 protocols.";
+  if (downstream_protocol_ == Http::CodecType::HTTP1 ||
+      upstreamProtocol() == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "Metadata is not enabled for HTTP1 protocols.";
   }
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->set_allow_metadata(true);
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->set_allow_metadata(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->set_allow_metadata(true);
+    }
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
@@ -4405,6 +4496,52 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   cleanupUpstreamAndDownstream();
 }
 
+// TODO(alyssawilk) fix windows build before flipping flag.
+#ifndef WIN32
+// A singleton which will fail creation of the Nth socket
+class AllowForceFail : public Api::OsSysCallsImpl {
+public:
+  void startFailing() {
+    absl::MutexLock m(&mutex_);
+    fail_ = true;
+  }
+  Api::SysCallSocketResult socket(int domain, int type, int protocol) override {
+    absl::MutexLock m(&mutex_);
+    if (fail_) {
+      return {-1, 1};
+    }
+    return Api::OsSysCallsImpl::socket(domain, type, protocol);
+  }
+
+private:
+  absl::Mutex mutex_;
+  bool fail_ = false;
+};
+
+TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
+                                    "true");
+  AllowForceFail fail_socket_n_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  EXPECT_ENVOY_BUG(
+      {
+        fail_socket_n_.startFailing();
+        auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ("503", response->headers().getStatusValue());
+      },
+      "");
+
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
+  fake_upstreams_.clear();
+}
+#endif
+
 TEST_P(ProtocolIntegrationTest, NoLocalInterfaceNameForUpstreamConnection) {
   config_helper_.prependFilter(R"EOF(
   name: stream-info-to-headers-filter
@@ -4542,6 +4679,7 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   // } is invalid character in header name
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo}name", "foo_value"}}, false);
+  upstream_request_->encodeData(1, true);
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());

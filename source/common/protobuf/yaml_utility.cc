@@ -118,17 +118,17 @@ void jsonConvertInternal(const Protobuf::Message& source,
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   bool has_unknown_field;
-  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
-  if (status.ok()) {
+  auto load_status = loadFromJsonNoThrow(json, message, has_unknown_field);
+  if (load_status.ok()) {
     return;
   }
   if (has_unknown_field) {
     // If the parsing failure is caused by the unknown fields.
-    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                      status.ToString());
+    THROW_IF_NOT_OK(validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                                      load_status.ToString()));
   } else {
     // If the error has nothing to do with unknown field.
-    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+    throw EnvoyException("Unable to parse JSON as proto (" + load_status.ToString() + "): " + json);
   }
 }
 
@@ -178,37 +178,6 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
-}
-
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
-  auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
-  const std::string contents = file_or_error.value();
-  // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
-    // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-    }
-    return;
-  }
-
-  // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
-    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
-    }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                         message.GetTypeName() + ")");
-  }
-  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
-      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
-    loadFromYaml(contents, message, validation_visitor);
-  } else {
-    loadFromJson(contents, message, validation_visitor);
-  }
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,

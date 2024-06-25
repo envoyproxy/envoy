@@ -4,12 +4,15 @@ import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class PulseClientImplTest {
   private var envoyEngine: EnvoyEngine = mock(EnvoyEngine::class.java)
 
@@ -30,9 +33,9 @@ class PulseClientImplTest {
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
     verify(envoyEngine)
       .recordCounterInc(elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture())
-    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
-    assertThat(countCaptor.getValue()).isEqualTo(1)
-    assertThat(tagsCaptor.getValue().size).isEqualTo(0)
+    assertThat(elementsCaptor.value).isEqualTo("test.stat")
+    assertThat(countCaptor.value).isEqualTo(1)
+    assertThat(tagsCaptor.value.size).isEqualTo(0)
   }
 
   @Test
@@ -48,10 +51,10 @@ class PulseClientImplTest {
     val countCaptor = ArgumentCaptor.forClass(Int::class.java)
     verify(envoyEngine)
       .recordCounterInc(elementsCaptor.capture(), tagsCaptor.capture(), countCaptor.capture())
-    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
-    assertThat(countCaptor.getValue()).isEqualTo(5)
+    assertThat(elementsCaptor.value).isEqualTo("test.stat")
+    assertThat(countCaptor.value).isEqualTo(5)
 
-    val tagCaptorValue = tagsCaptor.getValue()
+    val tagCaptorValue = tagsCaptor.value
     assertThat(tagCaptorValue.get("testKey1")).isEqualTo("testValue1")
     assertThat(tagCaptorValue.get("testKey2")).isEqualTo("testValue2")
   }

@@ -1,3 +1,10 @@
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_CONFIG_VISIBILITY",
+)
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
 load(
@@ -6,14 +13,8 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
 )
-load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
-    "EXTENSION_CONFIG_VISIBILITY",
-)
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -107,6 +108,7 @@ def envoy_cc_library(
         textual_hdrs = None,
         alwayslink = None,
         defines = [],
+        local_defines = [],
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
@@ -135,6 +137,7 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
         defines = envoy_mobile_defines(repository) + defines,
+        local_defines = local_defines,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate

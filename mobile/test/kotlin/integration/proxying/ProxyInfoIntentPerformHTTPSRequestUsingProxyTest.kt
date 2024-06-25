@@ -12,10 +12,13 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
-import io.envoyproxy.envoymobile.engine.testing.TestJni
+import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.junit.After
+import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito
@@ -33,24 +36,34 @@ import org.robolectric.RobolectricTestRunner
 //                                                │                  │
 //                                                └──────────────────┘
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPSRequestUsingProxy {
+class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
   init {
     JniLibrary.loadTestLibrary()
-    JniLibrary.load()
   }
 
+  private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+
+  @Before
+  fun setUp() {
+    httpProxyTestServer =
+      HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTPS_PROXY)
+  }
+
+  @After
+  fun tearDown() {
+    httpProxyTestServer.shutdown()
+  }
+
+  @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy`() {
-    TestJni.startHttpsProxyTestServer()
-    val port = TestJni.getServerPort()
-
     val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
     val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
     Mockito.doReturn(connectivityManager)
       .`when`(context)
       .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.getDefaultProxy())
-      .thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", port))
+    Mockito.`when`(connectivityManager.defaultProxy)
+      .thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", httpProxyTestServer.port))
 
     val onEngineRunningLatch = CountDownLatch(1)
     val onRespondeHeadersLatch = CountDownLatch(1)
@@ -60,7 +73,8 @@ class PerformHTTPSRequestUsingProxy {
     val builder = AndroidEngineBuilder(context)
     val engine =
       builder
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .enableProxying(true)
         .setOnEngineRunning { onEngineRunningLatch.countDown() }
         .build()
@@ -93,6 +107,5 @@ class PerformHTTPSRequestUsingProxy {
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
 
     engine.terminate()
-    TestJni.shutdownTestServer()
   }
 }

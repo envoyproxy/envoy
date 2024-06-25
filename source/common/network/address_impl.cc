@@ -213,18 +213,18 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
 }
 
 namespace {
-bool force_ipv4_unsupported_for_test = false;
+std::atomic<bool> force_ipv4_unsupported_for_test = false;
 }
 
 Cleanup Ipv4Instance::forceProtocolUnsupportedForTest(bool new_val) {
-  bool old_val = force_ipv4_unsupported_for_test;
-  force_ipv4_unsupported_for_test = new_val;
-  return Cleanup([old_val]() { force_ipv4_unsupported_for_test = old_val; });
+  bool old_val = force_ipv4_unsupported_for_test.load();
+  force_ipv4_unsupported_for_test.store(new_val);
+  return {[old_val]() { force_ipv4_unsupported_for_test.store(old_val); }};
 }
 
 absl::Status Ipv4Instance::validateProtocolSupported() {
   static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET);
-  if (supported && !force_ipv4_unsupported_for_test) {
+  if (supported && !force_ipv4_unsupported_for_test.load(std::memory_order_relaxed)) {
     return absl::OkStatus();
   }
   return absl::FailedPreconditionError("IPv4 addresses are not supported on this machine");
@@ -335,18 +335,18 @@ Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bo
 }
 
 namespace {
-bool force_ipv6_unsupported_for_test = false;
+std::atomic<bool> force_ipv6_unsupported_for_test = false;
 }
 
 Cleanup Ipv6Instance::forceProtocolUnsupportedForTest(bool new_val) {
-  bool old_val = force_ipv6_unsupported_for_test;
-  force_ipv6_unsupported_for_test = new_val;
-  return Cleanup([old_val]() { force_ipv6_unsupported_for_test = old_val; });
+  bool old_val = force_ipv6_unsupported_for_test.load();
+  force_ipv6_unsupported_for_test.store(new_val);
+  return {[old_val]() { force_ipv6_unsupported_for_test.store(old_val); }};
 }
 
 absl::Status Ipv6Instance::validateProtocolSupported() {
   static const bool supported = SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6);
-  if (supported && !force_ipv6_unsupported_for_test) {
+  if (supported && !force_ipv6_unsupported_for_test.load(std::memory_order_relaxed)) {
     return absl::OkStatus();
   }
   return absl::FailedPreconditionError("IPv6 addresses are not supported on this machine");
@@ -359,29 +359,34 @@ void Ipv6Instance::initHelper(const sockaddr_in6& address, bool v6only) {
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
 }
 
-PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode,
-                           const SocketInterface* sock_interface)
-    : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
-  if (address->sun_path[0] == '\0') {
-#if !defined(__linux__)
-    throwEnvoyExceptionOrPanic("Abstract AF_UNIX sockets are only supported on linux.");
-#endif
-    RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >= offsetof(struct sockaddr_un, sun_path) + 1,
-                   "");
-    pipe_.abstract_namespace_ = true;
-    pipe_.address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
-  }
-  absl::Status status = initHelper(address, mode);
-  throwOnError(status);
+absl::StatusOr<std::unique_ptr<PipeInstance>>
+PipeInstance::create(const sockaddr_un* address, socklen_t ss_len, mode_t mode,
+                     const SocketInterface* sock_interface) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<PipeInstance>(
+      new PipeInstance(creation_status, address, ss_len, mode, sock_interface));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+absl::StatusOr<std::unique_ptr<PipeInstance>>
+PipeInstance::create(const std::string& pipe_path, mode_t mode,
+                     const SocketInterface* sock_interface) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<PipeInstance>(
+      new PipeInstance(pipe_path, mode, sock_interface, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
-                           const SocketInterface* sock_interface)
+                           const SocketInterface* sock_interface, absl::Status& creation_status)
     : InstanceBase(Type::Pipe, sockInterfaceOrDefault(sock_interface)) {
   if (pipe_path.size() >= sizeof(pipe_.address_.sun_path)) {
-    throwEnvoyExceptionOrPanic(
+    creation_status = absl::InvalidArgumentError(
         fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
                     sizeof(pipe_.address_.sun_path)));
+    return;
   }
   memset(&pipe_.address_, 0, sizeof(pipe_.address_));
   pipe_.address_.sun_family = AF_UNIX;
@@ -392,10 +397,13 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
     // be null terminated. The friendly name is the address path with embedded nulls replaced with
     // '@' for consistency with the first character.
 #if !defined(__linux__)
-    throwEnvoyExceptionOrPanic("Abstract AF_UNIX sockets are only supported on linux.");
+    creation_status =
+        absl::InvalidArgumentError("Abstract AF_UNIX sockets are only supported on linux.");
+    return;
 #endif
     if (mode != 0) {
-      throwEnvoyExceptionOrPanic("Cannot set mode for Abstract AF_UNIX sockets");
+      creation_status = absl::InvalidArgumentError("Cannot set mode for Abstract AF_UNIX sockets");
+      return;
     }
     pipe_.abstract_namespace_ = true;
     pipe_.address_length_ = pipe_path.size();
@@ -407,9 +415,11 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
     friendly_name_ = friendlyNameFromAbstractPath(
         absl::string_view(pipe_.address_.sun_path, pipe_.address_length_));
   } else {
-    // Throw an error if the pipe path has an embedded null character.
+    // return an error if the pipe path has an embedded null character.
     if (pipe_path.size() != strlen(pipe_path.c_str())) {
-      throwEnvoyExceptionOrPanic("UNIX domain socket pathname contains embedded null characters");
+      creation_status = absl::InvalidArgumentError(
+          "UNIX domain socket pathname contains embedded null characters");
+      return;
     }
     StringUtil::strlcpy(&pipe_.address_.sun_path[0], pipe_path.c_str(),
                         sizeof(pipe_.address_.sun_path));

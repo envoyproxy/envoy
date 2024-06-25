@@ -117,6 +117,18 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
                                                // algorithm
                                                0x04, 0x03};
 
+  // ALPN extension
+  const uint16_t alpn_id = 0x10;
+  std::vector<uint8_t> alpn_extension = {(alpn_id & 0xff00) >> 8, alpn_id & 0xff,
+                                         // length
+                                         0x00, 0x0b,
+                                         // list length
+                                         0x00, 0x09,
+                                         // protocol length
+                                         0x08,
+                                         // protocol name
+                                         'H', 'T', 'T', 'P', '/', '1', '.', '1'};
+
   // extensions
   values = absl::StrSplit(fingerprint[2], '-', absl::SkipEmpty());
   std::vector<uint8_t> extensions;
@@ -139,6 +151,10 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
     case signature_algorithms_id: {
       extensions.insert(std::end(extensions), std::begin(signature_algorithms),
                         std::end(signature_algorithms));
+      break;
+    }
+    case alpn_id: {
+      extensions.insert(std::end(extensions), std::begin(alpn_extension), std::end(alpn_extension));
       break;
     }
     default: {

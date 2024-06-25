@@ -380,7 +380,9 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
       config_source, "private_key", secret_context, init_manager);
   auto private_key_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
 
-  SDSSecretReader secret_reader(certificate_secret_provider, private_key_secret_provider, *api);
+  NiceMock<ThreadLocal::MockInstance> tls;
+  SDSSecretReader secret_reader(std::move(certificate_secret_provider),
+                                std::move(private_key_secret_provider), tls, *api);
   EXPECT_TRUE(secret_reader.certificate().empty());
   EXPECT_TRUE(secret_reader.privateKey().empty());
 

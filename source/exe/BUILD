@@ -7,6 +7,7 @@ load(
     "envoy_cc_posix_without_linux_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
@@ -44,9 +45,10 @@ envoy_cc_library(
         "//source/server:options_base",
         "//source/server:server_base_lib",
     ] + select({
-        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
+        "//bazel:enable_http3_on_windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
+        "//bazel:enable_http3_on_linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:disable_http3_on_windows_x86_64": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + WINDOWS_SKIP_TARGETS),
+        "//bazel:disable_http3_on_linux_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -102,7 +104,7 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
-    deps = [
+    deps = envoy_select_admin_functionality([":admin_response_lib"]) + [
         ":platform_impl_lib",
         ":process_wide_lib",
         ":stripped_main_base_lib",
@@ -115,6 +117,19 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server/config_validation:server_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "admin_response_lib",
+    srcs = ["admin_response.cc"],
+    hdrs = ["admin_response.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/server:server_lib",
+        "//source/server/admin:admin_lib",
+        "//source/server/admin:utils_lib",
     ],
 )
 
@@ -144,10 +159,17 @@ envoy_cc_library(
         ":main_common_with_all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
         # Envoy requires them.
+        "//source/common/tls:server_context_lib",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
         "//source/server:options_lib",
+        # TODO(wbpcode) make this a proper extension
+        "//source/extensions/filters/http/match_delegate:config",
+        "//source/common/http:rds_lib",
+        "//source/common/router:rds_lib",
+        "//source/common/router:scoped_rds_lib",
     ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 
@@ -193,7 +215,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
-        "//source/common/http/http2:nghttp2_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/server:proto_descriptors_lib",
     ],

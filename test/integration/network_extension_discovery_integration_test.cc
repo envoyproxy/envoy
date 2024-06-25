@@ -679,14 +679,9 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemov
   envoy::admin::v3::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
   // With /config_dump?resource=ecds_filters, the response has the format: EcdsFilterConfig.
-  envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
-  config_dump.configs(0).UnpackTo(&ecds_msg);
-  EXPECT_EQ("", ecds_msg.version_info());
-  envoy::config::core::v3::TypedExtensionConfig filter_config;
-  EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
-  EXPECT_EQ("foo", filter_config.name());
-  // Verify ECDS config dump doesn't have the filter configuration.
-  EXPECT_EQ(false, filter_config.has_typed_config());
+  // The number of current ECDS configurations is zero because the ECDS resources have been deleted
+  // due to expiration.
+  EXPECT_EQ(0, config_dump.configs_size());
 }
 
 // ECDS config dump test with two filters.

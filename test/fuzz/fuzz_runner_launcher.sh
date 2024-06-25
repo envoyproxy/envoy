@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Launcher for the fuzz runner engine.
 # See https://github.com/bazelbuild/rules_fuzzing for more info.

@@ -19,9 +19,6 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun performRegistration(envoyConfiguration: EnvoyConfiguration) = Unit
 
-  override fun runWithYaml(configurationYAML: String, logLevel: String): EnvoyStatus =
-    EnvoyStatus.ENVOY_SUCCESS
-
   override fun startStream(
     callbacks: EnvoyHTTPCallbacks?,
     explicitFlowControl: Boolean

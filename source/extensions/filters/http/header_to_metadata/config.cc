@@ -16,8 +16,9 @@ namespace HeaderToMetadataFilter {
 
 Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
-  ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  ConfigSharedPtr filter_config(
+      std::make_shared<Config>(proto_config, context.serverFactoryContext().regexEngine()));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
@@ -28,8 +29,8 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 HeaderToMetadataConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const Config>(config, true);
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const Config>(config, context.regexEngine(), true);
 }
 
 /**

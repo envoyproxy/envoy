@@ -56,10 +56,8 @@ layered_runtime:
     rtds_layer:
       name: some_rtds_layer
       rtds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: {}
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster

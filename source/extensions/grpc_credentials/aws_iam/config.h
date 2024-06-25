@@ -20,7 +20,7 @@ class AwsIamGrpcCredentialsFactory : public Grpc::GoogleGrpcCredentialsFactory {
 public:
   std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
-                        Api::Api& api) override;
+                        Server::Configuration::CommonFactoryContext& context) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() {
     return std::make_unique<envoy::config::grpc_credential::v3::AwsIamConfig>();

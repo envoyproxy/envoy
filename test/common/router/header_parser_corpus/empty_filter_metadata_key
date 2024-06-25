@@ -1,0 +1,22 @@
+headers_to_add {
+  header {
+    key: "@"
+    value: "%START_TIME()%%DYNAMIC_METADATA(:)%"
+  }
+}
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            string_value: "\n#\022\034type.geco_nosode {\n  lueList\n\001\'80\n%\032\001]\022\034type.geco_nedsoo {\n  lueList\n\00080\n\"\022\034type.geco_nosode {\n  lueList\n\00080"
+          }
+        }
+      }
+    }
+  }
+  requested_server_name: "file.Optio^s"
+}

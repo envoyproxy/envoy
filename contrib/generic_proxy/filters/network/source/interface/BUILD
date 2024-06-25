@@ -24,6 +24,7 @@ envoy_cc_library(
         "codec_callbacks.h",
     ],
     deps = [
+        ":route_interface",
         ":stream_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:drain_decision_interface",
@@ -64,6 +65,7 @@ envoy_cc_library(
     ],
     deps = [
         ":stream_interface",
+        "//contrib/generic_proxy/filters/network/source:match_input_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
@@ -96,6 +98,7 @@ envoy_cc_library(
         ":filter_interface",
         ":route_interface",
         "//contrib/generic_proxy/filters/network/source:access_log_lib",
+        "//contrib/generic_proxy/filters/network/source:match_input_lib",
         "//envoy/tracing:trace_config_interface",
         "//envoy/tracing:tracer_interface",
     ],

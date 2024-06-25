@@ -5,6 +5,7 @@
 
 #endif
 
+#include "test/test_common/test_runtime.h"
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 
 using testing::Eq;
@@ -12,6 +13,40 @@ using testing::Eq;
 namespace Envoy {
 namespace Grpc {
 namespace {
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EnvoyGrpcFlowControlTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
+  GrpcClientIntegrationTestBase::initialize(0);
+  auto stream = createStream(empty_metadata_);
+
+  testing::StrictMock<Http::MockStreamDecoderFilterCallbacks> watermark_callbacks;
+
+  // TODO(tyxia) Uncomment this section in https://github.com/envoyproxy/envoy/pull/34769
+  // Registering a new watermark callback should note that the high watermark
+  // has already been hit.
+  // stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
+
+  // EXPECT_CALL(watermark_callbacks,
+  //             onDecoderFilterAboveWriteBufferHighWatermark());
+  // EXPECT_CALL(watermark_callbacks,
+  //             onDecoderFilterBelowWriteBufferLowWatermark());
+
+  // Create the send request.
+  std::string large_request = std::string(64 * 1024, 'a');
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(large_request);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
 
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
@@ -221,6 +256,28 @@ TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
   stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Internal);
   Buffer::OwnedImpl reply_buffer("\xde\xad\xbe\xef\x00", 5);
   stream->fake_stream_->encodeData(reply_buffer, true);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a reply that exceeds gRPC maximum frame size is handled as an RESOURCE_EXHAUSTED
+// gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadReplyOverGrpcFrameLimit) {
+  // Only testing behavior of Envoy client, since `max_receive_message_length` configuration is
+  // added to Envoy-gRPC only.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+
+  helloworld::HelloReply reply;
+  reply.set_message("HelloWorld");
+
+  initialize(/*envoy_grpc_max_recv_msg_length=*/2);
+
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->expectTrailingMetadata(empty_metadata_);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::ResourceExhausted);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
+  stream->fake_stream_->encodeData(*serialized_response, true);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -497,6 +554,29 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+// Validate TLS version mismatch between the client and the server.
+TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestHandshakeFailure) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.google_grpc_disable_tls_13", "true"}});
+  use_server_tls_13_ = true;
+  initialize();
+  auto request = createRequest(empty_metadata_, false);
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillOnce(InvokeWithoutArgs([this]() {
+    dispatcher_helper_.dispatcher_.exit();
+  }));
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  FakeRawConnectionPtr fake_connection;
+  ASSERT_TRUE(fake_upstream_->waitForRawConnection(fake_connection));
+  if (fake_connection->connected()) {
+    ASSERT_TRUE(fake_connection->waitForDisconnect());
+  }
+  dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
 #ifdef ENVOY_GOOGLE_GRPC
