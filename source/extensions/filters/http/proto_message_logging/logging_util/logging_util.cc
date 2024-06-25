@@ -186,7 +186,7 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
           } else if (field_wire_type == WireFormatLite::WIRETYPE_FIXED64) {
             count += length / WireFormatLite::kFixed64Size;
             input_stream->Skip(length);
-          } else { // WireFormatLite::WireFormatLite::WIRETYPE_VARINT) {
+          } else {
             CodedInputStream::Limit limit = input_stream->PushLimit(length);
             uint64_t varint = 0;
             while (input_stream->ReadVarint64(&varint)) {
