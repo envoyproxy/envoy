@@ -2,7 +2,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "contrib/generic_proxy/filters/network/test/mocks/filter.h"
+#include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 
 using testing::_;
 using testing::Invoke;

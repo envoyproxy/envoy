@@ -2,7 +2,7 @@
 
 #include "test/mocks/stream_info/mocks.h"
 
-#include "contrib/generic_proxy/filters/network/test/fake_codec.h"
+#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

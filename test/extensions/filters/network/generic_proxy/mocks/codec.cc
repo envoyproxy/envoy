@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "contrib/generic_proxy/filters/network/test/mocks/codec.h"
+#include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 
 using testing::ByMove;
 using testing::NiceMock;

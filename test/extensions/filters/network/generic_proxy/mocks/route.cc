@@ -1,4 +1,4 @@
-#include "contrib/generic_proxy/filters/network/test/mocks/route.h"
+#include "test/extensions/filters/network/generic_proxy/mocks/route.h"
 
 using testing::_;
 using testing::Return;

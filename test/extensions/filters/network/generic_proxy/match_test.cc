@@ -4,7 +4,7 @@
 
 #include "test/mocks/server/factory_context.h"
 
-#include "contrib/generic_proxy/filters/network/test/fake_codec.h"
+#include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;

@@ -2,15 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
-    "envoy_contrib_package",
     "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
-
-envoy_contrib_package()
 
 envoy_cc_test_library(
     name = "fake_codec_lib",
@@ -66,6 +63,7 @@ envoy_cc_test(
         "config_test.cc",
     ],
     deps = [
+        "//source/extensions/filters/network/generic_proxy/router:config",
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy:config",
@@ -92,6 +90,7 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
+        "//source/extensions/filters/network/generic_proxy/router:config",
         ":fake_codec_lib",
         "//envoy/event:timer_interface",
         "//source/common/buffer:buffer_lib",
