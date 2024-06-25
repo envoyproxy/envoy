@@ -3,6 +3,7 @@
 #include "source/common/common/token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 
 #include "gtest/gtest.h"
 
@@ -209,6 +210,9 @@ TEST_F(AtomicTokenBucketImplTest, YearlyMinRefillRate) {
 }
 
 TEST_F(AtomicTokenBucketImplTest, MultipleThreadsConsume) {
+  // Real time source to ensure we will not fall into endless loop.
+  Event::TestRealTimeSystem real_time_source;
+
   AtomicTokenBucketImpl token_bucket{1200, time_system_, 1.0};
 
   // Exhaust all tokens.
@@ -216,25 +220,25 @@ TEST_F(AtomicTokenBucketImplTest, MultipleThreadsConsume) {
   EXPECT_EQ(0, token_bucket.consume(1, false));
 
   std::vector<std::thread> threads;
-  auto timeout_point = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  auto timeout_point = real_time_source.monotonicTime() + std::chrono::seconds(30);
 
   size_t thread_1_token = 0;
   threads.push_back(std::thread([&] {
-    while (thread_1_token < 300 && std::chrono::steady_clock::now() < timeout_point) {
+    while (thread_1_token < 300 && real_time_source.monotonicTime() < timeout_point) {
       thread_1_token += token_bucket.consume(1, false);
     }
   }));
 
   size_t thread_2_token = 0;
   threads.push_back(std::thread([&] {
-    while (thread_2_token < 300 && std::chrono::steady_clock::now() < timeout_point) {
+    while (thread_2_token < 300 && real_time_source.monotonicTime() < timeout_point) {
       thread_2_token += token_bucket.consume(1, false);
     }
   }));
 
   size_t thread_3_token = 0;
   threads.push_back(std::thread([&] {
-    while (thread_3_token < 300 && std::chrono::steady_clock::now() < timeout_point) {
+    while (thread_3_token < 300 && real_time_source.monotonicTime() < timeout_point) {
       const size_t left = 300 - thread_3_token;
       thread_3_token += token_bucket.consume(std::min<size_t>(left, 2), true);
     }
@@ -242,7 +246,7 @@ TEST_F(AtomicTokenBucketImplTest, MultipleThreadsConsume) {
 
   size_t thread_4_token = 0;
   threads.push_back(std::thread([&] {
-    while (thread_4_token < 300 && std::chrono::steady_clock::now() < timeout_point) {
+    while (thread_4_token < 300 && real_time_source.monotonicTime() < timeout_point) {
       const size_t left = 300 - thread_4_token;
       thread_4_token += token_bucket.consume(std::min<size_t>(left, 3), true);
     }
