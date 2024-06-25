@@ -865,7 +865,7 @@ private:
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
-            absl::nullopt);
+            parent_.context_);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else
@@ -965,6 +965,8 @@ private:
   // Setting this true disables all events and does not re-enable as the above does.
   bool disable_and_do_not_enable_{};
   const bool enable_half_close_;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
@@ -972,7 +974,6 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif
