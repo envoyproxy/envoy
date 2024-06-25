@@ -33,7 +33,7 @@ If enabled, the DLB connection balancer will:
 When new connections come, one worker thread will accept it and send it to DLB hardware. DLB hardware
 does balancing then trigger one worker thread to receive via libevent.
 
-Installing DLB
---------------
+Using DLB
+---------
 
-For information on how to build/install and use libdlb see `the getting started guide <https://downloadmirror.intel.com/727424/DLB_Driver_User_Guide.pdf>`_.
+You can see full example in this [doc](https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/dlb.html).

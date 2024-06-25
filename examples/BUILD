@@ -22,6 +22,8 @@ filegroup(
             "jaeger-native-tracing/*",
             "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
+            # no available devices in the CI env
+            "dlb/*.yaml",
             # Contrib extensions tested over in contrib.
             "golang-http/*.yaml",
             "golang-network/*.yaml",
@@ -43,6 +45,7 @@ filegroup(
             "kafka/*.yaml",
         ],
         exclude = [
+            "dlb/*.yaml",
             "**/*docker-compose*.yaml",
         ],
     ),
