@@ -157,7 +157,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     stats_.named_.downstream_cx_ssl_total_.inc();
     stats_.named_.downstream_cx_ssl_active_.inc();
   }
-  read_callbacks_->connection().enableHalfClose(true);
+
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_->addProxyProtocolConnectionState() &&
