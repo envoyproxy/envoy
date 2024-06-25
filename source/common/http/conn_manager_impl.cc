@@ -663,9 +663,6 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
   // If request has completed before configured threshold, also check if the Envoy proxied the
   // response from the upstream. Requests without the response status were reset.
   // TODO(RyanTheOptimist): Possibly support half_closed_local instead.
-  if (read_callbacks_->connection().isHalfCloseEnabled()) {
-      return false;
-  }
   return !stream.filter_manager_.streamInfo().responseCode();
 }
 
