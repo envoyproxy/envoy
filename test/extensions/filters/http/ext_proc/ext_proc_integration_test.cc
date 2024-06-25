@@ -1166,7 +1166,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(!header.value().empty());
           EXPECT_TRUE(header.raw_value().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -1224,7 +1223,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(header.value().empty());
           EXPECT_TRUE(!header.raw_value().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.raw_value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 

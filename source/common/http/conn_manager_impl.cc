@@ -669,9 +669,7 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
 // Sends a GOAWAY if too many streams have been reset prematurely on this
 // connection.
 void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.send_goaway_for_premature_rst_streams") ||
-      closed_non_internally_destroyed_requests_ == 0) {
+  if (closed_non_internally_destroyed_requests_ == 0) {
     return;
   }
 
