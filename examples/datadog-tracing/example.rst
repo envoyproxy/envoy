@@ -80,18 +80,18 @@ Step 3: View the traces in Datadog UI
 
 Log in your Datadog account and navigate to APM tracing page.
 
-.. image:: /start/sandboxes/_include/datadog-tracing/datadog-ui-landing.png
+.. image:: /start/sandboxes/_include/datadog-tracing/_static/datadog-ui-landing.png
 
 Click on any of the trace with the service name ``envoy``. From here you can explore the paths taken by the requests, as well as the latency incurred at each hop,
 and other contextual information.
 
-.. image:: /start/sandboxes/_include/datadog-tracing/datadog-ui-trace.png
+.. image:: /start/sandboxes/_include/datadog-tracing/_static/datadog-ui-trace.png
 
 Note the Datadog tracer identifies the Envoy proxies by the name provided in the ``tracing.provider.typed_config.service_name`` configuration.
 
 You can also explore the map graph to view relationships between nodes and the path of traces.
 
-.. image:: /start/sandboxes/_include/datadog-tracing/datadog-ui-map.png
+.. image:: /start/sandboxes/_include/datadog-tracing/_static/datadog-ui-map.png
 
 .. seealso::
 
