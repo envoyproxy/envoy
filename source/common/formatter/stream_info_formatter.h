@@ -258,9 +258,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
  * which it was initialized.
  */
 template <class FormatterContext>
-class CommonPlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
+class PlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  CommonPlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
+  PlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
 
   // FormatterProviderBase
   absl::optional<std::string> formatWithContext(const FormatterContext&,
@@ -276,19 +276,13 @@ private:
   ProtobufWkt::Value str_;
 };
 
-template <class FormatterContext>
-class PlainStringFormatterBase : public CommonPlainStringFormatterBase<FormatterContext> {
-public:
-  using CommonPlainStringFormatterBase<FormatterContext>::CommonPlainStringFormatterBase;
-};
-
 /**
  * FormatterProvider for numbers.
  */
 template <class FormatterContext>
-class CommonPlainNumberFormatterBase : public FormatterProviderBase<FormatterContext> {
+class PlainNumberFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  CommonPlainNumberFormatterBase(double num) { num_.set_number_value(num); }
+  PlainNumberFormatterBase(double num) { num_.set_number_value(num); }
 
   // FormatterProviderBase
   absl::optional<std::string> formatWithContext(const FormatterContext&,
@@ -305,20 +299,14 @@ private:
   ProtobufWkt::Value num_;
 };
 
-template <class FormatterContext>
-class PlainNumberFormatterBase : public CommonPlainNumberFormatterBase<FormatterContext> {
-public:
-  using CommonPlainNumberFormatterBase<FormatterContext>::CommonPlainNumberFormatterBase;
-};
-
 /**
  * FormatterProvider based on StreamInfo fields.
  */
 template <class FormatterContext>
-class CommonStreamInfoFormatterBase : public FormatterProviderBase<FormatterContext> {
+class StreamInfoFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  CommonStreamInfoFormatterBase(const std::string& command, const std::string& sub_command = "",
-                                absl::optional<size_t> max_length = absl::nullopt) {
+  StreamInfoFormatterBase(const std::string& command, const std::string& sub_command = "",
+                          absl::optional<size_t> max_length = absl::nullopt) {
 
     const auto& formatters = getKnownStreamInfoFormatterProviders();
 
@@ -337,7 +325,7 @@ public:
     formatter_ = (*it).second.second(sub_command, max_length);
   }
 
-  CommonStreamInfoFormatterBase(StreamInfoFormatterProviderPtr formatter)
+  StreamInfoFormatterBase(StreamInfoFormatterProviderPtr formatter)
       : formatter_(std::move(formatter)) {}
 
   // FormatterProvider
@@ -354,12 +342,6 @@ public:
 
 private:
   StreamInfoFormatterProviderPtr formatter_;
-};
-
-template <class FormatterContext>
-class StreamInfoFormatterBase : public CommonStreamInfoFormatterBase<FormatterContext> {
-public:
-  using CommonStreamInfoFormatterBase<FormatterContext>::CommonStreamInfoFormatterBase;
 };
 
 // Aliases for backward compatibility.

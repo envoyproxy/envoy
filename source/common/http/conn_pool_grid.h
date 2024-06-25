@@ -43,17 +43,26 @@ public:
   // It also relays cancellation calls between the original caller and the
   // current connection attempts.
   class WrapperCallbacks : public ConnectionPool::Cancellable,
-                           public LinkedObject<WrapperCallbacks> {
+                           public LinkedObject<WrapperCallbacks>,
+                           public Event::DeferredDeletable {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder,
                      ConnectionPool::Callbacks& callbacks, const Instance::StreamOptions& options);
 
+    bool hasNotifiedCaller() { return inner_callbacks_ == nullptr; }
+
+    // Event::DeferredDeletable
+    // The wrapper is being deleted - cancel all alarms.
+    void deleteIsPending() override { next_attempt_timer_.reset(); }
+
     // This holds state for a single connection attempt to a specific pool.
     class ConnectionAttemptCallbacks : public ConnectionPool::Callbacks,
-                                       public LinkedObject<ConnectionAttemptCallbacks> {
+                                       public LinkedObject<ConnectionAttemptCallbacks>,
+                                       public Event::DeferredDeletable {
     public:
       ConnectionAttemptCallbacks(WrapperCallbacks& parent, ConnectionPool::Instance& pool);
       ~ConnectionAttemptCallbacks() override;
+      void deleteIsPending() override {}
 
       StreamCreationResult newStream();
 
@@ -206,9 +215,12 @@ private:
   // that specifies HTTP/3 and HTTP/3 is not broken.
   bool shouldAttemptHttp3();
 
-  // Creates the next pool in the priority list, or nullptr if all pools have been created.
-  // TODO(alyssawilk) replace this now we have explicit pools.
-  virtual ConnectionPool::Instance* createNextPool();
+  // Returns the specified pool, which will be created if necessary
+  ConnectionPool::Instance* getOrCreateHttp3Pool();
+  ConnectionPool::Instance* getOrCreateHttp2Pool();
+
+  virtual ConnectionPool::InstancePtr createHttp3Pool();
+  virtual ConnectionPool::InstancePtr createHttp2Pool();
 
   // This batch of member variables are latched objects required for pool creation.
   Event::Dispatcher& dispatcher_;
