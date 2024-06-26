@@ -25,6 +25,7 @@ envoy_cc_library(
         "//test:__subpackages__",
     ],
     deps = [
+        "//envoy/registry",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
