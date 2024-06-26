@@ -12,12 +12,11 @@ namespace Envoy {
 namespace Http {
 
 bool hasBothAddressFamilies(Upstream::HostConstSharedPtr host) {
-  Upstream::HostDescription::SharedConstAddressVector list_or_null = host->addressListOrNull();
-  if (!list_or_null || list_or_null->size() < 2 || !(*list_or_null)[0]->ip() ||
-      !(*list_or_null)[1]->ip()) {
+  Upstream::HostDescription::SharedConstAddressVector list_ = host->addressListOrNull();
+  if (!list_ || list_->size() < 2 || !(*list_)[0]->ip() || !(*list_)[1]->ip()) {
     return false;
   }
-  return (*list_or_null)[0]->ip()->version() != (*list_or_null)[1]->ip()->version();
+  return (*list_)[0]->ip()->version() != (*list_)[1]->ip()->version();
 }
 
 namespace {
@@ -80,22 +79,16 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
   parent_.onConnectionAttemptFailed(this, reason, transport_failure_reason, host);
 }
 
-void ConnectivityGrid::WrapperCallbacks::attemptHttp3HappyEyeballs() {
-  // Swap the v4/v6 pool for a v6/v4 pool.
-  if (!grid_.http3_alternate_pool_) {
-    grid_.http3_alternate_pool_ = grid_.createHttp3Pool(true);
-    grid_.setupPool(*grid_.http3_alternate_pool_);
-    grid_.pools_.push_back(grid_.http3_alternate_pool_.get());
-  }
+void ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
   has_tried_http3_alternate_address_ = true;
-
-  auto attempt = std::make_unique<ConnectionAttemptCallbacks>(*this, *grid_.http3_alternate_pool_);
+  auto attempt =
+      std::make_unique<ConnectionAttemptCallbacks>(*this, *grid_.getOrCreateHttp3AlternativePool());
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
-  // kick off a new stream attempt.
+  // Kick off a new stream attempt.
   connection_attempts_.front()->newStream();
 }
 
-bool ConnectivityGrid::WrapperCallbacks::shouldAttemptHttp3HappyEyeballs() {
+bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
   // Don't connect if the grid is shutting down.
   if (grid_.destroying_) {
     return false;
@@ -111,10 +104,7 @@ bool ConnectivityGrid::WrapperCallbacks::shouldAttemptHttp3HappyEyeballs() {
   }
   // QUIC "happy eyeballs" currently only handles one v4 and one v6 address. If
   // there's not multiple families don't bother.
-  if (!hasBothAddressFamilies(grid_.host_)) {
-    return false;
-  }
-  return true;
+  return hasBothAddressFamilies(grid_.host_);
 }
 
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
@@ -125,19 +115,16 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
   grid_.dispatcher_.deferredDelete(attempt->removeFromList(connection_attempts_));
 
   if (grid_.isPoolHttp3(attempt->pool())) {
-    if (shouldAttemptHttp3HappyEyeballs()) {
-      // Hot swap the original HTTP/3 connection pool for one of the alternate family.
-      attemptHttp3HappyEyeballs();
+    if (shouldAttemptSecondHttp3Connection()) {
+      attemptSecondHttp3Connection();
       // Return - the above attempt will handle everything else.
       return;
     }
-    if (has_tried_http3_alternate_address_) {
-      if (connection_attempts_.empty() ||
-          (connection_attempts_.size() == 1 &&
-           &connection_attempts_.front()->pool() == grid_.http2_pool_.get())) {
-        http3_attempt_failed_ = true;
-      }
-    } else {
+    // HTTP/3 is only marked as failing if both the initial and any secondary
+    // attempt have both failed (i.e. the only remaining attempts are TCP).
+    if (connection_attempts_.empty() ||
+        (connection_attempts_.size() == 1 &&
+         &connection_attempts_.front()->pool() == grid_.http2_pool_.get())) {
       http3_attempt_failed_ = true;
     }
   }
@@ -259,8 +246,8 @@ void ConnectivityGrid::WrapperCallbacks::onNextAttemptTimer() {
     return;
   }
   tryAnotherConnection();
-  if (shouldAttemptHttp3HappyEyeballs()) {
-    attemptHttp3HappyEyeballs();
+  if (shouldAttemptSecondHttp3Connection()) {
+    attemptSecondHttp3Connection();
   }
 }
 absl::optional<ConnectivityGrid::StreamCreationResult>
@@ -331,6 +318,16 @@ void ConnectivityGrid::deleteIsPending() {
   }
 }
 
+ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp3AlternativePool() {
+  ASSERT(!deferred_deleting_);
+  ASSERT(!draining_);
+  if (http3_alternate_pool_ == nullptr) {
+    http3_alternate_pool_ = createHttp3Pool(true);
+    pools_.push_back(http3_alternate_pool_.get());
+    setupPool(*http3_alternate_pool_.get());
+  }
+  return http3_alternate_pool_.get();
+}
 ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp3Pool() {
   ASSERT(!deferred_deleting_);
   ASSERT(!draining_);

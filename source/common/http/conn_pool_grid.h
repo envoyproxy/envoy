@@ -22,6 +22,10 @@ namespace Http {
 // Any cancel call on the wrapper callbacks cancels either or both stream
 // attempts to the wrapped pools. the wrapper callbacks will only pass up
 // failure if both HTTP/3 and HTTP/2 attempts fail.
+//
+// The grid also handles HTTP/3 "happy eyeballs" which is a best-effort attempt
+// to try using one IPv4 address and one IPv6 address if both families exist in
+// the host's address list.
 class ConnectivityGrid : public ConnectionPool::Instance,
                          public Http3::PoolConnectResultCallback,
                          protected Logger::Loggable<Logger::Id::pool> {
@@ -99,6 +103,10 @@ public:
     // connection has been attempted, an empty optional otherwise.
     absl::optional<StreamCreationResult> tryAnotherConnection();
 
+    // This timer is registered when an initial HTTP/3 attempt is started.
+    // The timeout for TCP failover and HTTP/3 happy eyeballs are the same, so
+    // when this timer fires it's possible that two additional connections will
+    // be kicked off.
     void onNextAttemptTimer();
 
     // Called by a ConnectionAttempt when the underlying pool fails.
@@ -120,8 +128,14 @@ public:
                                     Upstream::HostDescriptionConstSharedPtr host);
 
   private:
-    bool shouldAttemptHttp3HappyEyeballs();
-    void attemptHttp3HappyEyeballs();
+    // Called if the initial HTTP/3 connection fails.
+    // Returns true if an HTTP/3 happy eyeballs attempt can be kicked off
+    // (runtime guard is on, IPv6 and IPv6 addresses are present, happy eyeballs
+    // has not been tried yet for this wrapper, grid is not in shutdown).
+    bool shouldAttemptSecondHttp3Connection();
+    // This kicks off an HTTP/3 happy eyeballs attempt, connecting to the second
+    // address in the host's address list.
+    void attemptSecondHttp3Connection();
 
     // Removes this from the owning list, deleting it.
     void deleteThis();
@@ -148,7 +162,9 @@ public:
     Event::TimerPtr next_attempt_timer_;
     // Checks if http2 has been attempted.
     bool has_attempted_http2_ = false;
-    // Checks if "happy eyeballs" has been done for HTTP/3
+    // Checks if "happy eyeballs" has been done for HTTP/3. This largely makes
+    // sure that if we kick off a secondary attempt due to timeout we don't kick
+    // off another one if the original HTTP/3 connection explicitly fails.
     bool has_tried_http3_alternate_address_ = false;
     // True if the HTTP/3 attempt failed.
     bool http3_attempt_failed_{};
@@ -225,7 +241,10 @@ private:
   // Returns the specified pool, which will be created if necessary
   ConnectionPool::Instance* getOrCreateHttp3Pool();
   ConnectionPool::Instance* getOrCreateHttp2Pool();
+  ConnectionPool::Instance* getOrCreateHttp3AlternativePool();
 
+  // True if this pool is the "happy eyeballs" attempt, and should use the
+  // secondary address family.
   virtual ConnectionPool::InstancePtr createHttp3Pool(bool happy_eyeballs_attempt);
   virtual ConnectionPool::InstancePtr createHttp2Pool();
 
@@ -245,6 +264,8 @@ private:
 
   // The connection pools to use to create new streams
   ConnectionPool::InstancePtr http3_pool_;
+  // This is the pool used for the HTTP/3 "happy eyeballs" attempt. If it is
+  // created it will have the opposite address family from http3_pool_ above.
   ConnectionPool::InstancePtr http3_alternate_pool_;
   ConnectionPool::InstancePtr http2_pool_;
   // A convenience vector to allow taking actions on all pools.
