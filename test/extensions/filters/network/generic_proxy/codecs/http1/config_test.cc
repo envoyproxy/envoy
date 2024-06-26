@@ -1404,6 +1404,7 @@ TEST_F(Http1ClientCodecTest, SingleFrameModeRequestEncodingTest) {
                                        "content-length: 4\r\n"
                                        "\r\n"
                                        "body");
+          buffer.drain(buffer.length());
         }));
     EXPECT_TRUE(codec_->encode(request, encoding_context).ok());
   }

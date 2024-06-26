@@ -721,7 +721,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
 
   // End stream is set to true by default.
   auto frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
-  EXPECT_EQ(CommonFilterStatus::StopIteration, filter_->decodeCommonFrame(*frame_1));
+  EXPECT_EQ(CommonFilterStatus::StopIteration, filter_->decodeCommonFrame(*frame_2));
 
   // This will trigger the last frame to be sent directly because connection is ready and other
   // frames are already sent.
