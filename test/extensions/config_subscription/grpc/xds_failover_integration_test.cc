@@ -16,9 +16,9 @@
 namespace Envoy {
 
 namespace {
-const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-const auto eds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-const auto lds_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
+const auto CdsTypeUrl = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+const auto EdsTypeUrl = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+const auto LdsTypeUrl = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
 } // namespace
 
 // Tests the use of Envoy with a primary and failover sources.
@@ -212,30 +212,30 @@ public:
   }
 
   void validateAllXdsResponsesAndDataplaneRequest(FakeStream* xds_stream) {
-    EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true,
+    EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        cds_type_url, {ConfigHelper::buildCluster("cluster_0")},
+        CdsTypeUrl, {ConfigHelper::buildCluster("cluster_0")},
         {ConfigHelper::buildCluster("cluster_0")}, {}, "1", {}, xds_stream);
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
     test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
-    EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}, false,
+    EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"cluster_0"}, {"cluster_0"}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        eds_type_url, {buildClusterLoadAssignment("cluster_0")},
+        EdsTypeUrl, {buildClusterLoadAssignment("cluster_0")},
         {buildClusterLoadAssignment("cluster_0")}, {}, "1", {}, xds_stream);
 
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
     test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 
-    EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}, false,
+    EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "1", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
 
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-        lds_type_url, {buildSimpleListener("listener_0", "cluster_0")},
+        LdsTypeUrl, {buildSimpleListener("listener_0", "cluster_0")},
         {buildSimpleListener("listener_0", "cluster_0")}, {}, "1", {}, xds_stream);
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
@@ -417,11 +417,11 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
   xds_stream_->startGrpcStream();
 
   // Ensure basic flow with failover works.
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true,
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       xds_stream_.get()));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {ConfigHelper::buildCluster("cluster_0")},
+      CdsTypeUrl, {ConfigHelper::buildCluster("cluster_0")},
       {ConfigHelper::buildCluster("cluster_0")}, {}, "1", {}, xds_stream_.get());
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
@@ -508,11 +508,11 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   failover_xds_stream_->startGrpcStream();
 
   // Ensure basic flow with failover works.
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true,
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {ConfigHelper::buildCluster("cluster_0")},
+      CdsTypeUrl, {ConfigHelper::buildCluster("cluster_0")},
       {ConfigHelper::buildCluster("cluster_0")}, {}, "1", {}, failover_xds_stream_.get());
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);

@@ -87,7 +87,10 @@ NewGrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
                         grpc_mux_context.scope_,
                         // TODO(adisuissa): the backoff strategy for the failover should
                         // be the same as the primary source.
-                        std::make_unique<FixedBackOffStrategy>(500),
+                        std::make_unique<FixedBackOffStrategy>(
+                            GrpcMuxFailover<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                                            envoy::service::discovery::v3::DeltaDiscoveryResponse>::
+                                DefaultFailoverBackoffMilliseconds),
                         grpc_mux_context.rate_limit_settings_);
                   })
             : absl::nullopt,
