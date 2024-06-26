@@ -62,7 +62,7 @@ struct EnvoyStreamCallbacks {
    *
    * This callback can be invoked multiple times when data is streamed.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - buffer: the data received.
    * - length: the length of data to read. It will always be <= `buffer.length()`
    * - end_stream: whether the data is the last data frame.
@@ -77,7 +77,7 @@ struct EnvoyStreamCallbacks {
    *
    * Note that end stream is implied when on_trailers is called.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - trailers: the trailers received.
    * - stream_intel: contains internal stream metrics.
    */
@@ -89,7 +89,7 @@ struct EnvoyStreamCallbacks {
    *
    * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - stream_intel: contains internal stream metrics.
    * - final_stream_intel: contains final internal stream metrics.
    */
@@ -101,7 +101,7 @@ struct EnvoyStreamCallbacks {
    *
    * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - error: the error received/caused by the stream.
    * - stream_intel: contains internal stream metrics.
    * - final_stream_intel: contains final internal stream metrics.
@@ -114,7 +114,7 @@ struct EnvoyStreamCallbacks {
    *
    * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - stream_intel: contains internal stream metrics.
    * - final_stream_intel: contains final internal stream metrics.
    */
@@ -129,7 +129,7 @@ struct EnvoyStreamCallbacks {
    * for request body. It will then be called once per decodeData call to inform the sender when it
    * is safe to send more data.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - stream_intel: contains internal stream metrics.
    */
   absl::AnyInvocable<void(envoy_stream_intel)> on_send_window_available_ = [](envoy_stream_intel) {
@@ -140,7 +140,7 @@ struct EnvoyStreamCallbacks {
    * This only fires when flow control is on and
    * envoy.reloadable_features.report_available_data is true. It is meant to be temporary.
    *
-   * The callback function pases the following parameters.
+   * The callback function passes the following parameters.
    * - bytes_available: the response bytes available.
    * - stream_intel: contains internal stream metrics.
    */
