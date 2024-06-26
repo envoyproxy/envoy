@@ -89,7 +89,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   }
 
   // Apply parent `send_envoy_generated_header_` setting from configuration, if no per-stream
-  // override.
+  // override. (i.e., override the value from true to false)
   if (options.send_internal) {
     options_.setSendInternal(parent_.send_envoy_generated_header_);
   }
