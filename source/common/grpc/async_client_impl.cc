@@ -86,8 +86,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
 
-  // Apply parent send_internal (`x-envoy-internal`) and send_xff (`x-forward-for`) settings from
-  // configuration, if no per-stream override.
+  // Apply parent `send_envoy_generated_header_` setting from configuration, if no per-stream
+  // override.
   if (options.send_internal) {
     options_.setSendInternal(parent_.send_envoy_generated_header_);
   }
