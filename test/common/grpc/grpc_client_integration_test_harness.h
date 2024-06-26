@@ -352,8 +352,8 @@ public:
           envoy_grpc_max_recv_msg_length);
     }
 
-    config.mutable_envoy_grpc()->mutable_send_internal_header()->set_value(send_internal_header_);
-    config.mutable_envoy_grpc()->mutable_send_xff_header()->set_value(send_xff_header_);
+    config.mutable_envoy_grpc()->mutable_send_envoy_generated_header()->set_value(
+        send_envoy_generated_header_);
 
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
@@ -394,29 +394,19 @@ public:
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
 
     if (clientType() == ClientType::EnvoyGrpc) {
-      if (!send_internal_header_stream_option_ || !send_internal_header_) {
+      // "x-envoy-internal" and `x-forward-for` headers are only available in envoy gRPC path.
+      // They will be removed when either envoy gRPC config or stream option is false.
+      if (!send_envoy_generated_header_ || !send_internal_header_stream_option_) {
         EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
       } else {
         EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
       }
 
-      if (!send_xff_header_ || !send_xff_header_stream_option_) {
+      if (!send_envoy_generated_header_ || !send_xff_header_stream_option_) {
         EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
       } else {
         EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
       }
-
-      // if (send_internal_header_ || send_internal_header_stream_option_) {
-      //   EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
-      // } else {
-      //   EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
-      // }
-
-      // if (send_xff_header_ || send_xff_header_stream_option_) {
-      //   EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
-      // } else {
-      //   EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
-      // }
     }
 
     for (const auto& value : initial_metadata) {
@@ -560,8 +550,7 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
-  bool send_internal_header_{true};
-  bool send_xff_header_{true};
+  bool send_envoy_generated_header_{true};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
 };

@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 6]
   message EnvoyGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.EnvoyGrpc";
@@ -57,19 +57,13 @@ message GrpcService {
     // Defaults to 0, which means unlimited.
     google.protobuf.UInt32Value max_receive_message_length = 4;
 
-    // This provides gRPC client level control over ``x-envoy-internal`` header.
-    // If true, the header will be added. But it can be overridden by setting ``setSendInternal`` to false in 
-    // ``Http::AsyncClient::StreamOptions``, as per stream-level control.
-    // If false, the header will be removed and can not be overridden by per stream option.
+    // This provides gRPC client level control over envoy generated headers.
+    // For ``x-envoy-internal`` and ``x-forwarded-for`` header:
+    // - If true, the header will be sent. But it can be overridden by setting the ``send_internal`` or ``send_xff``
+    //   to false in ``Http::AsyncClient::StreamOptions``, as per stream-level control.
+    // - If false, the header will be removed and can not be overridden by per stream option.
     // Default to true 
-    google.protobuf.BoolValue send_internal_header = 5;
-
-    // This provides gRPC client level control over ``x-forwarded-for`` header.
-    // If true, the header will be added. But it can be overridden by setting ``setSendXff`` to false in
-    // ``Http::AsyncClient::StreamOptions``, as per stream-level control.
-    // If false, the header will be removed and can not be overridden by per stream option.
-    // Default to true.
-    google.protobuf.BoolValue send_xff_header = 6;
+    google.protobuf.BoolValue send_envoy_generated_header = 5;
   }
 
   // [#next-free-field: 9]

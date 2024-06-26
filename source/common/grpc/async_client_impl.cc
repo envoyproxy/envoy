@@ -19,9 +19,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  TimeSource& time_source)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
-      send_internal_header_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), send_internal_header, true)),
-      send_xff_header_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), send_xff_header, true)),
+      send_envoy_generated_header_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), send_envoy_generated_header, true)),
       cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
       metadata_parser_(Router::HeaderParser::configure(
@@ -87,13 +86,13 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
 
-  // Apply parent send_internal (`x-envoy-internal`) and send_xff ()`x-forward-for`) settings from
+  // Apply parent send_internal (`x-envoy-internal`) and send_xff (`x-forward-for`) settings from
   // configuration, if no per-stream override.
   if (options.send_internal) {
-    options_.setSendInternal(parent_.send_internal_header_);
+    options_.setSendInternal(parent_.send_envoy_generated_header_);
   }
   if (options.send_xff) {
-    options_.setSendXff(parent_.send_xff_header_);
+    options_.setSendXff(parent_.send_envoy_generated_header_);
   }
 
   // Configure the maximum frame length

@@ -35,8 +35,7 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
 TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeaders) {
   // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
-  send_internal_header_ = false;
-  send_xff_header_ = false;
+  send_envoy_generated_header_ = false;
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
