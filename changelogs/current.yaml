@@ -379,6 +379,11 @@ new_features:
     The RBAC filter will now log the enforced rule to the dynamic metadata field
     "enforced_effective_policy_id" and the result to the dynamic metadata field
     "enforced_engine_result". These are only populated if a non-shadow engine exists.
+- area: jwt_authn
+  change: |
+    Added :ref:`strip_failure_response
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
+    to allow stripping the failure response details from the JWT authentication filter.
 
 deprecated:
 - area: tracing
