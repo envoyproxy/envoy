@@ -271,8 +271,8 @@ public:
    */
   virtual void forceRefreshHosts() PURE;
 
-  /** Sets the `IpVersion` addresses to be removed from the DNS responses. */
-  virtual void setIpVersionToRemove(Network::Address::IpVersion ip_version) PURE;
+  /** Sets the `IpVersion` addresses to be removed from the DNS response. */
+  virtual void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

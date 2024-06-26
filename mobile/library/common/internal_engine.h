@@ -111,7 +111,7 @@ public:
    *
    * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
    *   `setIpVersionToRemove` in the DNS cache implementation to remove the IPv6 addresses from
-   *   the DNS responses in the subsequent DNS resolutions.
+   *   the DNS response in the subsequent DNS resolutions.
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    */
   void onNetworkChanged();

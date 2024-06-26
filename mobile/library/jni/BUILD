@@ -130,8 +130,6 @@ cc_binary(
         # included in the build, but several parts of Envoy rely on libm, for
         # example, for std::pow, so we link it in here.
         "-lm",
-        # https://developer.android.com/ndk/guides/common-problems#undefined_reference_to_atomic_
-        "-latomic",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],

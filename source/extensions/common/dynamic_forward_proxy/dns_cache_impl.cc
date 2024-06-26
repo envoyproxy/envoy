@@ -335,7 +335,8 @@ void DnsCacheImpl::forceRefreshHosts() {
   }
 }
 
-void DnsCacheImpl::setIpVersionToRemove(Network::Address::IpVersion ip_version) {
+void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) {
+  absl::MutexLock lock{&ip_version_to_remove_lock_};
   ip_version_to_remove_ = ip_version;
 }
 
@@ -364,11 +365,15 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
-    absl::optional<Network::Address::IpVersion> ip_version_to_remove = ip_version_to_remove_.load();
-    if (ip_version_to_remove.has_value()) {
-      response.remove_if([&ip_version_to_remove](const Network::DnsResponse& dns_resp) {
-        return dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
-      });
+    {
+      absl::MutexLock lock{&ip_version_to_remove_lock_};
+      if (ip_version_to_remove_.has_value()) {
+        auto ip_version_to_remove = *ip_version_to_remove_;
+        response.remove_if([ip_version_to_remove](const Network::DnsResponse& dns_resp) {
+          return !Network::Utility::isLoopbackAddress(*dns_resp.addrInfo().address_) &&
+                 dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
+        });
+      }
     }
   }
   ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
