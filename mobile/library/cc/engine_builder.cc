@@ -41,14 +41,6 @@
 namespace Envoy {
 namespace Platform {
 
-namespace {
-
-// This is the same value Cronet uses for QUIC:
-// https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
-constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
-
-} // namespace
-
 #ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
@@ -333,6 +325,11 @@ EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setSocketReceiveBufferSize(int32_t size) {
+  socket_receive_buffer_size_ = size;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
   enable_drain_post_dns_refresh_ = drain_post_dns_refresh_on;
   return *this;
@@ -410,7 +407,7 @@ EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setRuntimeGuard(std::string guard, bool value) {
+EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
   runtime_guards_.emplace_back(std::move(guard), value);
   return *this;
 }
@@ -827,8 +824,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
     sock_opt->set_name(SO_RCVBUF);
     sock_opt->set_level(SOL_SOCKET);
-    sock_opt->set_int_value(SocketReceiveBufferSize);
-    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
+    sock_opt->set_int_value(socket_receive_buffer_size_);
+    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
   }
 
   // Set up stats.
@@ -843,6 +840,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
   list->add_patterns()->set_prefix("runtime.load_success");
+  list->add_patterns()->set_prefix("dns_cache");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");

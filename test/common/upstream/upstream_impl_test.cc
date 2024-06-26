@@ -234,7 +234,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(Network::DnsResolver::ResolutionStatus::Success,
+        cb(Network::DnsResolver::ResolutionStatus::Success, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
@@ -473,7 +473,7 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, {});
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "", {});
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -517,11 +517,14 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 }
 
@@ -621,14 +624,17 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -639,7 +645,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -648,7 +654,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -657,7 +663,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
@@ -666,7 +672,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -688,7 +694,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({}));
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11002"}),
@@ -699,7 +705,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver2.expectResolve(*dns_resolver_);
   resolver2.timer_->invokeCallback();
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(1000), _));
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                           TestUtility::makeDnsResponse({}));
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11002"}),
@@ -760,7 +766,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
@@ -778,7 +784,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   }
 
   // Re-resolve the DNS name with only one record
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -821,7 +827,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
@@ -843,7 +849,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 
   // Re-resolve the DNS name with only one record, we should still have 2 hosts.
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   {
@@ -901,7 +907,7 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   {
@@ -916,7 +922,7 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   }
 
   // Re-resolve the DNS name with only one record, we should have 1 host.
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   {
@@ -1034,14 +1040,17 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1061,7 +1070,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1075,7 +1084,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1088,7 +1097,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
 
   // We received a new set of hosts for localhost2. Should rebuild the cluster.
@@ -1097,7 +1106,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 
   // We again received the same set as before for localhost1. No rebuild this time.
@@ -1106,7 +1115,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -1114,7 +1123,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -1129,7 +1138,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // Make sure that we *don't* de-dup between resolve targets.
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   const auto hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -1155,21 +1164,23 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
   auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
+      [&](uint32_t, const HostVector&, const HostVector& hosts_removed) {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
           removed_hosts.insert(host);
+          return absl::OkStatus();
         }
+        return absl::OkStatus();
       });
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({}));
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({}));
 
   // Ensure that we called the update membership callback.
@@ -1246,14 +1257,17 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1264,7 +1278,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1273,7 +1287,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1282,7 +1296,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
@@ -1291,7 +1305,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -1308,7 +1322,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}));
 
   // Make sure we have multiple priorities.
@@ -1397,18 +1411,18 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
   // Failing response kicks the failure refresh backoff strategy.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(1000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                          TestUtility::makeDnsResponse({}));
 
   // Successful call should reset the failure backoff strategy.
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({}));
 
   // Therefore, a subsequent failure should get a [0,base * 1] refresh.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(1000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                          TestUtility::makeDnsResponse({}));
 }
 
@@ -1442,7 +1456,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+      [&](uint32_t, const HostVector&, const HostVector&) {
+        membership_updated.ready();
+        return absl::OkStatus();
+      });
 
   cluster.initialize([] {});
 
@@ -1450,18 +1467,18 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
   EXPECT_CALL(membership_updated, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(5000), _));
   resolver.dns_callback_(
-      Network::DnsResolver::ResolutionStatus::Success,
+      Network::DnsResolver::ResolutionStatus::Success, "",
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(5)));
 
   // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(membership_updated, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 
   // On failure, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
@@ -1567,7 +1584,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
+  HostImpl host(cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
                 envoy::config::core::v3::UNKNOWN, simTime());
@@ -1591,7 +1608,7 @@ TEST_F(HostImplTest, CreateConnection) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
@@ -1607,9 +1624,11 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
   EXPECT_CALL(*connection, connectionInfoSetter());
+  EXPECT_CALL(*connection, streamInfo());
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   EXPECT_EQ(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
@@ -1623,10 +1642,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1647,11 +1666,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
@@ -1665,13 +1686,13 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
   Network::Address::InstanceConstSharedPtr proxy_address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
 
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1695,12 +1716,14 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
   // The underlying connection should be created to the proxy address.
   EXPECT_CALL(dispatcher, createClientConnection_(proxy_address, _, _, _))
       .WillOnce(Return(connection));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be a raw connection to the proxy address rather
   // than a happy eyeballs connection.
   EXPECT_EQ(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
@@ -1725,10 +1748,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1751,11 +1774,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[1], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
@@ -1776,10 +1801,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
   AddressVector address_list = {
       address,
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
   auto host = std::make_shared<HostImpl>(
       cluster.info_, "lyft.com", address,
@@ -1803,11 +1828,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
+  EXPECT_CALL(*connection, streamInfo());
 
   Envoy::Upstream::Host::CreateConnectionData connection_data =
       host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+  EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
 TEST_F(HostImplTest, HealthFlags) {
@@ -1927,7 +1954,7 @@ TEST_F(HostImplTest, HealthPipeAddress) {
         std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
         config.set_port_value(8000);
-        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"), nullptr,
+        HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr,
                                   envoy::config::core::v3::Locality().default_instance(), config, 1,
                                   simTime());
       },
@@ -1946,7 +1973,7 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_hostname("foo");
-  HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
+  HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
                             envoy::config::core::v3::Locality().default_instance(), config, 1,
                             simTime());
   EXPECT_EQ("foo", descr.hostnameForHealthChecks());
@@ -3288,7 +3315,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
-        std::make_shared<Network::Address::PipeInstance>("/test");
+        *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(v6_remote_address, nullptr)
@@ -3530,7 +3557,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
-        std::make_shared<Network::Address::PipeInstance>("/test");
+        *Network::Address::PipeInstance::create("/test");
     EXPECT_EQ("1.2.3.5:0", cluster->info()
                                ->getUpstreamLocalAddressSelector()
                                ->getUpstreamLocalAddress(v6_remote_address, nullptr)
@@ -3758,12 +3785,15 @@ TEST(PrioritySet, Extend) {
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
   auto priority_update_cb = priority_set.addPriorityUpdateCb(
-      [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
         last_priority = priority;
         ++priority_changes;
+        return absl::OkStatus();
       });
-  auto member_update_cb = priority_set.addMemberUpdateCb(
-      [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    ++membership_changes;
+    return absl::OkStatus();
+  });
 
   // The initial priority set starts with priority level 0.
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
@@ -3821,9 +3851,10 @@ TEST(PrioritySet, Extend) {
 
   // We're going to do a noop host change, so add a callback to assert that we're not announcing
   // any host changes.
-  auto member_update_cb2 = priority_set.addMemberUpdateCb(
-      [&](const HostVector& added, const HostVector& removed) -> void {
+  auto member_update_cb2 =
+      priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) {
         EXPECT_TRUE(added.empty() && removed.empty());
+        return absl::OkStatus();
       });
 
   TestBatchUpdateCb batch_update(hosts, hosts_per_locality);

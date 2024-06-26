@@ -176,6 +176,50 @@ ProcessingMode allDisabledMode() {
 
 } // namespace
 
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+    const std::chrono::milliseconds message_timeout, const uint32_t max_message_timeout_ms,
+    Stats::Scope& scope, const std::string& stats_prefix, bool is_upstream,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
+    : failure_mode_allow_(config.failure_mode_allow()),
+      route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
+      max_message_timeout_ms_(max_message_timeout_ms),
+      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      processing_mode_(config.processing_mode()),
+      mutation_checker_(config.mutation_rules(), context.regexEngine()),
+      filter_metadata_(config.filter_metadata()),
+      allow_mode_override_(config.allow_mode_override()),
+      disable_immediate_response_(config.disable_immediate_response()),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+      is_upstream_(is_upstream),
+      untyped_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().untyped().begin(),
+          config.metadata_options().forwarding_namespaces().untyped().end()),
+      typed_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().typed().begin(),
+          config.metadata_options().forwarding_namespaces().typed().end()),
+      untyped_receiving_namespaces_(
+          config.metadata_options().receiving_namespaces().untyped().begin(),
+          config.metadata_options().receiving_namespaces().untyped().end()),
+      expression_manager_(builder, context.localInfo(), config.request_attributes(),
+                          config.response_attributes()),
+      immediate_mutation_checker_(context.regexEngine()),
+      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+  if (config.disable_clear_route_cache() &&
+      (route_cache_action_ !=
+       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+    throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
+                         "be set to none-default at the same time.");
+  }
+  if (config.disable_clear_route_cache()) {
+    route_cache_action_ = envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
+  }
+  thread_local_stream_manager_slot_->set(
+      [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
+}
+
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
@@ -288,15 +332,27 @@ Filter::StreamOpenState Filter::openStream() {
   }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo());
+
+    Http::AsyncClient::ParentContext grpc_context;
+    grpc_context.stream_info = &decoder_callbacks_->streamInfo();
+    auto options = Http::AsyncClient::StreamOptions()
+                       .setParentSpan(decoder_callbacks_->activeSpan())
+                       .setParentContext(grpc_context)
+                       .setBufferBodyForRetry(true);
+
+    ExternalProcessorStreamPtr stream_object =
+        client_->start(*this, config_with_hash_key_, options);
+
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
       // beyond this point.
-      ASSERT(stream_ == nullptr);
+      ASSERT(stream_object == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
+
+    stream_ = config_->threadLocalStreamManager().store(this, std::move(stream_object));
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -312,7 +368,8 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
-    stream_.reset();
+    stream_ = nullptr;
+    config_->threadLocalStreamManager().erase(this);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }

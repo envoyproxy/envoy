@@ -39,7 +39,7 @@ public:
 
   void setAddressToReturn(const std::string& address) {
     callbacks_.socket_.connection_info_provider_->setRemoteAddress(
-        Network::Utility::resolveUrl(address));
+        *Network::Utility::resolveUrl(address));
   }
 
 protected:
@@ -112,7 +112,7 @@ TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressBleachesPort) {
   filter->onAccept(callbacks_);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
+  const auto expected_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.

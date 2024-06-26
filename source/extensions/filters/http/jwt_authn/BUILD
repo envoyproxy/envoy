@@ -16,7 +16,6 @@ envoy_cc_library(
     deps = [
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
         "@com_google_absl//absl/container:btree",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],

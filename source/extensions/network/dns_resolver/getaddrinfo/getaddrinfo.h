@@ -84,7 +84,7 @@ public:
                                          GetAddrInfoDnsResolverConfig()};
   }
 
-  DnsResolverSharedPtr
+  absl::StatusOr<DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
                     const envoy::config::core::v3::TypedExtensionConfig&) const override {
     return std::make_shared<GetAddrInfoDnsResolver>(dispatcher, api);

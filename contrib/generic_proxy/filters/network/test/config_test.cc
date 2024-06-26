@@ -96,7 +96,7 @@ TEST(FactoryTest, GenericRds) {
         type_url: envoy.generic_proxy.codecs.fake.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     )EOF";
 
@@ -152,8 +152,7 @@ TEST(FactoryTest, GenericRdsApiConfigSource) {
         value: {}
     generic_rds:
       config_source:
-        resource_api_version: V3
-        api_config_source: { api_type: GRPC, transport_api_version: V3 }
+        api_config_source: { api_type: GRPC }
       route_config_name: test_route
     )EOF";
 
@@ -186,7 +185,7 @@ TEST(FactoryTest, CustomReadFilterFactory) {
         type_url: envoy.generic_proxy.codecs.mock.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     )EOF";
 
@@ -366,7 +365,7 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
         type_url: envoy.generic_proxy.codecs.mock.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     tracing:
       max_path_tag_length: 128
@@ -420,7 +419,7 @@ TEST(BasicFilterConfigTest, TestConfigurationWithAccessLog) {
         type_url: envoy.generic_proxy.codecs.mock.type
         value: {}
     generic_rds:
-      config_source: { resource_api_version: V3, ads: {} }
+      config_source: { ads: {} }
       route_config_name: test_route
     access_log:
     - name: envoy.generic_proxy.access_loggers.file

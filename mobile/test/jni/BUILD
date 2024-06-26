@@ -1,5 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
+load("//bazel:envoy_mobile_android_jni.bzl", "envoy_mobile_so_to_jni_lib")
 
 licenses(["notice"])  # Apache 2
 
@@ -214,7 +214,6 @@ cc_library(
     deps = [
         "//library/common/http:header_utility_lib",
         "//library/jni:jni_utility_lib",
-        "//library/jni/types:jni_javavm_lib",
         "@envoy//test/test_common:utility_lib",
     ],
     alwayslink = True,

@@ -14,6 +14,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel;
+
 @RunWith(RobolectricTestRunner.class)
 public class JniUtilityTest {
   public JniUtilityTest() { System.loadLibrary("envoy_jni_utility_test"); }
@@ -31,6 +34,10 @@ public class JniUtilityTest {
                                                                     long length);
   public static native ByteBuffer javaCppNonDirectByteBufferConversion(ByteBuffer byteBuffer,
                                                                        long length);
+  public static native String getJavaExceptionMessage(Throwable throwable);
+  public static native EnvoyStreamIntel javaCppStreamIntelConversion(EnvoyStreamIntel streamIntel);
+  public static native EnvoyFinalStreamIntel
+  javaCppFinalStreamIntelConversion(EnvoyFinalStreamIntel finalStreamIntel);
 
   @Test
   public void testProtoJavaByteArrayConversion() throws Exception {
@@ -142,5 +149,43 @@ public class JniUtilityTest {
     ByteBuffer outByteBuffer = javaCppNonDirectByteBufferConversion(inByteBuffer, 3);
     assertThat(outByteBuffer.isDirect()).isFalse();
     assertThat(outByteBuffer.array()).isEqualTo(new byte[] {'h', 'e', 'l'});
+  }
+
+  @Test
+  public void testGetJavaExceptionMessage() {
+    assertThat(getJavaExceptionMessage(new RuntimeException("Test exception")))
+        .isEqualTo("Test exception");
+  }
+
+  @Test
+  public void testJavaCppStreamIntelConversion() {
+    EnvoyStreamIntel streamIntel = new EnvoyStreamIntel(
+        /* streamId= */ 1,
+        /* connectionId= */ 2,
+        /* attemptCount= */ 3,
+        /* consumedBytesFromResponse= */ 4);
+    assertThat(javaCppStreamIntelConversion(streamIntel)).isEqualTo(streamIntel);
+  }
+
+  @Test
+  public void testJavaCppFinalStreamIntelConversion() {
+    EnvoyFinalStreamIntel finalStreamIntel = new EnvoyFinalStreamIntel(
+        /* streamStartMs= */ 1,
+        /* dnsStartMs= */ 2,
+        /* dnsEndMs= */ 3,
+        /* connectStartMs= */ 4,
+        /* connectEndMs= */ 5,
+        /* sslStartMs= */ 6,
+        /* sslEndMs= */ 7,
+        /* sendingStartMs= */ 8,
+        /* sendingEndMs= */ 9,
+        /* responseStartMs= */ 10,
+        /* streamEndMs= */ 11,
+        /* socketReused= */ true,
+        /* sentByteCount= */ 13,
+        /* receivedByteCount= */ 14,
+        /* responseFlags= */ 15,
+        /* upstreamProtocol= */ 16);
+    assertThat(javaCppFinalStreamIntelConversion(finalStreamIntel)).isEqualTo(finalStreamIntel);
   }
 }

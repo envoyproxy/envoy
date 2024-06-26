@@ -8,6 +8,14 @@
 
 // NOLINT(namespace-envoy)
 
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
+  Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
+  Envoy::JNI::JniHelper::addClassToCache(
+      "io/envoyproxy/envoymobile/engine/testing/HttpTestServerFactory$HttpTestServer");
+  return Envoy::JNI::JniHelper::getVersion();
+}
+
 extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_HttpTestServerFactory_start(
     JNIEnv* env, jclass, jint type, jobject headers, jstring body, jobject trailers) {
@@ -22,15 +30,15 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpTestServerFactory_start(
   auto cpp_trailers = Envoy::JNI::javaMapToCppMap(jni_helper, trailers);
   test_server->setResponse(cpp_headers, cpp_body, cpp_trailers);
 
-  auto java_http_server_factory_class = jni_helper.findClass(
+  jclass java_http_server_factory_class = jni_helper.findClass(
       "io/envoyproxy/envoymobile/engine/testing/HttpTestServerFactory$HttpTestServer");
-  auto java_init_method_id = jni_helper.getMethodId(java_http_server_factory_class.get(), "<init>",
+  auto java_init_method_id = jni_helper.getMethodId(java_http_server_factory_class, "<init>",
                                                     "(JLjava/lang/String;ILjava/lang/String;)V");
   auto ip_address = Envoy::JNI::cppStringToJavaString(jni_helper, test_server->getIpAddress());
   int port = test_server->getPort();
   auto address = Envoy::JNI::cppStringToJavaString(jni_helper, test_server->getAddress());
   return jni_helper
-      .newObject(java_http_server_factory_class.get(), java_init_method_id,
+      .newObject(java_http_server_factory_class, java_init_method_id,
                  reinterpret_cast<jlong>(test_server), ip_address.get(), static_cast<jint>(port),
                  address.get())
       .release();

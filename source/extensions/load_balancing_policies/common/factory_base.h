@@ -59,7 +59,7 @@ private:
     ThreadAwareLb(Upstream::LoadBalancerFactorySharedPtr factory) : factory_(std::move(factory)) {}
 
     Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-    void initialize() override {}
+    absl::Status initialize() override { return absl::OkStatus(); }
 
   private:
     Upstream::LoadBalancerFactorySharedPtr factory_;

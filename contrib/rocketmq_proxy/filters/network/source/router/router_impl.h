@@ -5,7 +5,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "contrib/rocketmq_proxy/filters/network/source/router/router.h"
 

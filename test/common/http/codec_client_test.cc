@@ -503,6 +503,7 @@ public:
     upstream_listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, std::move(socket), listener_callbacks_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);

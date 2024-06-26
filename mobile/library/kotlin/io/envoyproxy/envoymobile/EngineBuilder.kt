@@ -631,13 +631,14 @@ open class EngineBuilder() {
   }
 
   /**
-   * Set a runtime guard with the provided value.
+   * Adds a runtime guard for the `envoy.reloadable_features.<guard>`. For example if the runtime
+   * guard is `envoy.reloadable_features.use_foo`, the guard name is `use_foo`.
    *
    * @param name the name of the runtime guard, e.g. test_feature_false.
    * @param value the value for the runtime guard.
    * @return This builder.
    */
-  fun setRuntimeGuard(name: String, value: Boolean): EngineBuilder {
+  fun addRuntimeGuard(name: String, value: Boolean): EngineBuilder {
     this.runtimeGuards.put(name, value)
     return this
   }

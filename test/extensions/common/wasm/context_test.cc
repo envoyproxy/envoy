@@ -40,6 +40,9 @@ public:
   void setNetworkWriteFilterCallbacksPtr(Network::WriteFilterCallbacks* cb) {
     network_write_filter_callbacks_ = cb;
   }
+  void setRequestHeaders(Http::RequestHeaderMap* request_headers) {
+    request_headers_ = request_headers;
+  }
 
   const LocalInfo::LocalInfo* getRootLocalInfo() const { return root_local_info_; }
   const std::shared_ptr<PluginBase>& getPlugin() const { return plugin_; }
@@ -242,6 +245,45 @@ TEST_F(ContextTest, FindValueTest) {
   EXPECT_FALSE(ctx_.FindValue("listener_direction", &arena).has_value());
   EXPECT_FALSE(ctx_.FindValue("listener_metadata", &arena).has_value());
   EXPECT_FALSE(ctx_.FindValue("plugin_name", &arena).has_value());
+}
+
+TEST_F(ContextTest, ClearRouteCacheCalledInDownstreamConfiguration) {
+
+  Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, clearRouteCache()).Times(5).WillRepeatedly(testing::Return());
+
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
+      .WillRepeatedly(testing::Return(
+          makeOptRef(dynamic_cast<Http::DownstreamStreamFilterCallbacks&>(downstream_callbacks))));
+  ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};
+  ctx_.setRequestHeaders(&request_headers);
+
+  ctx_.clearRouteCache();
+  ctx_.addHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value");
+  ctx_.setHeaderMapPairs(WasmHeaderMapType::RequestHeaders, Pairs{{"key2", "value2"}});
+  ctx_.replaceHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value2");
+  ctx_.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
+}
+
+TEST_F(ContextTest, ClearRouteCacheDoesNothingInUpstreamConfiguration) {
+
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
+      .WillRepeatedly(testing::Return(absl::nullopt));
+  ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};
+  ctx_.setRequestHeaders(&request_headers);
+
+  // Calling methods should be safe.
+  ctx_.clearRouteCache();
+  ctx_.addHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value");
+  ctx_.setHeaderMapPairs(WasmHeaderMapType::RequestHeaders, Pairs{{"key2", "value2"}});
+  ctx_.replaceHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value2");
+  ctx_.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
 }
 
 } // namespace Wasm

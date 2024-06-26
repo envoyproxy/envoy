@@ -5,26 +5,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-# Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
-# differ a bit between the two.
-envoy_cc_library(
-    name = "jni_support_lib",
-    srcs = select({
-        "@envoy//bazel:android": ["ndk_jni_support.cc"],
-        "//conditions:default": ["java_jni_support.cc"],
-    }),
-    hdrs = ["jni_support.h"],
-    linkopts = select({
-        "@envoy//bazel:android": ["-llog"],
-        "//conditions:default": [],
-    }),
-    repository = "@envoy",
-    deps = [
-        "//library/jni/import:jni_import_lib",
-    ],
-)
-
-# Various JNI helper libraries.
 envoy_cc_library(
     name = "jni_utility_lib",
     srcs = [
@@ -36,13 +16,9 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":jni_helper_lib",
-        ":jni_support_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
         "//library/common/types:matcher_data_lib",
-        "//library/jni/import:jni_import_lib",
-        "//library/jni/types:jni_env_lib",
-        "//library/jni/types:jni_exception_lib",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/http:header_map_lib",
@@ -59,9 +35,16 @@ envoy_cc_library(
         "jni_helper.h",
     ],
     repository = "@envoy",
-    deps = [
-        "//library/jni/import:jni_import_lib",
+    deps = select({
+        "@envoy//bazel:linux": ["//bazel:jni"],
+        "@envoy//bazel:apple": ["//bazel:jni"],
+        # On Android, we should use the JNI provided by the system.
+        "//conditions:default": [],
+    }) + [
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy//source/common/common:assert_lib",
     ],
 )
@@ -80,11 +63,10 @@ envoy_cc_library(
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib",
         "//library/common/api:c_types",
+        "//library/common/bridge:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
-        "//library/jni/types:jni_exception_lib",
-        "//library/jni/types:jni_javavm_lib",
         "@envoy//source/common/protobuf",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -102,34 +84,13 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":jni_helper_lib",
         ":jni_utility_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/types:c_types_lib",
-        "//library/jni/import:jni_import_lib",
-        "//library/jni/types:jni_exception_lib",
-        "//library/jni/types:jni_javavm_lib",
         "@envoy//bazel:boringssl",
     ],
-)
-
-# Implementations of the "native" Java methods for AndroidJniLibrary.java
-envoy_cc_library(
-    name = "android_jni_impl_lib",
-    srcs = [
-        "android_jni_impl.cc",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":android_network_utility_lib",
-        ":jni_impl_lib",
-        ":jni_support_lib",
-        ":jni_utility_lib",
-        "//library/common:internal_engine_lib",
-        "//library/jni/import:jni_import_lib",
-    ],
-    # We need this to ensure that we link this into the .so even though there are no code references.
-    alwayslink = True,
 )
 
 # Library which contains all the JNI related targets.
@@ -141,10 +102,8 @@ envoy_cc_library(
     }),
     repository = "@envoy",
     deps = [
-        ":android_jni_impl_lib",
         ":android_network_utility_lib",
         ":jni_impl_lib",
-        ":jni_support_lib",
         ":jni_utility_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -201,10 +160,9 @@ envoy_cc_library(
         "@envoy//source/common/common:assert_lib",
     ] + select({
         "@envoy//bazel:android": [
-            ":jni_support_lib",
+            ":jni_helper_lib",
             ":jni_utility_lib",
-            "//library/common/data:utility_lib",
-            "//library/jni/import:jni_import_lib",
+            "//library/common/bridge:utility_lib",
         ],
         "//conditions:default": [],
     }),

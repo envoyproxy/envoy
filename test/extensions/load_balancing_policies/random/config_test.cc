@@ -35,7 +35,7 @@ TEST(RandomConfigTest, ValidateFail) {
                      context.api_.random_, context.time_system_);
   EXPECT_NE(nullptr, thread_aware_lb);
 
-  thread_aware_lb->initialize();
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
 
   auto thread_local_lb_factory = thread_aware_lb->factory();
   EXPECT_NE(nullptr, thread_local_lb_factory);

@@ -207,7 +207,10 @@ ContextConfigImpl::ContextConfigImpl(
           certificate_validation_context_provider_->addValidationCallback(
               [this](
                   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
-                      dynamic_cvc) { getCombinedValidationContextConfig(dynamic_cvc); });
+                      dynamic_cvc) {
+                getCombinedValidationContextConfig(dynamic_cvc);
+                return absl::OkStatus();
+              });
     }
     // Load inlined, static or dynamic secret that's already available.
     if (certificate_validation_context_provider_->secret() != nullptr) {
@@ -217,9 +220,7 @@ ContextConfigImpl::ContextConfigImpl(
       } else {
         auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
             *certificate_validation_context_provider_->secret(), api_);
-        if (!config_or_status.status().ok()) {
-          throwEnvoyExceptionOrPanic(std::string(config_or_status.status().message()));
-        }
+        THROW_IF_STATUS_NOT_OK(config_or_status, throw);
         validation_context_config_ = std::move(config_or_status.value());
       }
     }
@@ -271,7 +272,7 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
   return std::move(config_or_status.value());
 }
 
-void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
+void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
   // When any of tls_certificate_providers_ receives a new secret, this callback updates
   // ContextConfigImpl::tls_certificate_configs_ with new secret.
   for (const auto& tls_certificate_provider : tls_certificate_providers_) {
@@ -286,7 +287,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
                   std::unique_ptr<Ssl::TlsCertificateConfigImpl>));
             }
           }
-          callback();
+          return callback();
         }));
   }
   if (certificate_validation_context_provider_) {
@@ -299,7 +300,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ = getCombinedValidationContextConfig(
                 *certificate_validation_context_provider_->secret());
-            callback();
+            return callback();
           });
     } else {
       // Once certificate_validation_context_provider_ receives new secret, this callback updates
@@ -312,7 +313,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
               throwEnvoyExceptionOrPanic(std::string(config_or_status.status().message()));
             }
             validation_context_config_ = std::move(config_or_status.value());
-            callback();
+            return callback();
           });
     }
   }
@@ -413,16 +414,15 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
       disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
-      full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, full_scan_certs_on_sni_mismatch,
-          !Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch"))) {
+      full_scan_certs_on_sni_mismatch_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, full_scan_certs_on_sni_mismatch, false)) {
 
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
         [this](const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys) {
           getSessionTicketKeys(keys);
+          return absl::OkStatus();
         });
     // Load inlined, static or dynamic secret that's already available.
     if (session_ticket_keys_provider_->secret() != nullptr) {
@@ -447,7 +447,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   }
 }
 
-void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
+void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
   ContextConfigImpl::setSecretUpdateCallback(callback);
   if (session_ticket_keys_provider_) {
     // Once session_ticket_keys_ receives new secret, this callback updates
@@ -455,7 +455,7 @@ void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> call
     stk_update_callback_handle_ =
         session_ticket_keys_provider_->addUpdateCallback([this, callback]() {
           session_ticket_keys_ = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
-          callback();
+          return callback();
         });
   }
 }

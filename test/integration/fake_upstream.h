@@ -904,6 +904,7 @@ private:
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return connection_balancer_;
     }
+    bool shouldBypassOverloadManager() const override { return false; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }

@@ -96,6 +96,7 @@ type upFilter struct {
 
 func (f *upFilter) OnPoolReady(cb api.ConnectionCallback) {
 	f.cb = cb
+	f.cb.EnableHalfClose(false)
 	localAddr, _ := f.cb.StreamInfo().UpstreamLocalAddress()
 	remoteAddr, _ := f.cb.StreamInfo().UpstreamRemoteAddress()
 	fmt.Printf("OnPoolReady, local: %v, remote: %v\n", localAddr, remoteAddr)

@@ -8,7 +8,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 namespace Envoy {
 namespace Quic {
@@ -18,10 +18,9 @@ namespace Quic {
 class QuicServerTransportSocketFactory : public Network::DownstreamTransportSocketFactory,
                                          public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
-                                   Ssl::ServerContextConfigPtr config,
-                                   Envoy::Ssl::ContextManager& manager,
-                                   const std::vector<std::string>& server_names);
+  static absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
+  create(bool enable_early_data, Stats::Scope& store, Ssl::ServerContextConfigPtr config,
+         Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names);
   ~QuicServerTransportSocketFactory() override;
 
   // Network::DownstreamTransportSocketFactory
@@ -52,10 +51,16 @@ public:
   bool handleCertsWithSharedTlsCode() const { return handle_certs_with_shared_tls_code_; }
 
 protected:
-  void onSecretUpdated() override;
+  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
+                                   Ssl::ServerContextConfigPtr config,
+                                   Envoy::Ssl::ContextManager& manager,
+                                   const std::vector<std::string>& server_names,
+                                   absl::Status& creation_status);
+
+  absl::Status onSecretUpdated() override;
 
 private:
-  Envoy::Ssl::ServerContextSharedPtr createSslServerContext() const;
+  absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> createSslServerContext() const;
 
   const bool handle_certs_with_shared_tls_code_;
   Envoy::Ssl::ContextManager& manager_;
@@ -72,7 +77,7 @@ class QuicServerTransportSocketConfigFactory
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::DownstreamTransportSocketConfigFactory
-  Network::DownstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;

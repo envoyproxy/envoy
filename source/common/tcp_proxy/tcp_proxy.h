@@ -33,7 +33,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -529,9 +529,12 @@ public:
     void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
     Http::ResponseTrailerMapOptRef responseTrailers() override { return {}; }
     void encodeMetadata(Http::MetadataMapPtr&&) override {}
-    // TODO(vikaschoudhary16): Implement watermark callbacks and test through flow control e2es.
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {}
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {}
+    void onDecoderFilterAboveWriteBufferHighWatermark() override {
+      parent_->upstream_callbacks_->onAboveWriteBufferHighWatermark();
+    }
+    void onDecoderFilterBelowWriteBufferLowWatermark() override {
+      parent_->upstream_callbacks_->onBelowWriteBufferLowWatermark();
+    }
     void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void setDecoderBufferLimit(uint32_t) override {}

@@ -129,7 +129,10 @@ TEST(OpenCensusTracerTest, Span) {
     ASSERT_EQ("", span->getBaggage("baggage_key"));
 
     // Trace id is automatically created when no parent context exists.
-    ASSERT_NE(span->getTraceIdAsHex(), "");
+    ASSERT_NE(span->getTraceId(), "");
+
+    // Span id should be empty since this is not yet supported.
+    ASSERT_EQ(span->getSpanId(), "");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -221,7 +224,9 @@ void testIncomingHeaders(
 
     // Check contents via public API.
     // Trace id is set via context propagation headers.
-    EXPECT_EQ(span->getTraceIdAsHex(), "404142434445464748494a4b4c4d4e4f");
+    EXPECT_EQ(span->getTraceId(), "404142434445464748494a4b4c4d4e4f");
+    // TODO(#34412) This method is unimplemented.
+    EXPECT_EQ(span->getSpanId(), "");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
