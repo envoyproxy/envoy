@@ -57,17 +57,17 @@ message GrpcService {
     // Defaults to 0, which means unlimited.
     google.protobuf.UInt32Value max_receive_message_length = 4;
 
-    // This provides gRPC client level control.
-    // If true, ``x-envoy-internal`` header will be added. But it can be overridden by setting ``setSendInternal`` to false in 
+    // This provides gRPC client level control over ``x-envoy-internal`` header.
+    // If true, the header will be added. But it can be overridden by setting ``setSendInternal`` to false in 
     // ``Http::AsyncClient::StreamOptions``, as per stream-level control.
-    // If false, ``x-envoy-internal`` header will be removed and can not be overridden by per stream option.
+    // If false, the header will be removed and can not be overridden by per stream option.
     // Default to true 
     google.protobuf.BoolValue send_internal_header = 5;
 
-    // This provides gRPC client level control.
-    // If true, ``x-forwarded-for`` header will be added. But it can be overridden by setting ``setSendXff`` to false in
+    // This provides gRPC client level control over ``x-forwarded-for`` header.
+    // If true, the header will be added. But it can be overridden by setting ``setSendXff`` to false in
     // ``Http::AsyncClient::StreamOptions``, as per stream-level control.
-    // If false, ``x-forwarded-for`` header will be removed and can not be overridden by per stream option.
+    // If false, the header will be removed and can not be overridden by per stream option.
     // Default to true.
     google.protobuf.BoolValue send_xff_header = 6;
   }
