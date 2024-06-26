@@ -398,19 +398,18 @@ public:
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
 
-    if (clientType() == ClientType::EnvoyGrpc) {
-      // "x-envoy-internal" and `x-forward-for` headers are only available in envoy gRPC path.
-      // They will be removed when either envoy gRPC config or stream option is false.
-      if (!send_envoy_generated_header_ || !send_internal_header_stream_option_) {
-        EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
-      } else {
+    // "x-envoy-internal" and `x-forward-for` headers are only available in envoy gRPC path.
+    // They will be removed when either envoy gRPC config or stream option is false.
+    if (getClientType() == ClientType::EnvoyGrpc) {
+      if (send_envoy_generated_header_ && send_internal_header_stream_option_) {
         EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
-      }
-
-      if (!send_envoy_generated_header_ || !send_xff_header_stream_option_) {
-        EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
       } else {
+        EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+      }
+      if (send_envoy_generated_header_ && send_xff_header_stream_option_) {
         EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
+      } else {
+        EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
       }
     }
 
