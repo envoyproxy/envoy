@@ -1,5 +1,7 @@
 #include "source/common/http/path_utility.h"
 
+#include <absl/strings/str_replace.h>
+
 #include "source/common/common/logger.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -92,12 +94,10 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
   }
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
 
-  // TODO(yanavlasov): optimize this by adding case insensitive matcher
-  std::string decoded_path{path};
-  unescapeInPath(decoded_path, "%2F", "/");
-  unescapeInPath(decoded_path, "%2f", "/");
-  unescapeInPath(decoded_path, "%5C", "\\");
-  unescapeInPath(decoded_path, "%5c", "\\");
+  // optimize this by adding case insensitive matcher
+  const std::string decoded_path {absl::StrReplaceAll(path,
+    {{"%2F", "/"},{"%2f", "/"}, {"%5C", "\\"}, {"%5c", "\\"}})};
+
   headers.setPath(absl::StrCat(decoded_path, query));
   // Path length will not match if there were unescaped %2f or %5c
   return headers.getPathValue().length() != original_length
