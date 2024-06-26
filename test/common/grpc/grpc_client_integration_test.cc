@@ -33,7 +33,7 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
 // A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
 // are removed due to grpc service configuration.
 TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeaders) {
-  // "x-envoy-internal" and `x-forward-for` headers are only avaiable on Envoy gRPC path.
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   send_internal_header_ = false;
   send_xff_header_ = false;
@@ -49,7 +49,7 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeaders) {
 // A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
 // are removed due to per stream options which overrides the gRPC service configuration.
 TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeadersWithStreamOption) {
-  // "x-envoy-internal" and `x-forward-for` headers are only avaiable on Envoy gRPC path.
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
   SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
   send_internal_header_stream_option_ = false;
   send_xff_header_stream_option_ = false;
