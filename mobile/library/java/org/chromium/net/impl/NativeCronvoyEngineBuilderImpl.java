@@ -166,7 +166,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    *
    * The default is 15s.
    *
-   * @param timeout The stream idle timeout, in seconds.
+   * @param timeout The per-try idle timeout, in seconds.
    */
   public NativeCronvoyEngineBuilderImpl setPerTryIdleTimeoutSeconds(int timeout) {
     mPerTryIdleTimeoutSeconds = timeout;
