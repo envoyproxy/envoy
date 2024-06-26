@@ -1567,9 +1567,9 @@ envoy.matching.inputs.dynamic_metadata:
   categories:
   - envoy.matching.http.input
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
-  - envoy.type.matcher.v3.MetadataMatcher
+  - envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput
 envoy.matching.inputs.uri_san:
   categories:
   - envoy.matching.http.input
@@ -1602,6 +1602,13 @@ envoy.matching.custom_matchers.trie_matcher:
   status: stable
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.matching.matchers.metadata_matcher:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.metadata.v3.Metadata
 envoy.load_balancing_policies.least_request:
   categories:
   - envoy.load_balancing_policies

@@ -214,44 +214,6 @@ TEST(MatchingData, FilterStateInput) {
   }
 }
 
-TEST(MatchingData, DynamicMetadataInput) {
-  StreamInfo::StreamInfoImpl stream_info(createStreamInfo());
-
-  auto foobar = ProtobufWkt::Struct();
-  (*foobar.mutable_fields())["foo"].set_string_value("bar");
-  auto jwtpayload = ProtobufWkt::Struct();
-  (*jwtpayload.mutable_fields())["payload"].set_allocated_struct_value(&foobar);
-  (*stream_info.metadata_.mutable_filter_metadata())["envoy.filters.http.jwt_authn"] = jwtpayload;
-
-  {
-    envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput input_config;
-    *(input_config.mutable_filter()) = "some-filter";
-    input_config.add_path()->set_key("some-key");
-    HttpMatchingDataImpl data(stream_info);
-
-    Network::Matching::DynamicMetadataInput<HttpMatchingData> input(input_config);
-    const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
-  }
-
-  {
-    envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput input_config;
-    *(input_config.mutable_filter()) = "envoy.filters.http.jwt_authn";
-    input_config.add_path()->set_key("payload");
-    input_config.add_path()->set_key("foo");
-    HttpMatchingDataImpl data1(stream_info);
-
-    Network::Matching::DynamicMetadataInput<HttpMatchingData> input(input_config);
-    const auto result = input.get(data1);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<std::string>(result.data_), "bar");
-  }
-  (*jwtpayload.mutable_fields())["payload"].release_struct_value()->clear_fields();
-}
-
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

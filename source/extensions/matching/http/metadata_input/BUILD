@@ -9,20 +9,17 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "inputs_lib",
-    srcs = ["inputs.cc"],
-    hdrs = ["inputs.h"],
+    name = "metadata_input_lib",
+    srcs = ["meta_input.cc"],
+    hdrs = ["meta_input.h"],
     extra_visibility = [
-        "//source/common/listener_manager:__subpackages__",
-        "//source/common/router:__subpackages__",
-        "//test:__subpackages__",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
-        "//envoy/network:filter_interface",
         "//envoy/registry",
-        "//source/common/network:utility_lib",
+        "//source/common/config:metadata_lib",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
     ],
 )

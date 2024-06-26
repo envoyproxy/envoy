@@ -72,11 +72,6 @@ class HttpFilterStateInputFactory : public FilterStateInputBaseFactory<Http::Htt
 REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(HttpFilterStateInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
-class HttpDynamicMetadataInputFactory
-    : public DynamicMetadataInputBaseFactory<Http::HttpMatchingData> {};
-REGISTER_FACTORY(HttpDynamicMetadataInputFactory,
-                 Matcher::DataInputFactory<Http::HttpMatchingData>);
-
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy
