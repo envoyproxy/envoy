@@ -17,7 +17,7 @@ namespace OpenTelemetry {
 class StaticConfigResourceDetectorFactory : public ResourceDetectorFactory {
 public:
   /**
-   * @brief Create a Resource Detector that use static config for resourse attributes.
+   * @brief Create a Resource Detector that use static config for resource attributes.
    *
    * @param message The resource detector configuration.
    * @param context The tracer factory context.
