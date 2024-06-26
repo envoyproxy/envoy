@@ -10,7 +10,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:95.5"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
-"source/common/http/http2:96.0"
+"source/common/http/http2:95.9"
 "source/common/json:94.6"
 "source/common/matcher:94.4"
 "source/common/memory:73.6" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589

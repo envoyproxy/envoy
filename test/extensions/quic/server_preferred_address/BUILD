@@ -19,5 +19,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_lib",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
