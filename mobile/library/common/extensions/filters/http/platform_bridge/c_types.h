@@ -149,12 +149,6 @@ typedef void (*envoy_filter_on_error_f)(envoy_error error, envoy_stream_intel st
                                         const void* context);
 
 /**
- * Function signature for on-data-available filter invocations.
- */
-typedef void (*envoy_filter_on_data_available_f)(uint32_t bytes_available,
-                                                 envoy_stream_intel stream_intel,
-                                                 const void* context);
-/**
  * Function signature to release a filter instance once the filter chain is finished with it.
  */
 typedef void (*envoy_filter_release_f)(const void* context);
@@ -204,7 +198,6 @@ typedef struct {
   envoy_filter_on_resume_f on_resume_response;
   envoy_filter_on_cancel_f on_cancel;
   envoy_filter_on_error_f on_error;
-  envoy_filter_on_data_available_f on_data_available;
   envoy_filter_release_f release_filter;
   const void* static_context;
   const void* instance_context;
