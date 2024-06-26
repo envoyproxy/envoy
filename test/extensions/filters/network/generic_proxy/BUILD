@@ -135,3 +135,13 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "stream_test",
+    srcs = [
+        "stream_test.cc",
+    ],
+    deps = [
+        "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
+    ]
+)

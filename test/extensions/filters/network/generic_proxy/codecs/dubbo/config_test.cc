@@ -49,6 +49,15 @@ MessageMetadataSharedPtr createDubboResponse(DubboRequest& request, ResponseStat
 TEST(DubboRequestTest, DubboRequestTest) {
   DubboRequest request(createDubboRequst(false));
 
+  {
+    auto frame_flags = request.frameFlags();
+    EXPECT_EQ(frame_flags.streamId(), 123456);
+    EXPECT_EQ(frame_flags.endStream(), true);
+    EXPECT_EQ(frame_flags.heartbeat(), false);
+    EXPECT_EQ(frame_flags.oneWayStream(), false);
+    EXPECT_EQ(frame_flags.drainClose(), false);
+  }
+
   // Static attributes test.
   { EXPECT_EQ("dubbo", request.protocol()); }
 
@@ -80,10 +89,53 @@ TEST(DubboRequestTest, DubboRequestTest) {
     // Version is not part of attachments. So there are only 2 attachments.
     EXPECT_EQ(2, attachment_size);
   }
+  // Iterate headers and break;
+  {
+    size_t attachment_size = 0;
+    request.forEach([&attachment_size](absl::string_view, absl::string_view) {
+      attachment_size++;
+      return false;
+    });
+    // Version is not part of attachments. So there are only 2 attachments.
+    EXPECT_EQ(1, attachment_size);
+  }
+
+  // Erase headers.
+  {
+    request.erase("group");
+    EXPECT_EQ(false, request.get("group").has_value());
+
+    request.erase("custom_key");
+    EXPECT_EQ(false, request.get("custom_key").has_value());
+  }
+}
+
+TEST(DubboRequestTest, OneWayDubboRequestTest) {
+  DubboRequest request(createDubboRequst(true));
+
+  {
+    auto frame_flags = request.frameFlags();
+    EXPECT_EQ(frame_flags.streamId(), 123456);
+    EXPECT_EQ(frame_flags.endStream(), true);
+    EXPECT_EQ(frame_flags.heartbeat(), false);
+    EXPECT_EQ(frame_flags.oneWayStream(), true);
+    EXPECT_EQ(frame_flags.drainClose(), false);
+  }
 }
 
 TEST(DubboResponseTest, DubboResponseTest) {
   DubboRequest request(createDubboRequst(false));
+
+  {
+    DubboResponse response(
+        createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
+    auto frame_flags = response.frameFlags();
+    EXPECT_EQ(frame_flags.streamId(), 123456);
+    EXPECT_EQ(frame_flags.endStream(), true);
+    EXPECT_EQ(frame_flags.heartbeat(), false);
+    EXPECT_EQ(frame_flags.oneWayStream(), false);
+    EXPECT_EQ(frame_flags.drainClose(), false);
+  }
 
   // Static attributes test.
   {
@@ -240,6 +292,20 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     server_codec.decode(buffer, false);
   }
 
+  // Decode heartbeat request.
+  {
+    server_codec.metadata_.reset();
+
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xda', '\xbb', '\xe2', 00}));
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(1);
+    buffer.writeByte('N');
+
+    EXPECT_CALL(callbacks, writeToConnection(_));
+    server_codec.decode(buffer, false);
+  }
+
   // Encode response.
   {
 
@@ -363,6 +429,20 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
         .WillOnce(Return(ByMove(std::move(response))));
 
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
+    client_codec.decode(buffer, false);
+  }
+
+  // Decode heartbeat request.
+  {
+    client_codec.metadata_.reset();
+
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xda', '\xbb', '\xe2', 00}));
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(1);
+    buffer.writeByte('N');
+
+    EXPECT_CALL(callbacks, writeToConnection(_));
     client_codec.decode(buffer, false);
   }
 

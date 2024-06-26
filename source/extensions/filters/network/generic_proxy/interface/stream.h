@@ -58,6 +58,11 @@ public:
   uint32_t frameTags() const { return frame_tags_; }
 
   /**
+   * @return the raw flags of the current stream frame.
+   */
+  uint32_t rawFlags() const { return flags_; }
+
+  /**
    * @return whether the current frame is the last frame of the request or response.
    */
   bool endStream() const { return flags_ & FLAG_END_STREAM; }
@@ -78,9 +83,11 @@ public:
 
   /**
    * @return whether the current request/response is a heartbeat request/response.
-   * NOTE: Only the header frame's isHeartbeat() flag will be used.
+   * NOTE: Only the header frame's heartbeat() flag will be used. In most cases, the heartbeat
+   * should be handled directly by the underlying codec and should not be exposed to the generic
+   * proxy filter. This should only be used when we need to send the heartbeat to the peer.
    */
-  bool isHeartbeat() const { return flags_ & FLAG_HEARTBEAT; }
+  bool heartbeat() const { return flags_ & FLAG_HEARTBEAT; }
 
 private:
   uint64_t stream_id_{};

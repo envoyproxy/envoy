@@ -28,13 +28,11 @@ public:
     ASSERT(inner_metadata_ != nullptr);
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasRequest());
+    ASSERT(!inner_metadata_->heartbeat()); // Heartbeat should be handled by codec directly.
 
     uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
     if (!inner_metadata_->context().isTwoWay()) {
       frame_flags |= FrameFlags::FLAG_ONE_WAY;
-    }
-    if (inner_metadata_->context().heartbeat()) {
-      frame_flags |= FrameFlags::FLAG_HEARTBEAT;
     }
 
     stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId()), frame_flags};
@@ -66,17 +64,11 @@ public:
     ASSERT(inner_metadata_ != nullptr);
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasResponse());
+    ASSERT(!inner_metadata_->heartbeat()); // Heartbeat should be handled by codec directly.
+
     refreshStatus();
 
-    uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
-    if (!inner_metadata_->context().isTwoWay()) {
-      frame_flags |= FrameFlags::FLAG_ONE_WAY;
-    }
-    if (inner_metadata_->context().heartbeat()) {
-      frame_flags |= FrameFlags::FLAG_HEARTBEAT;
-    }
-
-    stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId()), frame_flags};
+    stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId())};
   }
 
   void refreshStatus();
@@ -127,12 +119,8 @@ public:
         decode_status = codec_->decodeData(buffer, *metadata_);
       }
 
-      if (decode_status == Common::Dubbo::DecodeStatus::Failure) {
-        ENVOY_LOG(warn, "Dubbo codec: unexpected decoding error");
-        metadata_.reset();
-        callback_->onDecodingFailure();
-        return Common::Dubbo::DecodeStatus::Failure;
-      }
+      // Ingore DecodeStatus::Failure as the codec will never return it.
+      // TODO(wbpcode): make the codec exception free and handle the error status of the codec.
 
       if (decode_status == Common::Dubbo::DecodeStatus::Waiting) {
         ENVOY_LOG(debug, "Dubbo codec: waiting for more input data");
