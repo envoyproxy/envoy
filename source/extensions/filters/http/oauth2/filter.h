@@ -119,6 +119,7 @@ public:
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
+  bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
@@ -164,6 +165,7 @@ private:
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
+  const bool preserve_authorization_header_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
@@ -270,6 +272,7 @@ private:
   std::string refresh_token_;
   std::string expires_in_;
   std::string expires_refresh_token_in_;
+  std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
@@ -291,6 +294,8 @@ private:
   std::string getEncodedToken() const;
   std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
                                             const std::chrono::seconds& expires_in) const;
+  std::string getExpiresTimeForIdToken(const std::string& id_token,
+                                       const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

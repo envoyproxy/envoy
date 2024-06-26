@@ -245,6 +245,7 @@ private:
   // True if the CONNECT headers have been sent but proxying payload is paused
   // waiting for response headers.
   bool paused_for_connect_ : 1;
+  bool paused_for_websocket_ : 1;
   bool reset_stream_ : 1;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
@@ -361,6 +362,14 @@ public:
   }
   bool pausedForConnect() const override { return upstream_request_.paused_for_connect_; }
   void setPausedForConnect(bool value) override { upstream_request_.paused_for_connect_ = value; }
+
+  bool pausedForWebsocketUpgrade() const override {
+    return upstream_request_.paused_for_websocket_;
+  }
+  void setPausedForWebsocketUpgrade(bool value) override {
+    upstream_request_.paused_for_websocket_ = value;
+  }
+
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return upstream_request_.upstreamStreamOptions();
   }

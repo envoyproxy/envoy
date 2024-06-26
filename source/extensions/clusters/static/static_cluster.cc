@@ -21,11 +21,13 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
   Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
-          lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
+          lb_endpoint.endpoint().hostname(),
+          THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
+                                const Network::Address::InstanceConstSharedPtr),
           {}, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }

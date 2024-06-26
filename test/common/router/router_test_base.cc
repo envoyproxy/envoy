@@ -33,7 +33,7 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(host_address_);
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
   test_time_.setMonotonicTime(std::chrono::milliseconds(50));

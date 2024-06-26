@@ -55,6 +55,7 @@ build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
 test --test_verbose_timeout_warnings
+test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
@@ -147,12 +148,6 @@ build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
-
-# Workaround issue with pkgconfig, see https://github.com/envoyproxy/envoy/issues/33225
-build:macos --host_action_env=CXXFLAGS=-Wno-int-conversion
-build:macos --action_env=CXXFLAGS=-Wno-int-conversion
-build:macos --host_action_env=CFLAGS=-Wno-int-conversion
-build:macos --action_env=CFLAGS=-Wno-int-conversion
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -515,6 +510,7 @@ build:rbe-google --config=cache-google
 
 build:rbe-google-bes --bes_backend=grpcs://buildeventservice.googleapis.com
 build:rbe-google-bes --bes_results_url=https://source.cloud.google.com/results/invocations/
+build:rbe-google-bes --bes_upload_mode=fully_async
 
 # RBE (Engflow mobile)
 build:rbe-engflow --google_default_credentials=false

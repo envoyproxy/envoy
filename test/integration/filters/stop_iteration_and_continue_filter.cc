@@ -10,6 +10,7 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/integration/filters/common.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.validate.h"
 #include "test/test_common/utility.h"
@@ -20,8 +21,8 @@ namespace Envoy {
 // It can optionally register a ScopeTrackedObject on continuation.
 class StopIterationAndContinueFilter : public Http::PassThroughFilter {
 public:
-  StopIterationAndContinueFilter(bool set_tracked_object)
-      : set_tracked_object_(set_tracked_object) {}
+  StopIterationAndContinueFilter(bool set_tracked_object, bool stop_and_buffer)
+      : set_tracked_object_(set_tracked_object), stop_and_buffer_(stop_and_buffer) {}
 
   void setEndStreamAndDecodeTimer() {
     decode_end_stream_seen_ = true;
@@ -64,6 +65,9 @@ public:
     if (end_stream) {
       setEndStreamAndDecodeTimer();
     }
+    if (stop_and_buffer_) {
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -88,6 +92,7 @@ public:
   Event::TimerPtr encode_delay_timer_;
   bool encode_end_stream_seen_{};
   bool set_tracked_object_{};
+  bool stop_and_buffer_{};
 };
 
 class StopIterationAndContinueFilterFactory
@@ -101,14 +106,44 @@ private:
       const test::integration::filters::StopAndContinueConfig& proto_config, const std::string&,
       Server::Configuration::FactoryContext&) override {
     bool set_scope_tacked_object = proto_config.install_scope_tracked_object();
-    return [set_scope_tacked_object](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(
-          std::make_shared<::Envoy::StopIterationAndContinueFilter>(set_scope_tacked_object));
+    bool stop_and_buffer = proto_config.stop_and_buffer();
+    return [set_scope_tacked_object,
+            stop_and_buffer](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<::Envoy::StopIterationAndContinueFilter>(
+          set_scope_tacked_object, stop_and_buffer));
     };
   }
 };
 
-REGISTER_FACTORY(StopIterationAndContinueFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
+class StopIterationAndContinueUpstreamFilterFactory
+    : public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  std::string name() const override { return "stop-iteration-and-continue-filter"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::StopAndContinueConfig>();
+  }
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+
+    const auto& proto_config =
+        MessageUtil::downcastAndValidate<const test::integration::filters::StopAndContinueConfig&>(
+            config, context.serverFactoryContext().messageValidationVisitor());
+
+    return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<StopIterationAndContinueFilter>(
+          proto_config.install_scope_tracked_object(), proto_config.stop_and_buffer()));
+    };
+  };
+};
+
+static Registry::RegisterFactory<StopIterationAndContinueFilterFactory,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_;
+static Registry::RegisterFactory<StopIterationAndContinueUpstreamFilterFactory,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy

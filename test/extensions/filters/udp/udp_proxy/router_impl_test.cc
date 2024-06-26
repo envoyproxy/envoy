@@ -39,7 +39,7 @@ protected:
   }
 
   Network::Address::InstanceConstSharedPtr parseAddress(const std::string& address) {
-    return Network::Utility::parseInternetAddressAndPort(address);
+    return Network::Utility::parseInternetAddressAndPortNoThrow(address);
   }
 };
 

@@ -4,8 +4,11 @@ import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class EngineBuilderTest {
   private lateinit var engineBuilder: EngineBuilder
   private var envoyEngine: EnvoyEngine = mock(EnvoyEngine::class.java)
@@ -214,8 +217,8 @@ class EngineBuilderTest {
   fun `specifying runtime guards work`() {
     engineBuilder = EngineBuilder()
     engineBuilder
-      .setRuntimeGuard("test_feature_false", true)
-      .setRuntimeGuard("test_feature_true", false)
+      .addRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("test_feature_true", false)
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_false"]).isEqualTo("true")
     assertThat(engine.envoyConfiguration.runtimeGuards["test_feature_true"]).isEqualTo("false")

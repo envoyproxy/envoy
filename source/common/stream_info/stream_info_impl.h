@@ -221,6 +221,7 @@ struct StreamInfoImpl : public StreamInfo {
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
+    // Callers should sanitize with StringUtil::replaceAllEmptySpace if necessary.
     ASSERT(!StringUtil::hasEmptySpace(rc_details));
     response_code_details_.emplace(rc_details);
   }
@@ -291,6 +292,10 @@ struct StreamInfoImpl : public StreamInfo {
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
+
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+    (*metadata_.mutable_typed_filter_metadata())[name].MergeFrom(value);
+  }
 
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
@@ -427,6 +432,12 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_transport_failure_reason_;
   }
 
+  bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
+
+  void setShouldSchemeMatchUpstream(bool should_match_upstream) override {
+    should_scheme_match_upstream_ = should_match_upstream;
+  }
+
   bool shouldDrainConnectionUponCompletion() const override { return should_drain_connection_; }
 
   void setShouldDrainConnectionUponCompletion(bool should_drain) override {
@@ -437,26 +448,26 @@ struct StreamInfoImpl : public StreamInfo {
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> final_time_;
-
   absl::optional<Http::Protocol> protocol_;
 
 private:
   absl::optional<uint32_t> response_code_;
-
-public:
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+
+public:
   absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   bool health_check_request_{};
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
+
+private:
   absl::optional<uint32_t> attempt_count_;
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
 
-private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(
         Network::ConnectionInfoProviderSharedPtr,
@@ -479,6 +490,7 @@ private:
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
 };
 

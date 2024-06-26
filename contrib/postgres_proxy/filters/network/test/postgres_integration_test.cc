@@ -1,6 +1,7 @@
 #include "source/common/network/connection_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/fake_upstream.h"
@@ -316,12 +317,12 @@ public:
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         downstream_tls_context, mock_factory_ctx);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
-            new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
+            *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
                 std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()), {})};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
@@ -535,12 +536,12 @@ public:
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         upstream_tls_context, mock_factory_ctx);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::UpstreamTransportSocketFactoryPtr tls_context =
         Network::UpstreamTransportSocketFactoryPtr{
-            new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
+            *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
                 std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
 
     Network::TransportSocketOptionsConstSharedPtr options;

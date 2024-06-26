@@ -105,64 +105,41 @@ private:
   SslHandshakerImplSharedPtr info_;
 };
 
-class ClientSslSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
-                               public Secret::SecretCallbacks,
-                               Logger::Loggable<Logger::Id::config> {
+class InvalidSslSocket : public Network::TransportSocket {
 public:
-  ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
-                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
-
-  ~ClientSslSocketFactory() override;
-
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
-                        Upstream::HostDescriptionConstSharedPtr) const override;
-  bool implementsSecureTransport() const override;
-  absl::string_view defaultServerNameIndication() const override {
-    return clientContextConfig()->serverNameIndication();
+  // Network::TransportSocket
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
+  std::string protocol() const override { return EMPTY_STRING; }
+  bool canFlushClose() override { return true; }
+  void closeSocket(Network::ConnectionEvent) override {}
+  Network::IoResult doRead(Buffer::Instance&) override {
+    return {Network::PostIoAction::Close, 0, false};
   }
-  bool supportsAlpn() const override { return true; }
-
-  // Secret::SecretCallbacks
-  void onAddOrUpdateSecret() override;
-
-  OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override { return {*config_}; }
-
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() override;
-
-private:
-  Envoy::Ssl::ContextManager& manager_;
-  Stats::Scope& stats_scope_;
-  SslSocketFactoryStats stats_;
-  Envoy::Ssl::ClientContextConfigPtr config_;
-  mutable absl::Mutex ssl_ctx_mu_;
-  Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
+  Network::IoResult doWrite(Buffer::Instance&, bool) override {
+    return {Network::PostIoAction::Close, 0, false};
+  }
+  void onConnected() override {}
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
 };
 
-class ServerSslSocketFactory : public Network::DownstreamTransportSocketFactory,
-                               public Secret::SecretCallbacks,
-                               Logger::Loggable<Logger::Id::config> {
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
+class NotReadySslSocket : public InvalidSslSocket {
 public:
-  ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
-                         Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
-                         const std::vector<std::string>& server_names);
+  // Network::TransportSocket
+  absl::string_view failureReason() const override;
+};
 
-  ~ServerSslSocketFactory() override;
+class ErrorSslSocket : public InvalidSslSocket {
+public:
+  ErrorSslSocket(absl::string_view error) : error_(error) {}
 
-  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
-  bool implementsSecureTransport() const override;
-
-  // Secret::SecretCallbacks
-  void onAddOrUpdateSecret() override;
+  // Network::TransportSocket
+  absl::string_view failureReason() const override { return error_; }
 
 private:
-  Ssl::ContextManager& manager_;
-  Stats::Scope& stats_scope_;
-  SslSocketFactoryStats stats_;
-  Envoy::Ssl::ServerContextConfigPtr config_;
-  const std::vector<std::string> server_names_;
-  mutable absl::Mutex ssl_ctx_mu_;
-  Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
+  std::string error_;
 };
 
 } // namespace Tls

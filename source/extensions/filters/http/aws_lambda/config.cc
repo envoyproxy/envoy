@@ -34,20 +34,29 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 
 } // namespace
 
-// In case credentials_profile is set in the configuration, instead of using the
-// default providers chain, it will use the credentials file provider with
-// the configured profile. All other providers will be ignored.
+// In case credentials from config or credentials_profile are set in the configuration, instead of
+// using the default providers chain, it will use the credentials from config (if provided), then
+// credentials file provider with the configured profile. All other providers will be ignored.
 Extensions::Common::Aws::CredentialsProviderSharedPtr
 AwsLambdaFilterFactory::getCredentialsProvider(
-    const std::string& profile, Server::Configuration::ServerFactoryContext& server_context,
-    const std::string& region) const {
-  if (!profile.empty()) {
+    const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext& server_context, const std::string& region) const {
+  if (proto_config.has_credentials()) {
+    ENVOY_LOG(debug,
+              "credentials are set from filter configuration, default credentials providers chain "
+              "will be ignored and only this credentials will be used");
+    const auto& config_credentials = proto_config.credentials();
+    return std::make_shared<Extensions::Common::Aws::ConfigCredentialsProvider>(
+        config_credentials.access_key_id(), config_credentials.secret_access_key(),
+        config_credentials.session_token());
+  }
+  if (!proto_config.credentials_profile().empty()) {
     ENVOY_LOG(debug,
               "credentials profile is set to \"{}\" in config, default credentials providers chain "
               "will be ignored and only credentials file provider will be used",
-              profile);
+              proto_config.credentials_profile());
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-        server_context.api(), profile);
+        server_context.api(), proto_config.credentials_profile());
   }
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
       server_context.api(), makeOptRef(server_context), region,
@@ -65,8 +74,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   }
   const std::string region = arn->region();
 
-  auto credentials_provider =
-      getCredentialsProvider(proto_config.credentials_profile(), server_context, region);
+  auto credentials_provider = getCredentialsProvider(proto_config, server_context, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,
@@ -97,8 +105,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
         fmt::format("aws_lambda_filter: Invalid ARN: {}", per_route_config.invoke_config().arn()));
   }
   const std::string region = arn->region();
-  auto credentials_provider = getCredentialsProvider(
-      per_route_config.invoke_config().credentials_profile(), server_context, region);
+  auto credentials_provider =
+      getCredentialsProvider(per_route_config.invoke_config(), server_context, region);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name, region, std::move(credentials_provider), server_context,

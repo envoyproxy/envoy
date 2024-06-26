@@ -29,7 +29,7 @@ public:
     EXPECT_CALL(*dispatcher_, createFileEvent_(42, _, _, _)).WillOnce(Return(file_event_));
     io_handle_.setBlocking(false);
     io_handle_.initializeFileEvent(
-        *dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+        *dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
         Event::FileReadyType::Read | Event::FileReadyType::Closed);
   }
 

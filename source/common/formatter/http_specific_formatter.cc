@@ -197,6 +197,25 @@ HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& con
       context.requestHeaders(), context.responseHeaders(), context.responseTrailers()));
 }
 
+ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                                            const StreamInfo::StreamInfo&) const {
+  auto trace_id = context.activeSpan().getTraceId();
+  if (trace_id.empty()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::stringValue(trace_id);
+}
+
+absl::optional<std::string>
+TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
+                                    const StreamInfo::StreamInfo&) const {
+  auto trace_id = context.activeSpan().getTraceId();
+  if (trace_id.empty()) {
+    return absl::nullopt;
+  }
+  return trace_id;
+}
+
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
   if (format.empty() || format == "CAMEL_STRING") {
     return GrpcStatusFormatter::CamelString;
@@ -317,7 +336,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
@@ -327,7 +347,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header,
                                                             max_length);
@@ -337,7 +358,8 @@ HttpBuiltInCommandParser::getKnownFormatters() {
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
 
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header,
                                                              max_length);
@@ -386,10 +408,15 @@ HttpBuiltInCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& format, absl::optional<size_t>& max_length) {
            std::string main_header, alternative_header;
-           SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header, alternative_header);
+           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
+                                                                           alternative_header));
 
            return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
                                                            max_length);
+         }}},
+       {"TRACE_ID",
+        {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
+           return std::make_unique<TraceIDFormatter>();
          }}}});
 }
 

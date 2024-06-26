@@ -79,7 +79,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("78.26.243.166");
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -108,7 +108,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("2345:0425:2CA1:0:0:0567:5673:23b5");
+      Network::Utility::parseInternetAddressNoThrow("2345:0425:2CA1:0:0:0567:5673:23b5");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -130,7 +130,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.0.0");
+      Network::Utility::parseInternetAddressNoThrow("1.2.0.0");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -154,7 +154,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("71.160.223.45");
+      Network::Utility::parseInternetAddressNoThrow("71.160.223.45");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -178,7 +178,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("65.4.3.2");
+      Network::Utility::parseInternetAddressNoThrow("65.4.3.2");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -202,7 +202,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("abcd:1000::1");
+      Network::Utility::parseInternetAddressNoThrow("abcd:1000::1");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -225,7 +225,7 @@ TEST_F(GeoipProviderTest, ValidConfigEmptyLookupResult) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("10.10.10.10");
+      Network::Utility::parseInternetAddressNoThrow("10.10.10.10");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -246,7 +246,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address1 =
-      Network::Utility::parseInternetAddress("78.26.243.166");
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
   Geolocation::LookupRequest lookup_rq1{std::move(remote_address1)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
@@ -255,7 +255,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityMultipleLookups) {
   EXPECT_EQ(3, captured_lookup_response_.size());
   // Another lookup request.
   Network::Address::InstanceConstSharedPtr remote_address2 =
-      Network::Utility::parseInternetAddress("63.25.243.11");
+      Network::Utility::parseInternetAddressNoThrow("63.25.243.11");
   Geolocation::LookupRequest lookup_rq2{std::move(remote_address2)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
   auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
@@ -277,7 +277,7 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   )EOF";
   initializeProvider(config_yaml);
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("78.26.243.166");
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();

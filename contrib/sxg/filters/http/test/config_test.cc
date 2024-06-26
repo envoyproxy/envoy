@@ -100,12 +100,10 @@ certificate:
   name: certificate
   sds_config:
     path: "xxxx"
-    resource_api_version: V3
 private_key:
   name: private_key
   sds_config:
     path: "xxxx"
-    resource_api_version: V3
 cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
 )YAML";

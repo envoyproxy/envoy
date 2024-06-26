@@ -45,7 +45,7 @@ public:
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
-    addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+    addr_ = *Network::Address::PipeInstance::create("/test/test.sock");
 
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
@@ -141,7 +141,6 @@ public:
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
-transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -150,7 +149,6 @@ failure_mode_allow: true
 stat_prefix: name
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
-transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -168,7 +166,6 @@ filter_enabled_metadata:
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(
-transport_api_version: V3
 grpc_service: {}
 stat_prefix: name
   )EOF";
