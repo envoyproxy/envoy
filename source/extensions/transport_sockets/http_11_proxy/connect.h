@@ -28,13 +28,16 @@ public:
                                      size_t& bytes_processed);
 
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
-                              Network::TransportSocketOptionsConstSharedPtr options);
+                              Network::TransportSocketOptionsConstSharedPtr options,
+                              std::shared_ptr<const Upstream::HostDescription> host,
+                              bool legacy_behavior = true);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
 
 private:
+  void legacyConstructor();
   void generateHeader();
   Network::IoResult writeHeader();
 
@@ -42,12 +45,17 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   bool need_to_strip_connect_response_{};
+  absl::string_view proxy_address_;
+  // The legacy behavior of this transport socket required configuration via filter state metadata
+  // and only sent a CONNECT request if using a TLS transport to the target host.
+  bool legacy_behavior_{};
 };
 
 class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
   UpstreamHttp11ConnectSocketFactory(
-      Network::UpstreamTransportSocketFactoryPtr transport_socket_factory);
+      Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
+      absl::optional<std::string> proto_proxy_address = absl::nullopt);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -55,6 +63,9 @@ public:
                         std::shared_ptr<const Upstream::HostDescription> host) const override;
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override;
+
+private:
+  absl::optional<std::string> proto_proxy_address_;
 };
 
 // This is a utility class for isValidConnectResponse. It is only exposed for

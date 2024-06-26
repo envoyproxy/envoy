@@ -19,6 +19,7 @@ envoy_cc_extension(
     deps = [
         ":connect",
         "//envoy/network:transport_socket_interface",
+        "//source/common/network:resolver_lib",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",

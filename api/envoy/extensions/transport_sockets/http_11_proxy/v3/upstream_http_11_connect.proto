@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.http_11_proxy.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
@@ -17,20 +18,31 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.http_11_proxy]
 
 // Configuration for HTTP/1.1 proxy transport sockets.
-// This is intended for use in Envoy Mobile, though may eventually be extended
-// for upstream Envoy use.
-// If this transport socket is configured, and an intermediate filter adds the
-// stream info necessary for proxying to the stream info (as the test filter
-// does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`) then
 //
+// If this transport socket is configured with the `proxy_address` field set,
+// then the proxy address will be used for upstream connections.
+//
+// If the `proxy_address` field is not set, then the proxy address will be
+// read from the stream info set by an intermediate filter (as the test filter
+// does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`). This
+// method of configuration will only preface H1 CONNECT headers to TLS
+// connections.
+//
+// When the transport socket is configured:
 // * Upstream connections will be directed to the specified proxy address rather
 //   than the host's address
-// * Upstream TLS connections will have a raw HTTP/1.1 CONNECT header prefaced
-//   to the payload, and 200 response stripped (if less than 200 bytes)
+// * Upstream connections will have a raw HTTP/1.1 CONNECT header prefaced
+//   to the payload, and 200 response stripped (if less than 200 bytes). In the
+//   case of proxy addresses read from stream info set by an intermediate
+//   filter, this only applies to TLS connections.
 // * Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
 //
-// This transport socket is not compatible with HTTP/3, plaintext HTTP/2, or raw TCP.
+// This transport socket is not compatible with HTTP/3, plaintext HTTP/2.
 message Http11ProxyUpstreamTransport {
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
+
+  // The address of the proxy to connect to. If set, stream info set by an
+  // intermediate filter will be ignored.
+  config.core.v3.SocketAddress proxy_address = 2;
 }

@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/network/resolver_impl.h"
 #include "source/extensions/transport_sockets/http_11_proxy/connect.h"
 
 namespace Envoy {
@@ -23,10 +24,19 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
       Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto factory_or_error =
+  auto inner_transport_factory =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
-  return std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(factory_or_error.value()));
+  RETURN_IF_STATUS_NOT_OK(inner_transport_factory);
+
+  absl::optional<std::string> proxy_address;
+  if (outer_config.has_proxy_address()) {
+    auto addr_instance = Network::Address::resolveProtoSocketAddress(outer_config.proxy_address());
+    RETURN_IF_STATUS_NOT_OK(addr_instance);
+    proxy_address = addr_instance.value()->asString();
+  }
+
+  return std::make_unique<UpstreamHttp11ConnectSocketFactory>(
+      std::move(inner_transport_factory.value()), proxy_address);
 }
 
 ProtobufTypes::MessagePtr UpstreamHttp11ConnectSocketConfigFactory::createEmptyConfigProto() {

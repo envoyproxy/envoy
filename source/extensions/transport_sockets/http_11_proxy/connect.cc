@@ -29,8 +29,21 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
 
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
-    Network::TransportSocketOptionsConstSharedPtr options)
-    : PassthroughSocket(std::move(transport_socket)), options_(options) {
+    Network::TransportSocketOptionsConstSharedPtr options,
+    std::shared_ptr<const Upstream::HostDescription> host, bool legacy_behavior)
+    : PassthroughSocket(std::move(transport_socket)), options_(options),
+      legacy_behavior_(legacy_behavior) {
+  if (legacy_behavior_) {
+    legacyConstructor();
+    return;
+  }
+
+  header_buffer_.add(
+      absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+  need_to_strip_connect_response_ = true;
+}
+
+void UpstreamHttp11ConnectSocket::legacyConstructor() {
   if (options_ && options_->http11ProxyInfo() && transport_socket_->ssl()) {
     header_buffer_.add(
         absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
@@ -129,28 +142,30 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
 }
 
 UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
-    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory)
-    : PassthroughFactory(std::move(transport_socket_factory)) {}
+    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
+    absl::optional<std::string> proto_proxy_address)
+    : PassthroughFactory(std::move(transport_socket_factory)),
+      proto_proxy_address_(proto_proxy_address) {}
 
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,
     std::shared_ptr<const Upstream::HostDescription> host) const {
+
   auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options);
+
+  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host,
+                                                       !proto_proxy_address_.has_value());
 }
 
 void UpstreamHttp11ConnectSocketFactory::hashKey(
     std::vector<uint8_t>& key, Network::TransportSocketOptionsConstSharedPtr options) const {
   PassthroughFactory::hashKey(key, options);
-  if (options && options->http11ProxyInfo().has_value()) {
-    pushScalarToByteVector(
-        StringUtil::CaseInsensitiveHash()(options->http11ProxyInfo()->proxy_address->asString()),
-        key);
-    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(options->http11ProxyInfo()->hostname),
-                           key);
+
+  if (proto_proxy_address_.has_value()) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(proto_proxy_address_.value()), key);
   }
 }
 
