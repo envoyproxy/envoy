@@ -198,6 +198,9 @@ bug_fixes:
   change: |
     Fixed missing :ref:`additional addresses <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`
     for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
+- area: tracing
+  change: |
+    Added support to configure a static config resource detector for the OpenTelemetry tracer.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
