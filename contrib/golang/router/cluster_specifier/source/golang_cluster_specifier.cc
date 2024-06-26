@@ -1,12 +1,65 @@
 #include "contrib/golang/router/cluster_specifier/source/golang_cluster_specifier.h"
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "source/common/router/config_impl.h"
+
+#include "contrib/golang/filters/http/source/golang_filter.h"
 
 namespace Envoy {
 namespace Router {
 namespace Golang {
+
+void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
+  auto i = 0;
+  m.iterate([&i, &go_strs, &go_buf](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto key = std::string(header.key().getStringView());
+    auto value = std::string(header.value().getStringView());
+
+    auto len = key.length();
+    // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
+    // is safe.
+    go_strs[i].n = len;
+    go_strs[i].p = go_buf;
+    // go_buf is the heap memory of go, and the length is the total length of all keys and values in
+    // the header. So use memcpy is safe.
+    memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
+    go_buf += len;
+    i++;
+
+    len = value.length();
+    go_strs[i].n = len;
+    go_strs[i].p = go_buf;
+    memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
+    go_buf += len;
+    i++;
+    return Http::HeaderMap::Iterate::Continue;
+  });
+}
+
+CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto headers = state.headers;
+  if (headers == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+  copyHeaderMapToGo(*headers, go_strs, go_buf);
+  return CAPIStatus::CAPIOK;
+}
 
 // limit the max length of cluster name that could return from the Golang cluster specifier plugin,
 // to avoid memory security vulnerability since there might be a bug in Golang side.
