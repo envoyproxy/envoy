@@ -340,7 +340,9 @@ typed_config:
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("existed-trailer"));
     EXPECT_EQ(2, entries.size());
     EXPECT_EQ("foo", entries[0]->value().getStringView());
-    EXPECT_EQ("bar", entries[1]->value().getStringView());
+    if (entries.size() == 2) {
+      EXPECT_EQ("bar", entries[1]->value().getStringView());
+    }
 
     // check trailer value which set in golang: x-test-trailer-0
     entries = upstream_request_->trailers()->get(Http::LowerCaseString("x-test-trailer-0"));
@@ -506,6 +508,35 @@ typed_config:
     cleanup();
   }
 
+  void testRouteCache(std::string path, bool clear) {
+    initializeBasicFilter(BASIC);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    // no route found after clearing
+    if (!clear) {
+      waitForNextUpstreamRequest();
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+      upstream_request_->encodeHeaders(response_headers, true);
+    }
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    // check resp status
+    if (clear) {
+      EXPECT_EQ("404", response->headers().getStatusValue());
+    } else {
+      EXPECT_EQ("200", response->headers().getStatusValue());
+    }
+
+    cleanup();
+  }
+
   void testSendLocalReply(std::string path, std::string phase) {
     initializeBasicFilter(BASIC);
 
@@ -634,14 +665,9 @@ typed_config:
   }
 
   void cleanup() {
-    codec_client_->close();
+    cleanupUpstreamAndDownstream();
 
-    if (fake_upstream_connection_ != nullptr) {
-      AssertionResult result = fake_upstream_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_upstream_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
   }
 
   void testDynamicMetadata(std::string path) {
@@ -1105,6 +1131,16 @@ TEST_P(GolangIntegrationTest, RouteConfig_VirtualHost) {
 // set: baz
 TEST_P(GolangIntegrationTest, RouteConfig_Route) {
   testRouteConfig("test.com", "/route-config-test", false, "baz");
+}
+
+// Set new path without clear route cache, will get 200 response status
+TEST_P(GolangIntegrationTest, RouteCache_noClear) {
+  testRouteCache("/test?newPath=/not-found-path", false);
+}
+
+// Set new path with clear route cache, will get 404 response status
+TEST_P(GolangIntegrationTest, RouteCache_Clear) {
+  testRouteCache("/test?newPath=/not-found-path&clearRoute=1", true);
 }
 
 // Out of range in decode header phase

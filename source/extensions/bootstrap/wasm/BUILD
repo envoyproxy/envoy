@@ -25,6 +25,7 @@ envoy_cc_extension(
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
     ],

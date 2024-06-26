@@ -257,7 +257,7 @@ class FormatChecker:
 
     @cached_property
     def namespace_re(self):
-        return re.compile("^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
+        return re.compile(r"^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
 
     # Map a line transformation function across each line of a file,
     # writing the result lines as requested.
@@ -398,14 +398,18 @@ class FormatChecker:
         # core and exception code. Source files are also discouraged but
         # extensions source files are currently exempt from checks as many factory creation
         # calls do not yet support StatusOr.
-        return ((
-            file_path.endswith('.h') and file_path.startswith("./source/")
-            and not file_path.startswith("./source/extensions/")
-            and not file_path in self.config.paths["exception"]["include"]) or (
-                file_path.endswith('.cc') and file_path.startswith("./source/")
-                and not file_path.startswith("./source/extensions/")
-                and not file_path in self.config.paths["exception"]["include"])
-                or self.is_in_subdir(file_path, 'tools/testdata'))
+        if not file_path.startswith("./source/") or not (file_path.endswith('.h')
+                                                         or file_path.endswith('.cc')):
+            return False
+
+        # Extensions can have entire directories exempted
+        if file_path.startswith("./source/extensions/"):
+            for entry in self.config.paths["exception"]["include"]:
+                if entry in file_path:
+                    return False
+
+        # As core code is mostly exception free, list individual files.
+        return not file_path in self.config.paths["exception"]["include"]
 
     def allow_listed_for_build_urls(self, file_path):
         return file_path in self.config.paths["build_urls"]["include"]
@@ -802,7 +806,9 @@ class FormatChecker:
             return False
 
         if self.deny_listed_for_exceptions(file_path):
-            if has_non_comment_throw(line) or "THROW" in line or "throwExceptionOrPanic" in line:
+            if has_non_comment_throw(
+                    line) or "THROW" in line or "throwEnvoyExceptionOrPanic" in line:
+
                 report_error(
                     "Don't introduce throws into exception-free files, use error "
                     "statuses instead.")

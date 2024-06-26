@@ -59,7 +59,8 @@ bool validateOnMatchConfig(const xds::type::matcher::v3::Matcher::OnMatch& on_ma
       return false;
     }
     envoy::config::route::v3::Route on_match_route_action_config;
-    MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config);
+    THROW_IF_NOT_OK(
+        MessageUtil::unpackTo(on_match.action().typed_config(), on_match_route_action_config));
     ENVOY_LOG_MISC(trace, "typed_config of on_match.action is: {}",
                    on_match_route_action_config.DebugString());
     return !isUnsupportedRouteConfig(on_match_route_action_config);
@@ -139,7 +140,7 @@ bool validateConfig(const test::common::router::RouteTestCase& input) {
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+
   try {
     if (!validateConfig(input)) {
       return;
@@ -148,10 +149,12 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     TestUtility::validate(input);
     const auto cleaned_route_config = cleanRouteConfig(input.config());
     ENVOY_LOG_MISC(debug, "cleaned route config: {}", cleaned_route_config.DebugString());
-    ConfigImpl config(cleaned_route_config, factory_context,
-                      ProtobufMessage::getNullValidationVisitor(), true);
+    std::shared_ptr<ConfigImpl> config =
+        THROW_OR_RETURN_VALUE(ConfigImpl::create(cleaned_route_config, factory_context,
+                                                 ProtobufMessage::getNullValidationVisitor(), true),
+                              std::shared_ptr<ConfigImpl>);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
-    auto route = config.route(headers, stream_info, input.random_value());
+    auto route = config->route(headers, stream_info, input.random_value());
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
     }

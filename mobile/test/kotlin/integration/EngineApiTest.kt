@@ -1,5 +1,6 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
@@ -9,9 +10,11 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class EngineApiTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -22,7 +25,8 @@ class EngineApiTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.INFO)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setNodeId("node-id")
         .setNodeLocality("region", "zone", "subzone")
         .setNodeMetadata(

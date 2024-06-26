@@ -49,9 +49,9 @@ public:
   /**
    * Create a new access log file managed by the access log manager.
    * @param file_info specifies the file to create/open.
-   * @return the opened file.
+   * @return the opened file or an error status.
    */
-  virtual AccessLogFileSharedPtr
+  virtual absl::StatusOr<AccessLogFileSharedPtr>
   createAccessLog(const Envoy::Filesystem::FilePathAndType& file_info) PURE;
 };
 

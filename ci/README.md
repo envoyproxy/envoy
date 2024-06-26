@@ -27,6 +27,10 @@ main commit at which the binary was compiled, and `latest` corresponds to a bina
 
 ## Windows 2019 Envoy image
 
+On August 31, 2023 the Envoy project ended official Windows support due to a lack of resources.
+We will continue to accept patches related to the Windows build. Until further notice, Windows
+builds are excluded from Envoy CI, as well as the Envoy release and security processes.
+
 The Windows 2019 based Envoy Docker image at [`envoyproxy/envoy-build-windows2019:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build-windows2019/)
 is used for CI checks, where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh).
 Developers may work with the most recent `envoyproxy/envoy-build-windows2019` image to provide a self-contained environment for building Envoy binaries and
@@ -122,11 +126,18 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
-To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the remote cache endpoint to
-the BAZEL_BUILD_EXTRA_OPTIONS environment variable
+To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup):
+1. add bazel options like `--remote_cache` and/or `--remote_cache_header` to a `.bazelrc` file, such as `user.bazelrc`. For example
 
 ```bash
-./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh release"
+build:my-remote-cache --remote_cache=grpcs://remotecache.googleapis.com
+build:my-remote-cache --remote_cache_header=Authorization="Bearer <token>"
+```
+
+2. specify the config in the `BAZEL_BUILD_EXTRA_OPTIONS` environment variable. Run
+
+```bash
+export BAZEL_BUILD_EXTRA_OPTIONS=--config=my-remote-cache
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:

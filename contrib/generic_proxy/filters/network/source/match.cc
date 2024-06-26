@@ -5,35 +5,36 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-REGISTER_FACTORY(ServiceMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(ServiceMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(HostMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(HostMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(PathMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(PathMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(MethodMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(MethodMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
-REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<Request>);
+REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
 
 using StringMatcherImpl = Matchers::StringMatcherImpl<StringMatcherProto>;
 
-RequestMatchInputMatcher::RequestMatchInputMatcher(const RequestMatcherProto& proto_config) {
+RequestMatchInputMatcher::RequestMatchInputMatcher(
+    const RequestMatcherProto& proto_config, Server::Configuration::CommonFactoryContext& context) {
 
   if (proto_config.has_host()) {
-    host_ = std::make_unique<StringMatcherImpl>(proto_config.host());
+    host_ = std::make_unique<StringMatcherImpl>(proto_config.host(), context);
   }
   if (proto_config.has_path()) {
-    path_ = std::make_unique<StringMatcherImpl>(proto_config.path());
+    path_ = std::make_unique<StringMatcherImpl>(proto_config.path(), context);
   }
   if (proto_config.has_method()) {
-    method_ = std::make_unique<StringMatcherImpl>(proto_config.method());
+    method_ = std::make_unique<StringMatcherImpl>(proto_config.method(), context);
   }
 
   for (const auto& property : proto_config.properties()) {
     properties_.push_back(
-        {property.name(), std::make_unique<StringMatcherImpl>(property.string_match())});
+        {property.name(), std::make_unique<StringMatcherImpl>(property.string_match(), context)});
   }
 }
 
@@ -49,10 +50,10 @@ bool RequestMatchInputMatcher::match(const Matcher::MatchingDataType& input) {
     return false;
   }
 
-  return match(typed_data->request());
+  return match(typed_data->data().requestHeader());
 }
 
-bool RequestMatchInputMatcher::match(const Request& request) {
+bool RequestMatchInputMatcher::match(const RequestHeaderFrame& request) {
   // TODO(wbpcode): may add more debug log for request match?
   if (host_ != nullptr) {
     if (!host_->match(request.host())) {
@@ -96,8 +97,8 @@ Matcher::InputMatcherFactoryCb RequestMatchDataInputMatcherFactory::createInputM
   const auto& proto_config = MessageUtil::downcastAndValidate<const RequestMatcherProto&>(
       config, factory_context.messageValidationVisitor());
 
-  return [proto_config]() -> Matcher::InputMatcherPtr {
-    return std::make_unique<RequestMatchInputMatcher>(proto_config);
+  return [proto_config, &factory_context]() -> Matcher::InputMatcherPtr {
+    return std::make_unique<RequestMatchInputMatcher>(proto_config, factory_context);
   };
 }
 

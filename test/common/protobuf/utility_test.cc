@@ -217,10 +217,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value:\\s*10\n, value:\\s*20\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -1455,7 +1455,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 // Validated exception thrown when anyConvertAndValidate observes a PGV failures.
@@ -1468,7 +1468,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
                ProtoValidationException);
 }
 
-// MessageUtility::unpackTo() with the wrong type throws.
+// MessageUtility::unpackToOrThrow() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
@@ -1476,11 +1476,11 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::unpackTo(source_any, dst), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
-// MessageUtility::unpackTo() with API message works at same version.
+// MessageUtility::unpackToOrThrow() with API message works at same version.
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
@@ -1488,7 +1488,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    MessageUtil::unpackTo(source_any, dst);
+    MessageUtil::unpackToOrThrow(source_any, dst);
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
@@ -1497,35 +1497,36 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::unpackTo(source_any, dst);
+    MessageUtil::unpackToOrThrow(source_any, dst);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
 
-// MessageUtility::unpackToNoThrow() with the right type.
+// MessageUtility::unpackTo() with the right type.
 TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   ProtobufWkt::Duration src_duration;
   src_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(src_duration);
   ProtobufWkt::Duration dst_duration;
-  EXPECT_OK(MessageUtil::unpackToNoThrow(source_any, dst_duration));
+  EXPECT_OK(MessageUtil::unpackTo(source_any, dst_duration));
   // Source and destination are expected to be equal.
   EXPECT_EQ(src_duration, dst_duration);
 }
 
-// MessageUtility::unpackToNoThrow() with the wrong type.
+// MessageUtility::unpackTo() with the wrong type.
 TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
-  auto status = MessageUtil::unpackToNoThrow(source_any, dst);
+  auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
-  EXPECT_THAT(std::string(status.message()),
-              testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
-                                     "\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
+  EXPECT_THAT(
+      std::string(status.message()),
+      testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                             ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
@@ -1700,78 +1701,184 @@ TEST_F(ProtobufUtilityTest, GetYamlStringFromProtoInvalidAny) {
 }
 
 TEST(DurationUtilTest, OutOfRange) {
-  {
-    ProtobufWkt::Duration duration;
-    duration.set_seconds(-1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-  }
-  {
-    ProtobufWkt::Duration duration;
-    duration.set_nanos(-1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-  }
-  {
-    ProtobufWkt::Duration duration;
-    duration.set_nanos(1000000000);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-  }
-  {
-    ProtobufWkt::Duration duration;
-    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-  }
-  {
-    ProtobufWkt::Duration duration;
-    constexpr int64_t kMaxInt64Nanoseconds =
-        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-    duration.set_seconds(kMaxInt64Nanoseconds + 1);
-    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+  // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
+  // is deprecated, this test should only validate the "true" case.
+  for (const std::string strict_duration : {"true", "false"}) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.strict_duration_validation", strict_duration}});
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_seconds(-1);
+      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+    }
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_nanos(-1);
+      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+    }
+    // Invalid number of nanoseconds.
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_nanos(1000000000);
+      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+    }
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+    }
+    // Invalid number of seconds.
+    {
+      ProtobufWkt::Duration duration;
+      constexpr int64_t kMaxInt64Nanoseconds =
+          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+      duration.set_seconds(kMaxInt64Nanoseconds + 1);
+      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
+      // is deprecated, this test should only validate EXPECT_THROW.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
+        EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+      } else {
+        EXPECT_NO_THROW(DurationUtil::durationToMilliseconds(duration));
+      }
+    }
+    // Max valid seconds and nanoseconds.
+    {
+      ProtobufWkt::Duration duration;
+      constexpr int64_t kMaxInt64Nanoseconds =
+          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+      duration.set_seconds(kMaxInt64Nanoseconds);
+      duration.set_nanos(999999999);
+      EXPECT_NO_THROW(DurationUtil::durationToMilliseconds(duration));
+    }
+    // Invalid combined seconds and nanoseconds.
+    {
+      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
+      // is deprecated, this test should be executed unconditionally. The test is only
+      // with the flag because without the flag set to false it will trigger a
+      // runtime error (crash) with the current ASAN test suite.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
+        ProtobufWkt::Duration duration;
+        constexpr int64_t kMaxInt64Nanoseconds =
+            std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+        duration.set_seconds(kMaxInt64Nanoseconds);
+        duration.set_nanos(999999999);
+        EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+      }
+    }
   }
 }
 
 TEST(DurationUtilTest, NoThrow) {
-  {
-    // In range test
-    ProtobufWkt::Duration duration;
-    duration.set_seconds(5);
-    duration.set_nanos(10000000);
-    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_TRUE(result.ok());
-    EXPECT_TRUE(result.value() == 5010);
+  // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
+  // is deprecated, this test should only validate the "true" case.
+  for (const std::string strict_duration : {"true", "false"}) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.strict_duration_validation", strict_duration}});
+    {
+      // In range test
+      ProtobufWkt::Duration duration;
+      duration.set_seconds(5);
+      duration.set_nanos(10000000);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      EXPECT_TRUE(result.ok());
+      EXPECT_TRUE(result.value() == 5010);
+    }
+    // Below are out-of-range tests
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_seconds(-1);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      EXPECT_FALSE(result.ok());
+    }
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_nanos(-1);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      EXPECT_FALSE(result.ok());
+    }
+    // Invalid number of nanoseconds.
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_nanos(1000000000);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      EXPECT_FALSE(result.ok());
+    }
+    {
+      ProtobufWkt::Duration duration;
+      duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      EXPECT_FALSE(result.ok());
+    }
+    // Invalid number of seconds.
+    {
+      ProtobufWkt::Duration duration;
+      constexpr int64_t kMaxInt64Nanoseconds =
+          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+      duration.set_seconds(kMaxInt64Nanoseconds + 1);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
+      // is deprecated, this test should only validate EXPECT_FALSE.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
+        EXPECT_FALSE(result.ok());
+      } else {
+        EXPECT_TRUE(result.ok());
+      }
+    }
+    // Max valid seconds and nanoseconds.
+    {
+      ProtobufWkt::Duration duration;
+      constexpr int64_t kMaxInt64Nanoseconds =
+          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+      duration.set_seconds(kMaxInt64Nanoseconds);
+      duration.set_nanos(999999999);
+      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+      EXPECT_TRUE(result.ok());
+    }
+    // Invalid combined seconds and nanoseconds.
+    {
+      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
+      // is deprecated, this test should be executed unconditionally. The test is only
+      // with the flag because without the flag set to false it will trigger a
+      // runtime error (crash) with the current ASAN test suite.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
+        ProtobufWkt::Duration duration;
+        constexpr int64_t kMaxInt64Nanoseconds =
+            std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+        duration.set_seconds(kMaxInt64Nanoseconds);
+        duration.set_nanos(999999999);
+        const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+        EXPECT_FALSE(result.ok());
+      }
+    }
   }
+}
 
-  // Below are out-of-range tests
+// Validate that the duration in a message is validated correctly.
+TEST_F(ProtobufUtilityTest, MessageDurationValidation) {
+  // Once the runtime key is deprecated, the scoped_runtime should be removed.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.validate_duration_in_configs", "true"}});
+
   {
-    ProtobufWkt::Duration duration;
-    duration.set_seconds(-1);
-    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    bootstrap.mutable_stats_flush_interval()->set_seconds(1);
+    EXPECT_NO_THROW(MessageUtil::validateDurationFields(bootstrap));
+  }
+  // Invalid durations.
+  {
+    envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    bootstrap.mutable_stats_flush_interval()->set_seconds(-1);
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validateDurationFields(bootstrap), EnvoyException,
+                            "Invalid duration: Expected positive duration");
   }
   {
-    ProtobufWkt::Duration duration;
-    duration.set_nanos(-1);
-    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
-  }
-  {
-    ProtobufWkt::Duration duration;
-    duration.set_nanos(1000000000);
-    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
-  }
-  {
-    ProtobufWkt::Duration duration;
-    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
-    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
-  }
-  {
-    ProtobufWkt::Duration duration;
-    constexpr int64_t kMaxInt64Nanoseconds =
-        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-    duration.set_seconds(kMaxInt64Nanoseconds + 1);
-    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    bootstrap.mutable_stats_flush_interval()->set_seconds(1);
+    bootstrap.mutable_stats_flush_interval()->set_nanos(-100);
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validateDurationFields(bootstrap), EnvoyException,
+                            "Invalid duration: Expected positive duration");
   }
 }
 
@@ -2289,6 +2396,119 @@ TEST_F(ProtobufUtilityTest, SubsequentLoadClearsExistingProtoValues) {
   EXPECT_TRUE(obj.foo().empty());
   EXPECT_TRUE(obj.bar().empty());
   EXPECT_EQ(obj.baz(), 2);
+}
+
+// Validate that Equals and Equivalent have the same behavior with respect to
+// out of order repeated fields.
+TEST_F(ProtobufUtilityTest, CompareRepeatedFields) {
+  utility_test::message_field_wip::RepeatedField message1;
+  utility_test::message_field_wip::RepeatedField same_order;
+  utility_test::message_field_wip::RepeatedField different_order;
+
+  utility_test::message_field_wip::MultipleFields element1;
+  element1.set_foo("foo");
+  element1.set_bar("bar");
+  element1.set_baz(57);
+  utility_test::message_field_wip::MultipleFields element2;
+  element2.set_foo("foo1");
+  element2.set_bar("bar1");
+  element2.set_baz(25597);
+  utility_test::message_field_wip::MultipleFields element3;
+  element3.set_foo("foo99");
+  element3.set_bar("678bar");
+  element3.set_baz(985734);
+
+  *message1.add_repeated_multiple_fields() = element1;
+  *message1.add_repeated_multiple_fields() = element2;
+  *message1.add_repeated_multiple_fields() = element3;
+
+  *same_order.add_repeated_multiple_fields() = element1;
+  *same_order.add_repeated_multiple_fields() = element2;
+  *same_order.add_repeated_multiple_fields() = element3;
+
+  // Swap element 2 and 3
+  *different_order.add_repeated_multiple_fields() = element1;
+  *different_order.add_repeated_multiple_fields() = element3;
+  *different_order.add_repeated_multiple_fields() = element2;
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, same_order));
+  EXPECT_FALSE(Protobuf::util::MessageDifferencer::Equals(message1, different_order));
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
+  EXPECT_FALSE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
+}
+
+// Validate that order of insertion into a map does not influence results of
+// Equals and Equivalent calls.
+TEST_F(ProtobufUtilityTest, CompareMapFieldsCpp) {
+  utility_test::message_field_wip::MapField message1;
+  utility_test::message_field_wip::MapField same_order;
+  utility_test::message_field_wip::MapField different_order;
+
+  (*message1.mutable_map_field())["foo"] = "bar";
+  (*message1.mutable_map_field())["foo1"] = "bar1";
+  (*message1.mutable_map_field())["foo2"] = "bar2";
+
+  (*same_order.mutable_map_field())["foo"] = "bar";
+  (*same_order.mutable_map_field())["foo1"] = "bar1";
+  (*same_order.mutable_map_field())["foo2"] = "bar2";
+
+  (*different_order.mutable_map_field())["foo"] = "bar";
+  (*different_order.mutable_map_field())["foo2"] = "bar2";
+  (*different_order.mutable_map_field())["foo1"] = "bar1";
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, different_order));
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
+}
+
+// Validate that proto maps that were deserialized from wire representations with
+// different orders still produce the same result in the Equals and Equivalent
+// methods.
+TEST_F(ProtobufUtilityTest, CompareMapFieldsWire) {
+  utility_test::message_field_wip::StringMapWireCompatible::MapFieldEntry entry1;
+  entry1.set_key("foo");
+  entry1.set_value("bar");
+  utility_test::message_field_wip::StringMapWireCompatible::MapFieldEntry entry2;
+  entry2.set_key("foo1");
+  entry2.set_value("bar1");
+  utility_test::message_field_wip::StringMapWireCompatible::MapFieldEntry entry3;
+  entry3.set_key("foo2");
+  entry3.set_value("bar2");
+
+  utility_test::message_field_wip::StringMapWireCompatible wire_map1;
+  *wire_map1.add_entries() = entry1;
+  *wire_map1.add_entries() = entry2;
+  *wire_map1.add_entries() = entry3;
+  std::string wire_bytes1;
+  EXPECT_TRUE(wire_map1.SerializeToString(&wire_bytes1));
+
+  utility_test::message_field_wip::StringMapWireCompatible wire_map2;
+  *wire_map2.add_entries() = entry2;
+  *wire_map2.add_entries() = entry3;
+  *wire_map2.add_entries() = entry1;
+  std::string wire_bytes2;
+  EXPECT_TRUE(wire_map2.SerializeToString(&wire_bytes2));
+
+  // The MapField and StringMapWireCompatible are wire compatible per
+  // https://protobuf.dev/programming-guides/proto3/#backwards
+  utility_test::message_field_wip::MapField message1;
+  EXPECT_TRUE(message1.ParseFromString(wire_bytes1));
+  EXPECT_EQ(message1.map_field_size(), 3);
+  utility_test::message_field_wip::MapField same_order;
+  EXPECT_TRUE(same_order.ParseFromString(wire_bytes1));
+  // Parse different_order proto from wire bytes with elements in a different order from wire_bytes1
+  utility_test::message_field_wip::MapField different_order;
+  EXPECT_TRUE(different_order.ParseFromString(wire_bytes2));
+  EXPECT_EQ(different_order.map_field_size(), 3);
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(message1, different_order));
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
 }
 
 } // namespace Envoy

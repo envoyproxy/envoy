@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/action/v3:pkg_cc_proto",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
@@ -91,11 +92,23 @@ envoy_cc_library(
         "match.h",
     ],
     deps = [
+        ":match_input_lib",
         "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
+)
+
+envoy_cc_library(
+    name = "match_input_lib",
+    hdrs = [
+        "match_input.h",
+    ],
+    deps = [
+        "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -118,21 +131,6 @@ envoy_cc_library(
         "//envoy/rds:rds_interface",
         "//source/common/rds:rds_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "upstream_lib",
-    srcs = [
-        "upstream.cc",
-    ],
-    hdrs = [
-        "upstream.h",
-    ],
-    deps = [
-        "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
-        "//envoy/network:connection_interface",
-        "//envoy/upstream:thread_local_cluster_interface",
     ],
 )
 

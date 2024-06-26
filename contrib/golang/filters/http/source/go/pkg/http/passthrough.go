@@ -26,10 +26,8 @@ type passThroughFilter struct {
 	callbacks api.FilterCallbackHandler
 }
 
-func PassThroughFactory(interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &passThroughFilter{
-			callbacks: callbacks,
-		}
+func PassThroughFactory(config interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
+	return &passThroughFilter{
+		callbacks: callbacks,
 	}
 }

@@ -6,6 +6,7 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -43,7 +44,8 @@ public:
     const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
     add_regex_origin->MergeFrom(TestUtility::createRegexMatcher(R"(www\-[0-9]\.allow\.com)"));
 
-    return std::make_shared<CsrfFilterConfig>(policy, "test", *stats_.rootScope(), runtime_);
+    return std::make_shared<CsrfFilterConfig>(policy, "test", *stats_.rootScope(),
+                                              factory_context_);
   }
 
   CsrfFilterTest() : config_(setupConfig()), filter_(config_) {}
@@ -69,14 +71,14 @@ public:
   }
 
   void setFilterEnabled(bool enabled) {
-    ON_CALL(runtime_.snapshot_,
+    ON_CALL(factory_context_.runtime_loader_.snapshot_,
             featureEnabled("csrf.enabled",
                            testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
         .WillByDefault(Return(enabled));
   }
 
   void setShadowEnabled(bool enabled) {
-    ON_CALL(runtime_.snapshot_,
+    ON_CALL(factory_context_.runtime_loader_.snapshot_,
             featureEnabled("csrf.shadow_enabled",
                            testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
         .WillByDefault(Return(enabled));
@@ -87,7 +89,7 @@ public:
   Buffer::OwnedImpl data_;
   Router::MockDirectResponseEntry direct_response_entry_;
   Stats::IsolatedStoreImpl stats_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   CsrfFilterConfigSharedPtr config_;
 
   CsrfFilter filter_;

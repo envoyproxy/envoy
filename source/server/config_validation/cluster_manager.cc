@@ -11,11 +11,10 @@ namespace Upstream {
 ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   auto cluster_manager = std::unique_ptr<ValidationClusterManager>{new ValidationClusterManager(
-      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(),
+      bootstrap, *this, context_, stats_, tls_, context_.runtime(), context_.localInfo(),
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
       context_.routerContext(), server_)};
-  THROW_IF_NOT_OK(cluster_manager->init(bootstrap));
   return cluster_manager;
 }
 

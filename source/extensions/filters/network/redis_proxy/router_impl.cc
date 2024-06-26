@@ -98,9 +98,9 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy = absl::AsciiStrToLower(key);
-    value = prefix_lookup_table_.findLongestPrefix(copy.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(copy);
   } else {
-    value = prefix_lookup_table_.findLongestPrefix(key.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(key);
   }
 
   if (value == nullptr) {

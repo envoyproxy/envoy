@@ -13,7 +13,7 @@ func init() {
 	api.LogCritical("init")
 	api.LogCritical(api.GetLogLevel().String())
 
-	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, &parser{})
+	http.RegisterHttpFilterFactoryAndConfigParser(Name, filterFactory, &parser{})
 }
 
 type config struct {
@@ -37,16 +37,14 @@ func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
 	panic("TODO")
 }
 
-func ConfigFactory(c interface{}) api.StreamFilterFactory {
+func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
 	conf, ok := c.(*config)
 	if !ok {
 		panic("unexpected config type")
 	}
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &filter{
-			callbacks: callbacks,
-			config:    conf,
-		}
+	return &filter{
+		callbacks: callbacks,
+		config:    conf,
 	}
 }
 

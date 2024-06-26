@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/thread/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -20,12 +21,6 @@ namespace NetworkFilters {
 namespace Golang {
 namespace {
 
-class MockThreadFactory : public Thread::ThreadFactory {
-public:
-  MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
-  MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
-};
-
 class GolangFilterConfigTestBase {
 public:
   void testConfig(envoy::extensions::filters::network::golang::v3alpha::Config& config) {
@@ -37,14 +32,14 @@ public:
         .WillByDefault(ReturnRef(thread_factory_));
 
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_).value(); });
     Network::MockConnection connection;
     EXPECT_CALL(connection, addFilter(_));
     cb(connection);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  NiceMock<MockThreadFactory> thread_factory_;
+  NiceMock<Thread::MockThreadFactory> thread_factory_;
   ThreadLocal::MockInstance slot_allocator_;
   GolangConfigFactory factory_;
 };
@@ -57,8 +52,10 @@ public:
 TEST(GolangConfigFactoryTest, InvalidateEmptyConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
-      GolangConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::golang::v3alpha::Config(), context),
+      GolangConfigFactory()
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::network::golang::v3alpha::Config(), context)
+          .IgnoreError(),
       Envoy::ProtoValidationException,
       "ConfigValidationError.LibraryId: value length must be at least 1 characters");
 }

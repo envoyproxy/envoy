@@ -638,7 +638,7 @@ TEST_P(WasmCommonTest, VmCache) {
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Server::MockServerLifecycleNotifier2> lifecycle_notifier;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
+  RemoteAsyncDataProviderPtr remote_data_provider;
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "vm_cache";
@@ -737,7 +737,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier;
   Init::ExpectableWatcherImpl init_watcher;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
+  RemoteAsyncDataProviderPtr remote_data_provider;
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "vm_cache";
@@ -851,7 +851,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier;
   Init::ExpectableWatcherImpl init_watcher;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
+  RemoteAsyncDataProviderPtr remote_data_provider;
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   auto vm_configuration = "vm_cache";
@@ -1353,7 +1353,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onDone 1")));
 
   dns_callback(
-      Network::DnsResolver::ResolutionStatus::Success,
+      Network::DnsResolver::ResolutionStatus::Success, "",
       TestUtility::makeDnsResponse({"192.168.1.101", "192.168.1.102"}, std::chrono::seconds(1001)));
 
   rootContext().onResolveDns(1 /* token */, Envoy::Network::DnsResolver::ResolutionStatus::Failure,
@@ -1366,7 +1366,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
   }
   // Wait till the Wasm is destroyed and then the late callback should do nothing.
   deferred_runner_.setFunction([dns_callback] {
-    dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+    dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                  TestUtility::makeDnsResponse({"192.168.1.101", "192.168.1.102"},
                                               std::chrono::seconds(1001)));
   });
@@ -1440,6 +1440,56 @@ TEST_P(WasmCommonContextTest, LocalReplyWhenPanic) {
   // Create in-VM context.
   context().onCreate();
   EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
+}
+
+// test that in case -1 is send from wasm it propagate nullopt
+TEST_P(WasmCommonContextTest, ProcessInvalidGRPCStatusCodeAsEmptyInLocalReply) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestContextCpp";
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "send local reply grpc");
+  setupContext();
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([this](Http::ResponseHeaderMap&, bool) { context().onResponseHeaders(0, false); });
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                                                 testing::Eq(absl::nullopt), testing::Eq("ok")));
+
+  // Create in-VM context.
+  context().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
+}
+
+// test that in case valid grpc status is send from wasm it propagate as it is
+TEST_P(WasmCommonContextTest, ProcessValidGRPCStatusCodeAsEmptyInLocalReply) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestContextCpp";
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "send local reply grpc");
+  setupContext();
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([this](Http::ResponseHeaderMap&, bool) { context().onResponseHeaders(0, false); });
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::PermissionDenied),
+                             testing::Eq("ok")));
+
+  // Create in-VM context.
+  context().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(1, false));
 }
 
 } // namespace Wasm

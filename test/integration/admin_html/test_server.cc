@@ -14,7 +14,8 @@ namespace {
  * a query param but it could not be found.
  *
  * This test-server is only for testing; it potentially makes the
- * entire file-system avail
+ * entire file-system available to HTTP clients, so this should not
+ * be used for production systems.
  */
 Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                         Server::AdminStream& admin_stream) {

@@ -84,14 +84,15 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
           std::make_shared<QuicSslConnectionInfo>(*this),
           std::make_unique<StreamInfo::StreamInfoImpl>(
               dispatcher.timeSource(),
-              connection->connectionSocket()->connectionInfoProviderSharedPtr())),
+              connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+              StreamInfo::FilterState::LifeSpan::Connection)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
       quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
       transport_socket_options_(transport_socket_options),
       transport_socket_factory_(makeOptRefFromPtr(
-          dynamic_cast<QuicClientTransportSocketFactory*>(transport_socket_factory.ptr()))) {
+          dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   if (transport_socket_options_ != nullptr &&
       !transport_socket_options_->applicationProtocolListOverride().empty()) {
@@ -102,6 +103,11 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
         std::vector<std::string>(transport_socket_factory_->supportedAlpnProtocols().begin(),
                                  transport_socket_factory_->supportedAlpnProtocols().end());
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
+    http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
+  }
+#endif
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
@@ -251,7 +257,7 @@ void EnvoyQuicClientSession::setHttp3Options(
   }
   static_cast<EnvoyQuicClientConnection*>(connection())
       ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 4));
+          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 0));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
     const uint64_t initial_interval = PROTOBUF_GET_MS_OR_DEFAULT(

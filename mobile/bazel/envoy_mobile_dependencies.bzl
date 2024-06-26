@@ -72,7 +72,7 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "org.jetbrains.dokka:dokka-cli:1.5.31",
             "org.jetbrains.dokka:javadoc-plugin:1.5.31",
             # Test artifacts
-            "org.assertj:assertj-core:3.23.1",
+            "com.google.truth:truth:1.4.0",
             "junit:junit:4.13",
             "org.mockito:mockito-inline:4.8.0",
             "org.mockito:mockito-core:4.8.0",
@@ -88,7 +88,6 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "androidx.test.ext:junit:1.1.3",
             "org.robolectric:robolectric:4.8.2",
             "org.hamcrest:hamcrest:2.2",
-            "com.google.truth:truth:1.1.3",
         ] + extra_maven_dependencies,
         version_conflict_policy = "pinned",
         repositories = [

@@ -9,7 +9,7 @@ namespace ExternalProcessing {
 
 const absl::flat_hash_set<std::string> ExtProcTestUtility::ignoredHeaders() {
   CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "x-request-id",
-                         "x-envoy-upstream-service-time");
+                         "x-envoy-upstream-service-time", "x-envoy-expected-rq-timeout-ms");
 }
 
 bool ExtProcTestUtility::headerProtosEqualIgnoreOrder(
@@ -27,6 +27,14 @@ bool ExtProcTestUtility::headerProtosEqualIgnoreOrder(
     }
   }
   return TestUtility::headerMapEqualIgnoreOrder(expected, actual_headers);
+}
+
+envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
+                                                     const std::string& value) {
+  envoy::config::core::v3::HeaderValue v;
+  v.set_key(key);
+  v.set_value(value);
+  return v;
 }
 
 } // namespace ExternalProcessing

@@ -22,11 +22,12 @@ namespace GrpcCredentials {
 namespace AwsIam {
 
 std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config,
+    Server::Configuration::CommonFactoryContext& context) {
 
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
-      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, api);
+      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, context.api());
 
   std::shared_ptr<grpc::CallCredentials> call_creds;
   for (const auto& credential : google_grpc.call_credentials()) {
@@ -44,7 +45,21 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
-        const auto region = getRegion(config);
+
+        std::string region;
+        region = config.region();
+
+        if (region.empty()) {
+          auto region_provider = std::make_shared<Extensions::Common::Aws::RegionProviderChain>();
+          absl::optional<std::string> regionOpt = region_provider->getRegion();
+          if (!regionOpt.has_value()) {
+            throw EnvoyException(
+                "Region string cannot be retrieved from configuration, environment or "
+                "profile/config files.");
+          }
+          region = regionOpt.value();
+        }
+
         // TODO(suniltheta): Due to the reasons explained in
         // https://github.com/envoyproxy/envoy/issues/27586 this aws iam plugin is not able to
         // utilize http async client to fetch AWS credentials. For time being this is still using
@@ -52,10 +67,10 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // usage of AWS credentials common utils. Until then we are setting nullopt for server
         // factory context.
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, absl::nullopt /*Empty factory context*/, region,
+            context.api(), absl::nullopt /*Empty factory context*/, region,
             Common::Aws::Utility::fetchMetadata);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
-            config.service_name(), region, credentials_provider, api.timeSource(),
+            config.service_name(), region, credentials_provider, context,
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
             Common::Aws::AwsSigningHeaderExclusionVector{});
@@ -82,24 +97,6 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
   return creds;
 }
 
-std::string AwsIamGrpcCredentialsFactory::getRegion(
-    const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
-  Common::Aws::RegionProviderPtr region_provider;
-  if (!config.region().empty()) {
-    region_provider = std::make_unique<Common::Aws::StaticRegionProvider>(config.region());
-  } else {
-    region_provider = std::make_unique<Common::Aws::EnvironmentRegionProvider>();
-  }
-
-  if (!region_provider->getRegion().has_value()) {
-    throw EnvoyException("Could not determine AWS region. "
-                         "If you are not running Envoy in EC2 or ECS, "
-                         "provide the region in the plugin configuration.");
-  }
-
-  return *region_provider->getRegion();
-}
-
 grpc::Status
 AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::string_ref method_name,
                                        const grpc::AuthContext&,
@@ -108,9 +105,9 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
   auto message = buildMessageToSign(absl::string_view(service_url.data(), service_url.length()),
                                     absl::string_view(method_name.data(), method_name.length()));
 
-  TRY_NEEDS_AUDIT { signer_->sign(message, false); }
-  END_TRY catch (const EnvoyException& e) {
-    return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
+  auto status = signer_->sign(message, false);
+  if (!status.ok()) {
+    return {grpc::StatusCode::INTERNAL, std::string{status.message()}};
   }
 
   signedHeadersToMetadata(message.headers(), *metadata);

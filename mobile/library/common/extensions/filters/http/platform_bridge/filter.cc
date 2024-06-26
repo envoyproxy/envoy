@@ -1,20 +1,15 @@
 #include "library/common/extensions/filters/http/platform_bridge/filter.h"
 
-#include "envoy/server/filter_config.h"
-
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
-#include "source/common/common/utility.h"
 
 #include "library/common/api/external.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/buffer/bridge_fragment.h"
-#include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_type_definitions.h"
 #include "library/common/http/header_utility.h"
-#include "library/common/http/headers.h"
 #include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
@@ -30,8 +25,8 @@ constexpr auto SlowCallbackWarningThreshold = std::chrono::seconds(1);
 void replaceHeaders(Http::HeaderMap& headers, envoy_headers c_headers) {
   headers.clear();
   for (envoy_map_size_t i = 0; i < c_headers.length; i++) {
-    headers.addCopy(Http::LowerCaseString(Data::Utility::copyToString(c_headers.entries[i].key)),
-                    Data::Utility::copyToString(c_headers.entries[i].value));
+    headers.addCopy(Http::LowerCaseString(Bridge::Utility::copyToString(c_headers.entries[i].key)),
+                    Bridge::Utility::copyToString(c_headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(c_headers);
@@ -101,8 +96,7 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
     callback_time_ms->complete();
     auto elapsed = callback_time_ms->elapsed();
     if (elapsed > SlowCallbackWarningThreshold) {
-      ENVOY_LOG_EVENT(warn, "slow_init_cb",
-                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+      ENVOY_LOG_EVENT(warn, "slow_init_cb", "{}|{}ms", filter_name_, elapsed.count());
     }
 
     ASSERT(platform_filter_.instance_context,
@@ -180,8 +174,7 @@ void PlatformBridgeFilter::onDestroy() {
     callback_time_ms->complete();
     auto elapsed = callback_time_ms->elapsed();
     if (elapsed > SlowCallbackWarningThreshold) {
-      ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb",
-                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+      ENVOY_LOG_EVENT(warn, "slow_on_cancel_cb", "{}|{}ms", filter_name_, elapsed.count());
     }
   }
 
@@ -208,7 +201,7 @@ Http::LocalErrorStatus PlatformBridgeFilter::onLocalReply(const LocalReplyData& 
 
   if (platform_filter_.on_error) {
     envoy_error_code_t error_code = Bridge::Utility::errorCodeFromLocalStatus(reply.code_);
-    envoy_data error_message = Data::Utility::copyToBridgeData(reply.details_);
+    envoy_data error_message = Bridge::Utility::copyToBridgeData(reply.details_);
     int32_t attempts = static_cast<int32_t>(info.attemptCount().value_or(0));
     platform_filter_.on_error({error_code, error_message, attempts}, streamIntel(),
                               finalStreamIntel(), platform_filter_.instance_context);
@@ -285,8 +278,8 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_headers_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_headers_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_headers_called_ = true;
@@ -306,8 +299,6 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   default:
     PANIC("invalid filter state: unsupported status for platform filters");
   }
-
-  PANIC("not reached");
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance& data,
@@ -330,9 +321,9 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
 
   if (prebuffer_data) {
     internal_buffer->move(data);
-    in_data = Data::Utility::copyToBridgeData(*internal_buffer);
+    in_data = Bridge::Utility::copyToBridgeData(*internal_buffer);
   } else {
-    in_data = Data::Utility::copyToBridgeData(data);
+    in_data = Bridge::Utility::copyToBridgeData(data);
   }
 
   ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_{}_data", parent_.filter_name_, direction_);
@@ -346,8 +337,8 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_data_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_data_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_data_called_ = true;
@@ -414,8 +405,6 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
   default:
     PANIC("invalid filter state: unsupported status for platform filters");
   }
-
-  PANIC("not reached");
 }
 
 Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::HeaderMap& trailers) {
@@ -441,8 +430,8 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_trailers_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_trailers_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_trailers_called_ = true;
@@ -491,8 +480,6 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
   default:
     PANIC("invalid filter state: unsupported status for platform filters");
   }
-
-  PANIC("not reached");
 }
 
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -511,7 +498,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
 
   // Presence of internal error header indicates an error that should be surfaced as an
   // error callback (rather than an HTTP response).
-  const auto error_code_header = headers.get(Http::InternalHeaders::get().ErrorCode);
+  const auto error_code_header = headers.get(Http::LowerCaseString("x-internal-error-code"));
   if (error_code_header.empty()) {
     // No error, so delegate to base implementation for request and response path.
     return response_filter_base_->onHeaders(headers, end_stream);
@@ -526,10 +513,10 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
   RELEASE_ASSERT(parsed_code, "parse error reading error code");
 
   envoy_data error_message = envoy_nodata;
-  const auto error_message_header = headers.get(Http::InternalHeaders::get().ErrorMessage);
+  const auto error_message_header = headers.get(Http::LowerCaseString("x-internal-error-message"));
   if (!error_message_header.empty()) {
     error_message =
-        Data::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
+        Bridge::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
   }
 
   int32_t attempt_count = 1;
@@ -660,7 +647,7 @@ void PlatformBridgeFilter::FilterBase::onResume() {
     pending_headers = &bridged_headers;
   }
   if (internal_buffer) {
-    bridged_data = Data::Utility::copyToBridgeData(*internal_buffer);
+    bridged_data = Bridge::Utility::copyToBridgeData(*internal_buffer);
     pending_data = &bridged_data;
   }
   if (pending_trailers_) {
@@ -680,8 +667,8 @@ void PlatformBridgeFilter::FilterBase::onResume() {
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
   if (elapsed > SlowCallbackWarningThreshold) {
-    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_resume_cb",
-                    parent_.filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
+    ENVOY_LOG_EVENT(warn, "slow_on_" + direction_ + "_resume_cb", "{}|{}ms", parent_.filter_name_,
+                    elapsed.count());
   }
 
   state_.on_resume_called_ = true;

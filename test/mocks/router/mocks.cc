@@ -183,6 +183,9 @@ MockScopeKeyBuilder::MockScopeKeyBuilder() {
 }
 MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
 
+MockGenericConnPool::MockGenericConnPool() { ON_CALL(*this, host()).WillByDefault(Return(host_)); }
+MockGenericConnPool::~MockGenericConnPool() = default;
+
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
 }

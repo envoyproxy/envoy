@@ -33,9 +33,9 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
-        "//source/extensions/transport_sockets/tls:stats_lib",
-        "//source/extensions/transport_sockets/tls:utility_lib",
-        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "//source/common/tls:stats_lib",
+        "//source/common/tls:utility_lib",
+        "//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

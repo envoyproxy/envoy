@@ -75,7 +75,7 @@ public:
   MockWatcher();
   ~MockWatcher() override;
 
-  MOCK_METHOD(void, addWatch, (absl::string_view, uint32_t, OnChangedCb));
+  MOCK_METHOD(absl::Status, addWatch, (absl::string_view, uint32_t, OnChangedCb));
 };
 
 } // namespace Filesystem

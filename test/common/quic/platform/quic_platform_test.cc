@@ -14,7 +14,7 @@
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stats/stat_test_utility.h"
-#include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/common/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
@@ -436,6 +436,12 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
   EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
   EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
+}
+
+TEST_F(QuicPlatformTest, QuicheLogDFatalNoExit) {
+  quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
+  QUIC_LOG(DFATAL) << "This shouldn't call abort()";
+  QUICHE_DCHECK(false) << "This shouldn't call abort()";
 }
 
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {

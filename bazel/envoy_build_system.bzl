@@ -1,8 +1,15 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_PACKAGE_VISIBILITY",
+)
+
 # The main Envoy bazel file. Load this file for all Envoy-specific build macros
 # and rules that you'd like to use in your BUILD files.
 load("@rules_foreign_cc//foreign_cc:cmake.bzl", "cmake")
 load(":envoy_binary.bzl", _envoy_cc_binary = "envoy_cc_binary")
-load(":envoy_internal.bzl", "envoy_external_dep_path")
+load(":envoy_internal.bzl", "envoy_external_dep_path", _envoy_linkstatic = "envoy_linkstatic")
 load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
@@ -14,6 +21,10 @@ load(
     _envoy_cc_posix_without_linux_library = "envoy_cc_posix_without_linux_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
     _envoy_proto_library = "envoy_proto_library",
+)
+load(
+    ":envoy_mobile_defines.bzl",
+    _envoy_mobile_defines = "envoy_mobile_defines",
 )
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
@@ -38,7 +49,6 @@ load(
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
     _envoy_select_wasm_wamr = "envoy_select_wasm_wamr",
     _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
-    _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
 )
 load(
     ":envoy_test.bzl",
@@ -53,16 +63,6 @@ load(
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
-load(
-    ":envoy_mobile_defines.bzl",
-    _envoy_mobile_defines = "envoy_mobile_defines",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
-    "EXTENSION_PACKAGE_VISIBILITY",
-)
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 def envoy_package(default_visibility = ["//visibility:public"]):
     native.package(default_visibility = default_visibility)
@@ -248,8 +248,8 @@ envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
 envoy_select_wasm_wamr = _envoy_select_wasm_wamr
-envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
+envoy_select_linkstatic = _envoy_linkstatic
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary

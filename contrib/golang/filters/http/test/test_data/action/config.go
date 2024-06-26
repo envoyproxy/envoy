@@ -8,18 +8,12 @@ import (
 const Name = "action"
 
 func init() {
-	http.RegisterHttpFilterConfigFactoryAndParser(Name, ConfigFactory, nil)
+	http.RegisterHttpFilterFactoryAndConfigParser(Name, filterFactory, http.NullParser)
 }
 
-type config struct {
-	decodeHeadersRet api.StatusType
-}
-
-func ConfigFactory(c interface{}) api.StreamFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
-		return &filter{
-			callbacks: callbacks,
-		}
+func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.StreamFilter {
+	return &filter{
+		callbacks: callbacks,
 	}
 }
 

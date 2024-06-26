@@ -8,7 +8,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/btree_map.h"
@@ -253,20 +252,21 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
     ENVOY_LOG(debug, "extract {}", location_it.first);
-    const auto result =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
-    if (result.result().has_value()) {
-      auto value_str = result.result().value();
-      if (!location_spec->value_prefix_.empty()) {
-        const auto pos = value_str.find(location_spec->value_prefix_);
-        if (pos == absl::string_view::npos) {
-          // value_prefix not found anywhere in value_str, so skip
-          continue;
+    auto header_value = headers.get(location_spec->header_);
+    if (!header_value.empty()) {
+      for (size_t i = 0; i < header_value.size(); i++) {
+        auto value_str = header_value[i]->value().getStringView();
+        if (!location_spec->value_prefix_.empty()) {
+          const auto pos = value_str.find(location_spec->value_prefix_);
+          if (pos == absl::string_view::npos) {
+            // value_prefix not found anywhere in value_str, so skip
+            continue;
+          }
+          value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
         }
-        value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
+        tokens.push_back(std::make_unique<const JwtHeaderLocation>(
+            std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
       }
-      tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-          std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
     }
   }
 
@@ -329,15 +329,7 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   }
 
   // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.token_passed_entirely")) {
-    return value_str.substr(starting);
-  }
-
-  auto ending = value_str.find_first_not_of(ConstantBase64UrlEncodingCharsPlusDot, starting);
-  if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
-    return value_str.substr(starting);
-  }
-  return value_str.substr(starting, ending - starting);
+  return value_str.substr(starting);
 }
 
 void ExtractorImpl::sanitizeHeaders(Http::HeaderMap& headers) const {

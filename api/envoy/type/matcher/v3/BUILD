@@ -9,5 +9,6 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/type/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
+        "@com_github_cncf_xds//xds/core/v3:pkg",
     ],
 )

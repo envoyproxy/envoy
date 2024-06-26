@@ -20,6 +20,7 @@ envoy_cc_library(
         ":socket_interface_lib",
         "//envoy/network:address_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",
@@ -249,25 +250,47 @@ envoy_cc_library(
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
-    ],
+    ] + select({
+        "//bazel:android": [],
+        "//bazel:linux": [
+            "io_uring_socket_handle_impl.cc",
+        ],
+        "//conditions:default": [],
+    }),
     hdrs = [
         "io_socket_handle_base_impl.h",
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
-    ],
+    ] + select({
+        "//bazel:android": [],
+        "//bazel:linux": [
+            "io_uring_socket_handle_impl.h",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":address_lib",
         ":io_socket_error_lib",
         ":socket_interface_lib",
         ":socket_lib",
+        "//envoy/common/io:io_uring_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
+        "@com_github_google_quiche//:quic_core_lru_cache_lib",
+        "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:linux": [
+            "//source/common/io:io_uring_impl_lib",
+            "//source/common/io:io_uring_worker_factory_impl_lib",
+            "//source/common/io:io_uring_worker_lib",
+        ],
+        "//conditions:default": [],
+    }),
     alwayslink = LEGACY_ALWAYSLINK,
 )
 
@@ -343,6 +366,7 @@ envoy_cc_library(
         "//envoy/event:file_event_interface",
         "//envoy/network:exception_interface",
         "//envoy/network:listener_interface",
+        "//envoy/network:parent_drained_callback_registrar_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",

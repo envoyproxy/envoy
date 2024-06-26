@@ -35,13 +35,14 @@ public:
   /**
    * Removes the current configuration from the provider.
    * @param cb the continuation callback for a completed configuration application on all threads.
+   * @return status indicating if the config was successfully removed.
    */
-  virtual void onConfigRemoved(ConfigAppliedCb applied_on_all_threads) PURE;
+  virtual absl::Status onConfigRemoved(ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
    * Applies the default configuration if one is set, otherwise does nothing.
    */
-  virtual void applyDefaultConfiguration() PURE;
+  virtual absl::Status applyDefaultConfiguration() PURE;
   /**
    * Return Network::ListenerFilterMatcherSharedPtr& the listener filter matcher.
    */

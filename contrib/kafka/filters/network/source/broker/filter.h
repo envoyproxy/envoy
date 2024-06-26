@@ -147,7 +147,7 @@ public:
    * duration calculation.
    */
   KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source,
-                    const BrokerFilterConfig& filter_config);
+                    const BrokerFilterConfigSharedPtr& filter_config);
 
   /**
    * Visible for testing.
@@ -173,7 +173,7 @@ private:
    * Helper delegate constructor.
    * Passes metrics facade as argument to decoders.
    */
-  KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
+  KafkaBrokerFilter(const BrokerFilterConfigSharedPtr& filter_config,
                     const KafkaMetricsFacadeSharedPtr& metrics);
 
   const KafkaMetricsFacadeSharedPtr metrics_;

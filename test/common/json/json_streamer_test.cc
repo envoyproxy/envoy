@@ -65,6 +65,22 @@ TEST_F(JsonStreamerTest, MapOneString) {
   EXPECT_EQ(R"EOF({"a":"b"})EOF", buffer_.toString());
 }
 
+TEST_F(JsonStreamerTest, MapOneBool) {
+  {
+    Streamer::MapPtr map = streamer_.makeRootMap();
+    map->addEntries({{"a", true}});
+  }
+  EXPECT_EQ(R"EOF({"a":true})EOF", buffer_.toString());
+}
+
+TEST_F(JsonStreamerTest, MapTwoBools) {
+  {
+    Streamer::MapPtr map = streamer_.makeRootMap();
+    map->addEntries({{"a", true}, {"b", false}});
+  }
+  EXPECT_EQ(R"EOF({"a":true,"b":false})EOF", buffer_.toString());
+}
+
 TEST_F(JsonStreamerTest, MapOneSanitized) {
   {
     Streamer::MapPtr map = streamer_.makeRootMap();
@@ -89,19 +105,20 @@ TEST_F(JsonStreamerTest, SubArray) {
   Streamer::MapPtr map = streamer_.makeRootMap();
   map->addKey("a");
   Streamer::ArrayPtr array = map->addArray();
-  array->addEntries({1.0, "two", 3.5, std::nan("")});
+  array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
   array.reset();
   map->addEntries({{"embedded\"quote", "value"}});
   map.reset();
-  EXPECT_EQ(R"EOF({"a":[1,"two",3.5,null],"embedded\"quote":"value"})EOF", buffer_.toString());
+  EXPECT_EQ(R"EOF({"a":[1,"two",3.5,true,false,null],"embedded\"quote":"value"})EOF",
+            buffer_.toString());
 }
 
 TEST_F(JsonStreamerTest, TopArray) {
   {
     Streamer::ArrayPtr array = streamer_.makeRootArray();
-    array->addEntries({1.0, "two", 3.5, std::nan("")});
+    array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
   }
-  EXPECT_EQ(R"EOF([1,"two",3.5,null])EOF", buffer_.toString());
+  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null])EOF", buffer_.toString());
 }
 
 TEST_F(JsonStreamerTest, SubMap) {

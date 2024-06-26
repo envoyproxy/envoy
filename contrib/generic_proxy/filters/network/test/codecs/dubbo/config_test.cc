@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "source/extensions/common/dubbo/message_impl.h"
+#include "source/extensions/common/dubbo/message.h"
 
 #include "test/extensions/common/dubbo/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -25,26 +25,15 @@ using testing::Return;
 using namespace Common::Dubbo;
 
 MessageMetadataSharedPtr createDubboRequst(bool one_way_request) {
-  auto request = std::make_unique<RpcRequestImpl>();
-  request->setServiceName("fake_service");
-  request->setMethodName("fake_method");
-  request->setServiceVersion("fake_version");
-  request->setParametersLazyCallback([]() -> RpcRequestImpl::ParametersPtr {
-    return std::make_unique<RpcRequestImpl::Parameters>();
-  });
-  request->setAttachmentLazyCallback([]() -> RpcRequestImpl::AttachmentPtr {
-    auto map = std::make_unique<RpcRequestImpl::Attachment::Map>();
-    Hessian2::ObjectPtr key_o = std::make_unique<Hessian2::StringObject>("group");
-    Hessian2::ObjectPtr val_o = std::make_unique<Hessian2::StringObject>("fake_group");
+  auto request = std::make_unique<RpcRequest>("fake_dubbo_version", "fake_service", "fake_version",
+                                              "fake_method");
 
-    map->toMutableUntypedMap().value().get().emplace(std::move(key_o), std::move(val_o));
-    return std::make_unique<RpcRequestImpl::Attachment>(std::move(map), 0);
-  });
+  request->content().initialize("", {}, {});
+  request->content().setAttachment("group", "fake_group");
 
   auto context = std::make_unique<Context>();
   context->setMessageType(one_way_request ? MessageType::Oneway : MessageType::Request);
   context->setRequestId(123456);
-  context->setSerializeType(SerializeType::Hessian2);
 
   auto metadata = std::make_shared<MessageMetadata>();
   metadata->setContext(std::move(context));
@@ -60,10 +49,10 @@ MessageMetadataSharedPtr createDubboResponse(DubboRequest& request, ResponseStat
 TEST(DubboRequestTest, DubboRequestTest) {
   DubboRequest request(createDubboRequst(false));
 
-  // Static atrributes test.
+  // Static attributes test.
   { EXPECT_EQ("dubbo", request.protocol()); }
 
-  // Basic atrributes test.
+  // Basic attributes test.
   {
     EXPECT_EQ("fake_service", request.host());
     EXPECT_EQ("fake_service", request.path());
@@ -96,7 +85,7 @@ TEST(DubboRequestTest, DubboRequestTest) {
 TEST(DubboResponseTest, DubboResponseTest) {
   DubboRequest request(createDubboRequst(false));
 
-  // Static atrributes test.
+  // Static attributes test.
   {
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
@@ -206,7 +195,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
 
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     server_codec.decode(buffer, false);
   }
 
@@ -245,66 +234,68 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     buffer.add("anything");
 
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
-        .WillOnce(Return(ByMove(std::make_unique<RpcRequestImpl>())));
+        .WillOnce(Return(ByMove(std::make_unique<RpcRequest>("a", "b", "c", "d"))));
 
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
     server_codec.decode(buffer, false);
   }
 
   // Encode response.
   {
 
-    MockEncodingCallbacks encoding_callbacks;
+    MockEncodingContext encoding_context;
     DubboRequest request(createDubboRequst(false));
     DubboResponse response(
         createDubboResponse(request, ResponseStatus::Ok, RpcResponseType::ResponseWithValue));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _));
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+    EXPECT_CALL(callbacks, writeToConnection(_));
 
-    server_codec.encode(response, encoding_callbacks);
+    EXPECT_TRUE(server_codec.encode(response, encoding_context).ok());
   }
 
   {
     Status status = absl::OkStatus();
     DubboRequest request(createDubboRequst(false));
 
-    auto response = server_codec.respond(status, "", request);
+    auto response = server_codec.respond(status, "anything", request);
     auto* typed_response = static_cast<DubboResponse*>(response.get());
-    auto* typed_inner_response =
-        static_cast<RpcResponseImpl*>(&typed_response->inner_metadata_->mutableResponse());
+    auto& typed_inner_response = typed_response->inner_metadata_->mutableResponse();
 
     EXPECT_EQ(ResponseStatus::Ok, typed_response->inner_metadata_->responseStatus());
-    EXPECT_EQ(RpcResponseType::ResponseWithException, typed_inner_response->responseType().value());
-    EXPECT_EQ("exception_via_proxy", typed_inner_response->localRawMessage().value());
+    EXPECT_EQ(RpcResponseType::ResponseWithException, typed_inner_response.responseType().value());
+    EXPECT_EQ("anything", typed_inner_response.content().result()->toString().value().get());
+    EXPECT_EQ("envoy_response", typed_inner_response.content().attachments().at("reason"));
   }
 
   {
     Status status(StatusCode::kInvalidArgument, "test_message");
     DubboRequest request(createDubboRequst(false));
 
-    auto response = server_codec.respond(status, "", request);
+    auto response = server_codec.respond(status, "anything", request);
     auto* typed_response = static_cast<DubboResponse*>(response.get());
-    auto* typed_inner_response =
-        static_cast<RpcResponseImpl*>(&typed_response->inner_metadata_->mutableResponse());
+    auto& typed_inner_response = typed_response->inner_metadata_->mutableResponse();
 
     EXPECT_EQ(ResponseStatus::BadRequest, typed_response->inner_metadata_->responseStatus());
-    EXPECT_EQ(false, typed_inner_response->responseType().has_value());
-    EXPECT_EQ("test_message", typed_inner_response->localRawMessage().value());
+    EXPECT_EQ(false, typed_inner_response.responseType().has_value());
+
+    EXPECT_EQ("anything", typed_inner_response.content().result()->toString().value().get());
+    EXPECT_EQ("test_message", typed_inner_response.content().attachments().at("reason"));
   }
 
   {
     Status status(StatusCode::kAborted, "test_message2");
     DubboRequest request(createDubboRequst(false));
 
-    auto response = server_codec.respond(status, "", request);
+    auto response = server_codec.respond(status, "anything", request);
     auto* typed_response = static_cast<DubboResponse*>(response.get());
-    auto* typed_inner_response =
-        static_cast<RpcResponseImpl*>(&typed_response->inner_metadata_->mutableResponse());
+    auto& typed_inner_response = typed_response->inner_metadata_->mutableResponse();
 
     EXPECT_EQ(ResponseStatus::ServerError, typed_response->inner_metadata_->responseStatus());
-    EXPECT_EQ(false, typed_inner_response->responseType().has_value());
-    EXPECT_EQ("test_message2", typed_inner_response->localRawMessage().value());
+    EXPECT_EQ(false, typed_inner_response.responseType().has_value());
+
+    EXPECT_EQ("anything", typed_inner_response.content().result()->toString().value().get());
+    EXPECT_EQ("test_message2", typed_inner_response.content().attachments().at("reason"));
   }
 }
 
@@ -327,7 +318,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
 
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     client_codec.decode(buffer, false);
   }
 
@@ -365,38 +356,38 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     buffer.writeBEInt<int32_t>(8);
     buffer.add("anything");
 
-    auto response = std::make_unique<RpcResponseImpl>();
+    auto response = std::make_unique<RpcResponse>();
     response->setResponseType(RpcResponseType::ResponseWithValue);
 
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
         .WillOnce(Return(ByMove(std::move(response))));
 
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
     client_codec.decode(buffer, false);
   }
 
   // Encode normal request.
   {
-    MockEncodingCallbacks encoding_callbacks;
+    MockEncodingContext encoding_context;
 
     DubboRequest request(createDubboRequst(false));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+    EXPECT_CALL(callbacks, writeToConnection(_));
 
-    client_codec.encode(request, encoding_callbacks);
+    EXPECT_TRUE(client_codec.encode(request, encoding_context).ok());
   }
 
   // Encode one-way request.
   {
-    MockEncodingCallbacks encoding_callbacks;
+    MockEncodingContext encoding_context;
 
     DubboRequest request(createDubboRequst(true));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, _));
+    EXPECT_CALL(callbacks, writeToConnection(_));
 
-    client_codec.encode(request, encoding_callbacks);
+    EXPECT_TRUE(client_codec.encode(request, encoding_context).ok());
   }
 }
 
@@ -414,7 +405,7 @@ TEST(DubboCodecFactoryConfigTest, DubboCodecFactoryConfigTest) {
 
   Server::Configuration::MockFactoryContext context;
 
-  EXPECT_NE(nullptr, config.createCodecFactory(*proto_config, context));
+  EXPECT_NE(nullptr, config.createCodecFactory(*proto_config, context.server_factory_context_));
 }
 
 } // namespace

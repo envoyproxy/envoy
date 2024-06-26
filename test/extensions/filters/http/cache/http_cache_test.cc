@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -39,12 +40,13 @@ envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
 
 class LookupRequestTest : public testing::TestWithParam<LookupRequestTestCase> {
 public:
-  LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
+  LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers(), factory_context_) {}
 
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   VaryAllowList vary_allow_list_;
 
   static const SystemTime& currentTime() {
@@ -255,6 +257,30 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
   // Response is not expired but the request requires revalidation through
   // Pragma: no-cache.
   EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+}
+
+// "pragma:no-cache" is ignored if ignoreRequestCacheControlHeader is true.
+TEST_F(LookupRequestTest, IgnoreRequestCacheControlHeaderIgnoresPragma) {
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_,
+                                     /*ignore_request_cache_control_header=*/true);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is not expired and no-cache is ignored.
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+}
+
+// "cache-control:no-cache" is ignored if ignoreRequestCacheControlHeader is true.
+TEST_F(LookupRequestTest, IgnoreRequestCacheControlHeaderIgnoresCacheControl) {
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_,
+                                     /*ignore_request_cache_control_header=*/true);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is not expired and no-cache is ignored.
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
 TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {

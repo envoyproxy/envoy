@@ -42,14 +42,15 @@ void Span::setSampled(bool do_sample) {
 void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPTY_STRING, event); }
 
 void Span::finishSpan() {
+  span_entity_->setSpanLayer(skywalking::v3::SpanLayer::Http);
   span_entity_->endSpan();
   parent_tracer_.sendSegment(tracing_context_);
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr& upstream) {
+                         const Tracing::UpstreamContext& upstream) {
   absl::string_view remote_address =
-      upstream != nullptr ? upstream->address()->asStringView() : trace_context.host();
+      upstream.host_.has_value() ? upstream.host_->address()->asStringView() : trace_context.host();
 
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});

@@ -105,11 +105,10 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
   const mode_t mode = 0777;
-  Address::PipeInstance pipe(path, mode);
-  Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
+  Address::InstanceConstSharedPtr address = *Address::PipeInstance::create(path, mode);
   SocketImpl socket(Socket::Type::Stream, address, nullptr, {});
 
-  EXPECT_TRUE(socket.ioHandle().isOpen()) << pipe.asString();
+  EXPECT_TRUE(socket.ioHandle().isOpen()) << address->asString();
 
   Api::SysCallIntResult result = socket.bind(address);
   ASSERT_EQ(result.return_value_, 0);
@@ -148,6 +147,30 @@ TEST(IoSocketHandleImpl, NullptrIfaddrs) {
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
         return {0, 0};
+      }));
+
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+  EXPECT_FALSE(maybe_interface_name.has_value());
+}
+
+TEST(IoSocketHandleImpl, ErrnoIfaddrs) {
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4));
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+            os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
+            return {0, 0};
+          }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
+        return {/*return_value=*/-1, /*errno=*/19};
       }));
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();

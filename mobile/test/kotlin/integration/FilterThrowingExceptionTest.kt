@@ -2,6 +2,7 @@ package test.kotlin.integration
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -23,7 +24,6 @@ import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -91,7 +91,7 @@ class FilterThrowingExceptionTest {
   @Test
   fun `registers a filter that throws an exception and performs an HTTP request`() {
     val onEngineRunningLatch = CountDownLatch(1)
-    val onRespondeHeadersLatch = CountDownLatch(1)
+    val onResponseHeadersLatch = CountDownLatch(1)
     val onJNIExceptionEventLatch = CountDownLatch(2)
 
     var expectedMessages =
@@ -104,7 +104,8 @@ class FilterThrowingExceptionTest {
     val builder = AndroidEngineBuilder(context)
     val engine =
       builder
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setEventTracker { event ->
           if (
             event["name"] == "event_log" && event["log_name"] == "jni_cleared_pending_exception"
@@ -132,13 +133,13 @@ class FilterThrowingExceptionTest {
       .setOnResponseHeaders { responseHeaders, _, _ ->
         val status = responseHeaders.httpStatus ?: 0L
         assertThat(status).isEqualTo(200)
-        onRespondeHeadersLatch.countDown()
+        onResponseHeadersLatch.countDown()
       }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
 
-    onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
-    assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
+    onResponseHeadersLatch.await(15, TimeUnit.SECONDS)
+    assertThat(onResponseHeadersLatch.count).isEqualTo(0)
 
     onJNIExceptionEventLatch.await(15, TimeUnit.SECONDS)
     assertThat(onJNIExceptionEventLatch.count).isEqualTo(0)

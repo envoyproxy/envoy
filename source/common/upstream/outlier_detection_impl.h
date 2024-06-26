@@ -493,9 +493,12 @@ class EventLoggerImpl : public EventLogger {
 public:
   EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
                   TimeSource& time_source)
-      : file_(log_manager.createAccessLog(
-            Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name})),
-        time_source_(time_source) {}
+      : time_source_(time_source) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    file_ = file_or_error.value();
+  }
 
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,

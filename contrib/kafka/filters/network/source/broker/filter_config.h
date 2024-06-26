@@ -44,7 +44,7 @@ public:
   /**
    * Returns the prefix for stats.
    */
-  virtual const std::string& stat_prefix() const;
+  virtual const std::string& statPrefix() const;
 
   /**
    * Whether this configuration means that rewrite should be happening.

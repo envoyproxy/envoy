@@ -31,7 +31,8 @@ class ExtraRoutingHeaders;
 // the mutation rules expressed in the *HeaderMutationRules* proto.
 class Checker {
 public:
-  explicit Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules);
+  explicit Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules,
+                   Regex::Engine& regex_engine);
   // Return whether the current rules allow the named header to be modified or removed.
   // The header name in question can include HTTP headers or internal headers
   // that start with ":". The result will specify whether the attempt should

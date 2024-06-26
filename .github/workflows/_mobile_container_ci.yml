@@ -147,6 +147,7 @@ jobs:
       steps-pre: ${{ inputs.steps-pre }}
       steps-post: ${{ inputs.steps-post }}
       target: ${{ inputs.target }}
+      timeout-minutes: ${{ inputs.timeout-minutes }}
       trusted: ${{ fromJSON(inputs.request).request.trusted }}
       upload-name: ${{ inputs.upload-name }}
       upload-path: ${{ inputs.upload-path }}

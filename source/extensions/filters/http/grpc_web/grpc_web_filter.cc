@@ -300,7 +300,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   // The decoder always consumes and drains the given buffer. Incomplete data frame is buffered
   // inside the decoder.
   std::vector<Grpc::Frame> frames;
-  decoder_.decode(data, frames);
+  std::ignore = decoder_.decode(data, frames);
   if (frames.empty()) {
     // We don't have enough data to decode for one single frame, stop iteration until more data
     // comes in.

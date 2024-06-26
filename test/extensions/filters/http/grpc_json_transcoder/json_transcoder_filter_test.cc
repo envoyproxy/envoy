@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -47,6 +48,9 @@ protected:
   }
 
   Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  GrpcJsonTranscoderFilterStatsSharedPtr stats_ = std::make_shared<GrpcJsonTranscoderFilterStats>(
+      GrpcJsonTranscoderFilterStats::generateStats("prefix", context_.scope()));
 };
 
 class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
@@ -442,7 +446,8 @@ protected:
   GrpcJsonTranscoderFilterTest(
       envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
           bookstoreProtoConfig())
-      : config_(proto_config, *api_), filter_(config_) {
+      : config_(std::make_shared<JsonTranscoderConfig>(proto_config, *api_)),
+        filter_(config_, stats_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -469,7 +474,7 @@ protected:
   }
 
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
-  JsonTranscoderConfig config_;
+  JsonTranscoderConfigSharedPtr config_;
   JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -570,7 +575,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -642,7 +647,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -704,7 +709,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(*request_data, frames);
+  std::ignore = decoder.decode(*request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -737,7 +742,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, true));
 
   frames.clear();
-  decoder.decode(*response_data, frames);
+  std::ignore = decoder.decode(*response_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -1089,7 +1094,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   // decodeData with EOS will output the grpc frame.
   std::vector<Grpc::Frame> frames;
   Grpc::Decoder decoder;
-  decoder.decode(buffer, frames);
+  std::ignore = decoder.decode(buffer, frames);
   ASSERT_EQ(frames.size(), 1);
 
   bookstore::EchoBodyRequest expected_request;
@@ -1197,7 +1202,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
     EXPECT_EQ(frames.size(), 1);
 
     bookstore::EchoBodyRequest expected_request;
@@ -1667,8 +1672,8 @@ protected:
   GrpcJsonTranscoderFilterPrintTest() {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
-    config_ = new JsonTranscoderConfig(proto_config, *api_);
-    filter_ = new JsonTranscoderFilter(*config_);
+    config_ = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+    filter_ = std::make_unique<JsonTranscoderFilter>(config_, stats_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1677,13 +1682,8 @@ protected:
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
-  ~GrpcJsonTranscoderFilterPrintTest() override {
-    delete filter_;
-    delete config_;
-  }
-
-  JsonTranscoderConfig* config_;
-  JsonTranscoderFilter* filter_;
+  std::shared_ptr<JsonTranscoderConfig> config_;
+  std::unique_ptr<JsonTranscoderFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -1802,8 +1802,8 @@ protected:
   GrpcJsonTranscoderFilterUnescapeTest() {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
-    config_ = std::make_unique<JsonTranscoderConfig>(proto_config, *api_);
-    filter_ = std::make_unique<JsonTranscoderFilter>(*config_);
+    config_ = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+    filter_ = std::make_unique<JsonTranscoderFilter>(config_, stats_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1812,7 +1812,7 @@ protected:
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
-  std::unique_ptr<JsonTranscoderConfig> config_;
+  std::shared_ptr<JsonTranscoderConfig> config_;
   std::unique_ptr<JsonTranscoderFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -1828,7 +1828,7 @@ TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 

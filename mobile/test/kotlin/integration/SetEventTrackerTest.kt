@@ -1,15 +1,19 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
 import io.envoyproxy.envoymobile.EngineBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class SetEventTrackerTest {
 
   init {
@@ -21,6 +25,8 @@ class SetEventTrackerTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
         .setEventTracker { events ->
           for (entry in events) {
             assertThat(entry.key).isEqualTo("foo")
@@ -30,7 +36,7 @@ class SetEventTrackerTest {
         }
         .addNativeFilter(
           "envoy.filters.http.test_event_tracker",
-          "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker\",\"attributes\":{\"foo\":\"bar\"}}"
+          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
         )
         .build()
 
@@ -59,7 +65,7 @@ class SetEventTrackerTest {
       EngineBuilder()
         .addNativeFilter(
           "envoy.filters.http.test_event_tracker",
-          "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker\",\"attributes\":{\"foo\":\"bar\"}}"
+          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
         )
         .build()
 

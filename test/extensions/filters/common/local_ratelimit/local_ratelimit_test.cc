@@ -1,6 +1,10 @@
+#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -15,6 +19,86 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
+TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  Singleton::ManagerImpl manager;
+
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  cm.local_cluster_name_ = "local_cluster";
+  cm.initializeClusters({"local_cluster"}, {});
+
+  const auto* mock_local_cluster = cm.active_clusters_.at("local_cluster").get();
+
+  EXPECT_CALL(*mock_local_cluster, prioritySet()).WillOnce(ReturnRef(priority_set));
+  EXPECT_CALL(priority_set, addMemberUpdateCb(_));
+
+  // Set the membership total to 2.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(2);
+
+  ShareProviderManagerSharedPtr share_provider_manager =
+      ShareProviderManager::singleton(dispatcher, cm, manager);
+  EXPECT_NE(share_provider_manager, nullptr);
+
+  auto provider = share_provider_manager->getShareProvider(ProtoLocalClusterRateLimit());
+  EXPECT_NE(provider, nullptr);
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(1, provider->tokensPerFill(2));
+  EXPECT_EQ(2, provider->tokensPerFill(4));
+  EXPECT_EQ(4, provider->tokensPerFill(8));
+
+  // Set the membership total to 4.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(4);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(1, provider->tokensPerFill(4));
+  EXPECT_EQ(2, provider->tokensPerFill(8));
+  EXPECT_EQ(4, provider->tokensPerFill(16));
+
+  // Set the membership total to 0.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(0);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(2, provider->tokensPerFill(2));
+  EXPECT_EQ(4, provider->tokensPerFill(4));
+  EXPECT_EQ(8, provider->tokensPerFill(8));
+
+  // Set the membership total to 1.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(1);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(2, provider->tokensPerFill(2));
+  EXPECT_EQ(4, provider->tokensPerFill(4));
+  EXPECT_EQ(8, provider->tokensPerFill(8));
+
+  // Destroy the share provider manager.
+  // This is used to ensure the share provider is still safe to use even
+  // the share provider manager is destroyed. But note this should never
+  // happen in real production because the share provider manager should
+  // have longer life cycle than the limiter.
+  share_provider_manager.reset();
+
+  // Set the membership total to 4 again.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(4);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  // The provider should still work but the value should not change.
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(2, provider->tokensPerFill(2));
+  EXPECT_EQ(4, provider->tokensPerFill(4));
+  EXPECT_EQ(8, provider->tokensPerFill(8));
+}
+
+class MockShareProvider : public ShareProvider {
+public:
+  MockShareProvider() = default;
+  MOCK_METHOD(uint32_t, tokensPerFill, (uint32_t origin_tokens_per_fill), (const));
+};
+
 class LocalRateLimiterImplTest : public testing::Test {
 public:
   void initializeTimer() {
@@ -24,12 +108,13 @@ public:
   }
 
   void initialize(const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-                  const uint32_t tokens_per_fill) {
+                  const uint32_t tokens_per_fill, ShareProviderSharedPtr share_provider = nullptr) {
 
     initializeTimer();
 
-    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, share_provider);
   }
 
   Thread::ThreadSynchronizer& synchronizer() { return rate_limiter_->synchronizer_; }
@@ -154,6 +239,40 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFill) {
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
 }
 
+// Verify token bucket functionality with max tokens and tokens per fill > 1 and
+// share provider is used.
+TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFillWithShareProvider) {
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, tokensPerFill(_))
+      .WillRepeatedly(testing::Invoke([](uint32_t tokens) { return tokens / 2; }));
+
+  // Final tokens per fill is 2/2 = 1.
+  initialize(std::chrono::milliseconds(200), 2, 2, share_provider);
+
+  // The limiter will be initialized with max tokens and it will not be shared.
+  // So, the initial tokens is 2.
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+
+  // The tokens per fill will be handled by the share provider and it will be 1.
+  // 0 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+  fill_timer_->invokeCallback();
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+
+  // 0 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+  fill_timer_->invokeCallback();
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+}
+
 // Verify token bucket functionality with max tokens > tokens per fill.
 TEST_F(LocalRateLimiterImplTest, TokenBucketMaxTokensGreaterThanTokensPerFill) {
   initialize(std::chrono::milliseconds(200), 2, 1);
@@ -218,7 +337,7 @@ public:
     rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
         fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
   }
-  const std::string single_descriptor_config_yaml = R"(
+  static constexpr absl::string_view single_descriptor_config_yaml = R"(
   entries:
   - key: foo2
     value: bar2
@@ -247,7 +366,7 @@ public:
 
 // Verify descriptor rate limit time interval is multiple of token bucket fill interval.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFillInterval) {
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 10, 10, "60s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 10, 10, "60s"),
                             *descriptors_.Add());
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -256,9 +375,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFi
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -276,9 +395,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitNoExceptionWithout
 TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
   // This tests the case in which an allowed check races with the fill timer.
   {
-    TestUtility::loadFromYaml(
-        fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
-        *descriptors_.Add());
+    TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+                              *descriptors_.Add());
     initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
     dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
@@ -331,7 +449,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor2) {
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
@@ -344,7 +462,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor2) {
 
 // Verify token bucket functionality with a single token.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
@@ -387,7 +505,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
 
 // Verify token bucket functionality with request per unit > 1.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescriptor) {
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "0.1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 2, 2);
 
@@ -424,7 +542,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
 // Verify token bucket functionality with multiple descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDifferentRateLimits) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "1000s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "1000s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 3, 1);
 
@@ -450,7 +568,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDiffere
 TEST_F(LocalRateLimiterDescriptorImplTest,
        TokenBucketDifferentDescriptorDifferentRateLimitsSorted) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "1s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 3, 3);
   std::vector<RateLimit::LocalDescriptor> descriptors{{{{"hello", "world"}, {"foo", "bar"}}},
@@ -465,7 +583,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "3s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(1000), 2, 2);
 
@@ -512,7 +630,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
 // multiple descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "3s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 2, 1);
 

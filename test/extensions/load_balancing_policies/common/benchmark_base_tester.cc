@@ -1,9 +1,7 @@
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace LoadBalancingPolices {
-namespace Common {
+namespace Upstream {
 
 BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight,
                        bool attach_metadata) {
@@ -32,13 +30,11 @@ BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uin
       Upstream::makeHostsPerLocality({hosts});
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {}, hosts, {},
-      absl::nullopt);
+      random_.random(), absl::nullopt);
   local_priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {}, hosts, {},
-      absl::nullopt);
+      random_.random(), absl::nullopt);
 }
 
-} // namespace Common
-} // namespace LoadBalancingPolices
-} // namespace Extensions
+} // namespace Upstream
 } // namespace Envoy

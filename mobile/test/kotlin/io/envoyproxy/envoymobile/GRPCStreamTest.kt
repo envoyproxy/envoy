@@ -1,14 +1,18 @@
 package io.envoyproxy.envoymobile
 
+import com.google.common.truth.Truth.assertThat
+import io.envoyproxy.envoymobile.mocks.MockStream
+import io.envoyproxy.envoymobile.mocks.MockStreamClient
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class GRPCStreamTest {
   private val message1 = ByteBuffer.wrap(byteArrayOf(0x0, 0x1, 0x2, 0x3, 0x4, 0x5))
 
@@ -21,7 +25,7 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start().sendMessage(message1)
 
     assertThat(sentData.size()).isEqualTo(5 + message1.array().count())
   }
@@ -33,7 +37,7 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start().sendMessage(message1)
 
     assertThat(sentData.toByteArray()[0]).isEqualTo(0)
   }
@@ -45,7 +49,7 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start().sendMessage(message1)
 
     val size =
       ByteBuffer.wrap(sentData.toByteArray().sliceArray(1 until 5)).order(ByteOrder.BIG_ENDIAN).int
@@ -59,7 +63,7 @@ class GRPCStreamTest {
       stream.onRequestData = { data, _ -> sentData.write(data.array()) }
     }
 
-    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).sendMessage(message1)
+    GRPCClient(streamClient).newGRPCStreamPrototype().start().sendMessage(message1)
 
     assertThat(sentData.toByteArray().sliceArray(5 until sentData.size()))
       .isEqualTo(message1.array())
@@ -72,7 +76,7 @@ class GRPCStreamTest {
       stream.onCancel = { countDownLatch.countDown() }
     }
 
-    GRPCClient(streamClient).newGRPCStreamPrototype().start(Executor {}).cancel()
+    GRPCClient(streamClient).newGRPCStreamPrototype().start().cancel()
 
     assertThat(countDownLatch.await(2000, TimeUnit.MILLISECONDS)).isTrue()
   }
@@ -94,7 +98,7 @@ class GRPCStreamTest {
         assertThat(endStream).isTrue()
         countDownLatch.countDown()
       }
-      .start(Executor {})
+      .start()
 
     stream?.receiveHeaders(expectedHeaders, true)
     countDownLatch.await()
@@ -115,7 +119,7 @@ class GRPCStreamTest {
           .isEqualTo(expectedTrailers.caseSensitiveHeaders())
         countDownLatch.countDown()
       }
-      .start(Executor {})
+      .start()
 
     stream?.receiveTrailers(expectedTrailers)
     countDownLatch.await()
@@ -133,7 +137,7 @@ class GRPCStreamTest {
         assertThat(message.array()).isEqualTo(message1.array())
         countDownLatch.countDown()
       }
-      .start(Executor {})
+      .start()
 
     val messageLength = message1.array().count()
     val data = ByteBuffer.allocate(5 + messageLength)
@@ -187,7 +191,7 @@ class GRPCStreamTest {
         }
         countDownLatch.countDown()
       }
-      .start(Executor {})
+      .start()
 
     stream?.receiveData(firstMessageBuffer, false)
     stream?.receiveData(secondMessageBufferPart1, false)
@@ -204,10 +208,10 @@ class GRPCStreamTest {
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
       .setOnResponseMessage { message, _ ->
-        assertThat(message.array()).hasSize(0)
+        assertThat(message.array()).hasLength(0)
         countDownLatch.countDown()
       }
-      .start(Executor {})
+      .start()
 
     val emptyMessage =
       ByteBuffer.wrap(
@@ -257,13 +261,13 @@ class GRPCStreamTest {
       .newGRPCStreamPrototype()
       .setOnResponseMessage { message, _ ->
         if (countDownLatch.count == 2L) {
-          assertThat(message.array()).hasSize(0)
+          assertThat(message.array()).hasLength(0)
         } else {
           assertThat(message.array()).isEqualTo(secondMessage)
         }
         countDownLatch.countDown()
       }
-      .start(Executor {})
+      .start()
 
     stream?.receiveData(emptyMessageBuffer, false)
     stream?.receiveData(secondMessageBuffer, false)

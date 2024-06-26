@@ -180,6 +180,7 @@ public:
     }
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+    bool shouldBypassOverloadManager() const override { return false; }
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
     }
@@ -294,6 +295,7 @@ public:
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
     MOCK_METHOD(Api::IoCallUint64Result, flush, (), (override));
     MOCK_METHOD(void, activateRead, (), (override));
+    MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const, override));
 
   private:
     ConnectionHandlerTest& parent_;
@@ -2081,7 +2083,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   // Verify the file event created by listener filter was reset. If not
   // the initializeFileEvent will trigger the assertion.
   io_handle.initializeFileEvent(
-      dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
       Event::FileReadyType::Read | Event::FileReadyType::Closed);
 }
 
@@ -2135,7 +2137,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(*timeout, disableTimer());
 
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(io_handle, createFileEvent_(_, _, _, _));
   EXPECT_CALL(*listener, onDestroy());
@@ -2143,7 +2145,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   // Verify the file event created by listener filter was reset. If not
   // the initializeFileEvent will trigger the assertion.
   io_handle.initializeFileEvent(
-      dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
       Event::FileReadyType::Read | Event::FileReadyType::Closed);
 }
 
@@ -2243,7 +2245,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilter) {
           .find(local_address_->asString())
           ->second.get());
   EXPECT_CALL(*udp_listener_worker_router, registerWorkerForListener(_))
-      .WillOnce(Invoke([&](Network::UdpListenerCallbacks& cb) -> void {
+      .WillOnce(Invoke([&](Network::UdpListenerCallbacks& cb) {
         EXPECT_CALL(*udp_listener_worker_router, unregisterWorkerForListener(_));
         callbacks = &cb;
       }));

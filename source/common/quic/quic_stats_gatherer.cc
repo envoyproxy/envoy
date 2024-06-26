@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "envoy/formatter/http_formatter_context.h"
+
 namespace Envoy {
 namespace Quic {
 

@@ -119,19 +119,21 @@ template <> HeaderMapImpl::StaticLookupTable<RequestHeaderMap>::StaticLookupTabl
   INLINE_REQ_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
   INLINE_REQ_RESP_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
 
-  finalizeTable();
+  auto input = finalizedTable();
 
   // Special case where we map a legacy host header to :authority.
   const auto handle =
       CustomInlineHeaderRegistry::getInlineHeader<RequestHeaderMap::header_map_type>(
           Headers::get().Host);
-  add(Headers::get().HostLegacy.get().c_str(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
-    return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
-  });
+  input.emplace_back(
+      Headers::get().HostLegacy.get(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
+        return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
+      });
+  compile(std::move(input));
 }
 
 template <> HeaderMapImpl::StaticLookupTable<RequestTrailerMap>::StaticLookupTable() {
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTable() {
@@ -142,7 +144,7 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTab
   INLINE_REQ_RESP_HEADERS(REGISTER_RESPONSE_HEADER)
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_HEADER)
 
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTable() {
@@ -151,7 +153,7 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTa
       Headers::get().name);
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_TRAILER)
 
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
@@ -497,6 +499,17 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_, true);
   return 1;
+}
+
+ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailersImpl::serializeAsProto() const {
+  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
+  value().iterate([&proto_out](const HeaderEntry& e) -> HeaderMap::Iterate {
+    auto* new_header = proto_out->add_headers();
+    new_header->set_key(std::string(e.key().getStringView()));
+    new_header->set_value(std::string(e.value().getStringView()));
+    return HeaderMap::Iterate::Continue;
+  });
+  return proto_out;
 }
 
 namespace {

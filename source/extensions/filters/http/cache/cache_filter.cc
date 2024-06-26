@@ -23,6 +23,16 @@ namespace {
 inline bool isResponseNotModified(const Http::ResponseHeaderMap& response_headers) {
   return Http::Utility::getResponseStatus(response_headers) == enumToInt(Http::Code::NotModified);
 }
+
+// This value is only used if there is no encoderBufferLimit on the stream;
+// without *some* constraint here, a very large chunk can be requested and
+// attempt to load into a memory buffer.
+//
+// This default is quite large to minimize the chance of being a surprise
+// behavioral change when a constraint is added.
+//
+// And everyone knows 64MB should be enough for anyone.
+static const size_t MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST = 64 * 1024 * 1024;
 } // namespace
 
 struct CacheResponseCodeDetailValues {
@@ -31,11 +41,15 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
+CacheFilterConfig::CacheFilterConfig(
+    const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+    Server::Configuration::CommonFactoryContext& context)
+    : vary_allow_list_(config.allowed_vary_headers(), context), time_source_(context.timeSource()),
+      ignore_request_cache_control_header_(config.ignore_request_cache_control_header()) {}
+
+CacheFilter::CacheFilter(std::shared_ptr<const CacheFilterConfig> config,
                          std::shared_ptr<HttpCache> http_cache)
-    : time_source_(time_source), cache_(http_cache),
-      vary_allow_list_(config.allowed_vary_headers()) {}
+    : cache_(http_cache), config_(config) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -88,7 +102,9 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
+  LookupRequest lookup_request(headers, config_->timeSource().systemTime(),
+                               config_->varyAllowList(),
+                               config_->ignoreRequestCacheControlHeader());
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   lookup_ = cache_->makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
@@ -140,7 +156,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
   if (request_allows_inserts_ && !is_head_request_ &&
-      CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
+      CacheabilityUtils::isCacheableResponse(headers, config_->varyAllowList())) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     auto insert_context = cache_->makeInsertContext(std::move(lookup_), *encoder_callbacks_);
     if (insert_context != nullptr) {
@@ -155,7 +171,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
                                                insert_status_ = InsertStatus::InsertAbortedByCache;
                                              });
       // Add metadata associated with the cached response. Right now this is only response_time;
-      const ResponseMetadata metadata = {time_source_.systemTime()};
+      const ResponseMetadata metadata = {config_->timeSource().systemTime()};
       insert_queue_->insertHeaders(headers, metadata, end_stream);
     }
     if (end_stream) {
@@ -326,10 +342,21 @@ void CacheFilter::getBody() {
   // posted callback.
   CacheFilterWeakPtr self = weak_from_this();
 
+  // We don't want to request more than a buffer-size at a time from the cache.
+  uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
+  // If there is no buffer size limit, we still want *some* constraint.
+  if (fetch_size_limit == 0) {
+    fetch_size_limit = MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST;
+  }
+  AdjustedByteRange fetch_range = {remaining_ranges_[0].begin(),
+                                   (remaining_ranges_[0].length() > fetch_size_limit)
+                                       ? (remaining_ranges_[0].begin() + fetch_size_limit)
+                                       : remaining_ranges_[0].end()};
+
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
-                                             Buffer::InstancePtr&& body) {
+  lookup_->getBody(fetch_range, [self, &dispatcher = decoder_callbacks_->dispatcher()](
+                                    Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     dispatcher.post([self, body = std::move(body)]() mutable {
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
@@ -438,7 +465,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
-      : encoder_callbacks_->addEncodedData(*body, !response_has_trailers_);
+      : encoder_callbacks_->addEncodedData(*body, true);
 
   if (!remaining_ranges_.empty()) {
     getBody();
@@ -567,7 +594,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   if (should_update_cached_entry) {
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
-    const ResponseMetadata metadata = {time_source_.systemTime()};
+    const ResponseMetadata metadata = {config_->timeSource().systemTime()};
     cache_->updateHeaders(*lookup_, response_headers, metadata,
                           [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
     insert_status_ = InsertStatus::HeaderUpdate;

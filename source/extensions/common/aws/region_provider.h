@@ -23,6 +23,12 @@ public:
    * @return AWS region, or nullopt if unable to discover the region.
    */
   virtual absl::optional<std::string> getRegion() PURE;
+
+  /**
+   * Discover and return the AWS region set string.
+   * @return AWS region, or nullopt if unable to discover the region set.
+   */
+  virtual absl::optional<std::string> getRegionSet() PURE;
 };
 
 using RegionProviderPtr = std::unique_ptr<RegionProvider>;

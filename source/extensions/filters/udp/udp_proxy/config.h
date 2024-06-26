@@ -15,18 +15,9 @@ using TunnelingConfig =
     envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig::UdpTunnelingConfig;
 
 /**
- * Base class for both tunnel response headers and trailers.
- */
-class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
-public:
-  ProtobufTypes::MessagePtr serializeAsProto() const override;
-  virtual const Http::HeaderMap& value() const PURE;
-};
-
-/**
  * Response headers for the tunneling connections.
  */
-class TunnelResponseHeaders : public TunnelResponseHeadersOrTrailers {
+class TunnelResponseHeaders : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
@@ -40,7 +31,7 @@ private:
 /**
  * Response trailers for the tunneling connections.
  */
-class TunnelResponseTrailers : public TunnelResponseHeadersOrTrailers {
+class TunnelResponseTrailers : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
   TunnelResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers)
       : response_trailers_(std::move(response_trailers)) {}

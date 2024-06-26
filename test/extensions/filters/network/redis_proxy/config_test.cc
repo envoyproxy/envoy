@@ -18,8 +18,10 @@ namespace RedisProxy {
 
 TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy(), context),
+  EXPECT_THROW(RedisProxyFilterConfigFactory()
+                   .createFilterFactoryFromProto(
+                       envoy::extensions::filters::network::redis_proxy::v3::RedisProxy(), context)
+                   .IgnoreError(),
                ProtoValidationException);
 }
 
@@ -34,8 +36,8 @@ TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
-      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context), EnvoyException,
-      "cannot configure a redis-proxy without any upstream");
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context).IgnoreError(),
+      EnvoyException, "cannot configure a redis-proxy without any upstream");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoSettings) {
@@ -79,7 +81,7 @@ settings:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context.serverFactoryContext()));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -104,7 +106,7 @@ settings:
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -140,7 +142,7 @@ settings:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context.serverFactoryContext()));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -164,7 +166,7 @@ settings:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context.serverFactoryContext()));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));

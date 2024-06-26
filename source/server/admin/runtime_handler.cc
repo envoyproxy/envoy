@@ -90,7 +90,7 @@ Http::Code RuntimeHandler::handlerRuntimeModify(Http::ResponseHeaderMap&,
   for (const auto& it : params.data()) {
     overrides.insert({it.first, it.second[0]});
   }
-  TRY_ASSERT_MAIN_THREAD { server_.runtime().mergeValues(overrides); }
+  TRY_ASSERT_MAIN_THREAD { THROW_IF_NOT_OK(server_.runtime().mergeValues(overrides)); }
   END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(error, "{}", e.what());

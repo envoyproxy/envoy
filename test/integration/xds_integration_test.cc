@@ -193,7 +193,7 @@ public:
     BaseIntegrationTest::initialize();
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-        BaseIntegrationTest::timeSystem());
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
@@ -462,8 +462,8 @@ public:
 
     BaseIntegrationTest::initialize();
 
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }
@@ -977,10 +977,10 @@ TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthor
   // Two xDS resources with the same name and same type.
   ASSERT_EQ(config_dump.configs_size(), 2);
   envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
-  ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(0), dynamic_secret));
+  ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(0), dynamic_secret));
   EXPECT_EQ(cert_name, dynamic_secret.name());
   EXPECT_EQ("1", dynamic_secret.version_info());
-  ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(1), dynamic_secret));
+  ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(1), dynamic_secret));
   EXPECT_EQ(cert_name, dynamic_secret.name());
   EXPECT_EQ("1", dynamic_secret.version_info());
 }

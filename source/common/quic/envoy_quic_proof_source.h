@@ -34,15 +34,38 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  struct CertConfigWithFilterChain {
+  struct TransportSocketFactoryWithFilterChain {
+    const QuicServerTransportSocketFactory& transport_socket_factory_;
+    const Network::FilterChain& filter_chain_;
+  };
+
+  quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
+  legacyGetCertChain(const TransportSocketFactoryWithFilterChain& data);
+  void legacySignPayload(const TransportSocketFactoryWithFilterChain& data,
+                         uint16_t signature_algorithm, absl::string_view in,
+                         std::unique_ptr<quic::ProofSource::SignatureCallback> callback);
+
+  struct CertWithFilterChain {
+    quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
+    std::shared_ptr<quic::CertificatePrivateKey> private_key_;
+    absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
+  };
+
+  CertWithFilterChain getTlsCertAndFilterChain(const TransportSocketFactoryWithFilterChain& data,
+                                               const std::string& hostname, bool* cert_matched_sni);
+
+  struct LegacyCertConfigWithFilterChain {
     absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;
     absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
   };
 
-  CertConfigWithFilterChain
-  getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                 const quic::QuicSocketAddress& client_address,
-                                 const std::string& hostname);
+  LegacyCertConfigWithFilterChain
+  legacyGetTlsCertConfigAndFilterChain(const TransportSocketFactoryWithFilterChain& data);
+
+  absl::optional<TransportSocketFactoryWithFilterChain>
+  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};

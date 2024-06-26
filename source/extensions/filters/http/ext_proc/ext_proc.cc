@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <memory>
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
@@ -9,11 +11,13 @@
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
+namespace {
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
@@ -33,9 +37,114 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
-static const std::string ErrorPrefix = "ext_proc_error";
-static const int DefaultImmediateStatus = 200;
-static const std::string FilterName = "envoy.filters.http.ext_proc";
+constexpr absl::string_view ErrorPrefix = "ext_proc_error";
+constexpr int DefaultImmediateStatus = 200;
+constexpr absl::string_view FilterName = "envoy.filters.http.ext_proc";
+
+absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
+  if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
+    return config.overrides().processing_mode();
+  }
+  return absl::nullopt;
+}
+
+absl::optional<envoy::config::core::v3::GrpcService>
+initGrpcService(const ExtProcPerRoute& config) {
+  if (config.has_overrides() && config.overrides().has_grpc_service()) {
+    return config.overrides().grpc_service();
+  }
+  return absl::nullopt;
+}
+
+std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
+  std::vector<std::string> namespaces;
+  for (const auto& single_ns : ns) {
+    namespaces.emplace_back(single_ns);
+  }
+  return namespaces;
+}
+
+absl::optional<std::vector<std::string>>
+initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_forwarding_namespaces()) {
+    return absl::nullopt;
+  }
+
+  return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().untyped())};
+}
+
+absl::optional<std::vector<std::string>>
+initTypedForwardingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_forwarding_namespaces()) {
+    return absl::nullopt;
+  }
+
+  return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().typed())};
+}
+
+absl::optional<std::vector<std::string>>
+initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_receiving_namespaces()) {
+    return absl::nullopt;
+  }
+
+  return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
+}
+
+absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
+                                                   const FilterConfigPerRoute& more_specific) {
+  if (more_specific.disabled()) {
+    return absl::nullopt;
+  }
+  return more_specific.processingMode().has_value() ? more_specific.processingMode()
+                                                    : less_specific.processingMode();
+}
+
+// Replaces all entries with the same name or append one.
+void mergeHeaderValues(std::vector<envoy::config::core::v3::HeaderValue>& metadata,
+                       const envoy::config::core::v3::HeaderValue& header) {
+  bool has_key = false;
+  for (auto& dest : metadata) {
+    if (dest.key() == header.key()) {
+      dest.CopyFrom(header);
+      has_key = true;
+    }
+  }
+  if (!has_key) {
+    metadata.emplace_back(header);
+  }
+}
+
+std::vector<envoy::config::core::v3::HeaderValue>
+mergeGrpcInitialMetadata(const FilterConfigPerRoute& less_specific,
+                         const FilterConfigPerRoute& more_specific) {
+  std::vector<envoy::config::core::v3::HeaderValue> metadata(less_specific.grpcInitialMetadata());
+
+  for (const auto& header : more_specific.grpcInitialMetadata()) {
+    mergeHeaderValues(metadata, header);
+  }
+
+  return metadata;
+}
+
+// Replaces all entries with the same name or append one.
+void mergeHeaderValuesField(
+    Protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValue>& metadata,
+    const envoy::config::core::v3::HeaderValue& header) {
+  bool has_key = false;
+  for (auto& dest : metadata) {
+    if (dest.key() == header.key()) {
+      dest.CopyFrom(header);
+      has_key = true;
+    }
+  }
+  if (!has_key) {
+    metadata.Add()->CopyFrom(header);
+  }
+}
 
 // Changes to headers are normally tested against the MutationRules supplied
 // with configuration. When writing an immediate response message, however,
@@ -45,11 +154,11 @@ static const std::string FilterName = "envoy.filters.http.ext_proc";
 // set of rules for that purpose.
 class ImmediateMutationChecker {
 public:
-  ImmediateMutationChecker() {
+  ImmediateMutationChecker(Regex::Engine& regex_engine) {
     HeaderMutationRules rules;
     rules.mutable_allow_all_routing()->set_value(true);
     rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Checker>(rules);
+    rule_checker_ = std::make_unique<Checker>(rules, regex_engine);
   }
 
   const Checker& checker() const { return *rule_checker_; }
@@ -57,6 +166,59 @@ public:
 private:
   std::unique_ptr<Checker> rule_checker_;
 };
+
+ProcessingMode allDisabledMode() {
+  ProcessingMode pm;
+  pm.set_request_header_mode(ProcessingMode::SKIP);
+  pm.set_response_header_mode(ProcessingMode::SKIP);
+  return pm;
+}
+
+} // namespace
+
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+    const std::chrono::milliseconds message_timeout, const uint32_t max_message_timeout_ms,
+    Stats::Scope& scope, const std::string& stats_prefix, bool is_upstream,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
+    : failure_mode_allow_(config.failure_mode_allow()),
+      route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
+      max_message_timeout_ms_(max_message_timeout_ms),
+      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      processing_mode_(config.processing_mode()),
+      mutation_checker_(config.mutation_rules(), context.regexEngine()),
+      filter_metadata_(config.filter_metadata()),
+      allow_mode_override_(config.allow_mode_override()),
+      disable_immediate_response_(config.disable_immediate_response()),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+      is_upstream_(is_upstream),
+      untyped_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().untyped().begin(),
+          config.metadata_options().forwarding_namespaces().untyped().end()),
+      typed_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().typed().begin(),
+          config.metadata_options().forwarding_namespaces().typed().end()),
+      untyped_receiving_namespaces_(
+          config.metadata_options().receiving_namespaces().untyped().begin(),
+          config.metadata_options().receiving_namespaces().untyped().end()),
+      expression_manager_(builder, context.localInfo(), config.request_attributes(),
+                          config.response_attributes()),
+      immediate_mutation_checker_(context.regexEngine()),
+      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+  if (config.disable_clear_route_cache() &&
+      (route_cache_action_ !=
+       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+    throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
+                         "be set to none-default at the same time.");
+  }
+  if (config.disable_clear_route_cache()) {
+    route_cache_action_ = envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
+  }
+  thread_local_stream_manager_slot_->set(
+      [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
+}
 
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
@@ -115,77 +277,11 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
-std::vector<std::string>
-FilterConfigPerRoute::initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
-  if (ns.empty()) {
-    return {};
-  }
-
-  std::vector<std::string> namespaces;
-  for (const auto& single_ns : ns) {
-    namespaces.emplace_back(single_ns);
-  }
-  return namespaces;
-}
-
-absl::optional<std::vector<std::string>>
-FilterConfigPerRoute::initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
-  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides().metadata_options().has_forwarding_namespaces()) {
-    return absl::nullopt;
-  }
-
-  return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().untyped())};
-}
-
-absl::optional<std::vector<std::string>>
-FilterConfigPerRoute::initTypedForwardingNamespaces(const ExtProcPerRoute& config) {
-  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides().metadata_options().has_forwarding_namespaces()) {
-    return absl::nullopt;
-  }
-
-  return {initNamespaces(config.overrides().metadata_options().forwarding_namespaces().typed())};
-}
-
-absl::optional<std::vector<std::string>>
-FilterConfigPerRoute::initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
-  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
-      !config.overrides().metadata_options().has_receiving_namespaces()) {
-    return absl::nullopt;
-  }
-
-  return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
-}
-
-absl::optional<ProcessingMode>
-FilterConfigPerRoute::initProcessingMode(const ExtProcPerRoute& config) {
-  if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
-    return config.overrides().processing_mode();
-  }
-  return absl::nullopt;
-}
-absl::optional<envoy::config::core::v3::GrpcService>
-FilterConfigPerRoute::initGrpcService(const ExtProcPerRoute& config) {
-  if (config.has_overrides() && config.overrides().has_grpc_service()) {
-    return config.overrides().grpc_service();
-  }
-  return absl::nullopt;
-}
-
-absl::optional<ProcessingMode>
-FilterConfigPerRoute::mergeProcessingMode(const FilterConfigPerRoute& less_specific,
-                                          const FilterConfigPerRoute& more_specific) {
-  if (more_specific.disabled()) {
-    return absl::nullopt;
-  }
-  return more_specific.processingMode().has_value() ? more_specific.processingMode()
-                                                    : less_specific.processingMode();
-}
-
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
+      grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
+                             config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
@@ -196,6 +292,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       processing_mode_(mergeProcessingMode(less_specific, more_specific)),
       grpc_service_(more_specific.grpcService().has_value() ? more_specific.grpcService()
                                                             : less_specific.grpcService()),
+      grpc_initial_metadata_(mergeGrpcInitialMetadata(less_specific, more_specific)),
       untyped_forwarding_namespaces_(more_specific.untypedForwardingMetadataNamespaces().has_value()
                                          ? more_specific.untypedForwardingMetadataNamespaces()
                                          : less_specific.untypedForwardingMetadataNamespaces()),
@@ -235,15 +332,27 @@ Filter::StreamOpenState Filter::openStream() {
   }
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_with_hash_key_, decoder_callbacks_->streamInfo());
+
+    Http::AsyncClient::ParentContext grpc_context;
+    grpc_context.stream_info = &decoder_callbacks_->streamInfo();
+    auto options = Http::AsyncClient::StreamOptions()
+                       .setParentSpan(decoder_callbacks_->activeSpan())
+                       .setParentContext(grpc_context)
+                       .setBufferBodyForRetry(true);
+
+    ExternalProcessorStreamPtr stream_object =
+        client_->start(*this, config_with_hash_key_, options);
+
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
       // Asserts that `stream_` is nullptr since it is not valid to be used any further
       // beyond this point.
-      ASSERT(stream_ == nullptr);
+      ASSERT(stream_object == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
+
+    stream_ = config_->threadLocalStreamManager().store(this, std::move(stream_object));
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -259,7 +368,8 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
-    stream_.reset();
+    stream_ = nullptr;
+    config_->threadLocalStreamManager().erase(this);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
@@ -276,8 +386,7 @@ void Filter::onDestroy() {
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream,
-                                      ProtobufWkt::Struct* proto) {
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterHeadersStatus::StopIteration;
@@ -291,14 +400,12 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
   ProcessingRequest req;
+  addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
-  if (proto != nullptr) {
-    (*headers_req->mutable_attributes())[FilterName] = *proto;
-  }
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -315,19 +422,14 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     decoding_state_.setCompleteBodyAvailable(true);
   }
 
+  // Set the request headers on decoding and encoding state in case they are
+  // needed later.
+  decoding_state_.setRequestHeaders(&headers);
+  encoding_state_.setRequestHeaders(&headers);
+
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
-    ProtobufWkt::Struct proto;
-
-    if (config_->expressionManager().hasRequestExpr()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(
-          &config_->expressionManager().localInfo(), decoding_state_.callbacks()->streamInfo(),
-          &headers, nullptr, nullptr);
-      proto = config_->expressionManager().evaluateRequestAttributes(*activation_ptr);
-    }
-
-    status = onHeaders(decoding_state_, headers, end_stream,
-                       config_->expressionManager().hasRequestExpr() ? &proto : nullptr);
+    status = onHeaders(decoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returning {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "decodeHeaders: Skipped header processing");
@@ -590,7 +692,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_LOG(trace, "decodeTrailers");
   const auto status = onTrailers(decoding_state_, trailers);
-  ENVOY_LOG(trace, "encodeTrailers returning {}", static_cast<int>(status));
+  ENVOY_LOG(trace, "decodeTrailers returning {}", static_cast<int>(status));
   return status;
 }
 
@@ -605,17 +707,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
-    ProtobufWkt::Struct proto;
-
-    if (config_->expressionManager().hasResponseExpr()) {
-      auto activation_ptr = Filters::Common::Expr::createActivation(
-          &config_->expressionManager().localInfo(), encoding_state_.callbacks()->streamInfo(),
-          nullptr, &headers, nullptr);
-      proto = config_->expressionManager().evaluateResponseAttributes(*activation_ptr);
-    }
-
-    status = onHeaders(encoding_state_, headers, end_stream,
-                       config_->expressionManager().hasResponseExpr() ? &proto : nullptr);
+    status = onHeaders(encoding_state_, headers, end_stream);
     ENVOY_LOG(trace, "onHeaders returns {}", static_cast<int>(status));
   } else {
     ENVOY_LOG(trace, "encodeHeaders: Skipped header processing");
@@ -650,6 +742,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
                                          bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes, end_stream {}", data.length(), end_stream);
   ProcessingRequest req;
+  addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
@@ -667,6 +760,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
   ProcessingRequest req;
+  addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
@@ -769,6 +863,21 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   }
 
   *req.mutable_metadata_context() = forwarding_metadata;
+}
+
+void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
+  if (!state.sendAttributes(config_->expressionManager())) {
+    return;
+  }
+
+  auto activation_ptr = Filters::Common::Expr::createActivation(
+      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
+      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
+      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
+  auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
+
+  state.setSentAttributes(true);
+  (*req.mutable_attributes())[FilterName] = attributes;
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
@@ -994,11 +1103,12 @@ void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
   encoding_state_.onFinishProcessorCall(call_status);
 }
 
-static const ImmediateMutationChecker& immediateResponseChecker() {
-  CONSTRUCT_ON_FIRST_USE(ImmediateMutationChecker);
-}
-
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
+  if (config_->isUpstream()) {
+    stats_.send_immediate_resp_upstream_ignored_.inc();
+    ENVOY_LOG(debug, "Ignoring send immediate response when ext_proc filter is in upstream");
+    return;
+  }
   auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
   if (!MutationUtils::isValidHttpStatus(status_code)) {
     ENVOY_LOG(debug, "Ignoring attempt to set invalid HTTP status {}", status_code);
@@ -1017,9 +1127,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
                                                          config().mutationChecker(),
                                                          stats_.rejected_header_mutations_);
       } else {
-        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
-                                                         immediateResponseChecker().checker(),
-                                                         stats_.rejected_header_mutations_);
+        mut_status = MutationUtils::applyHeaderMutations(
+            response.headers(), headers, false, config().immediateMutationChecker().checker(),
+            stats_.rejected_header_mutations_);
       }
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
@@ -1033,13 +1143,6 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   const auto details = StringUtil::replaceAllEmptySpace(response.details());
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, details);
-}
-
-static ProcessingMode allDisabledMode() {
-  ProcessingMode pm;
-  pm.set_request_header_mode(ProcessingMode::SKIP);
-  pm.set_response_header_mode(ProcessingMode::SKIP);
-  return pm;
 }
 
 void Filter::mergePerRouteConfig() {
@@ -1087,6 +1190,16 @@ void Filter::mergePerRouteConfig() {
     ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
     grpc_service_ = *merged_config->grpcService();
     config_with_hash_key_.setConfig(*merged_config->grpcService());
+  }
+  if (!merged_config->grpcInitialMetadata().empty()) {
+    ENVOY_LOG(trace, "Overriding grpc initial metadata from per-route configuration");
+    envoy::config::core::v3::GrpcService config = config_with_hash_key_.config();
+    auto ptr = config.mutable_initial_metadata();
+    for (const auto& header : merged_config->grpcInitialMetadata()) {
+      ENVOY_LOG(trace, "Setting grpc initial metadata {} = {}", header.key(), header.value());
+      mergeHeaderValuesField(*ptr, header);
+    }
+    config_with_hash_key_.setConfig(config);
   }
 
   // For metadata namespaces, we only override the existing value if we have a

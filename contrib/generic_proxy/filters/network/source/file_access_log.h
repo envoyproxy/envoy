@@ -20,7 +20,7 @@ public:
                     Formatter::FormatterBasePtr<Context>&& formatter,
                     AccessLog::AccessLogManager& log_manager)
       : filter_(std::move(filter)), formatter_(std::move(formatter)) {
-    log_file_ = log_manager.createAccessLog(access_log_file_info);
+    log_file_ = log_manager.createAccessLog(access_log_file_info).value();
   }
 
   void log(const Context& context, const StreamInfo::StreamInfo& stream_info) override {

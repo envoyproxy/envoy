@@ -12,6 +12,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
@@ -31,11 +32,15 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
-    subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                              lds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }
@@ -76,7 +81,9 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();
       state->set_details(error_message);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
       state->mutable_failed_configuration()->PackFrom(resource.get().resource());
+#endif
       absl::StrAppend(&message, listener.name(), ": ", error_message, "\n");
     };
 

@@ -5,12 +5,14 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/event/libevent.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
@@ -50,6 +52,7 @@ XdsTestServer::XdsTestServer()
   Logger::Context logging_state(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
+  Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
   Config::forceRegisterAdsConfigSubscriptionFactory();
   Config::forceRegisterGrpcConfigSubscriptionFactory();
   Config::forceRegisterDeltaGrpcConfigSubscriptionFactory();
@@ -67,9 +70,9 @@ XdsTestServer::XdsTestServer()
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
   tls_cert->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
-  auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
+                                                                                 factory_context_);
+  auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager_, *stats_store_.rootScope(), std::vector<std::string>{});
   xds_upstream_ = std::make_unique<FakeUpstream>(std::move(context), 0, version_, upstream_config_);
 }

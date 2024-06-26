@@ -39,6 +39,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_object",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
+        "//source/common/crypto:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
@@ -52,6 +53,24 @@ envoy_cc_library(
         "@proxy_wasm_cpp_sdk//:common_lib",
     ],
     alwayslink = 1,
+)
+
+envoy_cc_library(
+    name = "remote_async_datasource_lib",
+    srcs = ["remote_async_datasource.cc"],
+    hdrs = ["remote_async_datasource.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:empty_string",
+        "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_extension(
@@ -90,9 +109,11 @@ envoy_cc_extension(
         "//source/common/http:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
         "//source/extensions/common/wasm/ext:set_envoy_filter_state_cc_proto",
+        "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "//source/extensions/filters/common/expr:context_lib",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",

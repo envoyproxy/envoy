@@ -51,12 +51,12 @@ public:
   }
 
   void setup() {
-    config_ = std::make_unique<ConfigImpl>(createConnPoolSettings());
+    config_ = std::make_shared<ConfigImpl>(createConnPoolSettings());
     finishSetup();
   }
 
-  void setup(std::unique_ptr<Config>&& config) {
-    config_ = std::move(config);
+  void setup(std::shared_ptr<Config> config) {
+    config_ = config;
     finishSetup();
   }
 
@@ -80,7 +80,7 @@ public:
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_, redis_command_stats_, *stats_.rootScope(), false);
+                                 config_, redis_command_stats_, *stats_.rootScope(), false);
     EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -137,7 +137,7 @@ public:
   Common::Redis::DecoderCallbacks* callbacks_{};
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
   Network::ReadFilterSharedPtr upstream_read_filter_;
-  std::unique_ptr<Config> config_;
+  std::shared_ptr<Config> config_;
   ClientPtr client_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   Stats::ScopeSharedPtr stats_scope_;
@@ -200,7 +200,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
   // have to wait for the flush timer to fire.
   InSequence s;
 
-  setup(std::make_unique<ConfigBufferSizeGTSingleRequest>());
+  setup(std::make_shared<ConfigBufferSizeGTSingleRequest>());
 
   // Make the dummy request
   Common::Redis::RespValue request1;
@@ -242,7 +242,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
   // that it is never invoked.
   InSequence s;
 
-  setup(std::make_unique<ConfigBufferSizeGTSingleRequest>());
+  setup(std::make_shared<ConfigBufferSizeGTSingleRequest>());
 
   // Make the dummy request (doesn't fill buffer, starts timer)
   Common::Redis::RespValue request1;
@@ -428,7 +428,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   // Make two GET requests (one success, one failure) and verify command stats are recorded
   InSequence s;
 
-  setup(std::make_unique<ConfigEnableCommandStats>());
+  setup(std::make_shared<ConfigEnableCommandStats>());
 
   client_->initialize(auth_username_, auth_password_);
 
@@ -746,7 +746,7 @@ class ConfigOutlierDisabled : public Config {
 TEST_F(RedisClientImplTest, OutlierDisabled) {
   InSequence s;
 
-  setup(std::make_unique<ConfigOutlierDisabled>());
+  setup(std::make_shared<ConfigOutlierDisabled>());
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -1018,7 +1018,7 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
 TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
   InSequence s;
 
-  setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, false)));
+  setup(std::make_shared<ConfigImpl>(createConnPoolSettings(20, true, false)));
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -1085,7 +1085,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
 TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
   InSequence s;
 
-  setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, false)));
+  setup(std::make_shared<ConfigImpl>(createConnPoolSettings(20, true, false)));
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -1213,7 +1213,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
-  ConfigImpl config(createConnPoolSettings());
+  auto config = std::make_shared<ConfigImpl>(createConnPoolSettings());
   Stats::IsolatedStoreImpl stats_;
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());

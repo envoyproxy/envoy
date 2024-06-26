@@ -5,8 +5,8 @@
 #include "test/extensions/filters/http/ext_proc/unit_test_fuzz/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -20,7 +20,7 @@ namespace UnitTestFuzz {
 class FuzzerMocks {
 public:
   FuzzerMocks()
-      : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")), buffer_("foo") {
+      : addr_(*Network::Address::PipeInstance::create("/test/test.sock")), buffer_("foo") {
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -47,7 +47,7 @@ public:
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
   NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 };
 
 DEFINE_PROTO_FUZZER(
@@ -77,17 +77,12 @@ DEFINE_PROTO_FUZZER(
       input.config();
   ExternalProcessing::FilterConfigSharedPtr config;
 
-  // Create regex engine which is used by regex matcher code.
-  Regex::EnginePtr regex_engine = std::make_shared<Regex::GoogleReEngine>();
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine.get());
-
   try {
     config = std::make_shared<ExternalProcessing::FilterConfig>(
-        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
+        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        mocks.local_info_);
+        mocks.factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;
@@ -100,24 +95,23 @@ DEFINE_PROTO_FUZZER(
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
   EXPECT_CALL(*client, start(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&](ExternalProcessing::ExternalProcessorCallbacks&,
-              const Grpc::GrpcServiceConfigWithHashKey&,
-              const StreamInfo::StreamInfo&) -> ExternalProcessing::ExternalProcessorStreamPtr {
-            auto stream = std::make_unique<MockStream>();
-            EXPECT_CALL(*stream, send(_, _))
-                .WillRepeatedly(
-                    Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&, bool) -> void {
-                      auto response =
-                          std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>(
-                              input.response());
-                      filter->onReceiveMessage(std::move(response));
-                    }));
-            EXPECT_CALL(*stream, streamInfo())
-                .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
-            EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
-            return stream;
-          }));
+      .WillRepeatedly(Invoke([&](ExternalProcessing::ExternalProcessorCallbacks&,
+                                 const Grpc::GrpcServiceConfigWithHashKey&,
+                                 const Envoy::Http::AsyncClient::StreamOptions&)
+                                 -> ExternalProcessing::ExternalProcessorStreamPtr {
+        auto stream = std::make_unique<MockStream>();
+        EXPECT_CALL(*stream, send(_, _))
+            .WillRepeatedly(Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&,
+                                       bool) -> void {
+              auto response = std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>(
+                  input.response());
+              filter->onReceiveMessage(std::move(response));
+            }));
+        EXPECT_CALL(*stream, streamInfo())
+            .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
+        EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
+        return stream;
+      }));
 
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()), input.request());

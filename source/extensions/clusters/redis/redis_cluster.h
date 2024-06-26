@@ -50,7 +50,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -148,6 +148,8 @@ private:
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
               std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
+              std::make_shared<envoy::config::core::v3::Metadata>(
+                  parent.localityLbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
@@ -198,7 +200,8 @@ private:
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks {
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
+        public std::enable_shared_from_this<RedisDiscoverySession> {
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -277,7 +280,7 @@ private:
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Random::RandomGenerator& random_;
-  RedisDiscoverySession redis_discovery_session_;
+  std::shared_ptr<RedisDiscoverySession> redis_discovery_session_;
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;

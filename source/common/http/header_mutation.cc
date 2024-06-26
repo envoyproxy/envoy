@@ -15,8 +15,9 @@ using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 // to reuse the formatter after the router's formatter is completely removed.
 class AppendMutation : public HeaderEvaluator, public Envoy::Router::HeadersToAddEntry {
 public:
-  AppendMutation(const HeaderValueOption& header_value_option)
-      : HeadersToAddEntry(header_value_option), header_name_(header_value_option.header().key()) {}
+  AppendMutation(const HeaderValueOption& header_value_option, absl::Status& creation_status)
+      : HeadersToAddEntry(header_value_option, creation_status),
+        header_name_(header_value_option.header().key()) {}
 
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
                        const StreamInfo::StreamInfo& stream_info) const override {
@@ -66,11 +67,25 @@ private:
 };
 } // namespace
 
-HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations) {
+absl::StatusOr<std::unique_ptr<HeaderMutations>>
+HeaderMutations::create(const ProtoHeaderMutatons& header_mutations) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret =
+      std::unique_ptr<HeaderMutations>(new HeaderMutations(header_mutations, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
+                                 absl::Status& creation_status) {
   for (const auto& mutation : header_mutations) {
     switch (mutation.action_case()) {
     case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kAppend:
-      header_mutations_.emplace_back(std::make_unique<AppendMutation>(mutation.append()));
+      header_mutations_.emplace_back(
+          std::make_unique<AppendMutation>(mutation.append(), creation_status));
+      if (!creation_status.ok()) {
+        return;
+      }
       break;
     case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kRemove:
       header_mutations_.emplace_back(std::make_unique<RemoveMutation>(mutation.remove()));

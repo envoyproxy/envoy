@@ -80,5 +80,12 @@ public:
   MOCK_METHOD(uint32_t, getNumOfSockets, (), (const));
 };
 
+class MockIoUringWorkerFactory : public IoUringWorkerFactory {
+public:
+  MOCK_METHOD(OptRef<IoUringWorker>, getIoUringWorker, ());
+  MOCK_METHOD(void, onWorkerThreadInitialized, ());
+  MOCK_METHOD(bool, currentThreadRegistered, ());
+};
+
 } // namespace Io
 } // namespace Envoy

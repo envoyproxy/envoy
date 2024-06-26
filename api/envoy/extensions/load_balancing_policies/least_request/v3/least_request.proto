@@ -7,6 +7,7 @@ import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -22,10 +23,34 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This configuration allows the built-in LEAST_REQUEST LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message LeastRequest {
+  // Available methods for selecting the host set from which to return the host with the
+  // fewest active requests.
+  enum SelectionMethod {
+    // Return host with fewest requests from a set of ``choice_count`` randomly selected hosts.
+    // Best selection method for most scenarios.
+    N_CHOICES = 0;
+
+    // Return host with fewest requests from all hosts.
+    // Useful in some niche use cases involving low request rates and one of:
+    // (example 1) low request limits on workloads, or (example 2) few hosts.
+    //
+    // Example 1: Consider a workload type that can only accept one connection at a time.
+    // If such workloads are deployed across many hosts, only a small percentage of those
+    // workloads have zero connections at any given time, and the rate of new connections is low,
+    // the ``FULL_SCAN`` method is more likely to select a suitable host than ``N_CHOICES``.
+    //
+    // Example 2: Consider a workload type that is only deployed on 2 hosts. With default settings,
+    // the ``N_CHOICES`` method will return the host with more active requests 25% of the time.
+    // If the request rate is sufficiently low, the behavior of always selecting the host with least
+    // requests as of the last metrics refresh may be preferable.
+    FULL_SCAN = 1;
+  }
+
   // The number of random healthy hosts from which the host with the fewest active requests will
   // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
+  // Only applies to the ``N_CHOICES`` selection method.
   google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32 = {gte: 2}];
 
   // The following formula is used to calculate the dynamic weights when hosts have different load
@@ -61,8 +86,12 @@ message LeastRequest {
   common.v3.LocalityLbConfig locality_lb_config = 4;
 
   // [#not-implemented-hide:]
-  // Configuration for performing full scan on the list of hosts.
-  // If this configuration is set, when selecting the host a full scan on the list hosts will be
-  // used to select the one with least requests instead of using random choices.
-  google.protobuf.BoolValue enable_full_scan = 5;
+  // Unused. Replaced by the `selection_method` enum for better extensibility.
+  google.protobuf.BoolValue enable_full_scan = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Method for selecting the host set from which to return the host with the fewest active requests.
+  //
+  // Defaults to ``N_CHOICES``.
+  SelectionMethod selection_method = 6 [(validate.rules).enum = {defined_only: true}];
 }

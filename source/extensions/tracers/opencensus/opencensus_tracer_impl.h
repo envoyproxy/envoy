@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/api/api.h"
 #include "envoy/config/trace/v3/opencensus.pb.h"
-#include "envoy/local_info/local_info.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/logger.h"
@@ -18,7 +17,7 @@ namespace OpenCensus {
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
 public:
   Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-         const LocalInfo::LocalInfo& localinfo, Api::Api& api);
+         Server::Configuration::CommonFactoryContext& context);
 
   // Tracing::Driver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,

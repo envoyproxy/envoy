@@ -8,6 +8,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -106,22 +107,95 @@ public:
   static absl::optional<std::string> fetchMetadata(Http::RequestMessage& message);
 
   /**
-   * @brief Adds a static cluster towards a credentials provider
+   * @brief Creates the prototype for a static cluster towards a credentials provider
    *        to fetch the credentials using http async client.
    *
-   * @param cm cluster manager
    * @param cluster_name a name for credentials provider cluster
    * @param cluster_type STATIC or STRICT_DNS or LOGICAL_DNS etc
    * @param uri provider's IP (STATIC cluster) or URL (STRICT_DNS). Will use port 80 if the port is
    * not specified in the uri or no matching cluster is found.
-   * @return true if successfully added the cluster or if a cluster with the cluster_name already
-   * exists.
+   * @return the created cluster prototype
    * @return false if failed to add the cluster
    */
-  static bool
-  addInternalClusterStatic(Upstream::ClusterManager& cm, absl::string_view cluster_name,
-                           const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
-                           absl::string_view uri);
+  static envoy::config::cluster::v3::Cluster
+  createInternalClusterStatic(absl::string_view cluster_name,
+                              const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
+                              absl::string_view uri);
+
+  /**
+   * @brief Retrieve an environment variable if set, otherwise return default_value
+   *
+   * @param variable_name Environment variable.
+   * @param default_value Value to be returned if environment variable is not set.
+   * @return The evaluation result.
+   */
+  static std::string getEnvironmentVariableOrDefault(const std::string& variable_name,
+                                                     const std::string& default_value);
+
+  /**
+   * @brief Given a profile name and a file containing profile elements, such as config or
+   * credentials, retrieve all elements in the elements map
+   *
+   * @param profile_file path to the file to search for elements.
+   * @param profile_name the profile section to search.
+   * @param elements a hash map of elements to search for. values will be replaced if found.
+   * @return true if profile file could be read and searched.
+   * @return false if profile file could not be read.
+   */
+  static bool resolveProfileElements(const std::string& profile_file,
+                                     const std::string& profile_name,
+                                     absl::flat_hash_map<std::string, std::string>& elements);
+
+  /**
+   * @brief Return the path of AWS credential file, following environment variable expansions
+   *
+   * @return File path of the AWS credential file.
+   */
+  static std::string getCredentialFilePath();
+
+  /**
+   * @brief Return the path of AWS config file, following environment variable expansions
+   *
+   * @return File path of the AWS config file.
+   */
+  static std::string getConfigFilePath();
+
+  /**
+   * @brief Return the AWS profile string within a config file, following environment variable
+   * expansions
+   *
+   * @return Name of the profile string.
+   */
+  static std::string getConfigProfileName();
+
+  /**
+   * @brief Return the AWS profile string within a credentials file, following environment variable
+   * expansions
+   *
+   * @return Name of the profile string.
+   */
+  static std::string getCredentialProfileName();
+
+  /**
+   * @brief Return a string value from a json object key, or a default it not found. Does not throw
+   * exceptions.
+   *
+   * @return String value or default
+   */
+  static std::string getStringFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                                const std::string& string_value,
+                                                const std::string& string_default);
+
+  /**
+   * @brief Return an integer value from a json object key, or a default it not found. Does not
+   * throw exceptions. Will correctly handle json exponent formatted integers as well as standard
+   * format.
+   *
+   * @return Integer value or default
+   */
+  static int64_t getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
+                                             const std::string& integer_value,
+                                             const int64_t integer_default);
 };
 
 } // namespace Aws

@@ -67,9 +67,9 @@ message DnsCacheConfig {
 
   // The minimum rate that DNS resolution will occur. Per ``dns_refresh_rate``, once a host is
   // resolved, the DNS TTL will be used, with a minimum set by ``dns_min_refresh_rate``.
-  // ``dns_min_refresh_rate`` defaults to 5s and must also be >= 5s.
+  // ``dns_min_refresh_rate`` defaults to 5s and must also be >= 1s.
   google.protobuf.Duration dns_min_refresh_rate = 14
-      [(validate.rules).duration = {gte {seconds: 5}}];
+      [(validate.rules).duration = {gte {seconds: 1}}];
 
   // The TTL for hosts that are unused. Hosts that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.

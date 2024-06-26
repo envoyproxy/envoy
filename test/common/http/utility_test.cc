@@ -420,8 +420,8 @@ TEST(HttpUtility, appendXff) {
 
   {
     TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
-    Network::Address::PipeInstance address("/foo");
-    Utility::appendXff(headers, address);
+    auto address = *Network::Address::PipeInstance::create("/foo");
+    Utility::appendXff(headers, *address);
     EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
   }
 }
@@ -1347,8 +1347,8 @@ num_retries: 10
 
   envoy::config::core::v3::RetryPolicy core_retry_policy2;
   TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
-  EXPECT_THROW_WITH_MESSAGE(Utility::validateCoreRetryPolicy(core_retry_policy2), EnvoyException,
-                            "max_interval must be greater than or equal to the base_interval");
+  EXPECT_EQ(Utility::validateCoreRetryPolicy(core_retry_policy2).message(),
+            "max_interval must be greater than or equal to the base_interval");
 }
 
 // Validates TE header is stripped if it contains an unsupported value
@@ -1975,37 +1975,12 @@ TEST(HeaderIsValidTest, SchemeIsHttp) {
   EXPECT_TRUE(Utility::schemeIsHttp("http"));
   EXPECT_TRUE(Utility::schemeIsHttp("htTp"));
   EXPECT_FALSE(Utility::schemeIsHttp("https"));
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
-  EXPECT_TRUE(Utility::schemeIsHttp("http"));
-  EXPECT_FALSE(Utility::schemeIsHttp("htTp"));
 }
 
 TEST(HeaderIsValidTest, SchemeIsHttps) {
   EXPECT_TRUE(Utility::schemeIsHttps("https"));
   EXPECT_TRUE(Utility::schemeIsHttps("htTps"));
   EXPECT_FALSE(Utility::schemeIsHttps("http"));
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
-  EXPECT_TRUE(Utility::schemeIsHttps("https"));
-  EXPECT_FALSE(Utility::schemeIsHttps("htTps"));
-}
-
-TEST(HeaderIsValidTest, SchemeIsValidLegacy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.handle_uppercase_scheme", "false"}});
-
-  EXPECT_TRUE(Utility::schemeIsValid("http"));
-  EXPECT_TRUE(Utility::schemeIsValid("https"));
-
-  // These were not considered valid previously
-  EXPECT_FALSE(Utility::schemeIsValid("HtTP"));
-  EXPECT_FALSE(Utility::schemeIsValid("HtTPs"));
-
-  EXPECT_FALSE(Utility::schemeIsValid("htt"));
-  EXPECT_FALSE(Utility::schemeIsValid("httpss"));
 }
 
 } // namespace Http

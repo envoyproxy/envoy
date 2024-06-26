@@ -126,11 +126,11 @@ public:
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (io_handle_->isOpen()) {
+    if (io_handle_ && io_handle_->isOpen()) {
       io_handle_->close();
     }
   }
-  bool isOpen() const override { return io_handle_->isOpen(); }
+  bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();

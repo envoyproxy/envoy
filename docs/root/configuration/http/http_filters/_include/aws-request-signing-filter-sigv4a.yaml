@@ -29,6 +29,8 @@ static_resources:
               service_name: vpc-lattice-svcs
               signing_algorithm: AWS_SIGV4A
               region: '*'
+              query_string:
+                expiration_time: 3s
               use_unsigned_payload: true
               match_excluded_headers:
               - prefix: x-envoy

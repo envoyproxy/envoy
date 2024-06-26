@@ -113,6 +113,11 @@ protected:
     uint8_t length_as_bytes_[4];
   };
   uint64_t count_{0};
+  // Default value 0 means there is no limitation on maximum frame length.
+  uint32_t max_frame_length_{0};
+  // When `max_frame_length_` is configured, this flag will be true if frame length is larger than
+  // `max_frame_length_`.
+  bool is_frame_oversized_{false};
 };
 
 class Decoder : public FrameInspector {
@@ -123,8 +128,8 @@ public:
   // error happened, the input buffer remains unchanged.
   // @param input supplies the binary octets wrapped in a GRPC data frame.
   // @param output supplies the buffer to store the decoded data.
-  // @return bool whether the decoding succeeded or not.
-  bool decode(Buffer::Instance& input, std::vector<Frame>& output);
+  // @return absl::status whether the decoding succeeded or not.
+  absl::Status decode(Buffer::Instance& input, std::vector<Frame>& output);
 
   // Determine the length of the current frame being decoded. This is useful when supplying a
   // partial frame to decode() and wanting to know how many more bytes need to be read to complete
@@ -133,6 +138,9 @@ public:
 
   // Indicates whether it has buffered any partial data.
   bool hasBufferedData() const { return state_ != State::FhFlag; }
+
+  // Configures the maximum frame length.
+  void setMaxFrameLength(uint32_t max_frame_length) { max_frame_length_ = max_frame_length; }
 
 protected:
   bool frameStart(uint8_t) override;

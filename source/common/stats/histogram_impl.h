@@ -20,7 +20,8 @@ namespace Stats {
 class HistogramSettingsImpl : public HistogramSettings {
 public:
   HistogramSettingsImpl() = default;
-  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config);
+  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                        Server::Configuration::CommonFactoryContext& context);
 
   // HistogramSettings
   const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;

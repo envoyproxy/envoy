@@ -12,6 +12,11 @@
 
 namespace Envoy {
 namespace AccessLog {
+namespace {
+static constexpr Filesystem::FlagSet default_flags{1 << Filesystem::File::Operation::Write |
+                                                   1 << Filesystem::File::Operation::Create |
+                                                   1 << Filesystem::File::Operation::Append};
+} // namespace
 
 AccessLogManagerImpl::~AccessLogManagerImpl() {
   for (auto& [log_key, log_file_ptr] : access_logs_) {
@@ -27,13 +32,20 @@ void AccessLogManagerImpl::reopen() {
   }
 }
 
-AccessLogFileSharedPtr
+absl::StatusOr<AccessLogFileSharedPtr>
 AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_info) {
   auto file = api_.fileSystem().createFile(file_info);
   std::string file_name = file->path();
   if (access_logs_.count(file_name)) {
     return access_logs_[file_name];
   }
+
+  Api::IoCallBoolResult open_result = file->open(default_flags);
+  if (!open_result.return_value_) {
+    return absl::InvalidArgumentError(fmt::format("unable to open file '{}': {}", file_name,
+                                                  open_result.err_->getErrorDetails()));
+  }
+
   access_logs_[file_name] =
       std::make_shared<AccessLogFileImpl>(std::move(file), dispatcher_, lock_, file_stats_,
                                           file_flush_interval_msec_, api_.threadFactory());
@@ -52,24 +64,6 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
       })),
       thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
   flush_timer_->enableTimer(flush_interval_msec_);
-  auto open_result = open();
-  if (!open_result.return_value_) {
-    throwEnvoyExceptionOrPanic(fmt::format("unable to open file '{}': {}", file_->path(),
-                                           open_result.err_->getErrorDetails()));
-  }
-}
-
-Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
-  static constexpr Filesystem::FlagSet default_flags{1 << Filesystem::File::Operation::Write |
-                                                     1 << Filesystem::File::Operation::Create |
-                                                     1 << Filesystem::File::Operation::Append};
-
-  return default_flags;
-}
-
-Api::IoCallBoolResult AccessLogFileImpl::open() {
-  Api::IoCallBoolResult result = file_->open(defaultFlags());
-  return result;
 }
 
 void AccessLogFileImpl::reopen() {
@@ -173,7 +167,7 @@ void AccessLogFileImpl::flushThreadFunc() {
         ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
                                                  result.err_->getErrorDetails()));
       }
-      const Api::IoCallBoolResult open_result = open();
+      const Api::IoCallBoolResult open_result = file_->open(default_flags);
       if (!open_result.return_value_) {
         stats_.reopen_failed_.inc();
       } else {

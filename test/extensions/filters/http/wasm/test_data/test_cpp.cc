@@ -8,6 +8,7 @@
 #include "proxy_wasm_intrinsics_lite.h"
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
+#include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #include "absl/base/casts.h"
@@ -770,6 +771,111 @@ void TestRootContext::onTick() {
         logWarn("setProperty(string_state) should fail in root context");
       }
     }
+  } else if (test_ == "verify_signature") {
+      std::string function = "verify_signature";
+
+      static const std::string data = "hello";
+      static const std::vector<uint8_t> key = {48, 130, 1, 34, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 1, 5, 0, 3, 130, 1, 15, 0, 48, 130, 1, 10, 2, 130, 1, 1, 0, 167, 71, 18, 102, 208, 29, 22, 3, 8, 215, 52, 9, 192, 111, 46, 141, 53, 197, 49, 196, 88, 211, 228, 128, 233, 243, 25, 24, 71, 208, 98, 236, 92, 207, 247, 188, 81, 233, 73, 213, 242, 195, 84, 12, 24, 154, 78, 202, 30, 134, 51, 166, 44, 242, 208, 146, 49, 1, 194, 126, 56, 1, 62, 113, 222, 154, 233, 26, 112, 72, 73, 191, 247, 251, 226, 206, 91, 244, 189, 102, 111, 217, 115, 17, 2, 165, 49, 147, 254, 90, 154, 90, 80, 100, 79, 248, 177, 24, 63, 168, 151, 100, 101, 152, 202, 173, 34, 163, 127, 149, 68, 81, 8, 54, 55, 43, 68, 197, 140, 152, 88, 111, 183, 20, 70, 41, 205, 140, 148, 121, 89, 45, 153, 109, 50, 255, 109, 57, 92, 11, 132, 66, 236, 90, 161, 239, 128, 81, 82, 158, 160, 227, 117, 136, 60, 239, 199, 44, 4, 227, 96, 180, 239, 143, 87, 96, 101, 5, 137, 202, 129, 73, 24, 246, 120, 238, 227, 155, 136, 77, 90, 248, 19, 106, 150, 48, 166, 204, 12, 222, 21, 125, 200, 224, 15, 57, 84, 6, 40, 213, 243, 53, 178, 195, 108, 84, 199, 200, 188, 55, 56, 166, 178, 26, 207, 248, 21, 64, 90, 250, 40, 229, 24, 63, 85, 13, 172, 25, 171, 207, 17, 69, 167, 249, 206, 217, 135, 219, 104, 14, 74, 34, 156, 172, 117, 222, 227, 71, 236, 158, 188, 225, 252, 61, 187, 187, 2, 3, 1, 0, 1};
+      std::string key_str(key.begin(), key.end());
+      static const std::vector<uint8_t> signature = {52, 90, 195, 161, 103, 85, 143, 79, 56, 122, 129, 194, 214, 66, 52, 217, 1, 167, 206, 170, 84, 77, 183, 121, 210, 247, 151, 176, 234, 78, 248, 81, 183, 64, 144, 90, 99, 226, 244, 213, 175, 66, 206, 224, 147, 162, 156, 113, 85, 219, 154, 99, 211, 212, 131, 224, 239, 148, 143, 90, 197, 28, 228, 225, 10, 58, 102, 6, 253, 147, 239, 104, 238, 71, 179, 12, 55, 73, 17, 3, 3, 148, 89, 18, 47, 120, 225, 199, 234, 113, 161, 165, 234, 36, 187, 101, 25, 188, 160, 44, 140, 153, 21, 254, 139, 226, 73, 39, 201, 24, 18, 161, 61, 183, 45, 188, 181, 0, 16, 58, 121, 232, 246, 127, 248, 203, 158, 42, 99, 25, 116, 224, 102, 138, 179, 151, 123, 245, 112, 169, 27, 103, 209, 182, 188, 213, 220, 232, 64, 85, 242, 20, 39, 214, 79, 66, 86, 160, 66, 171, 29, 200, 233, 37, 213, 58, 118, 159, 102, 129, 168, 115, 245, 133, 150, 147, 167, 114, 143, 203, 233, 91, 234, 206, 21, 99, 181, 255, 188, 215, 201, 59, 137, 138, 235, 163, 20, 33, 218, 251, 250, 222, 234, 80, 34, 156, 73, 253, 108, 68, 84, 73, 49, 68, 96, 243, 209, 145, 80, 189, 41, 169, 19, 51, 190, 172, 237, 85, 126, 214, 41, 82, 52, 247, 193, 79, 164, 99, 3, 183, 233, 119, 210, 200, 155, 168, 163, 154, 70, 163, 95, 51, 235, 7, 163, 50};
+      std::string signature_str(signature.begin(), signature.end());
+      static const std::string hashFunc = "sha256";
+      {
+          envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+
+          args.set_text(data);
+          args.set_public_key(key_str);
+          args.set_signature(signature_str);
+          args.set_hash_function(hashFunc);
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::VerifySignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logInfo("signature is valid");
+              } else {
+                  logError(result.error());
+              }
+          }
+          ::free(out);
+
+      }
+      {
+          envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+
+          args.set_text(data.data());
+          args.set_public_key(key_str.data());
+          args.set_signature(signature_str.data());
+          args.set_hash_function("unknown");
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::VerifySignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logCritical("signature should not be ok");
+              } else {
+                  logError(result.error());
+              }
+          }
+          ::free(out);
+      }
+      {
+          envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+
+          args.set_text(data.data());
+          args.set_public_key(key_str.data());
+          args.set_signature("0000");
+          args.set_hash_function(hashFunc.data());
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::VerifySignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logCritical("signature should not be ok");
+              } else {
+                  logError(result.error());
+              }
+          }
+
+          ::free(out);
+      }
+      {
+          envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+
+          args.set_text("xxxx");
+          args.set_public_key(key_str.data());
+          args.set_signature(signature_str.data());
+          args.set_hash_function(hashFunc.data());
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::VerifySignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logCritical("signature should not be ok");
+              } else {
+                  logError(result.error());
+              }
+          }
+
+          ::free(out);
+      }
   }
 }
 

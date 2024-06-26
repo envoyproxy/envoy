@@ -5,6 +5,7 @@ package envoy.config.core.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/event_service_config.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http.proto";
 import "envoy/type/v3/range.proto";
@@ -62,7 +63,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -95,12 +96,11 @@ message HealthCheck {
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used. The host header can be customized for a specific endpoint by setting the
     // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
-    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    string host = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE}];
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // ``/healthcheck``.
-    string path = 2
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    string path = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -178,6 +178,13 @@ message HealthCheck {
     // payload block must be found, and in the order specified, but not
     // necessarily contiguous.
     repeated Payload receive = 2;
+
+    // When setting this value, it tries to attempt health check request with ProxyProtocol.
+    // When ``send`` is presented, they are sent after preceding ProxyProtocol header.
+    // Only ProxyProtocol header is sent when ``send`` is not presented.
+    // It allows to use both ProxyProtocol V1 and V2. In V1, it presents L3/L4. In V2, it includes
+    // LOCAL command and doesn't include L3/L4.
+    ProxyProtocolConfig proxy_protocol_config = 3;
   }
 
   message RedisHealthCheck {
@@ -391,6 +398,11 @@ message HealthCheck {
   // initial health check failure event will be logged.
   // The default value is false.
   bool always_log_health_check_failures = 19;
+
+  // If set to true, health check success events will always be logged. If set to false, only host addition event will be logged
+  // if it is the first successful health check, or if the healthy threshold is reached.
+  // The default value is false.
+  bool always_log_health_check_success = 26;
 
   // This allows overriding the cluster TLS settings, just for health check connections.
   TlsOptions tls_options = 21;

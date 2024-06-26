@@ -57,7 +57,7 @@ public:
                             Http::Context& http_context, LazyCreateDnsResolver dns_resolver_fn,
                             Ssl::ContextManager& ssl_context_manager,
                             Secret::SecretManager& secret_manager,
-                            Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
+                            Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
@@ -106,7 +106,7 @@ protected:
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
-  const Server::Instance& server_;
+  Server::Instance& server_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -246,17 +246,9 @@ class ClusterManagerImpl : public ClusterManager,
                            public MissingClusterNotifier,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  // Initializes the ClusterManagerImpl instance based on the given Bootstrap config.
-  //
-  // This method *must* be called prior to invoking any other methods on the class and *must* only
-  // be called once. This method should be called immediately after ClusterManagerImpl construction
-  // and from the same thread in which the ClusterManagerImpl was constructed.
-  //
-  // The initialization is separated from the constructor because lots of work, including ADS
-  // initialization, is done in this method. If the contents of this method are invoked during
-  // construction, a derived class cannot override any of the virtual methods and have them invoked
-  // instead, since the base class's methods are used when in a base class constructor.
-  absl::Status init(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+
+  bool initialized() override { return initialized_; }
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -386,14 +378,15 @@ protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                     ClusterManagerFactory& factory, Stats::Store& stats,
+                     ClusterManagerFactory& factory,
+                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, const Server::Instance& server);
+                     Router::Context& router_context, Server::Instance& server);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -601,7 +594,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       absl::optional<bool> weighted_priority_health,
+                       uint64_t seed, absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
@@ -636,9 +629,8 @@ private:
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
       ClusterInfoConstSharedPtr cluster_info_;
-      // LB factory if applicable. Not all load balancer types have a factory. LB types that have
-      // a factory will create a new LB on every membership update. LB types that don't have a
-      // factory will create an LB on construction and use it forever.
+
+      // Factory to create active LB.
       LoadBalancerFactorySharedPtr lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;
@@ -885,7 +877,7 @@ private:
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
-  const Server::Instance& server_;
+  Server::Instance& server_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;

@@ -770,6 +770,59 @@ modify different aspects of the server:
     Text readout stats create a new label value every time the value
     of the text readout stat changes, which could create an unbounded number of time series.
 
+  .. http:get:: /stats?format=prometheus&histogram_buckets=summary
+
+  Optional ``histogram_buckets`` query parameter is used to control how histogram metrics get reported.
+  If unset, histograms get reported as the "histogram" prometheus metric type, but can also be used to
+  emit prometheus "summary" metrics if set to ``summary``. Each emitted summary is over the interval
+  of the last :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`.
+
+  Example histogram output:
+
+  .. code-block:: text
+
+    # TYPE envoy_server_initialization_time_ms histogram
+    envoy_server_initialization_time_ms_bucket{le="0.5"} 0
+    envoy_server_initialization_time_ms_bucket{le="1"} 0
+    envoy_server_initialization_time_ms_bucket{le="5"} 0
+    envoy_server_initialization_time_ms_bucket{le="10"} 0
+    envoy_server_initialization_time_ms_bucket{le="25"} 0
+    envoy_server_initialization_time_ms_bucket{le="50"} 0
+    envoy_server_initialization_time_ms_bucket{le="100"} 0
+    envoy_server_initialization_time_ms_bucket{le="250"} 1
+    envoy_server_initialization_time_ms_bucket{le="500"} 1
+    envoy_server_initialization_time_ms_bucket{le="1000"} 1
+    envoy_server_initialization_time_ms_bucket{le="2500"} 1
+    envoy_server_initialization_time_ms_bucket{le="5000"} 1
+    envoy_server_initialization_time_ms_bucket{le="10000"} 1
+    envoy_server_initialization_time_ms_bucket{le="30000"} 1
+    envoy_server_initialization_time_ms_bucket{le="60000"} 1
+    envoy_server_initialization_time_ms_bucket{le="300000"} 1
+    envoy_server_initialization_time_ms_bucket{le="600000"} 1
+    envoy_server_initialization_time_ms_bucket{le="1800000"} 1
+    envoy_server_initialization_time_ms_bucket{le="3600000"} 1
+    envoy_server_initialization_time_ms_bucket{le="+Inf"} 1
+    envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+    envoy_server_initialization_time_ms_count{} 1
+
+  Example summary output:
+
+  .. code-block:: text
+
+    # TYPE envoy_server_initialization_time_ms summary
+    envoy_server_initialization_time_ms{quantile="0"} 110.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.25"} 112.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.5"} 115.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.75"} 117.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.9"} 119.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.95"} 119.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.99"} 119.90000000000002
+    envoy_server_initialization_time_ms{quantile="0.995"} 119.95000000000002
+    envoy_server_initialization_time_ms{quantile="0.999"} 119.99000000000001
+    envoy_server_initialization_time_ms{quantile="1"} 120.00000000000001
+    envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+    envoy_server_initialization_time_ms_count{} 1
+
 .. http:get:: /stats/recentlookups
 
   This endpoint helps Envoy developers debug potential contention

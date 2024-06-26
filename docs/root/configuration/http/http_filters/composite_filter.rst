@@ -20,6 +20,7 @@ incremented.
 
 This filter adds a map of the delegated filter name (of the action that is matched )and the root config filter name to the filter state with key
 ``envoy.extensions.filters.http.composite.matched_actions``
+This filter state is not emitted when the filter is configured in the upstream filter chain.
 
 Contains a map of pairs `FILTER_CONFIG_NAME:ACTION_NAME`:
 

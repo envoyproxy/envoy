@@ -172,6 +172,12 @@ public:
    * @return bool Whether CORS policies are evaluated when filter is off.
    */
   virtual bool shadowEnabled() const PURE;
+
+  /**
+   * @return bool whether preflight requests with origin not matching
+   * configured allowed origins should be forwarded upstream.
+   */
+  virtual const absl::optional<bool>& forwardNotMatchingPreflights() const PURE;
 };
 
 /**
@@ -528,6 +534,11 @@ public:
    * @return true if the trace span should be sampled.
    */
   virtual bool traceSampled() const PURE;
+
+  /**
+   * @return true if host name should be suffixed with "-shadow".
+   */
+  virtual bool disableShadowHostSuffixAppend() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -1296,7 +1307,7 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
  * Shared part of the route configuration. This class contains interfaces that needn't depend on
  * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
  * entire route config is destroyed, the part of CommonConfig will still live until all
- * virtualhosts are destroyed.
+ * virtual hosts are destroyed.
  */
 class CommonConfig {
 public:
@@ -1423,7 +1434,7 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 
   /**
-   * @return returns if the connection pool was iniitalized successfully.
+   * @return returns if the connection pool was initialized successfully.
    */
   virtual bool valid() const PURE;
 };
@@ -1526,6 +1537,17 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+
+  // TODO(vikaschoudhary16): Remove this api.
+  // This api is only used to enable half-close semantics on the upstream connection.
+  // This ideally should be done via calling connection.enableHalfClose() but since TcpProxy
+  // does not have access to the upstream connection, it is done via this api for now.
+  /**
+   * Enable half-close semantics on the upstream connection. Reading a remote half-close
+   * will not fully close the connection. This is off by default.
+   * @param enabled Whether to set half-close semantics as enabled or disabled.
+   */
+  virtual void enableHalfClose() PURE;
   /**
    * Enable/disable further data from this stream.
    */

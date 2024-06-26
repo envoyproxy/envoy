@@ -10,7 +10,7 @@ namespace Server {
 AdminInstanceTest::AdminInstanceTest()
     : cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
       admin_(cpu_profile_path_, server_, false), request_headers_{{":path", "/"}},
-      admin_filter_(admin_.createRequestFunction()) {
+      admin_filter_(admin_) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(

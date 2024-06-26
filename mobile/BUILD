@@ -157,12 +157,6 @@ xcodeproj(
             ]),
         ),
         xcode_schemes.scheme(
-            name = "Swift C++ Interop Tests",
-            test_action = xcode_schemes.test_action([
-                "//test/swift/cxx:test",
-            ]),
-        ),
-        xcode_schemes.scheme(
             name = "Objective-C Library",
             build_action = xcode_schemes.build_action(["//library/objective-c:envoy_engine_objc_lib"]),
             test_action = xcode_schemes.test_action(["//test/objective-c:envoy_bridge_utility_test"]),

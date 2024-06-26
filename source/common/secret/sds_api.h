@@ -92,7 +92,8 @@ protected:
   Api::Api& api_;
 
 private:
-  absl::Status validateUpdateSize(int num_resources);
+  absl::Status validateUpdateSize(uint32_t added_resources_num,
+                                  uint32_t removed_resources_num) const;
   void initialize();
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
@@ -161,14 +162,14 @@ public:
     return resolved_tls_certificate_secrets_.get();
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>)
-      override {
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>) override {
     return nullptr;
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
+  addUpdateCallback(std::function<absl::Status()> callback) override {
     if (secret()) {
-      callback();
+      THROW_IF_NOT_OK(callback());
     }
     return update_callback_manager_.add(callback);
   }
@@ -249,15 +250,15 @@ public:
     return resolved_certificate_validation_context_secrets_.get();
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
+  addUpdateCallback(std::function<absl::Status()> callback) override {
     if (secret()) {
-      callback();
+      THROW_IF_NOT_OK(callback());
     }
     return update_callback_manager_.add(callback);
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<
-          void(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
           callback) override {
     return validation_callback_manager_.add(callback);
   }
@@ -292,7 +293,7 @@ protected:
 
   void
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    validation_callback_manager_.runCallbacks(secret.validation_context());
+    THROW_IF_NOT_OK(validation_callback_manager_.runCallbacks(secret.validation_context()));
   }
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return watched_directory_.get(); }
@@ -349,16 +350,16 @@ public:
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
+  addUpdateCallback(std::function<absl::Status()> callback) override {
     if (secret()) {
-      callback();
+      THROW_IF_NOT_OK(callback());
     }
     return update_callback_manager_.add(callback);
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<
-          void(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
+          absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
           callback) override {
     return validation_callback_manager_.add(callback);
   }
@@ -373,7 +374,7 @@ protected:
 
   void
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    validation_callback_manager_.runCallbacks(secret.session_ticket_keys());
+    THROW_IF_NOT_OK(validation_callback_manager_.runCallbacks(secret.session_ticket_keys()));
   }
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }
@@ -420,12 +421,13 @@ public:
     return generic_secret_.get();
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
+  addUpdateCallback(std::function<absl::Status()> callback) override {
     return update_callback_manager_.add(callback);
   }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
-          callback) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addValidationCallback(std::function<absl::Status(
+                            const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
+                            callback) override {
     return validation_callback_manager_.add(callback);
   }
   const Init::Target* initTarget() override { return &init_target_; }
@@ -438,7 +440,7 @@ protected:
   }
   void
   validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    validation_callback_manager_.runCallbacks(secret.generic_secret());
+    THROW_IF_NOT_OK(validation_callback_manager_.runCallbacks(secret.generic_secret()));
   }
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }

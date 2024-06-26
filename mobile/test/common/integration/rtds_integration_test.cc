@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
+#include "source/common/router/rds_impl.h"
+
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
@@ -18,6 +20,7 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     XdsIntegrationTest::initialize();
+    Router::forceRegisterRdsFactoryImpl();
 
     default_request_headers_.setScheme("http");
     initializeXdsStream();
@@ -26,7 +29,7 @@ public:
   void createEnvoy() override {
     Platform::XdsBuilder xds_builder(
         /*xds_server_address=*/Network::Test::getLoopbackAddressUrlString(ipVersion()),
-        /*xds_server_port=*/fake_upstreams_[1]->localAddress()->ip()->port());
+        /*xds_server_port=*/fake_upstreams_.back()->localAddress()->ip()->port());
     // Add the layered runtime config, which includes the RTDS layer.
     xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
         .setSslRootCerts(getUpstreamCert());
@@ -37,18 +40,19 @@ public:
   void SetUp() override { initialize(); }
 
   void runReloadTest() {
+    stream_ = createNewStream(createDefaultStreamCallbacks());
     // Send a request on the data plane.
-    stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+    stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                         true);
     terminal_callback_.waitReady();
-
-    EXPECT_EQ(cc_.on_headers_calls, 1);
-    EXPECT_EQ(cc_.status, "200");
-    EXPECT_EQ(cc_.on_data_calls, 2);
-    EXPECT_EQ(cc_.on_complete_calls, 1);
-    EXPECT_EQ(cc_.on_cancel_calls, 0);
-    EXPECT_EQ(cc_.on_error_calls, 0);
-    EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
-    EXPECT_EQ(cc_.on_complete_received_byte_count, 67);
+    EXPECT_EQ(cc_.on_headers_calls_, 1);
+    EXPECT_EQ(cc_.status_, "200");
+    EXPECT_EQ(cc_.on_data_calls_, 2);
+    EXPECT_EQ(cc_.on_complete_calls_, 1);
+    EXPECT_EQ(cc_.on_cancel_calls_, 0);
+    EXPECT_EQ(cc_.on_error_calls_, 0);
+    EXPECT_EQ(cc_.on_header_consumed_bytes_from_response_, 27);
+    EXPECT_EQ(cc_.on_complete_received_byte_count_, 67);
     // Check that the Runtime config is from the static layer.
     EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 

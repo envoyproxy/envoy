@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,12 +35,8 @@ class JvmBridgeUtility {
     String headerKey;
     String headerValue;
 
-    try {
-      headerKey = new String(key, "UTF-8");
-      headerValue = new String(value, "UTF-8");
-    } catch (java.io.UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    headerKey = new String(key, StandardCharsets.UTF_8);
+    headerValue = new String(value, StandardCharsets.UTF_8);
 
     // Ensure list is present in dictionary value
     List<String> values = headerAccumulator.get(headerKey);

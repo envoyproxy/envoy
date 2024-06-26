@@ -78,12 +78,12 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInRequest) {
 TEST_F(Http1HeaderValidatorTest, ValidateTransferEncodingInResponse) {
   auto uhv = createH1(empty_config);
 
-  TestResponseHeaderMapImpl request_headers = makeGoodResponseHeaders();
-  request_headers.setCopy(LowerCaseString("transfer-encoding"), "ChuNKeD");
-  EXPECT_ACCEPT(uhv->validateResponseHeaders(request_headers));
+  TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
+  response_headers.setCopy(LowerCaseString("transfer-encoding"), "ChuNKeD");
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
 
-  request_headers.setCopy(LowerCaseString("transfer-encoding"), "gzip");
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(request_headers),
+  response_headers.setCopy(LowerCaseString("transfer-encoding"), "gzip");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
                              "http1.invalid_transfer_encoding");
 }
 

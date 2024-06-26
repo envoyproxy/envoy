@@ -28,6 +28,16 @@ public:
     ASSERT(inner_metadata_ != nullptr);
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasRequest());
+
+    uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
+    if (!inner_metadata_->context().isTwoWay()) {
+      frame_flags |= FrameFlags::FLAG_ONE_WAY;
+    }
+    if (inner_metadata_->context().heartbeat()) {
+      frame_flags |= FrameFlags::FLAG_HEARTBEAT;
+    }
+
+    stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId()), frame_flags};
   }
 
   // Request
@@ -35,17 +45,18 @@ public:
   void forEach(IterateCallback callback) const override;
   absl::optional<absl::string_view> get(absl::string_view key) const override;
   void set(absl::string_view key, absl::string_view val) override;
-  absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
-  absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
-  absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+  absl::string_view host() const override { return inner_metadata_->request().service(); }
+  absl::string_view path() const override { return inner_metadata_->request().service(); }
+  absl::string_view method() const override { return inner_metadata_->request().method(); }
   void erase(absl::string_view key) override;
 
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
 
-  FrameFlags stream_frame_flags_;
-
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
+
+private:
+  FrameFlags stream_frame_flags_;
 };
 
 class DubboResponse : public Response {
@@ -56,6 +67,16 @@ public:
     ASSERT(inner_metadata_->hasContext());
     ASSERT(inner_metadata_->hasResponse());
     refreshStatus();
+
+    uint32_t frame_flags = FrameFlags::FLAG_END_STREAM; // Dubbo message only has one frame.
+    if (!inner_metadata_->context().isTwoWay()) {
+      frame_flags |= FrameFlags::FLAG_ONE_WAY;
+    }
+    if (inner_metadata_->context().heartbeat()) {
+      frame_flags |= FrameFlags::FLAG_HEARTBEAT;
+    }
+
+    stream_frame_flags_ = {static_cast<uint64_t>(inner_metadata_->requestId()), frame_flags};
   }
 
   void refreshStatus();
@@ -67,10 +88,11 @@ public:
   // StreamFrame
   FrameFlags frameFlags() const override { return stream_frame_flags_; }
 
-  FrameFlags stream_frame_flags_;
-
   StreamStatus status_;
   Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
+
+private:
+  FrameFlags stream_frame_flags_;
 };
 
 class DubboCodecBase : public Logger::Loggable<Logger::Id::connection> {
@@ -87,7 +109,7 @@ public:
 
   void setCodecCallbacks(CallBackType& callback) override { callback_ = &callback; }
 
-  void decode(Buffer::Instance& buffer, bool) override {
+  Common::Dubbo::DecodeStatus decodeOne(Buffer::Instance& buffer) {
     if (metadata_ == nullptr) {
       metadata_ = std::make_shared<Common::Dubbo::MessageMetadata>();
     }
@@ -109,41 +131,78 @@ public:
         ENVOY_LOG(warn, "Dubbo codec: unexpected decoding error");
         metadata_.reset();
         callback_->onDecodingFailure();
-        return;
+        return Common::Dubbo::DecodeStatus::Failure;
       }
 
       if (decode_status == Common::Dubbo::DecodeStatus::Waiting) {
         ENVOY_LOG(debug, "Dubbo codec: waiting for more input data");
-        return;
+        return Common::Dubbo::DecodeStatus::Waiting;
       }
 
       ASSERT(decode_status == Common::Dubbo::DecodeStatus::Success);
 
-      auto message = std::make_unique<DecoderMessageType>(metadata_);
-      message->stream_frame_flags_ = {{static_cast<uint64_t>(metadata_->requestId()),
-                                       !metadata_->context().isTwoWay(), false,
-                                       metadata_->context().heartbeat()},
-                                      true};
-      callback_->onDecodingSuccess(std::move(message));
+      if (metadata_->context().heartbeat()) {
+        Buffer::OwnedImpl heartbeat_response;
+
+        ENVOY_LOG(debug, "Dubbo codec: heartbeat from downstream/upstream");
+        constexpr char first_four_bytes[] = {'\xda', '\xbb', '\x22', 20};
+        heartbeat_response.add(first_four_bytes, 4);
+
+        heartbeat_response.writeBEInt<int64_t>(metadata_->requestId());
+        heartbeat_response.writeBEInt<int32_t>(1);
+        heartbeat_response.writeByte('N');
+
+        metadata_.reset();
+        callback_->writeToConnection(heartbeat_response);
+
+        return Common::Dubbo::DecodeStatus::Success;
+      }
+
+      auto message = std::make_unique<DecoderMessageType>(std::move(metadata_));
       metadata_.reset();
+
+      callback_->onDecodingSuccess(std::move(message));
+
+      return Common::Dubbo::DecodeStatus::Success;
     } catch (const EnvoyException& error) {
       ENVOY_LOG(warn, "Dubbo codec: decoding error: {}", error.what());
+
       metadata_.reset();
       callback_->onDecodingFailure();
+
+      return Common::Dubbo::DecodeStatus::Failure;
     }
   }
 
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override {
+  void decode(Buffer::Instance& buffer, bool) override {
+    while (buffer.length() > 0) {
+      // Continue decoding if the buffer has more data and the previous decoding is
+      // successful.
+      if (decodeOne(buffer) != Common::Dubbo::DecodeStatus::Success) {
+        break;
+      }
+    }
+  }
+
+  EncodingResult encode(const StreamFrame& frame, EncodingContext&) override {
     ASSERT(dynamic_cast<const EncoderMessageType*>(&frame) != nullptr);
     const auto* typed_message = static_cast<const EncoderMessageType*>(&frame);
 
-    Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *typed_message->inner_metadata_);
-    callbacks.onEncodingSuccess(buffer, true);
+    codec_->encode(encoding_buffer_, *typed_message->inner_metadata_);
+    const uint64_t encoded_size = encoding_buffer_.length();
+
+    // Write the encoded data to the connection and clean the buffer for the next encoding.
+    callback_->writeToConnection(encoding_buffer_);
+    encoding_buffer_.drain(encoding_buffer_.length());
+
+    return encoded_size;
   }
 
   Common::Dubbo::MessageMetadataSharedPtr metadata_;
   CallBackType* callback_{};
+
+private:
+  Buffer::OwnedImpl encoding_buffer_;
 };
 
 class DubboServerCodec
@@ -151,8 +210,7 @@ class DubboServerCodec
 public:
   using DubboDecoderBase::DubboDecoderBase;
 
-  ResponsePtr respond(absl::Status status, absl::string_view short_response_flags,
-                      const Request& request) override;
+  ResponsePtr respond(absl::Status status, absl::string_view data, const Request& request) override;
 };
 
 class DubboClientCodec
@@ -178,7 +236,7 @@ public:
   // CodecFactoryConfig
   CodecFactoryPtr
   createCodecFactory(const Protobuf::Message& config,
-                     Envoy::Server::Configuration::FactoryContext& context) override;
+                     Envoy::Server::Configuration::ServerFactoryContext& context) override;
   std::string name() const override { return "envoy.generic_proxy.codecs.dubbo"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoConfig>();

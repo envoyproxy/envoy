@@ -56,8 +56,8 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&
         primary_and_replicas->push_back(replica_host->second);
       }
 
-      shard_vector->emplace_back(
-          std::make_shared<RedisShard>(primary_host->second, replicas, primary_and_replicas));
+      shard_vector->emplace_back(std::make_shared<RedisShard>(primary_host->second, replicas,
+                                                              primary_and_replicas, random_));
     }
 
     for (auto i = slot.start(); i <= slot.end(); ++i) {
@@ -90,7 +90,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
 
   for (auto const& shard : *current_shard_vector) {
     shard_vector->emplace_back(std::make_shared<RedisShard>(
-        shard->primary(), shard->replicas().hostsPtr(), shard->allHosts().hostsPtr()));
+        shard->primary(), shard->replicas().hostsPtr(), shard->allHosts().hostsPtr(), random_));
   }
 
   {

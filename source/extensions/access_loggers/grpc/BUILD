@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/access_loggers/common:grpc_access_logger",
+        "//source/extensions/access_loggers/common:grpc_access_logger_clients_lib",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v3:pkg_cc_proto",

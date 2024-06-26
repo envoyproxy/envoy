@@ -28,14 +28,18 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/http:message_interface",
         "//envoy/router:context_interface",
+        "//envoy/router:router_interface",
         "//envoy/router:router_ratelimit_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/router:config_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:retry_factory_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -304,6 +308,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "rds_lib",
+    srcs = [
+        "route_config_update_requster.cc",
+    ],
+    hdrs = [
+        "route_config_update_requster.h",
+    ],
+    deps = [
+        "//envoy/router:rds_interface",
+        "//source/common/router:scoped_rds_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "conn_manager_impl.cc",
@@ -342,7 +360,6 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
-        "//envoy/router:rds_interface",
         "//envoy/router:scopes_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server/overload:overload_manager_interface",
@@ -364,13 +381,11 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/match_delegate:config",
         "//source/common/network:common_connection_filter_states_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_server_factory_stub_lib",
         "//source/common/router:config_lib",
-        "//source/common/router:scoped_rds_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -434,12 +449,14 @@ envoy_cc_library(
         ":headers_lib",
         "//envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:compiled_string_map_lib",
         "//source/common/common:dump_state_utils",
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -482,6 +499,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "http_option_limits_lib",
+    srcs = ["http_option_limits.cc"],
+    hdrs = ["http_option_limits.h"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -496,6 +519,7 @@ envoy_cc_library(
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
+        ":http_option_limits_lib",
         ":message_lib",
         "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",

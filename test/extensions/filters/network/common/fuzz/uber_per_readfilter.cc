@@ -103,8 +103,8 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
   // HttpConnectionManager} on which we have constraints.
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
-        dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
-            *config_message);
+        *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::direct_response::v3::Config>(config_message);
     if (config.response().specifier_case() ==
         envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
       throw EnvoyException(
@@ -112,8 +112,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
-        dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
-            *config_message);
+        *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit>(
+            config_message);
     if (config.token_bucket().fill_interval().seconds() > SecondsPerDay) {
       // Too large fill_interval may cause "c++/v1/chrono" overflow when simulated_time_system_ is
       // converting it to a smaller unit. Constraining fill_interval to no greater than one day is
@@ -124,8 +125,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        config = dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
-                                  HttpConnectionManager&>(*config_message);
+        config = *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager>(config_message);
     if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
                                    HttpConnectionManager::HTTP3) {
       // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
@@ -156,9 +158,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::
-        EnvoyMobileHttpConnectionManager& config =
-            dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
-                             EnvoyMobileHttpConnectionManager&>(*config_message);
+        EnvoyMobileHttpConnectionManager& config = *Envoy::Protobuf::DynamicCastToGenerated<
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                EnvoyMobileHttpConnectionManager>(config_message);
     if (config.config().codec_type() ==
         envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
             HTTP3) {

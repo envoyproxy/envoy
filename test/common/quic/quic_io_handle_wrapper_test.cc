@@ -189,6 +189,9 @@ TEST(QuicIoHandleWrapper, DelegateWithMocks) {
 
     EXPECT_CALL(mock_io, lastRoundTripTime()).Times(0);
     wrapper.lastRoundTripTime();
+
+    EXPECT_CALL(mock_io, interfaceName());
+    wrapper.interfaceName();
   }
 
   wrapper.close();

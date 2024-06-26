@@ -16,11 +16,11 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/matchers.h"
-#include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"
@@ -45,37 +45,17 @@ public:
 
 class SDSSecretReader : public SecretReader {
 public:
-  SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
-                  Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : update_callback_client_(readAndWatchSecret(client_secret_, client_secret_provider, api)),
-        update_callback_token_(readAndWatchSecret(token_secret_, token_secret_provider, api)) {}
-
-  const std::string& clientSecret() const override { return client_secret_; }
-
-  const std::string& tokenSecret() const override { return token_secret_; }
+  SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
+                  Secret::GenericSecretConfigProviderSharedPtr&& token_secret_provider,
+                  ThreadLocal::SlotAllocator& tls, Api::Api& api)
+      : client_secret_(std::move(client_secret_provider), tls, api),
+        token_secret_(std::move(token_secret_provider), tls, api) {}
+  const std::string& clientSecret() const override { return client_secret_.secret(); }
+  const std::string& tokenSecret() const override { return token_secret_.secret(); }
 
 private:
-  Envoy::Common::CallbackHandlePtr
-  readAndWatchSecret(std::string& value,
-                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
-    const auto* secret = secret_provider->secret();
-    if (secret != nullptr) {
-      value = Config::DataSource::read(secret->secret(), true, api);
-    }
-
-    return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
-      const auto* secret = secret_provider->secret();
-      if (secret != nullptr) {
-        value = Config::DataSource::read(secret->secret(), true, api);
-      }
-    });
-  }
-
-  std::string client_secret_;
-  std::string token_secret_;
-
-  Envoy::Common::CallbackHandlePtr update_callback_client_;
-  Envoy::Common::CallbackHandlePtr update_callback_token_;
+  Secret::ThreadLocalGenericSecretProvider client_secret_;
+  Secret::ThreadLocalGenericSecretProvider token_secret_;
 };
 
 /**
@@ -133,14 +113,18 @@ struct CookieNames {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
-               Upstream::ClusterManager& cluster_manager,
+               Server::Configuration::CommonFactoryContext& context,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
+  bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
+  }
+  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+    return deny_redirect_header_matchers_;
   }
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
@@ -160,6 +144,9 @@ public:
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
+  std::chrono::seconds defaultRefreshTokenExpiresIn() const {
+    return default_refresh_token_expires_in_;
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -178,11 +165,14 @@ private:
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
+  const bool preserve_authorization_header_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
   const bool use_refresh_token_{};
   const std::chrono::seconds default_expires_in_;
+  const std::chrono::seconds default_refresh_token_expires_in_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -281,11 +271,13 @@ private:
   std::string id_token_;
   std::string refresh_token_;
   std::string expires_in_;
+  std::string expires_refresh_token_in_;
+  std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};
-  bool was_refresh_token_flow_;
+  bool was_refresh_token_flow_{false};
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
@@ -294,11 +286,16 @@ private:
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
+  bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
+  std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
+                                            const std::chrono::seconds& expires_in) const;
+  std::string getExpiresTimeForIdToken(const std::string& id_token,
+                                       const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

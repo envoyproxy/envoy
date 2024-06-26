@@ -9,8 +9,7 @@ package io.envoyproxy.envoymobile
  *   error.
  * @param cause an optional cause for the exception.
  */
-class EnvoyError
-constructor(
+class EnvoyError(
   val errorCode: Int,
   val message: String,
   val attemptCount: Int? = null,

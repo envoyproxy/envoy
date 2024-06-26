@@ -429,7 +429,7 @@ typed_config:
     HttpIntegrationTest::initialize();
 
     const uint32_t port = lookupPort("udp_proxy");
-    listener_address_ = Network::Utility::resolveUrl(
+    listener_address_ = *Network::Utility::resolveUrl(
         fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
     client_ = std::make_unique<Network::Test::UdpSyncPeer>(version_);
@@ -443,7 +443,7 @@ typed_config:
 
   const std::string expectedCapsules(std::vector<std::string> raw_datagrams) {
     std::string expected_capsules = "";
-    for (std::string datagram : raw_datagrams) {
+    for (std::string& datagram : raw_datagrams) {
       expected_capsules += encapsulate(datagram);
     }
 

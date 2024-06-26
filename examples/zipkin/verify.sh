@@ -19,5 +19,5 @@ responds_with \
 
 run_log "View the traces in Zipkin UI"
 responds_with \
-    "<!doctype html>" \
+    "<!DOCTYPE html>" \
     "http://localhost:${PORT_UI}/zipkin/"

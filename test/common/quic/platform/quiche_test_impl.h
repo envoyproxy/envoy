@@ -15,6 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_flags.h"
+#include "quiche/common/platform/api/quiche_logging.h"
 
 using QuicheFlagSaverImpl = absl::FlagSaver;
 
@@ -42,14 +43,20 @@ inline std::string QuicheGetCommonSourcePathImpl() {
 
 class QuicheScopedDisableExitOnDFatalImpl {
 public:
-  explicit QuicheScopedDisableExitOnDFatalImpl() {}
+  explicit QuicheScopedDisableExitOnDFatalImpl() {
+    original_value_ = isDFatalExitDisabled();
+    setDFatalExitDisabled(true);
+  }
 
   // This type is neither copyable nor movable.
   QuicheScopedDisableExitOnDFatalImpl(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
   QuicheScopedDisableExitOnDFatalImpl&
   operator=(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
 
-  ~QuicheScopedDisableExitOnDFatalImpl() {}
+  ~QuicheScopedDisableExitOnDFatalImpl() { setDFatalExitDisabled(original_value_); }
+
+private:
+  bool original_value_;
 };
 
 } // namespace test

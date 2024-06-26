@@ -178,9 +178,10 @@ public:
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
    * @param seed seeds pseudo-random number generator (default = 0).
+   * @param n_slice number of slices (default = 1).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
-                                             uint64_t seed = 0);
+                                             uint64_t seed = 0, uint64_t n_slice = 1);
 
   /**
    * Finds a stat in a vector with the given name.

@@ -27,6 +27,7 @@ class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   void initialize() {
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(45));
     EXPECT_CALL(*cluster_, connectTimeout).WillOnce(Return(std::chrono::seconds(10)));
     auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
@@ -59,11 +60,11 @@ protected:
     }
     EXPECT_EQ(quic_ccopts, "6RTOAKD4");
 
-    test_address_ = Network::Utility::resolveUrl(
+    test_address_ = *Network::Utility::resolveUrl(
         absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(context));
-    factory_ = std::make_unique<Quic::QuicClientTransportSocketFactory>(
+    factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
@@ -88,6 +89,7 @@ protected:
   QuicStatNames quic_stat_names_{store_.symbolTable()};
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {

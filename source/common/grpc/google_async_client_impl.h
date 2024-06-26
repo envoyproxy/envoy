@@ -175,7 +175,8 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::config::core::v3::GrpcService& config, Api::Api& api,
+                        const envoy::config::core::v3::GrpcService& config,
+                        Server::Configuration::CommonFactoryContext& context,
                         const StatNames& stat_names);
   ~GoogleAsyncClientImpl() override;
 
@@ -313,6 +314,7 @@ private:
   // freed.
   uint32_t inflight_tags_{};
 
+  Tracing::SpanPtr current_span_;
   // This is unused.
   StreamInfo::StreamInfoImpl unused_stream_info_;
 

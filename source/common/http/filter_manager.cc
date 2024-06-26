@@ -442,9 +442,7 @@ void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
 }
 
 void ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
-  if (parent_.state_.decoder_filter_chain_aborted_ &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.stop_decode_metadata_on_local_reply")) {
+  if (parent_.state_.decoder_filter_chain_aborted_) {
     // The decoder filter chain has been aborted, possibly due to a local reply. In this case,
     // there's no reason to decode saved metadata.
     getSavedRequestMetadata()->clear();
@@ -488,6 +486,8 @@ void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() {
   return parent_.buffered_request_data_.get();
 }
+
+bool ActiveStreamDecoderFilter::shouldLoadShed() const { return parent_.shouldLoadShed(); }
 
 void ActiveStreamDecoderFilter::modifyDecodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
@@ -604,7 +604,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     ENVOY_BUG(!continue_iteration || !state_.local_complete_,
-              "Filter did not return StopAll or StopIteration after sending a local reply.");
+              fmt::format(
+                  "filter={} did not return StopAll or StopIteration after sending a local reply.",
+                  (*entry)->filter_context_.config_name));
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
@@ -899,9 +901,17 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
                                   FilterIterationStartState filter_iteration_start_state) {
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
+  ENVOY_STREAM_LOG(trace, "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}", *this,
+                   end_stream, filter_manager_callbacks_.isHalfCloseEnabled());
   if (filter == nullptr) {
-    ASSERT(!state_.local_complete_);
-    state_.local_complete_ = end_stream;
+    // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
+    // should not set the local_complete_ flag to true when end_stream is true.
+    // setting local_complete_ to true will cause any data sent in the upstream direction to be
+    // dropped.
+    if (end_stream && !filter_manager_callbacks_.isHalfCloseEnabled()) {
+      ASSERT(!state_.local_complete_);
+      state_.local_complete_ = true;
+    }
     return encoder_filters_.begin();
   }
 

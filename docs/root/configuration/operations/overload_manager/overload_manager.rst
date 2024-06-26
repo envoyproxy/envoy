@@ -165,6 +165,16 @@ The following core load shed points are supported:
     - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
       level which will eventually drain the HTTP/2 connection.
 
+  * - envoy.load_shed_points.hcm_ondata_creating_codec
+    - Envoy will close the connections before creating codec if Envoy is under
+      pressure, typically memory. This happens once geting data from the
+      connection.
+
+  * - envoy.load_shed_points.http_downstream_filter_check
+    - Envoy will send local reply directly before creating an upstream request in
+      the router if Envoy is under resource pressure, typically memory. This change
+      makes load shed check availabe in HTTP decoder filters.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
@@ -377,4 +387,5 @@ with the following statistics:
   :widths: 1, 1, 2
 
   scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+  shed_load_count, Counter, "Total count the load is sheded"
 

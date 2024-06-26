@@ -145,6 +145,11 @@ public:
   virtual OverloadManager& overloadManager() PURE;
 
   /**
+   * @return the server's null overload manager in case we want to skip overloading the server.
+   */
+  virtual OverloadManager& nullOverloadManager() PURE;
+
+  /**
    * @return the server's secret manager
    */
   virtual Secret::SecretManager& secretManager() PURE;
@@ -252,6 +257,11 @@ public:
    * @return const StatsConfig& the configuration of server stats.
    */
   virtual Configuration::StatsConfig& statsConfig() PURE;
+
+  /**
+   * @return the server regex engine.
+   */
+  virtual Regex::Engine& regexEngine() PURE;
 
   /**
    * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.

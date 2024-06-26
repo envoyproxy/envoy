@@ -25,7 +25,7 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
 
   ssl_async_event_ = dispatcher_.createFileEvent(
       fd,
-      [this, ctx, fd](uint32_t) -> void {
+      [this, ctx, fd](uint32_t) {
         CpaStatus status = CPA_STATUS_FAIL;
         {
           Thread::LockGuard data_lock(ctx->data_lock_);
@@ -41,6 +41,7 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
           ctx->setOpStatus(status);
         }
         this->cb_.onPrivateKeyMethodComplete();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
@@ -363,7 +364,8 @@ QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
   std::chrono::milliseconds poll_delay =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 5));
 
-  std::string private_key = Config::DataSource::read(conf.private_key(), false, api_);
+  std::string private_key =
+      THROW_OR_RETURN_VALUE(Config::DataSource::read(conf.private_key(), false, api_), std::string);
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));

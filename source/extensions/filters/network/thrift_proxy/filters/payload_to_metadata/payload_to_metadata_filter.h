@@ -32,7 +32,7 @@ using TrieSharedPtr = std::shared_ptr<Trie>;
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root);
+  Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
@@ -66,9 +66,12 @@ struct Trie {
 class Config {
 public:
   Config(const envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
-             PayloadToMetadata& config);
+             PayloadToMetadata& config,
+         Regex::Engine& regex_engine);
   const PayloadToMetadataRules& requestRules() const { return request_rules_; }
   TrieSharedPtr trieRoot() const { return trie_root_; };
+
+  friend class PayloadToMetadataTest;
 
 private:
   PayloadToMetadataRules request_rules_;
@@ -124,6 +127,8 @@ public:
 private:
   template <typename NumberType> FilterStatus numberValue(NumberType value);
   FilterStatus handleString(std::string value);
+  void assertNode();
+  void assertLastFieldId();
 
   FilterStatus handleContainerBegin() {
     steps_++;
@@ -131,6 +136,7 @@ private:
   }
 
   FilterStatus handleContainerEnd() {
+    ASSERT(steps_ > 0, "unmatched container end");
     steps_--;
     return FilterStatus::Continue;
   }
@@ -138,8 +144,8 @@ private:
   MetadataHandler& parent_;
   TrieSharedPtr node_;
   bool complete_{false};
-  absl::optional<int16_t> last_field_id_;
-  uint16_t steps_{0};
+  std::vector<int16_t> field_ids_;
+  int16_t steps_{0};
 };
 
 const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;

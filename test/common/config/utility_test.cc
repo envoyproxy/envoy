@@ -30,6 +30,7 @@
 
 using testing::ContainsRegex;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Optional;
 using testing::Ref;
 using testing::Return;
@@ -55,26 +56,6 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
-TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = Utility::createTagProducer(bootstrap, {});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  ASSERT_EQ(extracted_name, "http.rq_total");
-  ASSERT_EQ(tags.size(), 1);
-}
-
-TEST(UtilityTest, createTagProducerWithDefaultTgs) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = Utility::createTagProducer(bootstrap, {{"foo", "bar"}});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  EXPECT_EQ(extracted_name, "http.rq_total");
-  EXPECT_EQ(tags.size(), 2);
-}
-
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   Api::ApiPtr api = Api::createApiForTest();
 
@@ -86,19 +67,23 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(false, rate_limit_settings.enabled_);
-  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(false, rate_limit_settings->enabled_);
+  EXPECT_EQ(100, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings->fill_rate_);
 }
 
 TEST(UtilityTest, ParseEmptyRateLimitSettings) {
   envoy::config::core::v3::ApiConfigSource api_config_source;
   api_config_source.mutable_rate_limit_settings();
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(true, rate_limit_settings.enabled_);
-  EXPECT_EQ(100, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(10, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(true, rate_limit_settings->enabled_);
+  EXPECT_EQ(100, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(10, rate_limit_settings->fill_rate_);
 }
 
 TEST(UtilityTest, ParseRateLimitSettings) {
@@ -107,10 +92,38 @@ TEST(UtilityTest, ParseRateLimitSettings) {
       api_config_source.mutable_rate_limit_settings();
   rate_limits->mutable_max_tokens()->set_value(500);
   rate_limits->mutable_fill_rate()->set_value(4);
-  const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
-  EXPECT_EQ(true, rate_limit_settings.enabled_);
-  EXPECT_EQ(500, rate_limit_settings.max_tokens_);
-  EXPECT_EQ(4, rate_limit_settings.fill_rate_);
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_TRUE(rate_limit_settings.ok());
+  EXPECT_EQ(true, rate_limit_settings->enabled_);
+  EXPECT_EQ(500, rate_limit_settings->max_tokens_);
+  EXPECT_EQ(4, rate_limit_settings->fill_rate_);
+}
+
+TEST(UtilityTest, ParseNanFillRateLimitSettings) {
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_FALSE(rate_limit_settings.ok());
+  EXPECT_EQ(rate_limit_settings.status().message(),
+            "The value of fill_rate in RateLimitSettings (nan) must not be NaN nor Inf");
+}
+
+TEST(UtilityTest, ParseInfiniteFillRateLimitSettings) {
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      api_config_source.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::infinity());
+  const absl::StatusOr<RateLimitSettings> rate_limit_settings =
+      Utility::parseRateLimitSettings(api_config_source);
+  EXPECT_FALSE(rate_limit_settings.ok());
+  EXPECT_EQ(rate_limit_settings.status().message(),
+            "The value of fill_rate in RateLimitSettings (inf) must not be NaN nor Inf");
 }
 
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
@@ -123,12 +136,11 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    EXPECT_EQ(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false)
-            .status()
-            .message(),
-        "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false)
+                    .status()
+                    .message(),
+                HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
   }
 
   {
@@ -512,7 +524,7 @@ TEST(UtilityTest, AnyWrongType) {
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
                                      out),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
@@ -530,7 +542,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
       Utility::translateAnyToFactoryConfig(typed_config,
                                            ProtobufMessage::getStrictValidationVisitor(), factory),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyToFactoryConfig) {
@@ -702,10 +714,10 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_EQ(
+  EXPECT_THAT(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
           .message(),
-      "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+      HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");

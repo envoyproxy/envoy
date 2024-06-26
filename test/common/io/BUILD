@@ -19,7 +19,6 @@ envoy_cc_test(
         "//source/common/io:io_uring_impl_lib",
         "//source/common/network:address_lib",
         "//test/mocks/io:io_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
@@ -56,6 +55,25 @@ envoy_cc_test(
     ] + select({
         "//bazel:linux": [
             "//source/common/io:io_uring_worker_lib",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+envoy_cc_test(
+    name = "io_uring_worker_factory_impl_test",
+    srcs = select({
+        "//bazel:linux": ["io_uring_worker_factory_impl_test.cc"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ] + select({
+        "//bazel:linux": [
+            "//source/common/io:io_uring_impl_lib",
+            "//source/common/io:io_uring_worker_factory_impl_lib",
         ],
         "//conditions:default": [],
     }),
