@@ -352,6 +352,9 @@ public:
           envoy_grpc_max_recv_msg_length);
     }
 
+    config.mutable_envoy_grpc()->mutable_send_internal_header()->set_value(send_internal_header_);
+    config.mutable_envoy_grpc()->mutable_send_xff_header()->set_value(send_xff_header_);
+
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
@@ -389,6 +392,33 @@ public:
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
+
+    if (clientType() == ClientType::EnvoyGrpc) {
+      if (!send_internal_header_stream_option_ || !send_internal_header_) {
+        EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+      } else {
+        EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
+      }
+
+      if (!send_xff_header_ || !send_xff_header_stream_option_) {
+        EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
+      } else {
+        EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
+      }
+
+      // if (send_internal_header_ || send_internal_header_stream_option_) {
+      //   EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
+      // } else {
+      //   EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+      // }
+
+      // if (send_xff_header_ || send_xff_header_stream_option_) {
+      //   EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
+      // } else {
+      //   EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
+      // }
+    }
+
     for (const auto& value : initial_metadata) {
       EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
@@ -466,6 +496,8 @@ public:
     envoy::config::core::v3::Metadata m;
     (*m.mutable_filter_metadata())["com.foo.bar"] = {};
     options.setMetadata(m);
+    options.setSendInternal(send_internal_header_stream_option_);
+    options.setSendXff(send_xff_header_stream_option_);
     stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
@@ -528,6 +560,10 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
+  bool send_internal_header_{true};
+  bool send_xff_header_{true};
+  bool send_internal_header_stream_option_{true};
+  bool send_xff_header_stream_option_{true};
 };
 
 // SSL connection credential validation tests.
