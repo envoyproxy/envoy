@@ -17,9 +17,8 @@ FROM ${BUILD_OS}:${BUILD_TAG} AS envoy-base
 ENV DEBIAN_FRONTEND=noninteractive
 EXPOSE 10000
 CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
-# Ensure the envoy user is able to write to container logs owned by root:tty
 RUN mkdir -p /etc/envoy \
-    && useradd --system --no-create-home -d /nonexistent --groups tty --shell /usr/sbin/nologin envoy
+    && adduser --group --system envoy
 ENTRYPOINT ["/docker-entrypoint.sh"]
 # NB: Adding this here means that following steps, for example updating the system packages, are run
 #   when the version file changes. This should mean that a release version will always update.
