@@ -36,6 +36,10 @@ behavior_changes:
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
+- area: golang
+  change: |
+    Change ``OnLogDownstreamStart``, ``OnLogDownstreamPeriodic`` and ``OnLog`` methods so that user can get the request/response's
+    headers and trailers when producing access log.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
