@@ -889,6 +889,10 @@ void Filter::onUpstreamConnectionEstablished() {
     // Disabling retry and shadow: the request is to big.
     giveUpRetryAndShadow();
     if (getLength(callbacks_->decodingBuffer()) > callbacks_->decoderBufferLimit()) {
+      ENVOY_LOG(trace,
+                "Increasing decoding buffer limit to enable read on downstream connection. old "
+                "limit={} new limit={}.",
+                getLength(callbacks_->decodingBuffer()), retry_shadow_buffer_limit_);
       callbacks_->setDecoderBufferLimit(getLength(callbacks_->decodingBuffer()));
     }
   }

@@ -2461,6 +2461,8 @@ TEST_P(IntegrationTest, EnsureConnectionRetry) {
   // Send more data than the buffer limit.
   codec_client_->sendData(encoder, 256, true);
 
+  // the retry should not be abandoned yet.
+  test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 0);
   // Waiting to have at least one connection failure,
   // greater than 0, because in some cases, we retry the connection-failure within less than 10ms
   // which would make the counter superior to 1.
@@ -2479,6 +2481,43 @@ TEST_P(IntegrationTest, EnsureConnectionRetry) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+/*
+This tests ensures that the feature flag: envoy.restart_features.ensure_connection_retry
+does not change the behaviour for 5xx retries.
+*/
+TEST_P(IntegrationTest, ConnectionRetryEnableWith5xxError) {
+  // enable feature flags envoy.restart_features.ensure_connection_retry
+  config_helper_.addRuntimeOverride("envoy.restart_features.ensure_connection_retry", "true");
+  testRetry();
+}
+
+TEST_P(IntegrationTest, ConnectionRetryEnableWith5xxRetryBodyToBig) {
+  // Set buffer limit upstream and downstream.
+  config_helper_.setBufferLimits(100, 64);
+  // enable feature flags envoy.restart_features.ensure_connection_retry
+  config_helper_.addRuntimeOverride("envoy.restart_features.ensure_connection_retry", "true");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test_retry"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      512);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "510"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(512U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("510", response->headers().getStatusValue());
 }
 
 // Same test has above but without the feature enable.
@@ -2505,7 +2544,7 @@ TEST_P(IntegrationTest, BufferOverflowConnectionRetry) {
   auto& encoder = encoder_decoder.first;
   auto& response = encoder_decoder.second;
   // Send more data than the buffer limit, and not end-stream.
-  codec_client_->sendData(encoder, 128, true);
+  codec_client_->sendData(encoder, 128, false);
 
   test_server_->waitForCounterEq("cluster.cluster_0.retry_or_shadow_abandoned", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_fail", 1);
