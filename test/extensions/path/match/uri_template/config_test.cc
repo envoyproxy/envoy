@@ -65,7 +65,41 @@ TEST(ConfigTest, InvalidConfigSetup) {
 
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_EQ(config_or_error.status().message(),
-            "path_match_policy.path_template /bar/{lang}/{country is invalid");
+            "path_match_policy.path_template /bar/{lang}/{country is invalid: Unmatched variable "
+            "bracket in \"{country\"");
+}
+
+// Followup on issue https://github.com/envoyproxy/envoy/issues/34507 -
+// providing more details on errors.
+TEST(ConfigTest, InvalidConfigSetupMoreInfo) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.match.uri_template.uri_template_matcher
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+        path_template: "/api/MyFunction('{id}')"
+)EOF";
+
+  envoy::config::core::v3::TypedExtensionConfig config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  const auto& factory =
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
+
+  EXPECT_NE(nullptr, factory);
+  EXPECT_EQ(factory->name(), "envoy.path.match.uri_template.uri_template_matcher");
+
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
+
+  EXPECT_NE(nullptr, message);
+
+  absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
+      factory->createPathMatcher(*message);
+
+  EXPECT_FALSE(config_or_error.ok());
+  EXPECT_EQ(config_or_error.status().message(),
+            "path_match_policy.path_template /api/MyFunction('{id}') is invalid: Invalid literal: "
+            "\"MyFunction('{id}')\"");
 }
 
 TEST(ConfigTest, TestConfigSetup) {

@@ -182,7 +182,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
@@ -340,9 +340,9 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
                 slot.primary_hostname_, slot_idx);
       parent_.dns_resolver_->resolve(
           slot.primary_hostname_, parent_.dns_lookup_family_,
-          [this, slot_idx, slots,
-           hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
-                                             std::list<Network::DnsResponse>&& response) -> void {
+          [this, slot_idx, slots, hostname_resolution_required_cnt](
+              Network::DnsResolver::ResolutionStatus status, absl::string_view,
+              std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(
                 debug,
@@ -396,9 +396,9 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
     ENVOY_LOG(debug, "starting async DNS resolution for replica address {}", replica.first);
     parent_.dns_resolver_->resolve(
         replica.first, parent_.dns_lookup_family_,
-        [this, index, slots, replica_idx,
-         hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
-                                           std::list<Network::DnsResponse>&& response) -> void {
+        [this, index, slots, replica_idx, hostname_resolution_required_cnt](
+            Network::DnsResolver::ResolutionStatus status, absl::string_view,
+            std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);

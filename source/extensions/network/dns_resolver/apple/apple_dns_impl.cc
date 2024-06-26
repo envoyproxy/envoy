@@ -72,7 +72,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
     ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
                     "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
                     dns_name, address->asString());
-    callback(DnsResolver::ResolutionStatus::Success,
+    callback(DnsResolver::ResolutionStatus::Success, "apple_dns_success",
              {DnsResponse(address, std::chrono::seconds(60))});
     return {nullptr, true};
   }
@@ -115,7 +115,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   if (!pending_resolution_and_success.second) {
     ENVOY_LOG_EVENT(debug, "apple_dns_immediate_failure", "DNS resolution for {} failed", dns_name);
 
-    callback(DnsResolver::ResolutionStatus::Failure, {});
+    callback(DnsResolver::ResolutionStatus::Failure, "apple_dns_immediate_failure", {});
     return nullptr;
   }
 
@@ -188,6 +188,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     // events indicates that the sd_ref state is broken.
     // Therefore, finish resolving with an error.
     pending_response_.status_ = ResolutionStatus::Failure;
+    pending_response_.details_ = absl::StrCat(error);
     finishResolve();
   }
 }
@@ -228,7 +229,8 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
                   static_cast<int>(pending_response_.status_));
-  callback_(pending_response_.status_, std::move(finalAddressList()));
+  callback_(pending_response_.status_, std::move(pending_response_.details_),
+            std::move(finalAddressList()));
 
   if (owned_) {
     ENVOY_LOG(debug, "Resolution for {} completed (async)", dns_name_);
@@ -335,6 +337,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     parent_.chargeGetAddrInfoErrorStats(error_code);
 
     pending_response_.status_ = ResolutionStatus::Failure;
+    pending_response_.details_ = absl::StrCat("apple_dns_error_", error_code);
     pending_response_.v4_responses_.clear();
     pending_response_.v6_responses_.clear();
 

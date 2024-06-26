@@ -254,7 +254,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, IncompleteProfile) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile2");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("profile2_access_key", credentials.accessKeyId().value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
@@ -281,7 +281,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, EmptySecret) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile3");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("profile3_access_key", credentials.accessKeyId().value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }

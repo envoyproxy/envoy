@@ -23,7 +23,7 @@ namespace {
 
 class FuzzerMocks {
 public:
-  FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
+  FuzzerMocks() : addr_(*Network::Address::PipeInstance::create("/test/test.sock")) {
 
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
