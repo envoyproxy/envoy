@@ -1574,6 +1574,23 @@ TEST_F(HostImplTest, Weight) {
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), host->weight());
 }
 
+TEST_F(HostImplTest, HostLbPolicyData) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  EXPECT_TRUE(host->lbPolicyData() == nullptr);
+
+  class TestLbPolicyData : public Host::HostLbPolicyData {
+  public:
+    int foo = 42;
+  };
+
+  host->setLbPolicyData(std::make_shared<TestLbPolicyData>());
+  EXPECT_TRUE(host->lbPolicyData() != nullptr);
+  auto* test_policy_data = dynamic_cast<TestLbPolicyData*>(host->lbPolicyData().get());
+  EXPECT_TRUE(test_policy_data != nullptr);
+  EXPECT_EQ(test_policy_data->foo, 42);
+}
+
 TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   MockClusterMockPrioritySet cluster;
   envoy::config::core::v3::Metadata metadata;
