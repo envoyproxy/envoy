@@ -106,7 +106,7 @@ minor_behavior_changes:
 - area: jwt_authn
   change: |
     jwt_authn now validates provider URIs. If the validation is too strict it can temporarily be
-    disabled by setting the runtime guard ``envoy.reloadable_features.jwt_authz_validate_uri`` to
+    disabled by setting the runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` to
     false.
 - area: http
   change: |
