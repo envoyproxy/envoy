@@ -76,7 +76,7 @@ TEST_F(DataSourceServerPreferredAddressConfigTest, Validation) {
                             ".*wrong address family for v6 server preferred address.*");
   }
 
-  // Invalid datasource for address.
+  // Cannot read address.
   {
     envoy::extensions::quic::server_preferred_address::v3::DataSourceServerPreferredAddressConfig
         cfg;
@@ -86,7 +86,7 @@ TEST_F(DataSourceServerPreferredAddressConfigTest, Validation) {
                             EnvoyException, ".*Environment variable doesn't exist.*");
   }
 
-  // Invalid datasource for port.
+  // Cannot read port.
   {
     envoy::extensions::quic::server_preferred_address::v3::DataSourceServerPreferredAddressConfig
         cfg;
@@ -97,7 +97,7 @@ TEST_F(DataSourceServerPreferredAddressConfigTest, Validation) {
                             EnvoyException, ".*Environment variable doesn't exist.*");
   }
 
-  // Invalid datasource for dnat_address.
+  // Cannot read dnat_address.
   {
     envoy::extensions::quic::server_preferred_address::v3::DataSourceServerPreferredAddressConfig
         cfg;
