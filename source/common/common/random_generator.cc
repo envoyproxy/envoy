@@ -7,9 +7,10 @@
 namespace Envoy {
 namespace Random {
 
-const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
+constexpr size_t UUID_LENGTH = 36;
+const size_t RandomGeneratorImpl::UUID_LENGTH = UUID_LENGTH;
 
-uint64_t RandomGeneratorImpl::random() {
+uint64_t RandomUtility::random() {
   // Prefetch 256 * sizeof(uint64_t) bytes of randomness. buffered_idx is initialized to 256,
   // i.e. out-of-range value, so the buffer will be filled with randomness on the first call
   // to this function.
@@ -46,7 +47,7 @@ uint64_t RandomGeneratorImpl::random() {
   return buffered[buffered_idx++];
 }
 
-std::string RandomGeneratorImpl::uuid() {
+std::string RandomUtility::uuid() {
   // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
   // i.e. out-of-range value, so the buffer will be filled with randomness on the first
   // call to this function.
@@ -130,6 +131,9 @@ std::string RandomGeneratorImpl::uuid() {
 
   return {uuid, UUID_LENGTH};
 }
+
+uint64_t RandomGeneratorImpl::random() { return RandomUtility::random(); }
+std::string RandomGeneratorImpl::uuid() { return RandomUtility::uuid(); }
 
 } // namespace Random
 } // namespace Envoy
