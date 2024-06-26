@@ -94,6 +94,11 @@ minor_behavior_changes:
     This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.consistent_header_validation`` to false.
 - area: quic
   change: |
+    Cache source/destination address instances in a LUR cache for packet read to improve performance.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read`` to false.
+- area: quic
+  change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
 - area: config
   change: |
@@ -173,6 +178,9 @@ bug_fixes:
     Set the SNI value from the requested server name if it isn't available on the connection/socket. This applies when
     ``include_tls_session`` is true. The requested server name is set on a connection when filters such as the TLS
     inspector are used.
+- area: oauth
+  change: |
+    The id token cookie now expires at the same time the id token itself expires, instead of when the access token expires.
 - area: decompression
   change: |
     Fixed a bug where Envoy will go into an endless loop when using the brotli decompressor. If the input stream has
@@ -196,6 +204,10 @@ bug_fixes:
     Fixed a bug where the local rate limit filter would crash when the
     :ref:`enable_x_ratelimit_headers <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
     is set to ``DRAFT_VERSION_03`` and a send local reply is triggered before the rate limit filter is executed.
+- area: admin
+  change: |
+    Fixed missing :ref:`additional addresses <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`
+    for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
