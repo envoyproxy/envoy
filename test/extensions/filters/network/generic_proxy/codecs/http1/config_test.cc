@@ -1215,6 +1215,7 @@ TEST_F(Http1ClientCodecTest, HeaderOnlyRequestEncodingTest) {
                                        "host: host\r\n"
                                        "custom: value\r\n"
                                        "\r\n");
+          buffer.drain(buffer.length());
         }));
 
     EXPECT_TRUE(codec_->encode(request, encoding_context).ok());

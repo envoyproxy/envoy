@@ -87,10 +87,7 @@ void UniqueRequestManager::appendUpstreamRequest(uint64_t,
   pending_request_ = pending_request;
 }
 
-void UniqueRequestManager::removeUpstreamRequest(uint64_t) {
-  ASSERT(pending_request_ != nullptr);
-  pending_request_ = nullptr;
-}
+void UniqueRequestManager::removeUpstreamRequest(uint64_t) { pending_request_ = nullptr; }
 
 void UniqueRequestManager::onConnectionClose(Network::ConnectionEvent event) {
   if (pending_request_ != nullptr) {
@@ -286,11 +283,10 @@ void OwnedGenericUpstream::appendUpstreamRequest(uint64_t,
 }
 
 void OwnedGenericUpstream::removeUpstreamRequest(uint64_t) {
-  ASSERT(upstream_request_ != nullptr);
-  upstream_request_ = nullptr;
   if (encoder_decoder_ != nullptr) {
     encoder_decoder_->removeUpstreamRequest({});
   }
+  upstream_request_ = nullptr;
 }
 
 void OwnedGenericUpstream::onEvent(Network::ConnectionEvent event) {
