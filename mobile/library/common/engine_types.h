@@ -144,8 +144,8 @@ struct EnvoyStreamCallbacks {
    * - bytes_available: the response bytes available.
    * - stream_intel: contains internal stream metrics.
    */
-  absl::AnyInvocable<void(uint32_t, envoy_stream_intel)> on_data_available_ = [](uint32_t,
-                                                                                 envoy_stream_intel) {};
+  absl::AnyInvocable<void(uint32_t, envoy_stream_intel)> on_data_available_ =
+      [](uint32_t, envoy_stream_intel) {};
 };
 
 /** Networks classified by the physical link. */

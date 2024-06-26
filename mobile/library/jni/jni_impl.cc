@@ -889,15 +889,16 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
                               java_on_send_window_available_method_id, java_stream_intel.get());
   };
   stream_callbacks.on_data_available_ = [java_stream_callbacks_global_ref](
-                                                   uint32_t bytes_available, envoy_stream_intel stream_intel) {
+                                            uint32_t bytes_available,
+                                            envoy_stream_intel stream_intel) {
     Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
     auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
     auto java_stream_callbacks_class = jni_helper.getObjectClass(java_stream_callbacks_global_ref);
     auto java_on_data_available_method_id =
         jni_helper.getMethodId(java_stream_callbacks_class.get(), "onDataAvailable",
                                "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V");
-    jni_helper.callVoidMethod(java_stream_callbacks_global_ref,
-                              java_on_data_available_method_id, static_cast<jlong>(bytes_available), java_stream_intel.get());
+    jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_data_available_method_id,
+                              static_cast<jlong>(bytes_available), java_stream_intel.get());
   };
 
   envoy_status_t result = engine->startStream(static_cast<envoy_stream_t>(stream_handle),
