@@ -142,8 +142,8 @@ message UpstreamHttpProtocolOptions {
   string override_auto_sni_header = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-  // Alternative mechanism for derivation of the SNI value. It uses endpoint's :ref:`hostname <config.endpoint.v3.Endpoint.hostname>` as the value, if ``hostname`` is set.
-  // If set, takes precedense over ``auto_sni``.
+  // Alternative mechanism for derivation of the SNI value. It uses endpoint's :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` as the value, if ``hostname`` is set.
+  // If set, takes precedence over ``auto_sni``.
   bool auto_sni_from_upstream = 4;
 }
 

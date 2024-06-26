@@ -377,7 +377,8 @@ new_features:
 - area: conn pool
   change: |
     Added :ref:`auto_sni_from_upstream <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni_from_upstream>`
-    to use value of :ref:`hostnames <config.endpoint.v3.Endpoint.hostname>` of upstream cluster's endpoints as the value for SNI.
+    to use value of :ref:`hostnames <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` of
+    upstream cluster's endpoints as the value for SNI.
 
 deprecated:
 - area: tracing
