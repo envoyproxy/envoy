@@ -4295,11 +4295,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
-
   handleUpstreamRequest();
-
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -4323,7 +4320,6 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLoggingCloseStream) {
 
 TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
   proto_config_.set_observability_mode(true);
-
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
 
@@ -4333,7 +4329,6 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
-
   handleUpstreamRequest();
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));
