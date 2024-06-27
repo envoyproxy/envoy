@@ -308,7 +308,7 @@ ConnectivityGrid::~ConnectivityGrid() {
   }
   http2_pool_.reset();
   http3_pool_.reset();
-  alternate_pool_.reset();
+  http3_alternate_pool_.reset();
 }
 
 void ConnectivityGrid::deleteIsPending() {
@@ -329,6 +329,7 @@ ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp3AlternativePool() {
   }
   return http3_alternate_pool_.get();
 }
+
 ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp3Pool() {
   ASSERT(!deferred_deleting_);
   ASSERT(!draining_);
@@ -358,12 +359,12 @@ ConnectionPool::InstancePtr ConnectivityGrid::createHttp2Pool() {
                                                  origin_, alternate_protocols_);
 }
 
-ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_happy_eyeballs) {
+ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alternate_address) {
   return Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
                                  transport_socket_options_, state_, quic_stat_names_,
                                  *alternate_protocols_, scope_,
                                  makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this),
-                                 quic_info_, attempt_happy_eyeballs);
+                                 quic_info_, attempt_alternate_address);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {

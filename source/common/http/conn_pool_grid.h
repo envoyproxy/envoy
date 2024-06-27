@@ -245,7 +245,7 @@ private:
 
   // True if this pool is the "happy eyeballs" attempt, and should use the
   // secondary address family.
-  virtual ConnectionPool::InstancePtr createHttp3Pool(bool happy_eyeballs_attempt);
+  virtual ConnectionPool::InstancePtr createHttp3Pool(bool attempt_alternate_address);
   virtual ConnectionPool::InstancePtr createHttp2Pool();
 
   // This batch of member variables are latched objects required for pool creation.
