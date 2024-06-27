@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -32,7 +34,9 @@ ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
   if (stream->startStream(std::move(client), options)) {
-    stream->stream_->setWatermarkCallbacks(*decoder_watermark_callbacks);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control")) {
+      stream->stream_->setWatermarkCallbacks(*decoder_watermark_callbacks);
+    }
     return stream;
   }
   // Return nullptr on the start failure.
@@ -60,7 +64,9 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
 bool ExternalProcessorStreamImpl::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
-    stream_.removeWatermarkCallbacks();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control")) {
+      stream_.removeWatermarkCallbacks();
+    }
     stream_.closeStream();
     stream_closed_ = true;
     stream_.resetStream();

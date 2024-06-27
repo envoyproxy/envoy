@@ -46,6 +46,10 @@ behavior_changes:
     Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
     is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode that can be used by external
     processor to observe Envoy data and status.
+- area: grpc
+  change: |
+    Added support for flow control in Envoy gRPC side stream. This behavior can be disabled by setting the runtime flag
+    ``envoy.reloadable_features.grpc_side_stream_flow_control`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

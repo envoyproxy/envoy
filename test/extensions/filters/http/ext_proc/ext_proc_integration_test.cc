@@ -4351,4 +4351,38 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
+  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+    return;
+  }
+
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control", "false"}});
+
+  config_helper_.setBufferLimits(1024, 1024);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(1030, 'a');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+    processRequestBodyMessage(*grpc_upstreams_[0], count == 0 ? true : false,
+                              [&end_stream](const HttpBody& body, BodyResponse&) {
+                                end_stream = body.end_of_stream();
+                                return true;
+                              });
+    count++;
+  }
+  handleUpstreamRequest();
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy
