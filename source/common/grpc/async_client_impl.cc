@@ -19,9 +19,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  TimeSource& time_source)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
-      skip_envoy_headers_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), skip_envoy_headers, false)),
-      cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
+      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(cm),
+      remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
       metadata_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(

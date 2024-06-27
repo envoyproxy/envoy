@@ -61,7 +61,7 @@ message GrpcService {
     // If false, the header will be sent but it can be overridden by per stream option.
     // If true, the header will be removed and can not be overridden by per stream option.
     // Default to false.
-    google.protobuf.BoolValue skip_envoy_headers = 5;
+    bool skip_envoy_headers = 5;
   }
 
   // [#next-free-field: 9]

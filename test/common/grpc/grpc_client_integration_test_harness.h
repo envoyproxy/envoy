@@ -357,7 +357,7 @@ public:
           envoy_grpc_max_recv_msg_length);
     }
 
-    config.mutable_envoy_grpc()->mutable_skip_envoy_headers()->set_value(skip_envoy_headers_);
+    config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
