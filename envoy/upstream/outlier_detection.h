@@ -7,7 +7,9 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/types/optional.h"
 
@@ -47,6 +49,104 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
+// Types of errors reported to outlier detectors.
+// Each type may have a different syntax and content.
+// TODO (cpakulski) - maybe use enums from protobufs.
+enum class ExtResultType {
+  TEST, // Used in unit tests.
+  HTTP_CODE,
+  LOCAL_ORIGIN,
+};
+
+/*
+ * Class carries result of a transaction with upstream entity
+ * or generated internally by Envoy.
+ * Different categories of results will be derived from that base class.
+ * Those categories of results are fed only into Outlier Detection extensions.
+ */
+class ExtResult {
+public:
+  ExtResult() = delete;
+  ExtResult(ExtResultType type) : type_(type) {}
+  virtual ExtResultType type() const { return type_; };
+  virtual ~ExtResult() = default;
+
+private:
+  const ExtResultType type_;
+};
+
+// Types derived from TypedExtResult are used to report the result of transaction to
+// an outlier detection monitor.
+template <ExtResultType E> class TypedExtResult : public ExtResult {
+protected:
+  TypedExtResult() : ExtResult(E) {}
+};
+
+class HttpCode : public TypedExtResult<ExtResultType::HTTP_CODE> {
+public:
+  HttpCode(uint32_t code) : code_(code) {}
+  HttpCode() = delete;
+  virtual ~HttpCode() {}
+  uint32_t code() const { return code_; }
+
+private:
+  uint32_t code_;
+};
+
+// LocalOriginEvent is used to report errors like resets, timeouts but also
+// successful connection attempts.
+class LocalOriginEvent : public TypedExtResult<ExtResultType::LOCAL_ORIGIN> {
+public:
+  LocalOriginEvent(Result result) : result_(result) {}
+  LocalOriginEvent() = delete;
+  Result result() const { return result_; }
+
+private:
+  Result result_;
+};
+
+// Base class for various types of monitors.
+// Each monitor may implement different health detection algorithm.
+class ExtMonitor {
+public:
+  ExtMonitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  ExtMonitor() = delete;
+  virtual ~ExtMonitor() {}
+  virtual void reportResult(const ExtResult&) PURE;
+
+  void
+  setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
+    callback_ = callback;
+  }
+
+  void reset() { onReset(); }
+  std::string name() const { return name_; }
+
+protected:
+  virtual bool onError() PURE;
+  virtual void onSuccess() PURE;
+  virtual void onReset() PURE;
+  virtual std::string getFailedExtraInfo() { return ""; }
+
+  std::string name_;
+  uint32_t enforce_{100};
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
+};
+
+using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
+
+class ExtMonitorsSet {
+public:
+  void addMonitor(ExtMonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
+  void for_each(std::function<void(ExtMonitorPtr&)> f) {
+    for (auto& monitor : monitors_) {
+      f(monitor);
+    }
+  }
+
+private:
+  absl::InlinedVector<ExtMonitorPtr, 3> monitors_;
+};
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
  */
@@ -110,6 +210,22 @@ public:
    * and LocalOrigin type returns success rate for local origin errors.
    */
   virtual double successRate(SuccessRateMonitorType type) const PURE;
+
+  /* Returns name of failed extension monitor.
+     Returns empty string if failure was not in extensions.
+  */
+  virtual std::string getFailedExtensionMonitorName() const PURE;
+
+  /* Returns extra info which extension monitor wants to add to
+     event logger.
+     Returns empty string if failure was not in extensions.
+  */
+  virtual std::string getFailedExtensionMonitorExtraInfo() const PURE;
+
+  /* Returns ejection enforcing parameter configured in extension
+     monitor which failed.
+  */
+  virtual uint32_t getFailedExtensionMonitorEnforce() const PURE;
 };
 
 using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;
@@ -179,6 +295,29 @@ public:
 };
 
 using EventLoggerSharedPtr = std::shared_ptr<EventLogger>;
+
+using ExtMonitorCreateFn = std::function<ExtMonitorPtr()>;
+
+class ExtMonitorFactoryContext {
+public:
+  ExtMonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
+      : validation_visitor_(validation_visitor) {}
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() { return validation_visitor_; }
+
+private:
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+class ExtMonitorFactory : public Envoy::Config::TypedFactory {
+public:
+  ~ExtMonitorFactory() override = default;
+
+  virtual ExtMonitorCreateFn createMonitor(const std::string& name,
+                                           ProtobufTypes::MessagePtr&& config,
+                                           std::shared_ptr<ExtMonitorFactoryContext> context) PURE;
+
+  std::string category() const override { return "envoy.outlier_detection_monitors"; }
+};
 
 } // namespace Outlier
 } // namespace Upstream

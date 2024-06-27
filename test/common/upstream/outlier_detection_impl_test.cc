@@ -45,10 +45,10 @@ TEST(OutlierDetectorImplFactoryTest, NoDetector) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Random::MockRandomGenerator> random;
-  EXPECT_EQ(nullptr,
-            DetectorImplFactory::createForCluster(cluster, defaultStaticCluster("fake_cluster"),
-                                                  dispatcher, runtime, nullptr, random)
-                .value());
+  EXPECT_EQ(nullptr, DetectorImplFactory::createForCluster(
+                         cluster, defaultStaticCluster("fake_cluster"), dispatcher, runtime,
+                         nullptr, random, ProtobufMessage::getStrictValidationVisitor())
+                         .value());
 }
 
 TEST(OutlierDetectorImplFactoryTest, Detector) {
@@ -59,8 +59,9 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Random::MockRandomGenerator> random;
-  EXPECT_NE(nullptr, DetectorImplFactory::createForCluster(cluster, fake_cluster, dispatcher,
-                                                           runtime, nullptr, random)
+  EXPECT_NE(nullptr, DetectorImplFactory::createForCluster(
+                         cluster, fake_cluster, dispatcher, runtime, nullptr, random,
+                         ProtobufMessage::getStrictValidationVisitor())
                          .value());
 }
 
@@ -148,10 +149,10 @@ max_ejection_time: 400s
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   EXPECT_EQ(100UL, detector->config().intervalMs());
   EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
@@ -183,10 +184,10 @@ base_ejection_time: 10s
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   EXPECT_EQ(100UL, detector->config().intervalMs());
   EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
@@ -216,7 +217,8 @@ max_ejection_time: 3s
   TestUtility::loadFromYaml(yaml, outlier_detection);
   // Detector should reject the config.
   ASSERT_FALSE(DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_,
-                                    time_system_, event_logger_, random_)
+                                    time_system_, event_logger_, random_,
+                                    ProtobufMessage::getStrictValidationVisitor())
                    .status()
                    .ok());
 }
@@ -233,10 +235,10 @@ base_ejection_time: 400s
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   EXPECT_EQ(100UL, detector->config().intervalMs());
   EXPECT_EQ(400000UL, detector->config().baseEjectionTimeMs());
@@ -249,10 +251,10 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   addHosts({"tcp://127.0.0.1:80"}, true);
   addHosts({"tcp://127.0.0.1:81"}, false);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 500);
@@ -282,10 +284,10 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   detector.reset();
@@ -302,10 +304,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   addHosts({"tcp://127.0.0.1:81"});
@@ -380,10 +382,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   ON_CALL(cluster_, healthChecker()).WillByDefault(Return(health_checker.get()));
 
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   addHosts({"tcp://127.0.0.1:81"});
@@ -495,10 +497,10 @@ successful_active_health_check_uneject_host: false
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(0);
   ON_CALL(cluster_, healthChecker()).WillByDefault(Return(health_checker.get()));
 
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   addHosts({"tcp://127.0.0.1:81"});
@@ -553,10 +555,10 @@ TEST_F(OutlierDetectorImplTest, ConnectSuccessWithOptionalHTTP_OK) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Make sure that in non-split mode LOCAL_ORIGIN_CONNECT_SUCCESS with optional HTTP code 200
@@ -581,10 +583,10 @@ TEST_F(OutlierDetectorImplTest, ExternalOriginEventsNonSplit) {
   addHosts({"tcp://127.0.0.1:80"});
   addHosts({"tcp://127.0.0.2:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Make sure that EXT_ORIGIN_REQUEST_SUCCESS cancels EXT_ORIGIN_REQUEST_FAILED
@@ -610,10 +612,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   addHosts({"tcp://127.0.0.1:81"});
@@ -690,10 +692,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 0))
       .WillByDefault(Return(true));
@@ -789,10 +791,10 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Report several LOCAL_ORIGIN_TIMEOUT with optional Http code 500. Host should be ejected.
@@ -863,10 +865,10 @@ TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
       .WillByDefault(Return(true));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
@@ -919,10 +921,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
       .WillByDefault(Return(true));
@@ -1035,10 +1037,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 0))
       .WillByDefault(Return(true));
@@ -1126,10 +1128,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   addHosts({"tcp://127.0.0.1:81"});
@@ -1180,10 +1182,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection to test SR detection in isolation.
@@ -1281,10 +1283,10 @@ TEST_F(OutlierDetectorImplTest, ExternalOriginEventsWithSplit) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   for (auto i = 0; i < 100; i++) {
     hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestFailed);
@@ -1316,10 +1318,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off detecting consecutive local origin failures.
@@ -1406,10 +1408,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
 // zero. This is a regression test for earlier divide-by-zero behavior.
 TEST_F(OutlierDetectorImplTest, EmptySuccessRate) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   loadRq(hosts_, 200, 503);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
@@ -1431,10 +1433,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection and SR detection to test failure percentage detection in isolation.
@@ -1553,10 +1555,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
   });
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection and SR detection to test failure percentage detection in isolation.
@@ -1653,10 +1655,10 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 500);
@@ -1684,10 +1686,10 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80", "tcp://127.0.0.1:81"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(60));
@@ -1714,10 +1716,10 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80", "tcp://127.0.0.1:81", "tcp://127.0.0.1:82"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 503);
@@ -1758,10 +1760,10 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80", "tcp://127.0.0.1:81"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(50));
@@ -1797,10 +1799,10 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 500);
@@ -1823,10 +1825,10 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 500);
@@ -1851,10 +1853,10 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 500);
@@ -1894,10 +1896,10 @@ max_ejection_time_jitter: 13s
   addHosts({"tcp://127.0.0.4:80"});
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
@@ -1927,10 +1929,10 @@ max_ejection_time_jitter: 13s
 
   addHosts({"tcp://127.0.0.2:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   loadRq(hosts_[0], 5, 500);
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -1941,10 +1943,10 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
   // Cause a consecutive 5xx error.
   loadRq(hosts_[0], 4, 500);
@@ -1980,10 +1982,10 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Eject the node by consecutive 5xx errors.
@@ -2146,10 +2148,10 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection to test failure percentage in isolation.
@@ -2307,10 +2309,10 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Verify that maximum_ejection_time caps ejection time.
@@ -2402,10 +2404,10 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Verify that maximum_ejection_time caps ejection time.
@@ -2489,10 +2491,10 @@ max_ejection_time_jitter: 13s
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   EXPECT_EQ(100UL, detector->config().intervalMs());
   EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
@@ -2510,10 +2512,10 @@ base_ejection_time: 10s
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   EXPECT_EQ(100UL, detector->config().intervalMs());
   EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
@@ -2531,10 +2533,10 @@ TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsInRange) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
   // Set the return value of random().
   EXPECT_CALL(random_, random()).WillOnce(Return(123456789UL));
@@ -2562,10 +2564,10 @@ TEST_F(OutlierDetectorImplTest, EjectionTimeJitterIsZeroWhenNotConfigured) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
   // Set the return value of random().
   EXPECT_CALL(random_, random()).WillOnce(Return(1234567890UL));
@@ -2716,6 +2718,281 @@ TEST(OutlierUtility, SRThreshold) {
       DetectorImpl::successRateEjectionThreshold(sum, data, 1.9);
   EXPECT_EQ(90.0, success_rate_nums.success_rate_average_); // average success rate
   EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   //  ejection threshold
+}
+
+// Test disables "legacy" outlier, so all events will be handled by extensions.
+TEST_F(OutlierDetectorImplTest, BasicCall) {
+  // Disable all other outlier detectors so reported results all go to
+  // extensions.
+  const std::string yaml = R"EOF(
+    consecutive_5xx: 0
+    consecutive_gateway_failure: 0
+    consecutive_local_origin_failure: 0
+    split_external_local_origin_errors: true
+    monitors:
+    - name: "5xx"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          http_errors:
+            - range:
+                start: 500
+                end: 510
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
+
+  ON_CALL(runtime_.snapshot_, featureEnabled(std::string(EnforcingExtensionRuntime) + ".5xx", 100))
+      .WillByDefault(Return(true));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Cause a consecutive 5xx error.
+  // Host will be ejected and event log should indicate that the host was ejected by EXTENSION.
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::EXTENSION, true));
+  loadRq(hosts_[0], 4, 503);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+}
+
+// Test disables "legacy" consecutive errors outlier detection  and configures two independent
+// extensions of "consecutive errors" counting errors of different types.
+TEST_F(OutlierDetectorImplTest, TwoExtensions) {
+  // Disable all other outlier detectors so reported results all go to
+  // extensions.
+  const std::string yaml = R"EOF(
+    consecutive_5xx: 0
+    consecutive_gateway_failure: 0
+    consecutive_local_origin_failure: 0
+    split_external_local_origin_errors: true
+    monitors:
+    - name: "5xx"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          http_errors:
+            - range:
+                start: 500
+                end: 510
+    - name: "local_origin_monitor"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          local_origin_errors: {}
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled(std::string(EnforcingExtensionRuntime) + ".local_origin_monitor", 100))
+      .WillByDefault(Return(true));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Cause a consecutive 5xx error. "5xx" extension should react and eject the host.
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::EXTENSION, true));
+  loadRq(hosts_[0], 4, Result::LocalOriginConnectFailed);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+}
+
+// Test configures "legacy" consecutive 5xx outlier detector and
+// extension, which also counts 5xx errors.
+// The "legacy" outlier detector should react first and eject the node.
+// The test verifies that when the host is unejected, both monitors
+// "legacy" and extension are reset.
+TEST_F(OutlierDetectorImplTest, TwoExtensionsOneOverlapping) {
+  // Configure "legacy" consecutive 5xx to have the same threshold as
+  // new consecutive errors extension.
+  const std::string yaml = R"EOF(
+    consecutive_5xx: 3
+    consecutive_gateway_failure: 0
+    consecutive_local_origin_failure: 0
+    split_external_local_origin_errors: true
+    monitors:
+    - name: "5xx"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          http_errors:
+            - range:
+                start: 500
+                end: 510
+    - name: "local_origin_monitor"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          local_origin_errors: {}
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+
+  time_system_.setMonotonicTime(std::chrono::seconds(0));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
+
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
+      .WillByDefault(Return(true));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Cause a consecutive 5xx error. Event log should indicate that
+  // host was ejected by CONSECUTIVE_5XX "legacy" outlier detector.
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 4, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Move time to uneject time.
+  time_system_.setMonotonicTime(std::chrono::seconds(30));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been brought back.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // On uneject, all counters, including extensions should be reset, so next errors
+  // should again trigger "legacy" consecutive 5xx, not the extension monitor.
+
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 4, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+}
+
+// Test verifies scenario when "legacy" consecutive errors outlier detector
+// has a smaller threshold than new extension consecutive errors
+// monitor. In that case, the extension monitor should react first
+// and eject the node.
+// When the node is unejected,
+// counters are reset for both "legacy" and extension monitors
+// and new errors reported to outlier detector should cause
+// the extension to eject the host again.
+TEST_F(OutlierDetectorImplTest, TwoExtensionsOnePreferred) {
+  // Configure "legacy" consecutive 5xx to have higher threshold than
+  // new consecutive errors extension.
+  const std::string yaml = R"EOF(
+    consecutive_5xx: 4
+    consecutive_gateway_failure: 0
+    consecutive_local_origin_failure: 0
+    split_external_local_origin_errors: true
+    monitors:
+    - name: "5xx"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          http_errors:
+            - range:
+                start: 500
+                end: 510
+    - name: "local_origin_monitor"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
+        threshold: 3
+        enforcing: 100
+        error_buckets:
+          local_origin_errors: {}
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+
+  time_system_.setMonotonicTime(std::chrono::seconds(0));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
+
+  ON_CALL(runtime_.snapshot_, featureEnabled(std::string(EnforcingExtensionRuntime) + ".5xx", 100))
+      .WillByDefault(Return(true));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Cause a consecutive 5xx error. Event log should indicate that host was
+  // ejected by EXTENSION.
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::EXTENSION, true));
+  loadRq(hosts_[0], 4, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Move time to uneject time
+  time_system_.setMonotonicTime(std::chrono::seconds(30));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been brought back.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // On uneject, all counters, including extensions should be reset, so next errors
+  // should again trigger extension monitor, not "legacy" consecutive 5xx.
+
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::EXTENSION, true));
+  loadRq(hosts_[0], 4, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 }
 
 } // namespace

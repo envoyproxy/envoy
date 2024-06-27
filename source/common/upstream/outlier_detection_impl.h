@@ -37,7 +37,8 @@ public:
   static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                   EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
+                   EventLoggerSharedPtr event_logger, Random::RandomGenerator& random,
+                   ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -157,10 +158,16 @@ public:
   double successRate(SuccessRateMonitorType type) const override {
     return getSRMonitor(type).getSuccessRate();
   }
+  std::string getFailedExtensionMonitorName() const override { return failed_monitor_name_; }
+  std::string getFailedExtensionMonitorExtraInfo() const override { return failed_extra_info_; }
+  uint32_t getFailedExtensionMonitorEnforce() const override { return failed_monitor_enforce_; }
   void updateCurrentSuccessRateBucket();
   void successRate(SuccessRateMonitorType type, double new_success_rate) {
     getSRMonitor(type).setSuccessRate(new_success_rate);
   }
+
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)>
+  getOnFailedExtensioMonitorCallback();
 
   // handlers for reporting local origin errors
   void localOriginFailure();
@@ -171,6 +178,11 @@ public:
   // hosts are unejected
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
+
+  const std::unique_ptr<ExtMonitorsSet>& getExtensionMonitors() const { return monitors_set_; }
+  void setExtensionsMonitors(std::unique_ptr<ExtMonitorsSet>&& monitors_set) {
+    monitors_set_ = std::move(monitors_set);
+  }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -205,6 +217,15 @@ private:
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   std::function<void(DetectorHostMonitorImpl*, Result, absl::optional<uint64_t> code)>
       put_result_func_;
+
+  // Set of extension monitors.
+  std::unique_ptr<ExtMonitorsSet> monitors_set_;
+  // The following fields are reported when extension monitor is "tripped" and
+  // reports that a host where the extension monitor was attached should be
+  // ejected.
+  std::string failed_monitor_name_;
+  uint32_t failed_monitor_enforce_;
+  std::string failed_extra_info_;
 };
 
 /**
@@ -277,13 +298,15 @@ constexpr absl::string_view FailurePercentageThresholdRuntime =
     "outlier_detection.failure_percentage_threshold";
 constexpr absl::string_view MaxEjectionTimeJitterMsRuntime =
     "outlier_detection.max_ejection_time_jitter_ms";
+constexpr absl::string_view EnforcingExtensionRuntime = "outlier_detection.enforcing_extension";
 
 /**
  * Configuration for the outlier detection.
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config);
+  DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config,
+                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
   uint64_t intervalMs() const { return interval_ms_; }
   uint64_t baseEjectionTimeMs() const { return base_ejection_time_ms_; }
@@ -316,6 +339,8 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
+  std::unique_ptr<ExtMonitorsSet> createMonitorExtensions(
+      std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback);
 
 private:
   const uint64_t interval_ms_;
@@ -363,6 +388,10 @@ private:
   static constexpr uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_JITTER_MS = 0;
+
+  // Set of functions creating extensions. They are called when a new host is created and needs
+  // outlier detection monitors. Monitors configs are validated when this set is created.
+  absl::InlinedVector<ExtMonitorCreateFn, 3> monitors_create_fn;
 };
 
 /**
@@ -375,12 +404,15 @@ public:
   static absl::StatusOr<std::shared_ptr<DetectorImpl>>
   create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
+         EventLoggerSharedPtr event_logger, Random::RandomGenerator& random,
+         ProtobufMessage::ValidationVisitor& validation_visitor);
   ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host,
+                                        envoy::data::cluster::v3::OutlierEjectionType type);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
   void unejectHost(HostSharedPtr host);
@@ -421,7 +453,8 @@ public:
 private:
   DetectorImpl(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
+               EventLoggerSharedPtr event_logger, Random::RandomGenerator& randomi,
+               ProtobufMessage::ValidationVisitor& validation_visitor);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
@@ -431,11 +464,9 @@ private:
   void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
                                 envoy::data::cluster::v3::OutlierEjectionType type);
-  void notifyMainThreadConsecutiveError(HostSharedPtr host,
-                                        envoy::data::cluster::v3::OutlierEjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
-  bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type);
+  bool enforceEjection(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
   void updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
