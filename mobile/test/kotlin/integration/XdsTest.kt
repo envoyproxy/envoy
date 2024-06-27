@@ -6,7 +6,6 @@ import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.XdsBuilder
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.XdsTestServerFactory
 import java.io.File
@@ -23,8 +22,7 @@ class XdsTest {
   private lateinit var engine: Engine
 
   init {
-    AndroidJniLibrary.loadTestLibrary()
-    JniLibrary.load()
+    JniLibrary.loadTestLibrary()
   }
 
   private lateinit var xdsTestServer: XdsTestServerFactory.XdsTestServer

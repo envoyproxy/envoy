@@ -37,29 +37,29 @@ For example: January 25, 2020: ``0.3.1.20200125``.
 GPG Key
 ======================
 
-On 2024-04-20 the GPG key used to sign releases will expire. To extend the key's expiration date,
-follow these steps:
+To update the GPG key, use the following steps:
 
-Import the key locally::
+1. Generate a new GPG public/private key pair and follow the interactive prompt.
 
-    $ echo $GPG_KEY | base64 --decode > signing-key
-    $ gpg --passphrase $GPG_PASSPHRASE --batch --import signing-key
+    $ gpg --full-generate-key
+
+2. As part of GPG key generation, you will create a PASSPHRASE. Note it down.
+3. For the `Real Name`, enter `Envoy Release Bot` and for the `email`, enter `noreply@envoyproxy.io`.
+4. After the generate key command has finished, run the following to see the key that was created:
+
     $ gpg --list-keys
 
-Follow the instructions here on
-`Dealing with Expired Keys <https://central.sonatype.org/publish/requirements/gpg/#dealing-with-expired-keys>`_
-to extend the key and sub key expiration dates.
+5. Use the key ID from the `--list-keys` command to show the private key:
 
-Re-distribute the new public key:
+    $ gpg --armor --export-secret-keys $KEY_ID
+
+6. Re-distribute the new public key:
 
     $ gpg --keyserver keyserver.ubuntu.com --send-keys $KEY_ID
 
-Export the public/private keys, store them in a safe place::
+7. Ask an Envoy GitHub repo admin to update the following secrets:
 
-    $ gpg -a --export $KEY_ID > envoy.mobile.gpg.public
-    $ gpg -a --export-secret-keys $KEY_ID > envoy.mobile.gpg.private
+    .. code-block:: console
 
-Update the GitHub Action ``GPG_KEY`` secret with the Base64 encoded value
-of the private key.
-
-    $ cat envoy.mobile.gpg.private | base64
+      EM_GPG_PASSPHRASE=<passphrase noted down from step 2>
+      EM_GPG_KEY=<secret key from step 5>

@@ -170,8 +170,10 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
   }
 
   // TODO: increase the efficiency, avoid string transform back and forth
+  // Note: we don't do validity checking for CIDR range here because we know
+  // from addressAsString this is a valid address.
   Network::Address::CidrRange cidr_entry =
-      Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
+      *Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
   descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
 
   return true;

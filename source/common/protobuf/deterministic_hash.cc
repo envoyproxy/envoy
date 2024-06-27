@@ -196,7 +196,6 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
 // This is intentionally ignoring unknown fields.
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) {
   using Protobuf::FieldDescriptor;
-  std::string scratch;
   const Protobuf::Reflection* reflection = message.GetReflection();
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   seed = HashUtil::xxHash64(descriptor->full_name(), seed);

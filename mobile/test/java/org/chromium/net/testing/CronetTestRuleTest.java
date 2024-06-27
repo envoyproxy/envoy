@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import org.chromium.net.impl.CronvoyUrlRequestContext;
 import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
@@ -15,11 +14,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests features of CronetTestRule.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetTestRuleTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
   @Rule public final TestName mTestName = new TestName();

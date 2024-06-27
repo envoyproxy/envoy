@@ -13,7 +13,7 @@ namespace Tls {
 class UpstreamSslSocketFactory : public Server::Configuration::UpstreamTransportSocketConfigFactory,
                                  public SslSocketConfigFactory {
 public:
-  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

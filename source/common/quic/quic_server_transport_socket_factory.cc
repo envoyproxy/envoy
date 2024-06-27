@@ -12,25 +12,29 @@
 namespace Envoy {
 namespace Quic {
 
-Network::DownstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
   auto quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(
       config, context.messageValidationVisitor());
-  auto server_config = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      quic_transport.downstream_tls_context(), context);
+  absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
+      server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+          quic_transport.downstream_tls_context(), context);
+  RETURN_IF_NOT_OK(server_config_or_error.status());
+  auto server_config = std::move(server_config_or_error.value());
   // TODO(RyanTheOptimist): support TLS client authentication.
   if (server_config->requireClientCertificate()) {
-    throw EnvoyException("TLS Client Authentication is not supported over QUIC");
+    return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
   }
 
-  auto factory = std::make_unique<QuicServerTransportSocketFactory>(
+  auto factory_or_error = QuicServerTransportSocketFactory::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
       context.statsScope(), std::move(server_config), context.sslContextManager(), server_names);
-  factory->initialize();
-  return factory;
+  RETURN_IF_NOT_OK(factory_or_error.status());
+  (*factory_or_error)->initialize();
+  return std::move(*factory_or_error);
 }
 
 namespace {
@@ -91,25 +95,44 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
 }
 } // namespace
 
+absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
+QuicServerTransportSocketFactory::create(bool enable_early_data, Stats::Scope& store,
+                                         Ssl::ServerContextConfigPtr config,
+                                         Envoy::Ssl::ContextManager& manager,
+                                         const std::vector<std::string>& server_names) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(new QuicServerTransportSocketFactory(
+      enable_early_data, store, std::move(config), manager, server_names, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
     bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
-    Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names)
+    Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names,
+    absl::Status& creation_status)
     : QuicTransportSocketFactoryBase(scope, "server"),
       handle_certs_with_shared_tls_code_(Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.quic_handle_certs_with_shared_tls_code")),
       manager_(manager), stats_scope_(scope), config_(std::move(config)),
-      server_names_(server_names),
-      ssl_ctx_(handle_certs_with_shared_tls_code_ ? createSslServerContext() : nullptr),
-      enable_early_data_(enable_early_data) {}
+      server_names_(server_names), enable_early_data_(enable_early_data) {
+  if (handle_certs_with_shared_tls_code_) {
+    auto ctx_or_error = createSslServerContext();
+    SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
+    ssl_ctx_ = *ctx_or_error;
+  }
+}
 
 QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
   manager_.removeContext(ssl_ctx_);
 }
 
-Envoy::Ssl::ServerContextSharedPtr
+absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
 QuicServerTransportSocketFactory::createSslServerContext() const {
-  return manager_.createSslServerContext(stats_scope_, *config_, server_names_,
-                                         initializeQuicCertAndKey);
+  auto context_or_error = manager_.createSslServerContext(stats_scope_, *config_, server_names_,
+                                                          initializeQuicCertAndKey);
+  RETURN_IF_NOT_OK(context_or_error.status());
+  return *context_or_error;
 }
 
 ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyConfigProto() {
@@ -120,7 +143,7 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
 void QuicServerTransportSocketFactory::initialize() {
   config_->setSecretUpdateCallback([this]() {
     // The callback also updates config_ with the new secret.
-    onSecretUpdated();
+    return onSecretUpdated();
   });
   if (!config_->alpnProtocols().empty()) {
     supported_alpns_ = absl::StrSplit(config_->alpnProtocols(), ',');
@@ -155,19 +178,21 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   return {tls_context.quic_cert_, tls_context.quic_private_key_};
 }
 
-void QuicServerTransportSocketFactory::onSecretUpdated() {
+absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
 
   if (handle_certs_with_shared_tls_code_) {
-    auto ctx = createSslServerContext();
+    auto ctx_or_error = createSslServerContext();
+    RETURN_IF_NOT_OK(ctx_or_error.status());
     {
       absl::WriterMutexLock l(&ssl_ctx_mu_);
-      std::swap(ctx, ssl_ctx_);
+      std::swap(*ctx_or_error, ssl_ctx_);
     }
-    manager_.removeContext(ctx);
+    manager_.removeContext(*ctx_or_error);
   }
 
   stats_.context_config_update_by_sds_.inc();
+  return absl::OkStatus();
 }
 
 REGISTER_FACTORY(QuicServerTransportSocketConfigFactory,

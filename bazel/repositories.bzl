@@ -1141,6 +1141,11 @@ def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
+        patches = [
+            "@envoy//bazel/external:quiche_sequencer_fix.patch",
+            "@envoy//bazel/external:quiche_stream_fix.patch",
+        ],
+        patch_args = ["-p1"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(

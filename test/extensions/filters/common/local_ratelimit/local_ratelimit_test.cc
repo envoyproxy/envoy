@@ -1,6 +1,10 @@
+#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -15,6 +19,86 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
+TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  Singleton::ManagerImpl manager;
+
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  cm.local_cluster_name_ = "local_cluster";
+  cm.initializeClusters({"local_cluster"}, {});
+
+  const auto* mock_local_cluster = cm.active_clusters_.at("local_cluster").get();
+
+  EXPECT_CALL(*mock_local_cluster, prioritySet()).WillOnce(ReturnRef(priority_set));
+  EXPECT_CALL(priority_set, addMemberUpdateCb(_));
+
+  // Set the membership total to 2.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(2);
+
+  ShareProviderManagerSharedPtr share_provider_manager =
+      ShareProviderManager::singleton(dispatcher, cm, manager);
+  EXPECT_NE(share_provider_manager, nullptr);
+
+  auto provider = share_provider_manager->getShareProvider(ProtoLocalClusterRateLimit());
+  EXPECT_NE(provider, nullptr);
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(1, provider->tokensPerFill(2));
+  EXPECT_EQ(2, provider->tokensPerFill(4));
+  EXPECT_EQ(4, provider->tokensPerFill(8));
+
+  // Set the membership total to 4.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(4);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(1, provider->tokensPerFill(4));
+  EXPECT_EQ(2, provider->tokensPerFill(8));
+  EXPECT_EQ(4, provider->tokensPerFill(16));
+
+  // Set the membership total to 0.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(0);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(2, provider->tokensPerFill(2));
+  EXPECT_EQ(4, provider->tokensPerFill(4));
+  EXPECT_EQ(8, provider->tokensPerFill(8));
+
+  // Set the membership total to 1.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(1);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(2, provider->tokensPerFill(2));
+  EXPECT_EQ(4, provider->tokensPerFill(4));
+  EXPECT_EQ(8, provider->tokensPerFill(8));
+
+  // Destroy the share provider manager.
+  // This is used to ensure the share provider is still safe to use even
+  // the share provider manager is destroyed. But note this should never
+  // happen in real production because the share provider manager should
+  // have longer life cycle than the limiter.
+  share_provider_manager.reset();
+
+  // Set the membership total to 4 again.
+  mock_local_cluster->info_->endpoint_stats_.membership_total_.set(4);
+  priority_set.runUpdateCallbacks(0, {}, {});
+
+  // The provider should still work but the value should not change.
+  EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
+  EXPECT_EQ(2, provider->tokensPerFill(2));
+  EXPECT_EQ(4, provider->tokensPerFill(4));
+  EXPECT_EQ(8, provider->tokensPerFill(8));
+}
+
+class MockShareProvider : public ShareProvider {
+public:
+  MockShareProvider() = default;
+  MOCK_METHOD(uint32_t, tokensPerFill, (uint32_t origin_tokens_per_fill), (const));
+};
+
 class LocalRateLimiterImplTest : public testing::Test {
 public:
   void initializeTimer() {
@@ -24,12 +108,13 @@ public:
   }
 
   void initialize(const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-                  const uint32_t tokens_per_fill) {
+                  const uint32_t tokens_per_fill, ShareProviderSharedPtr share_provider = nullptr) {
 
     initializeTimer();
 
-    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, share_provider);
   }
 
   Thread::ThreadSynchronizer& synchronizer() { return rate_limiter_->synchronizer_; }
@@ -150,6 +235,40 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFill) {
 
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+}
+
+// Verify token bucket functionality with max tokens and tokens per fill > 1 and
+// share provider is used.
+TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFillWithShareProvider) {
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, tokensPerFill(_))
+      .WillRepeatedly(testing::Invoke([](uint32_t tokens) { return tokens / 2; }));
+
+  // Final tokens per fill is 2/2 = 1.
+  initialize(std::chrono::milliseconds(200), 2, 2, share_provider);
+
+  // The limiter will be initialized with max tokens and it will not be shared.
+  // So, the initial tokens is 2.
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+
+  // The tokens per fill will be handled by the share provider and it will be 1.
+  // 0 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+  fill_timer_->invokeCallback();
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+
+  // 0 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+  fill_timer_->invokeCallback();
+
+  // 1 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
 }

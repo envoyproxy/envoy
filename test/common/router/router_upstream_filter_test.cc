@@ -90,7 +90,7 @@ public:
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
   }
 
   Http::TestRequestHeaderMapImpl run() {
@@ -135,9 +135,9 @@ public:
 
   envoy::config::core::v3::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
-      Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+      *Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   Network::Address::InstanceConstSharedPtr upstream_local_address1_{
-      Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
+      *Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
   Network::ConnectionInfoSetterImpl connection_info1_{upstream_local_address1_,
                                                       upstream_local_address1_};
 

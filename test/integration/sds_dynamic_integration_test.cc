@@ -711,12 +711,13 @@ public:
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
 
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+    return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+               std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+               std::vector<std::string>{})
+        .value();
   }
 
   void TearDown() override {
@@ -1018,10 +1019,8 @@ public:
 
       // Set up the Bootstrap's CDS config to fetch from the CDS cluster.
       const std::string cds_yaml = R"EOF(
-    resource_api_version: V3
     api_config_source:
       api_type: GRPC
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: cds_cluster

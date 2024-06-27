@@ -123,7 +123,6 @@ public:
 TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
   const std::string ext_authz_config_yaml = R"EOF(
   stat_prefix: "wall"
-  transport_api_version: V3
   allowed_headers:
       patterns:
       - exact: baz
@@ -231,7 +230,6 @@ private:
 
 TEST_F(ExtAuthzFilterGrpcTest, EnvoyGrpc) {
   const std::string ext_authz_config_yaml = R"EOF(
-   transport_api_version: V3
    grpc_service:
      envoy_grpc:
        cluster_name: test_cluster
@@ -242,7 +240,6 @@ TEST_F(ExtAuthzFilterGrpcTest, EnvoyGrpc) {
 
 TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
   const std::string ext_authz_config_yaml = R"EOF(
-  transport_api_version: V3
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server

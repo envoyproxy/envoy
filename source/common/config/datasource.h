@@ -20,8 +20,11 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+class DataSourceProvider;
+
 using ProtoDataSource = envoy::config::core::v3::DataSource;
 using ProtoWatchedDirectory = envoy::config::core::v3::WatchedDirectory;
+using DataSourceProviderPtr = std::unique_ptr<DataSourceProvider>;
 
 /**
  * Read contents of the DataSource.
@@ -35,19 +38,6 @@ using ProtoWatchedDirectory = envoy::config::core::v3::WatchedDirectory;
  */
 absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
                                  bool allow_empty, Api::Api& api, uint64_t max_size = 0);
-
-/**
- * Read contents of the file.
- * @param path file path.
- * @param api reference to the Api.
- * @param allow_empty return an empty string if the file is empty.
- * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
- * would exceed the limit, it will return an error status.
- * @return std::string with file contents. or an error status if the file does not exist or
- * cannot be read.
- */
-absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
-                                     uint64_t max_size = 0);
 
 /**
  * @param source data source.
@@ -67,7 +57,7 @@ public:
               Filesystem::WatcherPtr watcher);
   ~DynamicData();
 
-  absl::string_view data() const;
+  const std::string& data() const;
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -98,12 +88,11 @@ public:
    * NOTE: If file watch is enabled and the new file content does not meet the
    * requirements (allow_empty, max_size), the provider will keep the old content.
    */
-  static absl::StatusOr<DataSourceProvider> create(const ProtoDataSource& source,
-                                                   Event::Dispatcher& main_dispatcher,
-                                                   ThreadLocal::SlotAllocator& tls, Api::Api& api,
-                                                   bool allow_empty, uint64_t max_size = 0);
+  static absl::StatusOr<DataSourceProviderPtr>
+  create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
+         ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty, uint64_t max_size = 0);
 
-  absl::string_view data() const;
+  const std::string& data() const;
 
 private:
   DataSourceProvider(std::string&& data) : data_(std::move(data)) {}

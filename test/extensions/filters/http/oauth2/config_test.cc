@@ -201,6 +201,64 @@ config:
       EnvoyException, "value does not match regex pattern");
 }
 
+TEST(ConfigTest, WrongCombinationOfPreserveAuthorizationAndForwardBearer) {
+  const std::string yaml = R"EOF(
+config:
+  forward_bearer_token: true
+  preserve_authorization_header: true
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+    cookie_names:
+      bearer_token: BearerToken
+      oauth_hmac: OauthHMAC
+      oauth_expires: OauthExpires
+      id_token: IdToken
+      refresh_token: RefreshToken
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+  auth_scopes:
+  - user
+  - openid
+  - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
+
+  // This returns non-nullptr for token_secret and hmac_secret.
+  auto& secret_manager =
+      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
+      EnvoyException,
+      "invalid combination of forward_bearer_token and preserve_authorization_header");
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

@@ -112,10 +112,13 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // of propagating original reset reason. In QUICHE if a stream stops reading
     // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
     StopReading();
-    runResetCallbacks(Http::StreamResetReason::LocalReset);
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
   }
+  // Run reset callbacks once because HCM calls resetStream() without tearing
+  // down its own ActiveStream. It might be no-op if it has been called already
+  // in ResetWithError().
+  runResetCallbacks(Http::StreamResetReason::LocalReset, absl::string_view());
 }
 
 void EnvoyQuicServerStream::switchStreamBlockState() {
@@ -326,7 +329,8 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
   if (!end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()));
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
+                      absl::string_view());
   }
   return true;
 }
@@ -341,7 +345,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
     // If both directions are closed but upstream hasn't received or sent end stream, run reset
     // stream callback.
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code), absl::string_view());
   }
 }
 
@@ -350,22 +354,24 @@ void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
   stats_.tx_reset_.inc();
   if (!local_end_stream_) {
     // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-    runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()));
+    runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
+                      absl::string_view());
   }
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
 }
 
-void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
+void EnvoyQuicServerStream::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                quic::ConnectionCloseSource source) {
   // Run reset callback before closing the stream so that the watermark change will not trigger
   // callbacks.
   if (!local_end_stream_) {
-    runResetCallbacks(
-        source == quic::ConnectionCloseSource::FROM_SELF
-            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
-            : quicErrorCodeToEnvoyRemoteResetReason(error));
+    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
+                          ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                                 session()->OneRttKeysAvailable())
+                          : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+                      quic::QuicErrorCodeToString(frame.quic_error_code));
   }
-  quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
+  quic::QuicSpdyServerStreamBase::OnConnectionClosed(frame, source);
 }
 
 void EnvoyQuicServerStream::CloseWriteSide() {

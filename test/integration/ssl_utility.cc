@@ -102,12 +102,13 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      tls_context, mock_factory_ctx);
+  auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context,
+                                                                                 mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
-          std::move(cfg), context_manager, *client_stats_store->rootScope())};
+      THROW_OR_RETURN_VALUE(Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+                                std::move(cfg), context_manager, *client_stats_store->rootScope()),
+                            Network::UpstreamTransportSocketFactoryPtr)};
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -117,12 +118,12 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, mock_factory_ctx);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
+                                                                                 mock_factory_ctx);
 
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
         std::vector<std::string>{});
   }
@@ -136,7 +137,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   auto& config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
-  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
+  return *config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
 Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
@@ -150,11 +151,11 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
   tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
       fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name)));
 
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
+                                                                                 factory_context);
 
   static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
       std::vector<std::string>{});
 }
@@ -162,7 +163,7 @@ Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::I
                                                        int port) {
   std::string url =
       "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
-  return Network::Utility::resolveUrl(url);
+  return *Network::Utility::resolveUrl(url);
 }
 
 } // namespace Ssl

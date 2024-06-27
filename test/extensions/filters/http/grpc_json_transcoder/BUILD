@@ -22,6 +22,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",

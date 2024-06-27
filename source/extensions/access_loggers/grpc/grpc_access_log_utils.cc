@@ -342,6 +342,10 @@ void Utility::extractCommonAccessLogProperties(
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
   }
 
+  if (const auto& reason = stream_info.downstreamTransportFailureReason(); !reason.empty()) {
+    common_access_log.set_downstream_transport_failure_reason(reason);
+  }
+
   if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
     common_access_log.set_downstream_wire_bytes_sent(bytes_meter->wireBytesSent());
     common_access_log.set_downstream_wire_bytes_received(bytes_meter->wireBytesReceived());

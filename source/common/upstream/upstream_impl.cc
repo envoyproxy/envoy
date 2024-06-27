@@ -413,32 +413,33 @@ LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
 
 HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
-    const envoy::config::core::v3::Locality& locality,
+    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
+    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
-    : HostDescriptionImplBase(cluster, hostname, dest_address, metadata, locality,
-                              health_check_config, priority, time_source),
+    : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
+                              locality, health_check_config, priority, time_source),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
 
 HostDescriptionImplBase::HostDescriptionImplBase(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
-    const envoy::config::core::v3::Locality& locality,
+    Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
+    MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, TimeSource& time_source)
     : cluster_(cluster), hostname_(hostname),
       health_checks_hostname_(health_check_config.hostname()),
-      canary_(Config::Metadata::metadataValue(metadata.get(),
+      canary_(Config::Metadata::metadataValue(endpoint_metadata.get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
-      metadata_(metadata), locality_(locality),
+      endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
+      locality_(locality),
       locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
-      socket_factory_(resolveTransportSocketFactory(dest_address, metadata_.get())),
+      socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())),
       creation_time_(time_source.monotonicTime()) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
@@ -459,8 +460,9 @@ HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressLi
 
 Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
-    const envoy::config::core::v3::Metadata* metadata) const {
-  auto match = cluster_->transportSocketMatcher().resolve(metadata);
+    const envoy::config::core::v3::Metadata* endpoint_metadata) const {
+  auto match =
+      cluster_->transportSocketMatcher().resolve(endpoint_metadata, locality_metadata_.get());
   match.stats_.total_match_count_.inc();
   ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
             match.name_, dest_address ? dest_address->asString() : "empty");
@@ -511,7 +513,6 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
-
   Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
@@ -572,6 +573,9 @@ Host::CreateConnectionData HostImplBase::createConnection(
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  if (auto upstream_info = connection->streamInfo().upstreamInfo(); upstream_info) {
+    upstream_info->setUpstreamHost(host);
+  }
   cluster.createNetworkFilterChain(*connection);
   return {std::move(connection), std::move(host)};
 }
@@ -983,7 +987,6 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
     const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
-
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
@@ -1032,7 +1035,6 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
-
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
   // In this case the subset load balancer should not be used.
@@ -1375,7 +1377,7 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   return nullptr;
 }
 
-Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
@@ -1464,7 +1466,6 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())) {
-
   auto& server_context = cluster_context.serverFactoryContext();
 
   auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
@@ -1474,12 +1475,15 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           cluster_context.clusterManager(), cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
-  auto socket_factory = createTransportSocketFactory(cluster, *transport_factory_context_);
-  auto* raw_factory_pointer = socket_factory.get();
+  auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);
+  THROW_IF_NOT_OK(socket_factory_or_error.status());
+  auto* raw_factory_pointer = socket_factory_or_error.value().get();
 
-  auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
-      cluster.transport_socket_matches(), *transport_factory_context_, socket_factory,
-      *stats_scope);
+  auto socket_matcher =
+      THROW_OR_RETURN_VALUE(TransportSocketMatcherImpl::create(
+                                cluster.transport_socket_matches(), *transport_factory_context_,
+                                socket_factory_or_error.value(), *stats_scope),
+                            std::unique_ptr<TransportSocketMatcherImpl>);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = server_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
@@ -1553,7 +1557,6 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 }
 
 namespace {
-
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
          host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) ||
@@ -1787,7 +1790,7 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
   absl::Status resolve_status;
   TRY_ASSERT_MAIN_THREAD {
     auto address_or_error = Network::Address::resolveProtoAddress(address);
-    if (address_or_error.value()) {
+    if (address_or_error.status().ok()) {
       return address_or_error.value();
     }
     resolve_status = address_or_error.status();
@@ -2039,13 +2042,19 @@ void PriorityStateManager::registerHostForPriority(
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
-  auto metadata = lb_endpoint.has_metadata()
-                      ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
-                      : nullptr;
+  auto endpoint_metadata =
+      lb_endpoint.has_metadata()
+          ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
+          : nullptr;
+  auto locality_metadata =
+      locality_lb_endpoint.has_metadata()
+          ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.metadata())
+          : nullptr;
   const auto host = std::make_shared<HostImpl>(
-      parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
-      locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source, address_list);
+      parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
+      lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+      lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+      lb_endpoint.health_status(), time_source, address_list);
   registerHostForPriority(host, locality_lb_endpoint);
 }
 

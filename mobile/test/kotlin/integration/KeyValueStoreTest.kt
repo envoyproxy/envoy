@@ -15,10 +15,13 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val TEST_KEY = "foo"
 private const val TEST_VALUE = "bar"
 
+@RunWith(RobolectricTestRunner::class)
 class KeyValueStoreTest {
   init {
     JniLibrary.loadTestLibrary()

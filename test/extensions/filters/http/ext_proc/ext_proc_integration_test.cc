@@ -9,6 +9,7 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/config.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
@@ -43,6 +44,7 @@ using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
+using Extensions::HttpFilters::ExternalProcessing::DEFAULT_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
@@ -254,6 +256,21 @@ protected:
       headers.setContentLength(body.size());
     }
     return codec_client_->makeRequestWithBody(headers, std::string(body));
+  }
+
+  IntegrationStreamDecoderPtr sendDownstreamRequestWithBodyAndTrailer(absl::string_view body) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendData(*request_encoder_, body, false);
+    Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+    codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+    return response;
   }
 
   void verifyDownstreamResponse(IntegrationStreamDecoder& response, int status_code) {
@@ -630,9 +647,6 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
-  if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
-  }
   initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     test::integration::filters::ExpectSpan ext_proc_span;
@@ -641,9 +655,13 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
     ext_proc_span.set_context_injected(true);
     ext_proc_span.set_sampled(true);
     ext_proc_span.mutable_tags()->insert({"grpc.status_code", "0"});
-    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
-
+    if (IsEnvoyGrpc()) {
+      ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    } else {
+      ext_proc_span.mutable_tags()->insert(
+          {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
+    }
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
@@ -659,6 +677,9 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
 
   processor_stream_->startGrpcStream();
+  EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
+      << "expected traceparent header";
+
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -697,9 +718,6 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
-  if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
-  }
   initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     test::integration::filters::ExpectSpan ext_proc_span;
@@ -709,8 +727,13 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
     ext_proc_span.set_sampled(true);
     ext_proc_span.mutable_tags()->insert({"grpc.status_code", "2"});
     ext_proc_span.mutable_tags()->insert({"error", "true"});
-    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
+    if (IsEnvoyGrpc()) {
+      ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    } else {
+      ext_proc_span.mutable_tags()->insert(
+          {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
+    }
 
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
@@ -725,6 +748,9 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
+      << "expected traceparent header";
+
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
   verifyDownstreamResponse(*response, 500);
@@ -1157,7 +1183,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(!header.value().empty());
           EXPECT_TRUE(header.raw_value().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -1215,7 +1240,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
         for (const auto& header : headers.headers().headers()) {
           EXPECT_TRUE(header.value().empty());
           EXPECT_TRUE(!header.raw_value().empty());
-          ENVOY_LOG_MISC(critical, "{}", header.raw_value());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -2355,10 +2379,6 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
-  if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "Tracing is currently only supported for Envoy gRPC";
-  }
-
   // ensure 200 ms timeout
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
   initializeConfig();
@@ -2371,9 +2391,13 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
     ext_proc_span.set_sampled(true);
     ext_proc_span.mutable_tags()->insert({"status", "canceled"});
     ext_proc_span.mutable_tags()->insert({"error", ""}); // not an error
-    ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
-
+    if (IsEnvoyGrpc()) {
+      ext_proc_span.mutable_tags()->insert({"upstream_address", "ext_proc_server_0"});
+    } else {
+      ext_proc_span.mutable_tags()->insert(
+          {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
+    }
     test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
@@ -2390,6 +2414,9 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
                                });
+
+  EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
+      << "expected traceparent header";
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 500);
@@ -4074,6 +4101,211 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
                 .getStringView(),
             "bluh");
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
+  proto_config_.set_observability_mode(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                          {":method", "GET"},
+                                                          {"host", "host"},
+                                                          {":path", "/"},
+                                                          {"x-forwarded-proto", "http"}};
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true,
+      [&expected_request_headers](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        // Verify the header request.
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+        EXPECT_TRUE(headers.end_of_stream());
+
+        // Try to mutate the header.
+        auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_header()->set_key("x-response-processed");
+        add1->mutable_header()->set_value("1");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  // Header mutation response has been ignored.
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  const std::string original_body_str = "Hello";
+  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
+
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        // Try to mutate the body.
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  // Body mutation response has been ignored.
+  EXPECT_EQ(upstream_request_->body().toString(), original_body_str);
+
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
+
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  const std::string original_body_str = "Hello";
+  auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  handleUpstreamRequestWithTrailer();
+
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], true, [](const HttpTrailers& trailers, TrailersResponse& resp) {
+        // Verify the trailer
+        Http::TestResponseTrailerMapImpl expected_trailers{{"x-test-trailers", "Yes"}};
+        EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
+
+        // Try to mutate the trailer
+        auto* trailer_mut = resp.mutable_header_mutation();
+        auto* trailer_add = trailer_mut->add_set_headers();
+        trailer_add->mutable_header()->set_key("x-modified-trailers");
+        trailer_add->mutable_header()->set_value("xxx");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(*(response->trailers()), HasNoHeader("x-modified-trailers"));
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  const std::string body_str = "Hello";
+  auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  handleUpstreamRequestWithTrailer();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+}
+
+TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
+  proto_config_.set_observability_mode(true);
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
+  ConfigOptions config_option = {};
+  config_option.valid_grpc_server = false;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+
+  handleUpstreamRequest();
+  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
+                                                         std::chrono::milliseconds(25000)));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
 } // namespace Envoy

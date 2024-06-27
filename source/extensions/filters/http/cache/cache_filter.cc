@@ -465,7 +465,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
-      : encoder_callbacks_->addEncodedData(*body, !response_has_trailers_);
+      : encoder_callbacks_->addEncodedData(*body, true);
 
   if (!remaining_ranges_.empty()) {
     getBody();

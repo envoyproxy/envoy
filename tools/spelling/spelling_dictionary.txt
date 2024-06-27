@@ -81,6 +81,7 @@ ETB
 ETX
 FS
 FIXME
+gperf
 HEXDIG
 HEXDIGIT
 HPE
@@ -695,6 +696,8 @@ deleter
 delim
 denylist
 deque
+dep
+deps
 deprecations
 dereference
 dereferences
@@ -1348,6 +1351,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars

@@ -6,7 +6,6 @@ import android.content.Context;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
@@ -56,7 +55,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
   private int mStreamIdleTimeoutSeconds = 15;
-  private final int mPerTryIdleTimeoutSeconds = 15;
+  private int mPerTryIdleTimeoutSeconds = 15;
   private final String mAppVersion = "unspecified";
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
@@ -159,16 +158,30 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
-   * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
-   * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
-   * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
+   * Set the per-try stream idle timeout, in seconds, which is defined as the period in which
+   * there are no active requests. When the idle timeout is reached, the connection is closed.
+   * This setting is the same as the stream idle timeout, except it's applied per-retry attempt.
+   * See
+   * https://github.com/envoyproxy/envoy/blob/f15ec821d6a70a1d132f53f50970595efd1b84ee/api/envoy/config/route/v3/route_components.proto#L1570.
    *
-   * TODO(abeyad): Change the name to setRuntimeFeature here and in the C++ APIs.
+   * The default is 15s.
+   *
+   * @param timeout The per-try idle timeout, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setPerTryIdleTimeoutSeconds(int timeout) {
+    mPerTryIdleTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Adds the boolean value for the reloadable runtime feature flag value. For example, to set the
+   * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
+   * call `addRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
    *
    * @param feature The reloadable runtime feature flag name.
    * @param value The Boolean value to set the runtime feature flag to.
    */
-  public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
+  public NativeCronvoyEngineBuilderImpl addRuntimeGuard(String feature, boolean value) {
     mRuntimeGuards.put(feature, value);
     return this;
   }
@@ -219,7 +232,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
                            String logLevel) {
     AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
-    AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;

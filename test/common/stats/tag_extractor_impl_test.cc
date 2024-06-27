@@ -485,12 +485,23 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "http.rbac.policy.shadow_denied",
                          {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
 
+  // Proxy Protocol stat prefix
+  Tag proxy_protocol_prefix;
+  proxy_protocol_prefix.name_ = tag_names.PROXY_PROTOCOL_PREFIX;
+  proxy_protocol_prefix.value_ = "test_stat_prefix";
+  regex_tester.testRegex("proxy_proto.not_found_disallowed", "proxy_proto.not_found_disallowed",
+                         {});
+  regex_tester.testRegex("proxy_proto.test_stat_prefix.not_found_disallowed",
+                         "proxy_proto.not_found_disallowed", {proxy_protocol_prefix});
+
   // Proxy Protocol version prefix
   Tag proxy_protocol_version;
   proxy_protocol_version.name_ = tag_names.PROXY_PROTOCOL_VERSION;
   proxy_protocol_version.value_ = "2";
   regex_tester.testRegex("proxy_proto.versions.v2.error", "proxy_proto.error",
                          {proxy_protocol_version});
+  regex_tester.testRegex("proxy_proto.test_stat_prefix.versions.v2.error", "proxy_proto.error",
+                         {proxy_protocol_prefix, proxy_protocol_version});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

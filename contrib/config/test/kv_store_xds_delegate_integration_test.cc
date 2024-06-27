@@ -494,10 +494,8 @@ public:
 
       auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
       const std::string cds_yaml = fmt::format(R"EOF(
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: {}

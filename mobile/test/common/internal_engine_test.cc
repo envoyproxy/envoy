@@ -8,6 +8,7 @@
 #include "test/common/integration/test_server.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/mocks/thread/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
@@ -24,6 +25,7 @@ using testing::ByMove;
 using testing::Return;
 
 constexpr Logger::Logger::Levels LOG_LEVEL = Logger::Logger::Levels::debug;
+constexpr int kDefaultTimeoutSec = 3 * TIMEOUT_FACTOR;
 
 struct EngineTestContext {
   absl::Notification on_engine_running;
@@ -166,11 +168,13 @@ TEST_F(InternalEngineTest, RecordCounter) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   EXPECT_EQ(ENVOY_SUCCESS, engine->recordCounterInc("counter", envoy_stats_notags, 1));
 
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, Logger) {
@@ -187,13 +191,17 @@ TEST_F(InternalEngineTest, Logger) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  ASSERT_TRUE(test_context.on_log.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
+  ASSERT_TRUE(
+      test_context.on_log.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 
   engine->terminate();
   engine.reset();
-  ASSERT_TRUE(test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_log_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
@@ -209,7 +217,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
       Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
   EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker == nullptr);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   // Simulate a failed assertion by invoking a debug assertion failure
   // record action.
   // Verify that no crash if the assertion fails when no real event
@@ -217,7 +226,8 @@ TEST_F(InternalEngineTest, EventTrackerRegistersDefaultAPI) {
   Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
 
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
@@ -235,16 +245,19 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAPI) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   const auto registered_event_tracker = static_cast<std::unique_ptr<EnvoyEventTracker>*>(
       Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME));
   EXPECT_TRUE(registered_event_tracker != nullptr && *registered_event_tracker != nullptr);
 
   (*registered_event_tracker)->on_track_({{"foo", "bar"}});
 
-  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
@@ -263,16 +276,19 @@ TEST_F(InternalEngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   // Simulate a failed assertion by invoking a debug assertion failure
   // record action.
   // Verify that an envoy event is emitted when an event tracker is passed
   // at engine's initialization time.
   Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
 
-  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
@@ -292,16 +308,19 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
 
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
   // Simulate an envoy bug by invoking an Envoy bug failure
   // record action.
   // Verify that an envoy event is emitted when an event tracker is passed
   // at engine's initialization time.
   Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly("foo_location");
 
-  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 #ifdef ENVOY_ENABLE_FULL_PROTOS
@@ -401,12 +420,14 @@ TEST_F(InternalEngineTest, ResetConnectivityState) {
       createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
   Platform::EngineBuilder builder;
   runEngine(engine, builder, LOG_LEVEL);
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(
+      absl::Seconds(kDefaultTimeoutSec)));
 
   ASSERT_EQ(ENVOY_SUCCESS, engine->resetConnectivityState());
 
   engine->terminate();
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(
+      test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
 TEST_F(InternalEngineTest, ThreadCreationFailed) {

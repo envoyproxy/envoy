@@ -109,7 +109,6 @@ jobs:
     - name: 'Configure gpg signing'
       env:
         GPG_KEY: ${{ secrets.EM_GPG_KEY }}
-        GPG_KEY_NAME: ${{ secrets.EM_GPG_KEY_NAME }}
         GPG_PASSPHRASE: ${{ secrets.EM_GPG_PASSPHRASE }}
       run: |
         # https://github.com/keybase/keybase-issues/issues/2798

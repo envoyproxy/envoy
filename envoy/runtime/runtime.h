@@ -227,8 +227,9 @@ public:
    * the constructor is finished, with the exception of dynamic RTDS layers,
    * which require ClusterManager.
    * @param cm cluster manager reference.
+   * @return a status indicating if initialization was successful.
    */
-  virtual void initialize(Upstream::ClusterManager& cm) PURE;
+  virtual absl::Status initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
    * @return const Snapshot& the current snapshot. This reference is safe to use for the duration of

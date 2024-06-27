@@ -153,7 +153,7 @@ public:
   }
 
   void basicTest();
-  void trickleTest();
+  void trickleTest(bool final_chunk_has_data);
   void explicitFlowControlWithCancels(uint32_t body_size = 1000, bool terminate_engine = false);
 
   static std::string protocolToString(Http::CodecType type) {
@@ -276,19 +276,26 @@ TEST_P(ClientIntegrationTest, LargeResponse) {
   }
 }
 
-void ClientIntegrationTest::trickleTest() {
+void ClientIntegrationTest::trickleTest(bool final_chunk_has_data) {
   autonomous_upstream_ = false;
 
   initialize();
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t /* length */,
-                                     bool /* end_stream */, envoy_stream_intel) {
+  stream_callbacks.on_data_ = [this,
+                               final_chunk_has_data](const Buffer::Instance&, uint64_t /* length */,
+                                                     bool /* end_stream */, envoy_stream_intel) {
     if (explicit_flow_control_) {
       // Allow reading up to 100 bytes.
       stream_->readData(100);
     }
     cc_.on_data_calls_++;
+    if (cc_.on_data_calls_ < 10) {
+      upstream_request_->encodeData(1, cc_.on_data_calls_ == 9 && final_chunk_has_data);
+    }
+    if (cc_.on_data_calls_ == 10 && !final_chunk_has_data) {
+      upstream_request_->encodeData(0, true);
+    }
   };
 
   stream_ = createNewStream(std::move(stream_callbacks));
@@ -307,23 +314,73 @@ void ClientIntegrationTest::trickleTest() {
       upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*BaseIntegrationTest::dispatcher_));
 
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  for (int i = 0; i < 10; ++i) {
-    upstream_request_->encodeData(1, i == 9);
-  }
+  // This will be read immediately. on_data_ will kick off more chunks.
+  upstream_request_->encodeData(1, false);
 
   terminal_callback_.waitReady();
 }
 
 TEST_P(ClientIntegrationTest, Trickle) {
-  trickleTest();
+  trickleTest(true);
   ASSERT_LE(cc_.on_data_calls_, 11);
+  ASSERT_EQ(cc_.on_error_calls_, 0);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
 }
 
 TEST_P(ClientIntegrationTest, TrickleExplicitFlowControl) {
   explicit_flow_control_ = true;
-  trickleTest();
+  trickleTest(true);
   ASSERT_LE(cc_.on_data_calls_, 11);
+  ASSERT_EQ(cc_.on_error_calls_, 0);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+}
+
+TEST_P(ClientIntegrationTest, TrickleFinalChunkEmpty) {
+  trickleTest(false);
+  ASSERT_EQ(cc_.on_data_calls_, 11);
+  ASSERT_EQ(cc_.on_error_calls_, 0);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+}
+
+TEST_P(ClientIntegrationTest, TrickleExplicitFlowControlFinalChunkEmpty) {
+  explicit_flow_control_ = true;
+  trickleTest(false);
+  ASSERT_EQ(cc_.on_data_calls_, 11);
+  ASSERT_EQ(cc_.on_error_calls_, 0);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+}
+
+TEST_P(ClientIntegrationTest, ExplicitFlowControlEmptyChunkThenReadData) {
+  expect_data_streams_ = false; // Don't validate intel.
+  explicit_flow_control_ = true;
+  autonomous_upstream_ = false;
+  initialize();
+
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+
+  stream_ = createNewStream(std::move(stream_callbacks));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(0, true);
+
+  // Wait for the chunk to hopefully arrive.
+  sleep(1);
+  stream_->readData(100);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_data_calls_, 1);
+  ASSERT_EQ(cc_.on_error_calls_, 0);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
 }
 
 TEST_P(ClientIntegrationTest, ManyStreamExplicitFlowControl) {
@@ -415,9 +472,8 @@ void ClientIntegrationTest::explicitFlowControlWithCancels(const uint32_t body_s
       // Allow reading up to 100 bytes.
       streams[i]->readData(100);
     };
-    stream_callbacks.on_error_ = [](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
-      RELEASE_ASSERT(0, "unexpected");
-    };
+    stream_callbacks.on_error_ = [](const EnvoyError&, envoy_stream_intel,
+                                    envoy_final_stream_intel) { RELEASE_ASSERT(0, "unexpected"); };
 
     auto stream = createNewStream(std::move(stream_callbacks));
     stream->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
@@ -618,7 +674,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 }
 
 TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
-  builder_.setRuntimeGuard("reresolve_null_addresses", true);
+  builder_.addRuntimeGuard("reresolve_null_addresses", true);
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
   Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
@@ -658,7 +714,7 @@ TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
     return; // This test relies on ipv4 loopback.
   }
 
-  auto next_address = Network::Utility::parseInternetAddress(
+  auto next_address = Network::Utility::parseInternetAddressNoThrow(
       "127.0.0.3", fake_upstreams_[0]->localAddress()->ip()->port());
   // This will hopefully be miniminally flaky because of low use of 127.0.0.3
   // but may need to be disabled.
@@ -1277,8 +1333,8 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
 }
 
 TEST_P(ClientIntegrationTest, TestRuntimeSet) {
-  builder_.setRuntimeGuard("test_feature_true", false);
-  builder_.setRuntimeGuard("test_feature_false", true);
+  builder_.addRuntimeGuard("test_feature_true", false);
+  builder_.addRuntimeGuard("test_feature_false", true);
   initialize();
 
   // Verify that the Runtime config values are from the RTDS response.
