@@ -308,6 +308,7 @@ ConnectivityGrid::~ConnectivityGrid() {
   }
   http2_pool_.reset();
   http3_pool_.reset();
+  alternate_pool_.reset();
 }
 
 void ConnectivityGrid::deleteIsPending() {

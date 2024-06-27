@@ -308,6 +308,52 @@ TEST_F(ConnectivityGridTest, DoubleFailureThenSuccessSerial) {
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
+// Test all three connections in paralle, H3 failing and TCP connecting.
+TEST_F(ConnectivityGridTest, ParallelConnectionsTcpConnects) {
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
+  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(2);
+  EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
+
+  EXPECT_LOG_CONTAINS("trace", "http3 pool attempting to create a new stream to host 'hostname'",
+                      grid_->newStream(decoder_, callbacks_,
+                                       {/*can_send_early_data=*/false,
+                                        /*can_use_http3_=*/true}));
+
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_EQ(grid_->http2Pool(), nullptr);
+  EXPECT_EQ(grid_->alternate(), nullptr);
+
+  // The failover timer should kick off H3 alternate and H2
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+  EXPECT_NE(grid_->alternate(), nullptr);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  // Fail the alternate pool. H3 should not be broken.
+  grid_->callbacks(2)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "reason", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // Fail the H3 pool. H3 should still not be broken as TCP has not connected.
+  grid_->callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // Now TCP connects. H3 should be marked broken.
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_->callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  EXPECT_LOG_CONTAINS("trace", "http2 pool successfully connected to host 'hostname'",
+                      grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt));
+  EXPECT_TRUE(grid_->isHttp3Broken());
+}
+
 // Test the first pool failing inline but http/3 happy eyeballs succeeding inline
 TEST_F(ConnectivityGridTest, H3HappyEyeballsMeansNoH2Pool) {
   // The alternate H3 pool will succeed inline.

@@ -180,7 +180,8 @@ private:
       quic::kQuicDefaultConnectionIdLength};
 
   // Make a best effort attempt to find an address family other than the initial
-  // address.
+  // address. This fails over to using the primary address if the second address
+  // in the list isn't of a different address family.
   bool attempt_happy_eyeballs_;
 };
 

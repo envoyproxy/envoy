@@ -29,6 +29,10 @@ getHostAddress(std::shared_ptr<const Upstream::HostDescription> host,
   Upstream::HostDescription::SharedConstAddressVector list_or_null = host->addressListOrNull();
   if (!list_or_null || list_or_null->size() < 2 || !(*list_or_null)[0]->ip() ||
       !(*list_or_null)[1]->ip()) {
+    // This function is only called if the parallel address checks in conn_pool_grid.cc
+    // already passed so it should not return here, but if there was a DNS
+    // re-resolve between checking the address list in the grid and checking
+    // here, we'll fail over here rather than fast-fail the connection.
     return host->address();
   }
   return (*list_or_null)[1];
