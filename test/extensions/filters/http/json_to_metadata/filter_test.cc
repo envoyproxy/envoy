@@ -4,6 +4,7 @@
 
 #include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
@@ -671,7 +672,7 @@ request_rules:
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.filters.http.json_to_metadata", MapEq(expected)));
+              setDynamicMetadata(HttpFilterNames::get().JsonToMetadata, MapEq(expected)));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);

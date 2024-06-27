@@ -186,7 +186,9 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
 Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
                                                  Upstream::LoadBalancerContext* context) const {
   uint16_t default_port = 80;
-  if (info_->transportSocketMatcher().resolve(nullptr).factory_.implementsSecureTransport()) {
+  if (info_->transportSocketMatcher()
+          .resolve(nullptr, nullptr)
+          .factory_.implementsSecureTransport()) {
     default_port = 443;
   }
 
@@ -365,7 +367,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // stream metadata, or configuration (which is then added as stream metadata).
   const bool is_secure = cluster_.info()
                              ->transportSocketMatcher()
-                             .resolve(nullptr)
+                             .resolve(nullptr, nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
   if (context->requestStreamInfo()) {

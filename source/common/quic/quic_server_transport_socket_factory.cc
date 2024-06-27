@@ -19,11 +19,14 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   auto quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(
       config, context.messageValidationVisitor());
-  auto server_config = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      quic_transport.downstream_tls_context(), context);
+  absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
+      server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+          quic_transport.downstream_tls_context(), context);
+  RETURN_IF_NOT_OK(server_config_or_error.status());
+  auto server_config = std::move(server_config_or_error.value());
   // TODO(RyanTheOptimist): support TLS client authentication.
   if (server_config->requireClientCertificate()) {
-    throw EnvoyException("TLS Client Authentication is not supported over QUIC");
+    return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
   }
 
   auto factory_or_error = QuicServerTransportSocketFactory::create(

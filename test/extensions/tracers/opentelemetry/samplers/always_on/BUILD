@@ -46,7 +46,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",
-        "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
