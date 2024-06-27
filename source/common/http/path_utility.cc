@@ -82,7 +82,6 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
   }
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
 
-  // TODO(yanavlasov): optimize this by adding case insensitive matcher
   std::string decoded_path{path};
   std::map<const char*, const char*> replacements;
   replacements["%2F"] = "/";
