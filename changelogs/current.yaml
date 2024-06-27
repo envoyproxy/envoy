@@ -389,6 +389,9 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: quic
+  change: |
+    Added function to QuicListenerFilter interface that is called on receiving the first packet.
 
 deprecated:
 - area: tracing
