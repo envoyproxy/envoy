@@ -890,7 +890,6 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-// TODO(tyxia) Add logging support for observability mode.
 void Filter::logGrpcStreamInfo() {
   if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
     const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
