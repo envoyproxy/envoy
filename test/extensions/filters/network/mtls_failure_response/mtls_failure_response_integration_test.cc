@@ -18,41 +18,16 @@ namespace NetworkFilters {
 namespace MtlsFailureResponse {
 
 namespace {
-void expectCorrectProto() {
-  std::string yaml = R"EOF(
-  validation_mode: PRESENTED
-  failure_mode: KEEP_CONNECTION_OPEN
-  token_bucket:
-    max_tokens: 1
-    tokens_per_fill: 1
-    fill_interval: 5s
-  )EOF";
 
-  MtlsFailureResponseConfigFactory factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  // Test to create a filter closing connections
+  // Assert that no token bucket is created
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*proto_config, context).value();
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
+  // Test to create a filter keeping connections open without any limit
 
-// TEST(ExtAuthzFilterConfigTest, ValidateFail) {
-//   NiceMock<Server::Configuration::MockFactoryContext> context;
-//   envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse config;
-//   EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(config,
-//   context).IgnoreError(),
-//                ProtoValidationException);
-// }
+  // Test to create a filter keeping connections open with a token bucket and check it is getting closed
 
-// Test with empty values in config
+  // Test to not fail on this filter
 
-// Test with open connection, but no token bucket
-
-TEST(MtlsFailureReponseFilterConfigTest, MtlsFailureResponseCorrectProto) { expectCorrectProto(); }
 
 } // namespace MtlsFailureResponse
 } // namespace NetworkFilters

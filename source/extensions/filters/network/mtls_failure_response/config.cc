@@ -17,12 +17,9 @@ Network::FilterFactoryCb MtlsFailureResponseConfigFactory::createFilterFactoryFr
     const envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse&
         proto_config,
     Server::Configuration::FactoryContext& context) {
-  const auto& config = dynamic_cast<
-      const envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse&>(
-      proto_config);
+  const auto& config = proto_config;
 
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_ = nullptr;
-
   if (config.failure_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::
                                    MtlsFailureResponse::KEEP_CONNECTION_OPEN &&
       config.has_token_bucket()) {
@@ -34,9 +31,9 @@ Network::FilterFactoryCb MtlsFailureResponseConfigFactory::createFilterFactoryFr
   }
 
   return [config, &context, token_bucket_](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<MtlsFailureResponseFilter>(config, context, token_bucket_));
+    filter_manager.addReadFilter(std::make_shared<MtlsFailureResponseFilter>(config, context, token_bucket_));
   };
+
 };
 
 /**

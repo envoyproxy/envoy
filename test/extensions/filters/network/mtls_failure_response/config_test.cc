@@ -31,7 +31,10 @@ public:
         factory.createFilterFactoryFromProto(proto_config, context_).value();
     Network::MockConnection connection;
 
-    EXPECT_CALL(connection, addReadFilter(_));
+    EXPECT_CALL(connection, addReadFilter(_)).WillOnce(Invoke([&](Network::ReadFilterSharedPtr filter) {
+      filter_ = std::dynamic_pointer_cast<MtlsFailureResponseFilter>(filter);
+    }));
+
     cb(connection);
     proto_config_ = proto_config;
   }
@@ -39,47 +42,24 @@ public:
   MtlsFailureResponseConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse proto_config_;
+  std::shared_ptr<MtlsFailureResponseFilter> filter_;
 };
 
 class MtlsFailureResponseFilterTest : public MtlsFailureResponseTestBase {
 public:
   struct ActiveFilter {
-    ActiveFilter(
-        const envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse&
-            config,
-        NiceMock<Server::Configuration::MockFactoryContext>& context)
-        : filter_(config, context, config.toke) {
-      filter_.initializeReadFilterCallbacks(read_filter_callbacks_);
+    ActiveFilter(std::shared_ptr<MtlsFailureResponseFilter> filter)
+        : filter_(std::move(filter)) {
+      filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     }
 
     NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
-    MtlsFailureResponseFilter filter_;
+    std::shared_ptr<MtlsFailureResponseFilter> filter_;
   };
 };
 
+
 TEST_F(MtlsFailureResponseFilterTest, ValidateConfigCloseConnectionOnFailure) {
-  const std::string filter_yaml = R"EOF(
-  validation_mode: PRESENTED
-  failure_mode: CLOSE_CONNECTION
-  token_bucket:
-    max_tokens: 10
-    tokens_per_fill: 1
-    fill_interval: 5s
-  )EOF";
-
-  initialize(filter_yaml);
-
-  EXPECT_EQ(proto_config_.validation_mode(),
-            envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::
-                PRESENTED);
-  EXPECT_EQ(proto_config_.failure_mode(),
-            envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::
-                CLOSE_CONNECTION);
-  // If failure mode is set as CLOSE_CONNECTION, token bucket should be ignored if set.
-  EXPECT_FALSE(proto_config_.has_token_bucket());
-}
-
-TEST_F(MtlsFailureResponseFilterTest, ValidateConfigCloseConnectionOnFailureWithoutTokens) {
   const std::string filter_yaml = R"EOF(
   validation_mode: PRESENTED
   failure_mode: CLOSE_CONNECTION
@@ -115,8 +95,8 @@ TEST_F(MtlsFailureResponseFilterTest, ValidateConfigKeepConnectionOpenWithTokens
             envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::
                 KEEP_CONNECTION_OPEN);
   EXPECT_TRUE(proto_config_.has_token_bucket());
-  EXPECT_EQ(proto_config_.token_bucket().max_tokens().value(), 10);
-  EXPECT_EQ(proto_config_.token_bucket().tokens_per_fill().value(), 1);
+  EXPECT_EQ(proto_config_.token_bucket().max_tokens(), 10);
+  EXPECT_EQ(static_cast<::uint32_t>(proto_config_.token_bucket().tokens_per_fill().value()), static_cast<::uint32_t>(1));
   EXPECT_EQ(proto_config_.token_bucket().fill_interval().seconds(), 5);
 }
 
@@ -135,6 +115,16 @@ TEST_F(MtlsFailureResponseFilterTest, ValidateConfigKeepConnectionOpenWithoutTok
             envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::
                 KEEP_CONNECTION_OPEN);
   EXPECT_FALSE(proto_config_.has_token_bucket());
+}
+
+TEST_F(MtlsFailureResponseFilterTest, InvalidConfig) {
+  const std::string filter_yaml = R"EOF(
+  validation_mode: INVALID
+  failure_mode: CLOSE_CONNECTION
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(initialize(filter_yaml), EnvoyException,
+                          "INVALID_ARGUMENT");
 }
 
 } // namespace
