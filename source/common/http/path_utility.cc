@@ -25,14 +25,14 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
   return absl::make_optional(std::move(canonical_path));
 }
 
-void unescapeInPath(std::string& path, absl::string_view escape_sequence,
-                    absl::string_view substitution) {
-  std::vector<absl::string_view> split = absl::StrSplit(path, escape_sequence);
-  if (split.size() == 1) {
-    return;
-  }
-  path = absl::StrJoin(split, substitution);
-}
+//void unescapeInPath(std::string& path, absl::string_view escape_sequence,
+//                    absl::string_view substitution) {
+//  std::vector<absl::string_view> split = absl::StrSplit(path, escape_sequence);
+//  if (split.size() == 1) {
+//    return;
+//  }
+//  path = absl::StrJoin(split, substitution);
+//}
 
 } // namespace
 
