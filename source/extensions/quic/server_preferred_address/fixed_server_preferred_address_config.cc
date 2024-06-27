@@ -58,13 +58,13 @@ parseIpAddressFromSocketAddress(const envoy::config::core::v3::SocketAddress& ad
   return socket_addr.host();
 }
 
-ServerPreferredAddressConfig::FamilyAddresses
+ServerPreferredAddressConfig::IpVersionConfig
 parseFamily(const std::string& addr_string,
             const envoy::extensions::quic::server_preferred_address::v3::
                 FixedServerPreferredAddressConfig::AddressFamilyConfig* addresses,
             Network::Address::IpVersion version, absl::string_view address_family,
             const Protobuf::Message& message) {
-  ServerPreferredAddressConfig::FamilyAddresses ret;
+  ServerPreferredAddressConfig::IpVersionConfig ret;
   if (addresses != nullptr) {
     if (addresses->has_dnat_address() && !addresses->has_address()) {
       ProtoExceptionUtil::throwProtoValidationException(
@@ -109,10 +109,10 @@ FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
                                            FixedServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
 
-  ServerPreferredAddressConfig::FamilyAddresses v4 =
+  ServerPreferredAddressConfig::IpVersionConfig v4 =
       parseFamily(config.ipv4_address(), config.has_ipv4_config() ? &config.ipv4_config() : nullptr,
                   Network::Address::IpVersion::v4, "v4", message);
-  ServerPreferredAddressConfig::FamilyAddresses v6 =
+  ServerPreferredAddressConfig::IpVersionConfig v6 =
       parseFamily(config.ipv6_address(), config.has_ipv6_config() ? &config.ipv6_config() : nullptr,
                   Network::Address::IpVersion::v6, "v6", message);
 

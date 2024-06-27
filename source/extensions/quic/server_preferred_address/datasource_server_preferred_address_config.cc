@@ -35,13 +35,13 @@ quic::QuicIpAddress parseIp(const envoy::config::core::v3::DataSource& source,
   return ip;
 }
 
-ServerPreferredAddressConfig::FamilyAddresses
+ServerPreferredAddressConfig::IpVersionConfig
 parseFamily(const envoy::extensions::quic::server_preferred_address::v3::
                 DataSourceServerPreferredAddressConfig::AddressFamilyConfig& addresses,
             quiche::IpAddressFamily address_family, absl::string_view address_family_str,
             const Protobuf::Message& message,
             Server::Configuration::ServerFactoryContext& context) {
-  ServerPreferredAddressConfig::FamilyAddresses ret;
+  ServerPreferredAddressConfig::IpVersionConfig ret;
 
   const quic::QuicIpAddress spa_addr =
       parseIp(addresses.address(), address_family, address_family_str, message, context);
@@ -92,12 +92,12 @@ DataSourceServerPreferredAddressConfigFactory::createServerPreferredAddressConfi
                                            DataSourceServerPreferredAddressConfig&>(
           message, validation_visitor);
 
-  ServerPreferredAddressConfig::FamilyAddresses v4;
+  ServerPreferredAddressConfig::IpVersionConfig v4;
   if (config.has_ipv4_config()) {
     v4 = parseFamily(config.ipv4_config(), quiche::IpAddressFamily::IP_V4, "v4", message, context);
   }
 
-  ServerPreferredAddressConfig::FamilyAddresses v6;
+  ServerPreferredAddressConfig::IpVersionConfig v6;
   if (config.has_ipv6_config()) {
     v6 = parseFamily(config.ipv6_config(), quiche::IpAddressFamily::IP_V6, "v6", message, context);
   }
