@@ -95,8 +95,8 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
 
   // optimize this by adding case insensitive matcher
-  const std::string decoded_path {absl::StrReplaceAll(path,
-    {{"%2F", "/"},{"%2f", "/"}, {"%5C", "\\"}, {"%5c", "\\"}})};
+  const std::string decoded_path = absl::StrReplaceAll(path,
+    {{"%2F", "/"},{"%2f", "/"}, {"%5C", "\\"}, {"%5c", "\\"}});
   headers.setPath(absl::StrCat(decoded_path, query));
   // Path length will not match if there were unescaped %2f or %5c
   return headers.getPathValue().length() != original_length
