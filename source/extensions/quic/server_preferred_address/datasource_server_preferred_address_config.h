@@ -9,6 +9,9 @@
 namespace Envoy {
 namespace Quic {
 
+// This method of configuring server preferred address allows fetching the config from
+// a `DataSource`, for situations where the control plane doesn't know the correct value
+// but it is available in the context in which Envoy is running.
 class DataSourceServerPreferredAddressConfigFactory
     : public Envoy::Quic::EnvoyQuicServerPreferredAddressConfigFactory {
 public:

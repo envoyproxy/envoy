@@ -37,46 +37,45 @@ quic::QuicIpAddress parseIp(const envoy::config::core::v3::DataSource& source,
 
 ServerPreferredAddressConfig::FamilyAddresses
 parseFamily(const envoy::extensions::quic::server_preferred_address::v3::
-                DataSourceServerPreferredAddressConfig::AddressFamilyConfig* addresses,
+                DataSourceServerPreferredAddressConfig::AddressFamilyConfig& addresses,
             quiche::IpAddressFamily address_family, absl::string_view address_family_str,
             const Protobuf::Message& message,
             Server::Configuration::ServerFactoryContext& context) {
   ServerPreferredAddressConfig::FamilyAddresses ret;
-  if (addresses != nullptr) {
-    const quic::QuicIpAddress spa_addr =
-        parseIp(addresses->address(), address_family, address_family_str, message, context);
 
-    if (!addresses->has_dnat_address() && addresses->has_port()) {
+  const quic::QuicIpAddress spa_addr =
+      parseIp(addresses.address(), address_family, address_family_str, message, context);
+
+  if (!addresses.has_dnat_address() && addresses.has_port()) {
+    ProtoExceptionUtil::throwProtoValidationException(
+        fmt::format("port must be unset unless 'dnat_address' is set "
+                    "for address family {}",
+                    address_family_str),
+        message);
+  }
+
+  uint16_t spa_port = 0;
+  if (addresses.has_port()) {
+    std::string port_str = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(addresses.port(), false, context.api()), std::string);
+
+    // absl::SimpleAtoi doesn't work with uint16_t, so first convert to uint32_t.
+    uint32_t big_port = 0;
+    const bool success = absl::SimpleAtoi(port_str, &big_port);
+    if (!success || big_port > UINT16_MAX) {
       ProtoExceptionUtil::throwProtoValidationException(
-          fmt::format("port must be unset unless 'dnat_address' is set "
-                      "for address family {}",
-                      address_family_str),
+          absl::StrCat("server preferred address ", address_family_str,
+                       " port was not a valid port: ", port_str),
           message);
     }
 
-    uint16_t spa_port = 0;
-    if (addresses->has_port()) {
-      std::string port_str = THROW_OR_RETURN_VALUE(
-          Config::DataSource::read(addresses->port(), false, context.api()), std::string);
+    spa_port = big_port;
+  }
+  ret.spa_ = quic::QuicSocketAddress(spa_addr, spa_port);
 
-      // absl::SimpleAtoi doesn't work with uint16_t, so first convert to uint32_t.
-      uint32_t big_port = 0;
-      const bool success = absl::SimpleAtoi(port_str, &big_port);
-      if (!success || big_port > UINT16_MAX) {
-        ProtoExceptionUtil::throwProtoValidationException(
-            absl::StrCat("server preferred address ", address_family_str,
-                         " port was not a valid port: ", port_str),
-            message);
-      }
-
-      spa_port = big_port;
-    }
-    ret.spa_ = quic::QuicSocketAddress(spa_addr, spa_port);
-
-    if (addresses->has_dnat_address()) {
-      ret.dnat_ =
-          parseIp(addresses->dnat_address(), address_family, address_family_str, message, context);
-    }
+  if (addresses.has_dnat_address()) {
+    ret.dnat_ =
+        parseIp(addresses.dnat_address(), address_family, address_family_str, message, context);
   }
 
   return ret;
@@ -93,12 +92,15 @@ DataSourceServerPreferredAddressConfigFactory::createServerPreferredAddressConfi
                                            DataSourceServerPreferredAddressConfig&>(
           message, validation_visitor);
 
-  ServerPreferredAddressConfig::FamilyAddresses v4 =
-      parseFamily(config.has_ipv4_config() ? &config.ipv4_config() : nullptr,
-                  quiche::IpAddressFamily::IP_V4, "v4", message, context);
-  ServerPreferredAddressConfig::FamilyAddresses v6 =
-      parseFamily(config.has_ipv6_config() ? &config.ipv6_config() : nullptr,
-                  quiche::IpAddressFamily::IP_V6, "v6", message, context);
+  ServerPreferredAddressConfig::FamilyAddresses v4;
+  if (config.has_ipv4_config()) {
+    v4 = parseFamily(config.ipv4_config(), quiche::IpAddressFamily::IP_V4, "v4", message, context);
+  }
+
+  ServerPreferredAddressConfig::FamilyAddresses v6;
+  if (config.has_ipv6_config()) {
+    v6 = parseFamily(config.ipv6_config(), quiche::IpAddressFamily::IP_V6, "v6", message, context);
+  }
 
   return std::make_unique<ServerPreferredAddressConfig>(v4, v6);
 }
