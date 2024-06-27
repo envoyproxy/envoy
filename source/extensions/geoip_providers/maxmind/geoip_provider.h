@@ -86,7 +86,19 @@ private:
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
-using MaxmindDbSharedPtr = std::shared_ptr<MMDB_s>;
+// Wrapper class for MMDB_s type that ensures a proper cleanup of the MMDB_s
+// instance resources prior to its destruction.
+class MaxmindDb {
+public:
+  MaxmindDb(MMDB_s&& db) : db_(db) {}
+  ~MaxmindDb() { MMDB_close(&db_); }
+  const MMDB_s& get() const { return db_; }
+
+private:
+  MMDB_s db_;
+};
+
+using MaxmindDbSharedPtr = std::shared_ptr<MaxmindDb>;
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
