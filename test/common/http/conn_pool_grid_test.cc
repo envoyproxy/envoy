@@ -308,7 +308,7 @@ TEST_F(ConnectivityGridTest, DoubleFailureThenSuccessSerial) {
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
-// Test all three connections in paralle, H3 failing and TCP connecting.
+// Test all three connections in parallel, H3 failing and TCP connecting.
 TEST_F(ConnectivityGridTest, ParallelConnectionsTcpConnects) {
   initialize();
   grid_->alternate_immediate_ = false;
