@@ -357,8 +357,7 @@ public:
           envoy_grpc_max_recv_msg_length);
     }
 
-    config.mutable_envoy_grpc()->mutable_send_envoy_generated_header()->set_value(
-        send_envoy_generated_header_);
+    config.mutable_envoy_grpc()->mutable_skip_envoy_headers()->set_value(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
@@ -401,12 +400,12 @@ public:
     // "x-envoy-internal" and `x-forward-for` headers are only available in envoy gRPC path.
     // They will be removed when either envoy gRPC config or stream option is false.
     if (getClientType() == ClientType::EnvoyGrpc) {
-      if (send_envoy_generated_header_ && send_internal_header_stream_option_) {
+      if (!skip_envoy_headers_ && send_internal_header_stream_option_) {
         EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
       } else {
         EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
       }
-      if (send_envoy_generated_header_ && send_xff_header_stream_option_) {
+      if (!skip_envoy_headers_ && send_xff_header_stream_option_) {
         EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
       } else {
         EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
@@ -554,7 +553,7 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
-  bool send_envoy_generated_header_{true};
+  bool skip_envoy_headers_{false};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
 };
