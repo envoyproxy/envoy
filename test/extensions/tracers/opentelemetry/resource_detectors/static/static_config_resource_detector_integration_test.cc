@@ -57,7 +57,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StaticConfigResourceDetectorIntegrationTest
                          TestUtility::ipTestParamsToString);
 
 // Verify Envoy starts even when the Static Config resource detector doesn't have attributes
-TEST_P(StaticConfigResourceDetectorIntegrationTest, TestWithNoEnvVariableSet) {
+TEST_P(StaticConfigResourceDetectorIntegrationTest, TestWithNoAttributeSet) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
