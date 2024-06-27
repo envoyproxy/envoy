@@ -125,7 +125,7 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-      auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
           tls_context, factory_context_);
       // upstream_stats_store_ should have been initialized be prior call to
       // BaseIntegrationTest::createXdsUpstream().
