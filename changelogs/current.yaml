@@ -70,6 +70,13 @@ minor_behavior_changes:
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: jwt_authn
+  change: |
+    Changes the behavior of the
+    :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
+    config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
+    used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
