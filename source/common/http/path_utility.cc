@@ -94,14 +94,13 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
 
   // TODO(yanavlasov): optimize this by adding case insensitive matcher
   std::string decoded_path{path};
-  unescapeInPath(decoded_path, "%2F", "/");
-  unescapeInPath(decoded_path, "%2f", "/");
-  unescapeInPath(decoded_path, "%5C", "\\");
-  unescapeInPath(decoded_path, "%5c", "\\");
-  headers.setPath(absl::StrCat(decoded_path, query));
   std::map<const char*, const char*> replacements;
   replacements["%2F"] = "/";
-  std::string decoded_path2 = absl::StrReplaceAll(decoded_path, replacements);
+  replacements["%2f"] = "/";
+  replacements["%5C"] = "\\";
+  replacements["%5c"] = "\\";
+  headers.setPath(absl::StrCat(absl::StrReplaceAll(decoded_path, replacements), query));
+
   // Path length will not match if there were unescaped %2f or %5c
   return headers.getPathValue().length() != original_length
              ? UnescapeSlashesResult::FoundAndUnescaped
