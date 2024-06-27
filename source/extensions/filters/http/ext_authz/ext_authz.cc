@@ -237,9 +237,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
-          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+      sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                     Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
@@ -707,7 +706,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // setResponseFlag must be called before sendLocalReply
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-    decoder_callbacks_->sendLocalReply(
+    sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
          &callbacks = *decoder_callbacks_](Http::HeaderMap& response_headers) -> void {
@@ -752,9 +751,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
-          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+      sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                     Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
@@ -771,9 +769,17 @@ void Filter::rejectResponse() {
   stats_.invalid_.inc();
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-  decoder_callbacks_->sendLocalReply(
-      status, EMPTY_STRING, nullptr, absl::nullopt,
-      Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
+  sendLocalReply(status, EMPTY_STRING, nullptr, absl::nullopt,
+                 Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
+}
+
+void Filter::sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                            std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                            absl::string_view details) {
+  setLoggingInfo();
+  decoder_callbacks_->sendLocalReply(response_code, body_text, modify_headers, grpc_status,
+                                     details);
 }
 
 bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
@@ -793,12 +799,13 @@ bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
 void Filter::setLoggingInfo() {
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
-    filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  if (filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    return;
   }
+  filter_state->setData(decoder_callbacks_->filterConfigName(),
+                        std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                        Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+                        Envoy::StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void Filter::continueDecoding() {

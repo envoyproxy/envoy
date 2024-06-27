@@ -328,6 +328,12 @@ private:
   // code.
   void rejectResponse();
 
+  // Convenience function for setting logging info (if unset) and then send local reply.
+  void sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                      std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
+
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);

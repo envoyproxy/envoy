@@ -86,8 +86,6 @@ public:
         uri: "ext_authz:9000"
         cluster: "ext_authz"
         timeout: 0.25s
-    filter_metadata:
-      foo: "bar"
     )EOF";
 
     const std::string grpc_config = R"EOF(
@@ -95,8 +93,6 @@ public:
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    filter_metadata:
-      foo: "bar"
     )EOF";
 
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -2896,8 +2892,16 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
-TEST_P(HttpFilterTestParam, LoggingInfo) {
+TEST_F(HttpFilterTest, LoggingInfoOK) {
   InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_metadata:
+    foo: "bar"
+  )EOF");
 
   prepareCheck();
 
@@ -2914,6 +2918,185 @@ TEST_P(HttpFilterTestParam, LoggingInfo) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
+}
+
+TEST_F(HttpFilterTest, LoggingInfoEmpty) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  EXPECT_TRUE(logging_info->filterMetadata().fields().empty());
+}
+
+TEST_F(HttpFilterTest, LoggingInfoLocalReplyDenyAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_metadata:
+    foo: "bar"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: true
+  )EOF");
+
+  prepareCheck();
+
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(true));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
+}
+
+TEST_F(HttpFilterTest, LoggingInfoLocalReplyError) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_metadata:
+    foo: "bar"
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
+}
+
+TEST_F(HttpFilterTest, LoggingInfoLocalReplyDenied) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_metadata:
+    foo: "bar"
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
+}
+
+TEST_F(HttpFilterTest, LoggingInfoLocalReplyRejectResponse) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_metadata:
+    foo: "bar"
+  validate_mutations: true
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{"invalid\n\nkey", "boooo"}};
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
 
   auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
