@@ -79,8 +79,8 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
     // - int64, uint64 as number
     // - everything else as string via print
     //
-    // Handling all value types here would be graceful but is not currently 
-    // testable and drives down coverage %. This is not a _great_ reason to 
+    // Handling all value types here would be graceful but is not currently
+    // testable and drives down coverage %. This is not a _great_ reason to
     // not do it; will get feedback from reviewers.
     ProtobufWkt::Value value;
     switch (result.value().type()) {
