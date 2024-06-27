@@ -134,7 +134,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
   } else {
     // Unexpected response from external authz server is interpreted as failure
     ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
-              Grpc::Utility::grpcStatusToString(authz_response->status_code));
+              Grpc::Utility::grpcStatusToString(response->status().code()));
     authz_response->status = CheckStatus::Error;
     authz_response->status_code = Http::Code::Forbidden;
   }
