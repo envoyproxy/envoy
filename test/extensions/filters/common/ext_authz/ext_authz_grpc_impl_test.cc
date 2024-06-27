@@ -436,6 +436,43 @@ ok_response:
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
                      span_);
 }
+// Test the client when an error code response is received.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
+  initialize();
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = check_response->mutable_status();
+
+  ProtobufWkt::Struct expected_dynamic_metadata;
+  auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
+  (*metadata_fields)["foo"] = ValueUtil::stringValue("ok");
+  (*metadata_fields)["bar"] = ValueUtil::numberValue(1);
+
+  // The expected dynamic metadata is set to the outer check response, hence regardless the
+  // check_response's http_response value (either OkHttpResponse or DeniedHttpResponse) the dynamic
+  // metadata is set to be equal to the check response's dynamic metadata.
+  check_response->mutable_dynamic_metadata()->MergeFrom(expected_dynamic_metadata);
+
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Unavailable);
+
+  // This is the expected authz response.
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::OK;
+
+  authz_response.dynamic_metadata = expected_dynamic_metadata;
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
 
 } // namespace ExtAuthz
 } // namespace Common
