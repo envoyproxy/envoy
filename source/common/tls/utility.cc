@@ -297,9 +297,13 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_BMPSTRING: {
-      ASN1_BMPSTRING* tmp_str = value->value.bmpstring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
-                 ASN1_STRING_length(tmp_str));
+      // `ASN1_BMPSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
+      unsigned char* tmp = nullptr;
+      if (ASN1_STRING_to_UTF8(&tmp, value->value.bmpstring) < 0) {
+        break;
+      }
+      san.assign(reinterpret_cast<const char*>(tmp));
+      OPENSSL_free(tmp);
       break;
     }
     case V_ASN1_UNIVERSALSTRING: {

@@ -322,6 +322,22 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMat
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+// Test to check if the cert has an OtherName SAN
+// with a BMPString type value "BMPStringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBmpStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.14", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("BMPStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
 // Test to check if the cert has an OtherName SAN with a SET type
 // containing select values "test1" and "test2".
 // SET is a non-primitive type containing multiple values and is DER-encoded.
