@@ -437,7 +437,7 @@ ok_response:
                      span_);
 }
 // Test the client when an error code response is received.
-TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationReturnsErrorOnBadGrpcCode) {
   initialize();
 
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
