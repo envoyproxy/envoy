@@ -58,25 +58,12 @@ public:
                                absl::optional<uint64_t> bytes_received,
                                Upstream::ClusterInfoConstSharedPtr cluster_info,
                                Upstream::HostDescriptionConstSharedPtr upstream_host)
-      : filter_metadata_(filter_metadata), latency_(latency), bytes_sent_(bytes_sent),
-        bytes_received_(bytes_received), cluster_info_(std::move(cluster_info)),
-        upstream_host_(std::move(upstream_host)) {}
+      : filter_metadata_(filter_metadata) {}
 
   const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
-  std::chrono::microseconds latency() const { return latency_; };
-  absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
-  absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
-  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
-  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
 
 private:
   const Envoy::ProtobufWkt::Struct filter_metadata_;
-  const std::chrono::microseconds latency_;
-  // The following stats are populated for ext_authz filters using Envoy gRPC only.
-  absl::optional<uint64_t> bytes_sent_;
-  absl::optional<uint64_t> bytes_received_;
-  Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
 /**
