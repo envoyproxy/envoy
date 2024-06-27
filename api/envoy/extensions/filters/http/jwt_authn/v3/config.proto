@@ -395,7 +395,7 @@ message RemoteJwks {
   //      cluster: jwt.www.googleapis.com|443
   //      timeout: 1s
   //
-  config.core.v3.HttpUri http_uri = 1;
+  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 10 minutes.

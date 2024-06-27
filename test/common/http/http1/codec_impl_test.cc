@@ -5271,14 +5271,8 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
       {"transfer-encoding", "chunked"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual("Hello World"), false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
-  } else {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  }
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
 
   // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
@@ -5287,11 +5281,10 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
                            "0\r\n\r\n");
   // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0u, buffer.length());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_CHUNK_EXTENSION");
   } else {
-    EXPECT_TRUE(isCodecProtocolError(status));
 #ifdef ENVOY_ENABLE_UHV
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
 #else
@@ -5316,13 +5309,6 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
   };
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("Hello World"), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
-  }
-
   // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6;\ra\r\nHello \r\n"
@@ -5330,11 +5316,10 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
                            "0\r\n\r\n");
   // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0u, buffer.length());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_CHUNK_EXTENSION");
   } else {
-    EXPECT_TRUE(isCodecProtocolError(status));
 #ifdef ENVOY_ENABLE_UHV
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
 #else
