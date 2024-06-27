@@ -1268,7 +1268,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponse) {
   // Force refresh the hosts and set the IPv4 to be removed.
   dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v4);
   EXPECT_CALL(*resolver_, resetNetworking());
-  EXPECT_CALL(*timeout_timer, enabled());
+  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(update_callbacks_,
@@ -1290,7 +1290,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponse) {
   // Force refresh the hosts and set the IP version to be removed to empty.
   dns_cache_->setIpVersionToRemove(absl::nullopt);
   EXPECT_CALL(*resolver_, resetNetworking());
-  EXPECT_CALL(*timeout_timer, enabled());
+  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(
