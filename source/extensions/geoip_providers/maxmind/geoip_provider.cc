@@ -143,15 +143,6 @@ GeoipProvider::~GeoipProvider() {
     mmdb_reload_thread_->join();
     mmdb_reload_thread_.reset();
   }
-  if (city_db_) {
-    MMDB_close(city_db_.get());
-  }
-  if (isp_db_) {
-    MMDB_close(isp_db_.get());
-  }
-  if (anon_db_) {
-    MMDB_close(anon_db_.get());
-  }
 }
 
 void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
@@ -174,7 +165,7 @@ void GeoipProvider::lookupInCityDb(
     auto city_db = getCityDb();
     RELEASE_ASSERT(city_db, "Maxmind city database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        city_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        city_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -216,7 +207,7 @@ void GeoipProvider::lookupInAsnDb(
     auto isp_db = getIspDb();
     RELEASE_ASSERT(isp_db, "Maxmind asn database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        isp_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -244,7 +235,7 @@ void GeoipProvider::lookupInAnonDb(
     auto anon_db = getAnonDb();
     RELEASE_ASSERT(anon_db, "Maxmind anon database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        anon_db.get(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        anon_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;

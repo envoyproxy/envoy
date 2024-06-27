@@ -86,7 +86,21 @@ private:
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
-using MaxmindDbSharedPtr = std::shared_ptr<MMDB_s>;
+class MMDBWrapper {
+public:
+  MMDBWrapper(const MMDB_s& mmdb) { mmdb_ = mmdb; }
+
+  ~MMDBWrapper() {
+      MMDB_close(&mmdb_);
+  }
+
+  const MMDB_s* getMMDB() const { return &mmdb_; }
+
+private:
+  MMDB_s mmdb_;
+};
+
+using MaxmindDbSharedPtr = std::shared_ptr<MMDBWrapper>;
 class GeoipProvider : public Envoy::Geolocation::Driver,
                       public Logger::Loggable<Logger::Id::geolocation> {
 
