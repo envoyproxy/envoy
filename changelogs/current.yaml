@@ -287,6 +287,11 @@ new_features:
     to specify headers that should never be sent to the external authentication service. Overrides
     :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`
     if a header matches both.
+- area: upstream
+  change: |
+    Added a new field to LocalityLbEndpoints, :ref:`LocalityLbEndpoints.Metadata
+    <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`, that may be used for transport socket
+    matching groups of endpoints.
 - area: quic
   change: |
     Added support for QUIC server preferred address when there is a DNAT between the client and Envoy. See
@@ -379,6 +384,11 @@ new_features:
     The RBAC filter will now log the enforced rule to the dynamic metadata field
     "enforced_effective_policy_id" and the result to the dynamic metadata field
     "enforced_engine_result". These are only populated if a non-shadow engine exists.
+- area: jwt_authn
+  change: |
+    Added :ref:`strip_failure_response
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
+    to allow stripping the failure response details from the JWT authentication filter.
 
 deprecated:
 - area: tracing
