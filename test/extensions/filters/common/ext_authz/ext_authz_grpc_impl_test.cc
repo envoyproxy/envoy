@@ -457,7 +457,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   // This is the expected authz response.
   auto authz_response = Response{};
-  authz_response.status = CheckStatus::OK;
+  authz_response.status = CheckStatus::Error;
 
   authz_response.dynamic_metadata = expected_dynamic_metadata;
 
