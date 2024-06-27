@@ -14,7 +14,8 @@
 
 namespace quic {
 class QuicSocketAddress;
-}
+class QuicReceivedPacket;
+} // namespace quic
 
 namespace Envoy {
 
@@ -465,6 +466,10 @@ public:
    */
   virtual FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                                             Connection& connection) PURE;
+
+  virtual FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket&) {
+    return FilterStatus::Continue;
+  };
 };
 
 using QuicListenerFilterPtr = std::unique_ptr<QuicListenerFilter>;
@@ -490,6 +495,7 @@ public:
 
   virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                                     Connection& connection) PURE;
+  virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&){};
 };
 
 /**

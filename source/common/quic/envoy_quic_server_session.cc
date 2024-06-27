@@ -10,6 +10,8 @@
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 
+#include "quiche/quic/core/quic_packets.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -215,6 +217,10 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // If L4 filters causes the connection to be closed early during initialization, now
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
+  if (!first_packet_received_) {
+    onFirstPacketReceived(packet);
+  }
+  first_packet_received_ = true;
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
   if (connection()->expected_server_preferred_address().IsInitialized() &&
       self_address == connection()->expected_server_preferred_address()) {
@@ -243,6 +249,10 @@ EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) 
     }
   }
   return alpns.end();
+}
+
+void EnvoyQuicServerSession::onFirstPacketReceived(const quic::QuicReceivedPacket& packet) {
+  quic_connection_->OnFirstPacketReceived(packet);
 }
 
 } // namespace Quic

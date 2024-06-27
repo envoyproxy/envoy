@@ -2460,5 +2460,35 @@ TEST_P(QuicHttpIntegrationTest, StreamTimeoutWithHalfClose) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacket) {
+  useAccessLog(fmt::format("%FILTER_STATE({}:PLAIN)%", TestFirstPacketReceivedFilterState::key()));
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener_filter =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+    listener_filter->set_name("envoy.filters.quic_listener.test");
+    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+    configuration.set_added_value("foo");
+    configuration.set_allow_server_migration(false);
+    configuration.set_allow_client_migration(false);
+    listener_filter->mutable_typed_config()->PackFrom(configuration);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  codec_client_->close();
+
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  // Log format defined in TestFirstPacketReceivedFilterState::serializeAsString.
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
+  ASSERT_EQ(metrics.size(), 2);
+  // onFirstPacketReceived was called only once.
+  EXPECT_EQ(std::stoi(metrics.at(0)), 1);
+  // first packet has length greater than zero.
+  EXPECT_GT(std::stoi(metrics.at(1)), 0);
+}
+
 } // namespace Quic
 } // namespace Envoy
