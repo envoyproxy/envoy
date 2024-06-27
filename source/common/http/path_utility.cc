@@ -1,11 +1,10 @@
 #include "source/common/http/path_utility.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
 #include "url/url_canon.h"
 #include "url/url_canon_stdstring.h"
