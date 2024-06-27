@@ -256,7 +256,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, XdsFailoverAdsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         DELTA_SOTW_UNIFIED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that when there's no failover defined (but runtime flag enabled),
 // the primary is used.
