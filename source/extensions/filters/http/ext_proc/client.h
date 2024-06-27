@@ -22,6 +22,7 @@ public:
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual void notifyFilterDestroy() PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
