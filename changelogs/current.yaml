@@ -389,6 +389,14 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: ext_authz
+  change: |
+    The http ext_authz extension now emits filter state containing various metrics (check request
+    latency, bytes sent / received, upstream host, cluster info) for access logging. This filter
+    state's key is the ext_authz filter's configured name. Every field except latency is only
+    populated when using an Envoy GRPC client. The new config field
+    :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_metadata>`
+    allows for injecting arbitrary data to the filter state for logging.
 
 deprecated:
 - area: tracing

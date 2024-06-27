@@ -85,6 +85,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
                                                             factory_context.regexEngine()))
               : absl::nullopt),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
+      filter_metadata_(config.filter_metadata()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -402,6 +403,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
+
+  setLoggingInfo();
 
   if (!response->dynamic_metadata.fields().empty()) {
     // Add duration of call to dynamic metadata if applicable
@@ -785,6 +788,20 @@ bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
   }
 
   return num_bytes_buffered >= max_request_bytes_;
+}
+
+void Filter::setLoggingInfo() {
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    filter_state->setData(decoder_callbacks_->filterConfigName(),
+                          std::make_shared<ExtAuthzLoggingInfo>(
+                              config_->filterMetadata(), latency, bytes_sent, bytes_received,
+                              cluster_info ? std::move(*cluster_info) : nullptr,
+                              std::move(upstream_host)),
+                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  }
 }
 
 void Filter::continueDecoding() {

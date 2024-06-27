@@ -53,6 +53,8 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
+constexpr char filter_config_name[] = "ext_authz_filter";
+
 template <class T> class HttpFilterTestBase : public T {
 public:
   HttpFilterTestBase() {}
@@ -84,6 +86,8 @@ public:
         uri: "ext_authz:9000"
         cluster: "ext_authz"
         timeout: 0.25s
+    filter_metadata:
+      foo: "bar"
     )EOF";
 
     const std::string grpc_config = R"EOF(
@@ -91,6 +95,8 @@ public:
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
+    filter_metadata:
+      foo: "bar"
     )EOF";
 
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -102,6 +108,8 @@ public:
   void prepareCheck() {
     ON_CALL(decoder_filter_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+    ON_CALL(decoder_filter_callbacks_, filterConfigName())
+        .WillByDefault(Return(filter_config_name));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
@@ -2886,6 +2894,33 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
                     .counterFromString("ext_authz.ok")
                     .value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+TEST_P(HttpFilterTestParam, LoggingInfo) {
+  InSequence s;
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
 }
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP
