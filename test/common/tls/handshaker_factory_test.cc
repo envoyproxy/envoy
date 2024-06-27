@@ -135,8 +135,8 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       /*config=*/
-      std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, mock_factory_ctx),
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context_,
+                                                                          mock_factory_ctx),
       *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
@@ -161,8 +161,8 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       /*config=*/
-      std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, mock_factory_ctx),
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context_,
+                                                                          mock_factory_ctx),
       *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
@@ -199,8 +199,8 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       /*config=*/
-      std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-          tls_context_, mock_factory_ctx),
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context_,
+                                                                          mock_factory_ctx),
       *context_manager_, *stats_store_.rootScope());
 
   std::unique_ptr<Network::TransportSocket> socket =
@@ -295,11 +295,11 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   EXPECT_CALL(mock_factory_ctx.api_, processContext())
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
-  Extensions::TransportSockets::Tls::ServerContextConfigImpl server_context_config(
+  auto server_context_config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context_, mock_factory_ctx);
-  EXPECT_TRUE(server_context_config.isReady());
+  EXPECT_TRUE(server_context_config->isReady());
   EXPECT_NO_THROW(*context_manager_->createSslServerContext(
-      *stats_store_.rootScope(), server_context_config, std::vector<std::string>{}, nullptr));
+      *stats_store_.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr));
 }
 
 } // namespace
