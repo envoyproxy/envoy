@@ -13,14 +13,12 @@ namespace {
 // to do so.
 TEST(FetchClientTest, Http2) {
   Envoy::Fetch client;
-  // TODO(fredyw): Connecting to www.google.com is currently broken with oghttp2.
-  ASSERT_EQ(client.fetch({"https://www.example.com/"}), ENVOY_SUCCESS);
+  ASSERT_EQ(client.fetch({"https://www.google.com/"}), ENVOY_SUCCESS);
 }
 
 TEST(FetchClientTest, Http3) {
   Envoy::Fetch client;
-  // TODO(fredyw): Connecting to www.google.com is currently broken with oghttp2.
-  ASSERT_EQ(client.fetch({"https://www.example.com/"}, {"www.example.com"}), ENVOY_SUCCESS);
+  ASSERT_EQ(client.fetch({"https://www.google.com/"}, {"www.google.com"}), ENVOY_SUCCESS);
 }
 
 } // namespace

@@ -24,6 +24,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -2455,7 +2456,7 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   connection_socket->setRequestedServerName("envoyproxy.io");
 
   // Start measuring memory and dump state.
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   connection_socket->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 
@@ -2490,7 +2491,7 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
       std::move(mocks.transport_socket_), stream_info_);
 
   // Start measuring memory and dump state.
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   server_connection->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 

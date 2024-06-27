@@ -428,7 +428,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
         dyn_resources.ads_config(), random_,
         Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
         Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
-    THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+    RETURN_IF_STATUS_NOT_OK(strategy_or_error);
     JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
     const bool use_eds_cache =
@@ -449,7 +449,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       }
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+      RETURN_IF_STATUS_NOT_OK(factory_or_error);
       ads_mux_ = factory->create(factory_or_error.value()->createUncachedRawAsyncClient(), nullptr,
                                  dispatcher_, random_, *stats_.rootScope(),
                                  dyn_resources.ads_config(), local_info_,
@@ -472,7 +472,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       }
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+      RETURN_IF_STATUS_NOT_OK(factory_or_error);
       ads_mux_ = factory->create(
           factory_or_error.value()->createUncachedRawAsyncClient(), nullptr, dispatcher_, random_,
           *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
@@ -526,10 +526,11 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   if (dyn_resources.has_cds_config() || !dyn_resources.cds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> cds_resources_locator;
     if (!dyn_resources.cds_resources_locator().empty()) {
+      auto url_or_error =
+          Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator());
+      RETURN_IF_STATUS_NOT_OK(url_or_error);
       cds_resources_locator =
-          std::make_unique<xds::core::v3::ResourceLocator>(THROW_OR_RETURN_VALUE(
-              Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()),
-              xds::core::v3::ResourceLocator));
+          std::make_unique<xds::core::v3::ResourceLocator>(std::move(url_or_error.value()));
     }
     cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
     init_helper_.setCds(cds_api_.get());
@@ -568,7 +569,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     RETURN_IF_NOT_OK(status);
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
         *async_client_manager_, load_stats_config, *stats_.rootScope(), false);
-    THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+    RETURN_IF_STATUS_NOT_OK(factory_or_error);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(),
         factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_);

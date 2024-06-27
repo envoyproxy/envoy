@@ -53,14 +53,14 @@ public:
 
     if (absl::StartsWith(destination_address, "/")) {
       res->connection_info_provider_->setLocalAddress(
-          std::make_shared<Network::Address::PipeInstance>(destination_address));
+          *Network::Address::PipeInstance::create(destination_address));
     } else {
       res->connection_info_provider_->setLocalAddress(
           Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port));
     }
     if (absl::StartsWith(source_address, "/")) {
       res->connection_info_provider_->setRemoteAddress(
-          std::make_shared<Network::Address::PipeInstance>(source_address));
+          *Network::Address::PipeInstance::create(source_address));
     } else {
       res->connection_info_provider_->setRemoteAddress(
           Network::Utility::parseInternetAddressNoThrow(source_address, source_port));
