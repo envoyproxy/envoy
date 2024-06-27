@@ -71,7 +71,6 @@ static const void *ios_http_filter_init(const void *context) {
     if (filter.onError == nil) {
       c_filter->on_error = NULL;
     }
-    c_filter->on_data_available = NULL;
 
     return CFBridgingRetain(filter);
   }
