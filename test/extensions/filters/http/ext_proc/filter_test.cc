@@ -180,7 +180,7 @@ protected:
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      const Envoy::Http::AsyncClient::StreamOptions&,
-                                     Envoy::Http::StreamDecoderFilterCallbacks*) {
+                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) {
     if (final_expected_grpc_service_.has_value()) {
       EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
                                           config_with_hash_key.config()));

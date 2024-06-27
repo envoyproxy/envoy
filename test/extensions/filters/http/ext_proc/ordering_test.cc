@@ -87,7 +87,7 @@ protected:
   virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                              const Grpc::GrpcServiceConfigWithHashKey&,
                                              const Envoy::Http::AsyncClient::StreamOptions&,
-                                             Envoy::Http::StreamDecoderFilterCallbacks*) {
+                                             Envoy::Http::DecoderFilterWatermarkCallbacks*) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -226,7 +226,7 @@ class FastFailOrderingTest : public OrderingTest {
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const Grpc::GrpcServiceConfigWithHashKey&,
                                      const Envoy::Http::AsyncClient::StreamOptions&,
-                                     Envoy::Http::StreamDecoderFilterCallbacks*) override {
+                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) override {
     callbacks.onGrpcError(Grpc::Status::Internal);
     // Returns nullptr on start stream failure.
     return nullptr;

@@ -30,7 +30,7 @@ public:
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
-        Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks) override;
+        Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) override;
 
 private:
   Grpc::AsyncClientManager& client_manager_;
@@ -45,7 +45,7 @@ public:
   static ExternalProcessorStreamPtr
   create(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
          ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
-         Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks);
+         Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks);
 
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we

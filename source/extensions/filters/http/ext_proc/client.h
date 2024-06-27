@@ -43,7 +43,7 @@ public:
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
-        Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks) PURE;
+        Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

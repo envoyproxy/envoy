@@ -98,7 +98,7 @@ DEFINE_PROTO_FUZZER(
       .WillRepeatedly(Invoke([&](ExternalProcessing::ExternalProcessorCallbacks&,
                                  const Grpc::GrpcServiceConfigWithHashKey&,
                                  const Envoy::Http::AsyncClient::StreamOptions&,
-                                 Envoy::Http::StreamDecoderFilterCallbacks*)
+                                 Envoy::Http::DecoderFilterWatermarkCallbacks*)
                                  -> ExternalProcessing::ExternalProcessorStreamPtr {
         auto stream = std::make_unique<MockStream>();
         EXPECT_CALL(*stream, send(_, _))
