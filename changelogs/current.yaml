@@ -32,6 +32,11 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: composite_filter
+  change: |
+    Adding support for
+    :ref:`sample_percent <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.sample_percent>`.
+    It specifies the probability of the action execution. If not specified, it is 100%.
 - area: golang
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
