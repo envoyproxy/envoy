@@ -143,5 +143,5 @@ envoy_cc_test(
     ],
     deps = [
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
-    ]
+    ],
 )

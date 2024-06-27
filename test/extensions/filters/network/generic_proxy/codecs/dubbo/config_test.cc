@@ -302,6 +302,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     buffer.writeBEInt<int32_t>(1);
     buffer.writeByte('N');
 
+    EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _));
     EXPECT_CALL(callbacks, writeToConnection(_));
     server_codec.decode(buffer, false);
   }
@@ -442,6 +443,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     buffer.writeBEInt<int32_t>(1);
     buffer.writeByte('N');
 
+    EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _));
     EXPECT_CALL(callbacks, writeToConnection(_));
     client_codec.decode(buffer, false);
   }

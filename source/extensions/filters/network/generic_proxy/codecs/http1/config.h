@@ -144,15 +144,21 @@ public:
   static uint64_t statusToHttpStatus(absl::StatusCode status_code);
 };
 
+// ActiveRequest is used to store the state of server codec for decoding a request
+// and encoding a response.
 struct ActiveRequest {
   Http::RequestHeaderMapPtr request_headers_;
+  bool request_has_body_{};
 
   bool request_complete_{};
   bool response_chunk_encoding_{};
 };
 
+// ExpectResponse is used to store the state of client codec for decoding a response
+// and encoding a request.
 struct ExpectResponse {
   Http::ResponseHeaderMapPtr response_headers_;
+  bool response_has_body_{};
 
   bool request_complete_{};
   bool head_request_{};
@@ -245,7 +251,7 @@ public:
 
   bool decodeBuffer(Buffer::Instance& buffer);
 
-  void dispatchBufferedBody(bool end_stream);
+  bool dispatchBufferedBody(bool end_stream);
   bool bufferedBodyOverflow();
 
   virtual Http::HeaderMap& headerMap() PURE;
@@ -296,7 +302,7 @@ public:
   void setCodecCallbacks(ServerCodecCallbacks& callbacks) override { callbacks_ = &callbacks; }
   void decode(Envoy::Buffer::Instance& buffer, bool) override {
     if (!decodeBuffer(buffer)) {
-      callbacks_->onDecodingFailure();
+      onDecodingFailure();
     }
   }
   EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
@@ -357,7 +363,7 @@ public:
   void setCodecCallbacks(ClientCodecCallbacks& callbacks) override { callbacks_ = &callbacks; }
   void decode(Envoy::Buffer::Instance& buffer, bool) override {
     if (!decodeBuffer(buffer)) {
-      callbacks_->onDecodingFailure();
+      onDecodingFailure();
     }
   }
   EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;

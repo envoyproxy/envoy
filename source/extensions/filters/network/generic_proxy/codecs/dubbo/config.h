@@ -119,7 +119,7 @@ public:
         decode_status = codec_->decodeData(buffer, *metadata_);
       }
 
-      // Ingore DecodeStatus::Failure as the codec will never return it.
+      // Ignore DecodeStatus::Failure as the codec will never return it.
       // TODO(wbpcode): make the codec exception free and handle the error status of the codec.
 
       if (decode_status == Common::Dubbo::DecodeStatus::Waiting) {

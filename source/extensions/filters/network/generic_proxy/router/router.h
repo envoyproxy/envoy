@@ -154,7 +154,7 @@ public:
     max_retries_ = route_entry_ ? route_entry->retryPolicy().numRetries() : 1;
   }
 
-  size_t upstreamRequestsSize() { return upstream_requests_.size(); }
+  size_t upstreamRequestsSize() { return upstream_request_ != nullptr ? 1 : 0; }
 
   // Upstream::LoadBalancerContextBase
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
@@ -168,7 +168,6 @@ private:
   friend class UpstreamManagerImpl;
 
   void kickOffNewUpstreamRequest();
-  void resetStream(StreamResetReason reason, absl::string_view reason_detail);
   void completeAndSendLocalReply(absl::Status status, absl::string_view details,
                                  absl::optional<StreamInfo::CoreResponseFlag> flag = {});
 
@@ -204,7 +203,9 @@ private:
 
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_;
 
-  std::list<UpstreamRequestPtr> upstream_requests_;
+  // Only allow one upstream request at a time. This is a simplification of the code that may be
+  // changed in the future.
+  UpstreamRequestPtr upstream_request_;
   Envoy::Event::TimerPtr timeout_timer_;
 
   DecoderFilterCallback* callbacks_{};

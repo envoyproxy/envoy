@@ -216,17 +216,15 @@ void BoundGenericUpstream::cleanUp(bool close_connection) {
 }
 
 void BoundGenericUpstream::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected ||
-      event == Network::ConnectionEvent::ConnectedZeroRtt) {
-    return;
-  }
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    if (encoder_decoder_ != nullptr) {
+      encoder_decoder_->onConnectionClose(event);
+    }
 
-  if (encoder_decoder_ != nullptr) {
-    encoder_decoder_->onConnectionClose(event);
+    // If the downstream connection is not closed, close it.
+    downstream_conn_.close(Network::ConnectionCloseType::FlushWrite);
   }
-
-  // If the downstream connection is not closed, close it.
-  downstream_conn_.close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void BoundGenericUpstream::onUpstreamSuccess() {
@@ -290,17 +288,18 @@ void OwnedGenericUpstream::removeUpstreamRequest(uint64_t) {
 }
 
 void OwnedGenericUpstream::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected ||
-      event == Network::ConnectionEvent::ConnectedZeroRtt) {
-    return;
-  }
-  if (encoder_decoder_ != nullptr) {
-    encoder_decoder_->onConnectionClose(event);
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    if (encoder_decoder_ != nullptr) {
+      encoder_decoder_->onConnectionClose(event);
+    }
   }
 }
 
 void OwnedGenericUpstream::onUpstreamSuccess() {
   ASSERT(upstream_request_ != nullptr);
+  ASSERT(encoder_decoder_ != nullptr);
+
   auto upstream_request = upstream_request_;
   upstream_request_ = nullptr;
 

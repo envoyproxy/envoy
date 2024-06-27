@@ -28,6 +28,7 @@ static constexpr uint32_t DEFAULT_MAX_BUFFER_SIZE = 8 * 1024 * 1024;
 static constexpr absl::string_view _100_CONTINUE_RESPONSE = "HTTP/1.1 100 Continue\r\n"
                                                             "content-length: 0\r\n"
                                                             "\r\n";
+static constexpr absl::string_view ZERO_VIEW = "0";
 
 void encodeNormalHeaders(Buffer::Instance& buffer, const Http::RequestOrResponseHeaderMap& headers,
                          bool chunk_encoding) {
@@ -49,7 +50,7 @@ void encodeNormalHeaders(Buffer::Instance& buffer, const Http::RequestOrResponse
 
   if (chunk_encoding) {
     if (headers.TransferEncoding() == nullptr) {
-      buffer.add("Transfer-Encoding: chunked\r\n");
+      buffer.add("transfer-encoding: chunked\r\n");
     }
   }
 }
@@ -117,8 +118,7 @@ absl::Status Utility::validateRequestHeaders(Http::RequestHeaderMap& headers) {
   return absl::OkStatus();
 }
 
-absl::Status Utility::validateResponseHeaders(Http::ResponseHeaderMap& headers,
-                                              Envoy::Http::Code code) {
+absl::Status Utility::validateResponseHeaders(Http::ResponseHeaderMap& headers, Http::Code code) {
   if (auto status = validateCommonHeaders(headers); !status.ok()) {
     return status;
   }
@@ -126,21 +126,18 @@ absl::Status Utility::validateResponseHeaders(Http::ResponseHeaderMap& headers,
   ASSERT(headers.Status() != nullptr);
 
   if (code < Http::Code::OK || code == Http::Code::NoContent || code == Http::Code::NotModified) {
-    // There is no clear description in the RFC about the transfer-encoding behavior
-    // of NotModified response. But 1xx, 204 responses should not have transfer-encoding.
-    // See https://datatracker.ietf.org/doc/html/rfc9112#section-6.1-6
-    if (code != Http::Code::NotModified) {
-      if (headers.TransferEncoding() != nullptr) {
-        return absl::InvalidArgumentError("transfer-encoding is set for 1xx, 204 response");
-      }
+    // 1xx, 204 responses should not have transfer-encoding. See
+    // https://datatracker.ietf.org/doc/html/rfc9112#section-6.1-6.
+    // There is no clear description in the RFC about the transfer-encoding behavior of NotModified
+    // response. But it is safe to treat it as same as 1xx and 204 responses.
+    if (headers.TransferEncoding() != nullptr) {
+      return absl::InvalidArgumentError("transfer-encoding is set for 1xx/204/304 response");
     }
 
     // 1xx, 204, 304 responses should not have body.
-    if (headers.ContentLength() != nullptr) {
-      if (headers.ContentLength()->value().getStringView() != "0") {
-        return absl::InvalidArgumentError(
-            "content-length (non-zero) is set for 1xx, 204, 304 response");
-      }
+    const auto content_length = headers.ContentLength();
+    if (content_length != nullptr && content_length->value().getStringView() != ZERO_VIEW) {
+      return absl::InvalidArgumentError("non-zero content-length is set for 1xx/204/304 response");
     }
   }
 
@@ -280,51 +277,49 @@ bool Http1CodecBase::decodeBuffer(Buffer::Instance& buffer) {
     const auto slice = decoding_buffer_.frontSlice();
     const auto nread = parser_->execute(static_cast<const char*>(slice.mem_), slice.len_);
     decoding_buffer_.drain(nread);
-    const auto status = parser_->getStatus();
 
-    // Parser is paused by the callback. Do nothing and return. Don't handle the buffered body
-    // because parser is paused and no callback should be called.
-    if (status == Http::Http1::ParserStatus::Paused) {
-      return true;
-    }
-    // Parser has encountered an error. Return false to indicate decoding failure. Ignore the
-    // buffered body.
-    if (status == Http::Http1::ParserStatus::Error) {
-      // Decoding error.
+    if (const auto status = parser_->getStatus(); status == Http::Http1::ParserStatus::Error) {
+      // Parser has encountered an error. Return false to indicate decoding failure. Ignore the
+      // buffered body.
       return false;
-    }
-    // No more data to read and parser is not paused, break to avoid infinite loop. This is
-    // preventive check. The parser should not be in this state in normal cases.
-    if (nread == 0) {
+    } else if (status == Http::Http1::ParserStatus::Paused || nread == 0) {
+      // If parser is paused by the callback. Do nothing and return. Don't handle the buffered body
+      // because parser is paused and no callback should be called.
+      // If consumed buffer size is 0 means no more data to read, break to avoid infinite loop. This
+      // is preventive check. The parser should not be in this state in normal cases.
       return true;
     }
   }
-  // Try to dispatch any buffered body. If the message is complete then this will be a no-op.
-  dispatchBufferedBody(false);
-  return true;
+
+  // Try to dispatch any buffered body. We assume the headers should be handled in the callbacks.
+  // And if the headers are not handled then the buffered body should be empty, this should be a
+  // no-op. And if the message is complete then this will also be a no-op.
+  return dispatchBufferedBody(false);
 }
 
-void Http1CodecBase::dispatchBufferedBody(bool end_stream) {
+bool Http1CodecBase::dispatchBufferedBody(bool end_stream) {
   if (single_frame_mode_) {
-    // Do nothing until the onMessageComplete callback if we are in single frame mode.
+    // Do nothing to the buffered body until the onMessageComplete callback if we are in single
+    // frame mode.
 
     // Check if the buffered body is too large.
     if (bufferedBodyOverflow()) {
       // Pause the parser to avoid further parsing.
       parser_->pause();
       // Tell the caller that the decoding failed.
-      onDecodingFailure();
+      return false;
     }
-    return;
+    return true;
   }
 
   if (buffered_body_.length() > 0 || end_stream) {
-    ENVOY_LOG(debug,
-              "Generic proxy HTTP1 codec: decoding request/response body (end_stream={} size={})",
+    ENVOY_LOG(debug, "Generic proxy HTTP1 codec: decoding message body (end_stream={} size={})",
               end_stream, buffered_body_.length());
     auto frame = std::make_unique<HttpRawBodyFrame>(buffered_body_, end_stream);
     onDecodingSuccess(std::move(frame));
   }
+
+  return true;
 }
 
 bool Http1CodecBase::bufferedBodyOverflow() {
@@ -368,6 +363,7 @@ Http::Http1::CallbackResult Http1ServerCodec::onHeadersCompleteImpl() {
   }
 
   const bool non_end_stream = Utility::hasBody(*parser_, false, false);
+  active_request_->request_has_body_ = non_end_stream;
   ENVOY_LOG(debug, "decoding request headers complete (end_stream={}):\n{}", !non_end_stream,
             *active_request_->request_headers_);
 
@@ -435,6 +431,11 @@ Http::Http1::CallbackResult Http1ServerCodec::onMessageCompleteImpl() {
 }
 
 EncodingResult Http1ServerCodec::encode(const StreamFrame& frame, EncodingContext&) {
+  if (!active_request_.has_value()) {
+    ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: no request for coming response");
+    return absl::InvalidArgumentError("no request for coming response");
+  }
+
   const bool response_end_stream = frame.frameFlags().endStream();
 
   if (auto* headers = dynamic_cast<const HttpResponseFrame*>(&frame); headers != nullptr) {
@@ -474,11 +475,6 @@ EncodingResult Http1ServerCodec::encode(const StreamFrame& frame, EncodingContex
   ASSERT(encoding_buffer_.length() == 0);
 
   if (response_end_stream) {
-    if (!active_request_.has_value()) {
-      ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete without request");
-      return absl::InvalidArgumentError("response complete without request");
-    }
-
     if (!active_request_->request_complete_) {
       ENVOY_LOG(debug,
                 "Generic proxy HTTP1 server codec: response complete before request complete");
@@ -571,7 +567,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onHeadersCompleteImpl() {
   }
 
   const bool non_end_stream = Utility::hasBody(*parser_, true, expect_response_->head_request_);
-
+  expect_response_->response_has_body_ = non_end_stream;
   ENVOY_LOG(debug, "decoding response headers complete (end_stream={}):\n{}", !non_end_stream,
             *expect_response_->response_headers_);
 

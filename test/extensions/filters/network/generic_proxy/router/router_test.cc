@@ -119,26 +119,33 @@ public:
     mock_generic_upstream_->requests_.begin()->second->onUpstreamSuccess();
   }
 
-  void notifyDecodingSuccess(ResponseHeaderFramePtr&& response,
-                             absl::optional<StartTime> start_time = {}) {
+  UpstreamRequestCallbacks* notifyDecodingSuccess(ResponseHeaderFramePtr&& response,
+                                                  absl::optional<StartTime> start_time = {}) {
     ASSERT(filter_->upstreamRequestsSize() != 0);
-    mock_generic_upstream_->requests_.begin()->second->onDecodingSuccess(std::move(response),
-                                                                         start_time);
+    auto upstream_request = mock_generic_upstream_->requests_.begin()->second;
+    upstream_request->onDecodingSuccess(std::move(response), start_time);
+    return upstream_request;
   }
 
-  void notifyDecodingSuccess(ResponseCommonFramePtr&& response) {
+  UpstreamRequestCallbacks* notifyDecodingSuccess(ResponseCommonFramePtr&& response) {
     ASSERT(filter_->upstreamRequestsSize() != 0);
-    mock_generic_upstream_->requests_.begin()->second->onDecodingSuccess(std::move(response));
+    auto upstream_request = mock_generic_upstream_->requests_.begin()->second;
+    upstream_request->onDecodingSuccess(std::move(response));
+    return upstream_request;
   }
 
-  void notifyDecodingFailure(absl::string_view reason) {
+  UpstreamRequestCallbacks* notifyDecodingFailure(absl::string_view reason) {
     ASSERT(filter_->upstreamRequestsSize() != 0);
-    mock_generic_upstream_->requests_.begin()->second->onDecodingFailure(reason);
+    auto upstream_request = mock_generic_upstream_->requests_.begin()->second;
+    upstream_request->onDecodingFailure(reason);
+    return upstream_request;
   }
 
-  void notifyConnectionClose(Network::ConnectionEvent event) {
+  UpstreamRequestCallbacks* notifyConnectionClose(Network::ConnectionEvent event) {
     ASSERT(filter_->upstreamRequestsSize() != 0);
-    mock_generic_upstream_->requests_.begin()->second->onConnectionClose(event);
+    auto upstream_request = mock_generic_upstream_->requests_.begin()->second;
+    upstream_request->onConnectionClose(event);
+    return upstream_request;
   }
 
   void expectNewUpstreamRequest(bool with_tracing = false) {
@@ -204,7 +211,8 @@ public:
           .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
         request_struct;
 
-    auto match = filter_->metadataMatchCriteria()->metadataMatchCriteria();
+    auto match_criteria = filter_->metadataMatchCriteria();
+    auto match = match_criteria->metadataMatchCriteria();
 
     EXPECT_EQ(match.size(), 3);
     auto it = match.begin();
@@ -222,6 +230,8 @@ public:
 
     EXPECT_EQ((*it)->name(), "xkey_in_request");
     EXPECT_EQ((*it)->value().value().string_value(), "1");
+
+    EXPECT_EQ(match_criteria, filter_->metadataMatchCriteria());
   }
 
   void expectResponseTimerCreate() {
@@ -407,8 +417,11 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
   EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
   EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
-  notifyConnectionClose(Network::ConnectionEvent::LocalClose);
+  auto* upstream_request = notifyConnectionClose(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(0, filter_->upstreamRequestsSize());
+
+  // Calling resetStream() again should do nothing.
+  dynamic_cast<UpstreamRequest*>(upstream_request)->resetStream(StreamResetReason::LocalReset, {});
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -557,7 +570,9 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
   EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
 
   // Mock connection close event.
-  notifyConnectionClose(Network::ConnectionEvent::LocalClose);
+  auto upstream_request = notifyConnectionClose(Network::ConnectionEvent::LocalClose);
+  // Calling onConnectionClose() again should do nothing.
+  upstream_request->onConnectionClose(Network::ConnectionEvent::LocalClose);
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -610,23 +625,50 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
   setup();
   kickOffNewUpstreamRequest(true);
 
-  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _));
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
+      .WillOnce(Invoke([this](const StreamFrame&, EncodingContext& ctx) -> EncodingResult {
+        EXPECT_EQ(ctx.routeEntry().ptr(), &mock_route_entry_);
+        return 0;
+      }));
 
   expectInjectContextToUpstreamRequest();
 
   notifyUpstreamSuccess();
 
-  expectFinalizeUpstreamSpanAny();
+  EXPECT_CALL(mock_filter_callback_, onResponseHeaderFrame(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsSize());
+  }));
   EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
   EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
+  expectFinalizeUpstreamSpanAny();
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  notifyDecodingSuccess(std::move(response), {});
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButDecodeFailureAfterResponse) {
+  setup();
+  kickOffNewUpstreamRequest(false);
+
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _));
+  notifyUpstreamSuccess();
 
   EXPECT_CALL(mock_filter_callback_, onResponseHeaderFrame(_)).WillOnce(Invoke([this](ResponsePtr) {
     // When the response is sent to callback, the upstream request should be removed.
     EXPECT_EQ(0, filter_->upstreamRequestsSize());
   }));
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(false));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-  notifyDecodingSuccess(std::move(response), {});
+  auto upstream_request = notifyDecodingSuccess(std::move(response), {});
+
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+  upstream_request->onDecodingFailure("decode-failure");
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -698,6 +740,43 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseAndTimeout) {
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButEncodingFailure) {
+  // There are multiple frames in the request.
+  setup(FrameFlags(0, FrameFlags::FLAG_EMPTY));
+  kickOffNewUpstreamRequest(true);
+
+  auto frame_1 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
+  frame_1->stream_frame_flags_ = FrameFlags(0, FrameFlags::FLAG_EMPTY);
+  EXPECT_EQ(CommonFilterStatus::StopIteration, filter_->decodeCommonFrame(*frame_1));
+  // This only store the frame and does nothing else because the pool is not ready yet.
+  filter_->onRequestCommonFrame(std::move(frame_1));
+
+  // End stream is set to true by default.
+  auto frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
+  EXPECT_EQ(CommonFilterStatus::StopIteration, filter_->decodeCommonFrame(*frame_2));
+  // This only store the frame and does nothing else because the pool is not ready yet.
+  filter_->onRequestCommonFrame(std::move(frame_2));
+
+  testing::InSequence s;
+  expectInjectContextToUpstreamRequest();
+  // Encode header frame success.
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
+      .WillOnce(Return(EncodingResult(0)));
+  // Encode common frame failure.
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _))
+      .WillOnce(Return(absl::UnknownError("encode-failure")));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+  expectFinalizeUpstreamSpanAny();
+
+  // This will trigger frames to be encoded.
+  notifyUpstreamSuccess();
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) {
   // There are multiple frames in the request.
   setup(FrameFlags(0, FrameFlags::FLAG_EMPTY));
@@ -755,6 +834,56 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithMultipleFrames) 
   // End stream is set to true by default.
   auto response_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   notifyDecodingSuccess(std::move(response_frame_2));
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(RouterFilterTest,
+       UpstreamRequestPoolReadyAndResponseWithMultipleFramesButWithRepeatedHeaders) {
+  setup();
+  kickOffNewUpstreamRequest(false);
+
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _));
+  notifyUpstreamSuccess();
+
+  // Request complete and response starts.
+
+  EXPECT_CALL(mock_filter_callback_, onResponseHeaderFrame(_));
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response->stream_frame_flags_ = FrameFlags(0, FrameFlags::FLAG_EMPTY);
+  notifyDecodingSuccess(std::move(response));
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
+  auto response_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response_2->stream_frame_flags_ = FrameFlags(0, FrameFlags::FLAG_EMPTY);
+
+  notifyDecodingSuccess(std::move(response_2));
+
+  // Mock downstream closing.
+  mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(RouterFilterTest,
+       UpstreamRequestPoolReadyAndResponseWithMultipleFramesButCommonFrameBeforeHeader) {
+  setup();
+  kickOffNewUpstreamRequest(false);
+
+  EXPECT_CALL(mock_generic_upstream_->mock_client_codec_, encode(_, _));
+  notifyUpstreamSuccess();
+
+  // Request complete and response starts.
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
+  response->stream_frame_flags_ = FrameFlags(0, FrameFlags::FLAG_EMPTY);
+
+  EXPECT_CALL(*mock_generic_upstream_, removeUpstreamRequest(_));
+  EXPECT_CALL(*mock_generic_upstream_, cleanUp(true));
+
+  notifyDecodingSuccess(std::move(response));
 
   // Mock downstream closing.
   mock_downstream_connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

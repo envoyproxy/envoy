@@ -47,7 +47,7 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, FrameFlags header_frame_f
       stream_id_(header_frame_flags.streamId()),
       expects_response_(!header_frame_flags.oneWayStream()) {
 
-  // Host is known at this point and set the initial upstream host.
+  // Host is known at this point and set the upstream host.
   onUpstreamHostSelected(generic_upstream_->upstreamHost());
 
   auto filter_callbacks = parent_.callbacks_;
@@ -123,10 +123,10 @@ void UpstreamRequest::clearStream(bool close_connection) {
 }
 
 void UpstreamRequest::deferredDelete() {
-  if (inserted()) {
-    // Remove this stream from the parent's list of upstream requests and delete it at
-    // next event loop iteration.
-    parent_.callbacks_->dispatcher().deferredDelete(removeFromList(parent_.upstream_requests_));
+  if (parent_.upstream_request_.get() == this) {
+    // Remove this stream from the parent and delete it at next event loop iteration.
+    parent_.callbacks_->dispatcher().deferredDelete(std::move(parent_.upstream_request_));
+    parent_.upstream_request_.reset();
   }
 }
 
@@ -231,6 +231,8 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
                                         absl::optional<StartTime> start_time) {
   if (response_stream_header_received_) {
     ENVOY_LOG(error, "upstream request: multiple StreamResponse received");
+    resetStream(StreamResetReason::ProtocolError, {});
+    return;
   }
   response_stream_header_received_ = true;
 
@@ -287,23 +289,14 @@ void UpstreamRequest::onConnectionClose(Network::ConnectionEvent event) {
     return;
   }
 
-  switch (event) {
-  case Network::ConnectionEvent::LocalClose:
-    resetStream(StreamResetReason::LocalReset, {});
-    break;
-  case Network::ConnectionEvent::RemoteClose:
+  if (event == Network::ConnectionEvent::RemoteClose) {
     resetStream(StreamResetReason::ConnectionTermination, {});
-    break;
-  default:
-    break;
+  } else if (event == Network::ConnectionEvent::LocalClose) {
+    resetStream(StreamResetReason::LocalReset, {});
   }
 }
 
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
-  if (host == nullptr || host == upstream_info_->upstream_host_) {
-    return;
-  }
-
   ENVOY_LOG(debug, "upstream request: selected host {}", host->address()->asStringView());
   upstream_info_->upstream_host_ = std::move(host);
 }
@@ -341,6 +334,8 @@ void RouterFilter::onUpstreamRequestReset(UpstreamRequest&, StreamResetReason re
     return;
   }
 
+  ASSERT(upstream_request_ == nullptr);
+
   // Retry is the upstream request is reset because of the connection failure or the
   // protocol error.
   if (couldRetry(reason)) {
@@ -348,7 +343,9 @@ void RouterFilter::onUpstreamRequestReset(UpstreamRequest&, StreamResetReason re
     return;
   }
 
-  resetStream(reason, reason_detail);
+  // Complete the filter/request and send the local reply to the downstream if no retry.
+  const auto [view, flag] = resetReasonToViewAndFlag(reason);
+  completeAndSendLocalReply(Status(StatusCode::kUnavailable, view), reason_detail, flag);
 }
 
 void RouterFilter::onFilterComplete() {
@@ -359,8 +356,8 @@ void RouterFilter::onFilterComplete() {
   filter_complete_ = true;
 
   // Clean up all pending upstream requests.
-  while (!upstream_requests_.empty()) {
-    auto* upstream_request = upstream_requests_.back().get();
+  if (upstream_request_ != nullptr) {
+    auto* upstream_request = upstream_request_.get();
     // Remove the upstream request from the upstream request list first. The resetStream() will
     // also do this. But in some corner cases, the upstream request is already reset and triggers
     // the router filter to call onFilterComplete(). But note because the upstream request is
@@ -398,16 +395,6 @@ void RouterFilter::onTimeout() {
 
 void RouterFilter::onDestroy() { onFilterComplete(); }
 
-void RouterFilter::resetStream(StreamResetReason reason, absl::string_view reason_detail) {
-  // Ensure this method is called only once strictly and never called after
-  // onFilterComplete().
-  if (filter_complete_) {
-    return;
-  }
-  const auto [view, flag] = resetReasonToViewAndFlag(reason);
-  completeAndSendLocalReply(Status(StatusCode::kUnavailable, view), reason_detail, flag);
-}
-
 void RouterFilter::completeAndSendLocalReply(absl::Status status, absl::string_view details,
                                              absl::optional<StreamInfo::CoreResponseFlag> flag) {
   if (flag.has_value()) {
@@ -418,6 +405,8 @@ void RouterFilter::completeAndSendLocalReply(absl::Status status, absl::string_v
 }
 
 void RouterFilter::kickOffNewUpstreamRequest() {
+  ASSERT(upstream_request_ != nullptr);
+
   num_retries_++;
 
   const auto& cluster_name = route_entry_->clusterName();
@@ -448,23 +437,18 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     return;
   }
 
-  auto upstream_request = std::make_unique<UpstreamRequest>(*this, request_stream_->frameFlags(),
-                                                            std::move(generic_upstream));
-  auto raw_upstream_request = upstream_request.get();
-  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  raw_upstream_request->startStream();
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, request_stream_->frameFlags(),
+                                                        std::move(generic_upstream));
+  upstream_request_->startStream();
 }
 
 void RouterFilter::onRequestCommonFrame(RequestCommonFramePtr frame) {
   mayRequestStreamEnd(frame->frameFlags().endStream());
 
   request_stream_frames_.emplace_back(std::move(frame));
-
-  if (upstream_requests_.empty()) {
-    return;
+  if (upstream_request_ != nullptr) {
+    upstream_request_->sendCommonFrameToUpstream();
   }
-
-  upstream_requests_.front()->sendCommonFrameToUpstream();
 }
 
 HeaderFilterStatus RouterFilter::decodeHeaderFrame(StreamRequest& request) {
