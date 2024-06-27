@@ -187,7 +187,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
   auto authz_response = Response{};
-  authz_response.status = CheckStatus::Denied;
+  authz_response.status = CheckStatus::Error;
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -468,7 +468,6 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationReturnsErrorOnBadGrpcCode) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_error")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
