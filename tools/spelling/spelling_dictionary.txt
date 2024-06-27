@@ -697,6 +697,8 @@ deleter
 delim
 denylist
 deque
+dep
+deps
 deprecations
 dereference
 dereferences
@@ -1350,6 +1352,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars

@@ -1341,7 +1341,7 @@ CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   if (active_request_) {
-    active_request_->response_encoder_.runResetCallbacks(reason);
+    active_request_->response_encoder_.runResetCallbacks(reason, absl::string_view());
     connection_.dispatcher().deferredDelete(std::move(active_request_));
   }
 }
@@ -1599,7 +1599,7 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
   if (pending_response_.has_value() && !pending_response_done_) {
-    pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_.value().encoder_.runResetCallbacks(reason, absl::string_view());
     pending_response_done_ = true;
     pending_response_.reset();
   }

@@ -17,8 +17,12 @@ class Dso {
 public:
   Dso() = default;
   Dso(const std::string dso_name);
-  ~Dso();
+  virtual ~Dso();
   bool loaded() { return loaded_; }
+  /*
+   * Clean up resources that are referenced on the Golang side.
+   */
+  virtual void cleanup(){};
 
 protected:
   const std::string dso_name_;
@@ -29,15 +33,15 @@ protected:
 class HttpFilterDso : public Dso {
 public:
   HttpFilterDso(const std::string dso_name) : Dso(dso_name){};
-  virtual ~HttpFilterDso() = default;
+  ~HttpFilterDso() override = default;
 
   virtual GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) PURE;
   virtual GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                       GoUint64 p3) PURE;
   virtual void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0, GoInt p1) PURE;
-  virtual GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+  virtual GoUint64 envoyGoFilterOnHttpHeader(processState* p0, GoUint64 p1, GoUint64 p2,
                                              GoUint64 p3) PURE;
-  virtual GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+  virtual GoUint64 envoyGoFilterOnHttpData(processState* p0, GoUint64 p1, GoUint64 p2,
                                            GoUint64 p3) PURE;
   virtual void envoyGoFilterOnHttpLog(httpRequest* p0, int p1) PURE;
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
@@ -53,31 +57,34 @@ public:
   GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) override;
   void envoyGoFilterDestroyHttpPluginConfig(GoUint64 p0, GoInt p1) override;
-  GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+  GoUint64 envoyGoFilterOnHttpHeader(processState* p0, GoUint64 p1, GoUint64 p2,
                                      GoUint64 p3) override;
-  GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
+  GoUint64 envoyGoFilterOnHttpData(processState* p0, GoUint64 p1, GoUint64 p2,
+                                   GoUint64 p3) override;
   void envoyGoFilterOnHttpLog(httpRequest* p0, int p1) override;
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
   void envoyGoRequestSemaDec(httpRequest* p0) override;
+  void cleanup() override;
 
 private:
   GoUint64 (*envoy_go_filter_new_http_plugin_config_)(httpConfig* p0) = {nullptr};
   GoUint64 (*envoy_go_filter_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1, GoUint64 p2,
                                                         GoUint64 p3) = {nullptr};
   void (*envoy_go_filter_destroy_http_plugin_config_)(GoUint64 p0, GoInt p1) = {nullptr};
-  GoUint64 (*envoy_go_filter_on_http_header_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+  GoUint64 (*envoy_go_filter_on_http_header_)(processState* p0, GoUint64 p1, GoUint64 p2,
                                               GoUint64 p3) = {nullptr};
-  GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+  GoUint64 (*envoy_go_filter_on_http_data_)(processState* p0, GoUint64 p1, GoUint64 p2,
                                             GoUint64 p3) = {nullptr};
   void (*envoy_go_filter_on_http_log_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_go_request_sema_dec_)(httpRequest* p0) = {nullptr};
+  void (*envoy_go_filter_cleanup_)() = {nullptr};
 };
 
 class ClusterSpecifierDso : public Dso {
 public:
   ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name){};
-  virtual ~ClusterSpecifierDso() = default;
+  ~ClusterSpecifierDso() override = default;
 
   virtual GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
                                           GoUint64 plugin_id, GoUint64 buffer_ptr,
@@ -109,7 +116,7 @@ class NetworkFilterDso : public Dso {
 public:
   NetworkFilterDso() = default;
   NetworkFilterDso(const std::string dso_name) : Dso(dso_name){};
-  virtual ~NetworkFilterDso() = default;
+  ~NetworkFilterDso() override = default;
 
   virtual GoUint64 envoyGoFilterOnNetworkFilterConfig(GoUint64 library_id_ptr,
                                                       GoUint64 library_id_len, GoUint64 config_ptr,
@@ -262,6 +269,22 @@ public:
       return it->second;
     }
     return nullptr;
+  };
+
+  /**
+   * Clean up all golang runtime to make asan happy in testing.
+   */
+  static void cleanUpForTest() {
+    DsoStoreType& dsoStore = getDsoStore();
+    absl::WriterMutexLock lock(&dsoStore.mutex_);
+    for (auto it = dsoStore.id_to_dso_.begin(); it != dsoStore.id_to_dso_.end(); it++) {
+      auto dso = it->second;
+      if (dso != nullptr) {
+        dso->cleanup();
+      }
+    }
+    dsoStore.id_to_dso_.clear();
+    dsoStore.plugin_name_to_dso_.clear();
   };
 
 private:

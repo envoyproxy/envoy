@@ -166,6 +166,21 @@ public:
     return ret;
   }
 
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
+    last_local_address_ = local_address;
+    last_peer_address_ = peer_address;
+    EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
+                                             receive_time, tos);
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
+    return last_local_address_;
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastPeerAddress() const { return last_peer_address_; }
+
 private:
   Event::Dispatcher& dispatcher_;
   bool saw_path_response_{false};
@@ -175,6 +190,8 @@ private:
   bool waiting_for_handshake_done_{false};
   bool waiting_for_new_cid_{false};
   bool validation_failure_on_path_response_{false};
+  Network::Address::InstanceConstSharedPtr last_local_address_;
+  Network::Address::InstanceConstSharedPtr last_peer_address_;
 };
 
 // A test that sets up its own client connection with customized quic version and connection ID.
@@ -391,6 +408,7 @@ public:
   }
 
   void testMultipleQuicConnections() {
+    autonomous_upstream_ = true;
     // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky
     // if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
     setConcurrency(8);
@@ -431,19 +449,11 @@ public:
       }
     }
     for (size_t i = 0; i < concurrency_; ++i) {
-      fake_upstream_connection_ = nullptr;
-      upstream_request_ = nullptr;
       auto encoder_decoder = codec_clients[i]->startRequest(default_request_headers_);
 
       auto& request_encoder = encoder_decoder.first;
       auto response = std::move(encoder_decoder.second);
       codec_clients[i]->sendData(request_encoder, 1000, true);
-      waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                       {"set-cookie", "foo"},
-                                                                       {"set-cookie", "bar"}},
-                                       true);
-
       ASSERT_TRUE(response->waitForEndStream());
       EXPECT_TRUE(response->complete());
       codec_clients[i]->close();
@@ -850,6 +860,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   EXPECT_EQ(4u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
                     &quic_connection_->sent_packet_manager()));
 
+  Network::Address::InstanceConstSharedPtr last_peer_addr = quic_connection_->getLastPeerAddress();
+  Network::Address::InstanceConstSharedPtr last_local_addr =
+      quic_connection_->getLastLocalAddress();
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
@@ -862,6 +875,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   while (!quic_connection_->IsHandshakeConfirmed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+
+  EXPECT_EQ(last_peer_addr.get(), quic_connection_->getLastPeerAddress().get());
+  EXPECT_EQ(last_local_addr.get(), quic_connection_->getLastLocalAddress().get());
 
   // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -879,6 +895,8 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_NE(last_peer_addr.get(), quic_connection_->getLastPeerAddress().get());
+  EXPECT_NE(last_local_addr.get(), quic_connection_->getLastLocalAddress().get());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
@@ -1357,6 +1375,61 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   // Ensure that request headers from top-level access logger parameter and stream info are
   // consistent.
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
+}
+
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "true");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
+  initialize();
+
+  // Make a header-only request and delay the response by 1ms to ensure that the ROUNDTRIP_DURATION
+  // metric is > 0 if exists.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  absl::SleepFor(absl::Milliseconds(1));
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Prevent the client's dispatcher from running by not calling waitForEndStream or closing the
+  // client's connection, then wait for server to tear down connection due to too many
+  // retransmissions.
+  int iterations = 0;
+  std::string contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+  while (iterations < 20) {
+    timeSystem().advanceTimeWait(std::chrono::seconds(1));
+    // check for deferred logs from connection teardown.
+    contents = TestEnvironment::readFileToStringForTest(access_log_name_);
+    if (!contents.empty()) {
+      break;
+    }
+    iterations++;
+  }
+
+  std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+  EXPECT_EQ(entries.size(), 1);
+  std::string log = entries[0];
+
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
+  ASSERT_EQ(metrics.size(), 21);
+  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
+  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
+  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  // Ensure that request headers from top-level access logger parameter and stream info are
+  // consistent.
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
+
+  codec_client_->close();
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
@@ -2015,6 +2088,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         listener_filter->mutable_filter_disabled()->set_any_match(true);
       });
 
+  // Do socket swap before initialization to avoid races.
+  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
+
   initialize();
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients")) {
@@ -2025,10 +2101,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   auto listener_port = lookupPort("http");
 
   // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
-  SocketInterfaceSwap socket_swap(Network::Socket::Type::Datagram);
   socket_swap.write_matcher_->setDnat(
-      Network::Utility::parseInternetAddress("1.2.3.4", 12345),
-      Network::Utility::parseInternetAddress("127.0.0.2", listener_port));
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 12345),
+      Network::Utility::parseInternetAddressNoThrow("127.0.0.2", listener_port));
 
   codec_client_ = makeHttpConnection(makeClientConnection(listener_port));
   EnvoyQuicClientSession* quic_session =

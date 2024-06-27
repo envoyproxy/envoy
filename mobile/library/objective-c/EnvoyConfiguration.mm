@@ -208,7 +208,7 @@
 
   for (NSString *key in self.runtimeGuards) {
     BOOL value = [[self.runtimeGuards objectForKey:key] isEqualToString:@"true"];
-    builder.setRuntimeGuard([key toCXXString], value);
+    builder.addRuntimeGuard([key toCXXString], value);
   }
 
   builder.addConnectTimeoutSeconds(self.connectTimeoutSeconds);

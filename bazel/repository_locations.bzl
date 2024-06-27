@@ -116,17 +116,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
-        # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
+        # 1. Open https://chromiumdash.appspot.com/releases?platform=Linux and find the latest Stable release.
+        # 2. In the info for that release, open the "Branch Base Commit" link, then open DEPS, and use the <boringssl_revision>.
         #
-        # chromium-118.0.5993.54 (linux/beta)
-        version = "45cf810dbdbd767f09f8cb0b0fcccd342c39041f",
-        sha256 = "f1f421738e9ba39dd88daf8cf3096ddba9c53e2b6b41b32fff5a3ff82f4cd162",
+        # chromium-126.0.6478.55 (linux/stable)
+        version = "2db0eb3f96a5756298dcd7f9319e56a98585bd10",
+        sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-08-28",
+        release_date = "2024-04-29",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -621,13 +620,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Datadog C++ Tracing Library",
         project_desc = "Datadog distributed tracing for C++",
         project_url = "https://github.com/DataDog/dd-trace-cpp",
-        version = "0.2.1",
-        sha256 = "1d3dd5dc139fca43e902c756f3eb5ca0b64a6f50a09c06215084a9fb632c0da7",
+        version = "0.2.2",
+        sha256 = "ee524a9b70d39dcfd815b90d9d6fc5599db7989dff072980bff90bae81c4daf7",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.datadog"],
-        release_date = "2024-05-28",
+        release_date = "2024-06-21",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md",
@@ -1192,12 +1191,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "cea6f57f9ce03a5aa2bb0e0d8adcdf3ab452c0c3",
-        sha256 = "d0187c4c3c74a709727549b020ef90471113d70047dff7d8fd9f2bfd37a6da5b",
+        version = "cf8d05ab435919878ca0db342e05e64620b43173",
+        sha256 = "a0b89cf43edb6e17126d536ee522127f7a71ee38d2813ba0464ed1a8c62db25f",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-05-29",
+        release_date = "2024-06-21",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",

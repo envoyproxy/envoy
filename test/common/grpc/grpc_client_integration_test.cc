@@ -14,6 +14,40 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EnvoyGrpcFlowControlTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
+  GrpcClientIntegrationTestBase::initialize(0);
+  auto stream = createStream(empty_metadata_);
+
+  testing::StrictMock<Http::MockStreamDecoderFilterCallbacks> watermark_callbacks;
+
+  // TODO(tyxia) Uncomment this section in https://github.com/envoyproxy/envoy/pull/34769
+  // Registering a new watermark callback should note that the high watermark
+  // has already been hit.
+  // stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
+
+  // EXPECT_CALL(watermark_callbacks,
+  //             onDecoderFilterAboveWriteBufferHighWatermark());
+  // EXPECT_CALL(watermark_callbacks,
+  //             onDecoderFilterBelowWriteBufferLowWatermark());
+
+  // Create the send request.
+  std::string large_request = std::string(64 * 1024, 'a');
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(large_request);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,

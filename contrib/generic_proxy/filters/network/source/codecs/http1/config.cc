@@ -474,12 +474,19 @@ EncodingResult Http1ServerCodec::encode(const StreamFrame& frame, EncodingContex
   ASSERT(encoding_buffer_.length() == 0);
 
   if (response_end_stream) {
-    if (active_request_->request_complete_) {
-      active_request_.reset();
-      return encoded_size;
+    if (!active_request_.has_value()) {
+      ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete without request");
+      return absl::InvalidArgumentError("response complete without request");
     }
-    ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete before request complete");
-    return absl::InvalidArgumentError("response complete before request complete");
+
+    if (!active_request_->request_complete_) {
+      ENVOY_LOG(debug,
+                "Generic proxy HTTP1 server codec: response complete before request complete");
+      return absl::InvalidArgumentError("response complete before request complete");
+    }
+
+    active_request_.reset();
+    return encoded_size;
   }
 
   return encoded_size;

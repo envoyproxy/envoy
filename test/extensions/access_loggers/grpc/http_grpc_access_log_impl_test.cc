@@ -194,7 +194,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     StreamInfo::TimingUtility timing(stream_info);
     ASSERT(timing.lastDownstreamTxByteSent().has_value());
     stream_info.downstream_connection_info_provider_->setLocalAddress(
-        std::make_shared<Network::Address::PipeInstance>("/foo"));
+        *Network::Address::PipeInstance::create("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
@@ -764,7 +764,7 @@ response: {}
     StreamInfo::TimingUtility timing(stream_info);
     ASSERT(timing.lastDownstreamTxByteSent().has_value());
     stream_info.downstream_connection_info_provider_->setLocalAddress(
-        std::make_shared<Network::Address::PipeInstance>("/foo"));
+        *Network::Address::PipeInstance::create("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),

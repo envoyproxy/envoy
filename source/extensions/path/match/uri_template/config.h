@@ -22,9 +22,11 @@ public:
         const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig&>(
         config, ProtobufMessage::getStrictValidationVisitor());
 
-    if (!UriTemplate::isValidMatchPattern(path_match_config.path_template()).ok()) {
-      return absl::InvalidArgumentError(fmt::format("path_match_policy.path_template {} is invalid",
-                                                    path_match_config.path_template()));
+    const absl::Status valid = UriTemplate::isValidMatchPattern(path_match_config.path_template());
+    if (!valid.ok()) {
+      return absl::InvalidArgumentError(
+          fmt::format("path_match_policy.path_template {} is invalid: {}",
+                      path_match_config.path_template(), valid.message()));
     }
 
     return std::make_shared<UriTemplateMatcher>(path_match_config);
