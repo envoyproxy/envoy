@@ -838,12 +838,16 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_terminated; "
-            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
-            "termination",
-            response->body());
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(response->headers().getProxyStatusValue(),
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
+              "ERROR}; UC\"");
+  } else {
+    EXPECT_EQ(response->headers().getProxyStatusValue(),
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
+  }
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(

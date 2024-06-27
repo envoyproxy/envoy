@@ -55,7 +55,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
   private int mStreamIdleTimeoutSeconds = 15;
-  private final int mPerTryIdleTimeoutSeconds = 15;
+  private int mPerTryIdleTimeoutSeconds = 15;
   private final String mAppVersion = "unspecified";
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
@@ -154,6 +154,22 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setStreamIdleTimeoutSeconds(int timeout) {
     mStreamIdleTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Set the per-try stream idle timeout, in seconds, which is defined as the period in which
+   * there are no active requests. When the idle timeout is reached, the connection is closed.
+   * This setting is the same as the stream idle timeout, except it's applied per-retry attempt.
+   * See
+   * https://github.com/envoyproxy/envoy/blob/f15ec821d6a70a1d132f53f50970595efd1b84ee/api/envoy/config/route/v3/route_components.proto#L1570.
+   *
+   * The default is 15s.
+   *
+   * @param timeout The per-try idle timeout, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setPerTryIdleTimeoutSeconds(int timeout) {
+    mPerTryIdleTimeoutSeconds = timeout;
     return this;
   }
 

@@ -1618,7 +1618,6 @@ envoy_cc_library(
         # "quiche/quic/platform/api/quic_test_loopback.h",
     ],
     repository = "@envoy",
-    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_bug_tracker",
@@ -1695,7 +1694,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/platform/api/quic_ip_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
@@ -1743,7 +1741,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/platform/api/quic_socket_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
@@ -3408,9 +3405,12 @@ envoy_cc_library(
     }),
 )
 
-envoy_quic_cc_library(
+envoy_cc_library(
     name = "quic_core_lru_cache_lib",
     hdrs = ["quiche/quic/core/quic_lru_cache.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
 )
 

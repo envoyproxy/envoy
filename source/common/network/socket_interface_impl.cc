@@ -26,6 +26,7 @@ namespace {
 
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
     int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    const SocketCreationOptions& options,
     [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
@@ -39,12 +40,14 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
                                                      socket_v6only, domain);
   }
 #endif
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain,
+                                              options.max_addresses_cache_size_);
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain) const {
-  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain);
+                                            absl::optional<int> domain,
+                                            const SocketCreationOptions& options) const {
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options);
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
@@ -99,7 +102,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
                      fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
     }
   }
-  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
+  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain, options);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.

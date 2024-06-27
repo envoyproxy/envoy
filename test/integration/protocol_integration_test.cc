@@ -4485,8 +4485,14 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
   codec_client_->sendData(*downstream_request, data, true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_THAT(waitForAccessLog(access_log_name_),
+                HasSubstr("upstream_reset_before_response_started{connection_termination|QUIC_"
+                          "PACKET_WRITE_ERROR}"));
+  } else {
+    EXPECT_THAT(waitForAccessLog(access_log_name_),
+                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+  }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   socket_swap.write_matcher_->setWriteOverride(Api::IoError::none());
@@ -4687,8 +4693,13 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
-  EXPECT_EQ(waitForAccessLog(access_log_name_),
-            "upstream_reset_before_response_started{protocol_error}");
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(waitForAccessLog(access_log_name_),
+              "upstream_reset_before_response_started{protocol_error|QUIC_HTTP_FRAME_ERROR}");
+  } else {
+    EXPECT_EQ(waitForAccessLog(access_log_name_),
+              "upstream_reset_before_response_started{protocol_error}");
+  }
 }
 
 TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
@@ -4714,6 +4725,7 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
+
   EXPECT_EQ(waitForAccessLog(access_log_name_),
             "upstream_reset_before_response_started{protocol_error}");
   // Upstream connection should stay up
