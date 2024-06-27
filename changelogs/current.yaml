@@ -32,10 +32,20 @@ behavior_changes:
     :ref:`TlvsMetadata type <envoy_v3_api_msg_data.core.v3.TlvsMetadata>`.
     This change can be temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` to ``false``.
+- area: composite_filter
+  change: |
+    Adding support for
+    :ref:`sample_percent <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.sample_percent>`.
+    It specifies the probability of the action execution. If not specified, it is 100%.
 - area: golang
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
+- area: ext_proc
+  change: |
+    Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
+    is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode that can be used by external
+    processor to observe Envoy data and status.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -108,6 +118,11 @@ minor_behavior_changes:
 - area: filters
   change: |
     Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
+- area: jwt_authn
+  change: |
+    jwt_authn now validates provider URIs. If the validation is too strict it can temporarily be
+    disabled by setting the runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` to
+    false.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
@@ -203,6 +218,10 @@ bug_fixes:
   change: |
     Fixed missing :ref:`additional addresses <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`
     for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
+- area: http
+  change: |
+    Fixed a bug where additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`
+    are not sent properly to clients.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -287,6 +306,11 @@ new_features:
     to specify headers that should never be sent to the external authentication service. Overrides
     :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`
     if a header matches both.
+- area: upstream
+  change: |
+    Added a new field to LocalityLbEndpoints, :ref:`LocalityLbEndpoints.Metadata
+    <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`, that may be used for transport socket
+    matching groups of endpoints.
 - area: quic
   change: |
     Added support for QUIC server preferred address when there is a DNAT between the client and Envoy. See
@@ -379,6 +403,11 @@ new_features:
     The RBAC filter will now log the enforced rule to the dynamic metadata field
     "enforced_effective_policy_id" and the result to the dynamic metadata field
     "enforced_engine_result". These are only populated if a non-shadow engine exists.
+- area: jwt_authn
+  change: |
+    Added :ref:`strip_failure_response
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
+    to allow stripping the failure response details from the JWT authentication filter.
 
 deprecated:
 - area: tracing
