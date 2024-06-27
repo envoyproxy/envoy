@@ -303,7 +303,7 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_UNIVERSALSTRING: {
-      // ASN1_UNIVERSALSTRING is encoded using UCS-4, which needs conversion to UTF-8.
+      // `ASN1_UNIVERSALSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
       unsigned char* tmp = nullptr;
       if (ASN1_STRING_to_UTF8(&tmp, value->value.universalstring) < 0) {
         break;
