@@ -224,12 +224,15 @@ def envoy_repo():
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive("com_google_ortools")
+    external_http_archive("com_google_proto_field_extraction")
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
     )
     external_http_archive("com_google_protofieldextraction")
+    external_http_archive("com_google_protoprocessinglib")
     external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
