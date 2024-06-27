@@ -100,8 +100,7 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
   unescapeInPath(decoded_path, "%5C", "\\");
   unescapeInPath(decoded_path, "%5c", "\\");
   headers.setPath(absl::StrCat(decoded_path, query));
-  std::string test = absl::StrReplaceAll(
-          decoded_path, {{"%2F", "/"},{"%2f", "/"}, {"%5C", "\\"}, {"%5c", "\\"}});
+  std::string decoded_path2 = absl::StrReplaceAll(decoded_path, {{"%5c", "\\"}});
   // Path length will not match if there were unescaped %2f or %5c
   return headers.getPathValue().length() != original_length
              ? UnescapeSlashesResult::FoundAndUnescaped
