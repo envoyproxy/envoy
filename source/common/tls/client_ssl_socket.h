@@ -56,11 +56,12 @@ public:
 
   Envoy::Ssl::ClientContextSharedPtr sslCtx() override;
 
-private:
+protected:
   ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
                          absl::Status& creation_status);
 
+private:
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
