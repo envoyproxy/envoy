@@ -161,6 +161,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   http_validation_policy.require_content_length_if_body_required = false;
   http_validation_policy.disallow_invalid_header_characters_in_response = true;
   http_validation_policy.disallow_lone_cr_in_request_headers = true;
+  http_validation_policy.disallow_lone_cr_in_chunk_extension = true;
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);

@@ -238,6 +238,10 @@ void SslSocket::drainErrorQueue() {
                     absl::NullSafeStringView(ERR_reason_error_string(err)));
   }
 
+  if (!saw_error) {
+    return;
+  }
+
   if (!failure_reason_.empty()) {
     if (new_ssl_failure_format) {
       absl::StrAppend(&failure_reason_, ":TLS_error_end");
@@ -247,7 +251,7 @@ void SslSocket::drainErrorQueue() {
                    failure_reason_);
   }
 
-  if (saw_error && !saw_counted_error) {
+  if (!saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
 }
