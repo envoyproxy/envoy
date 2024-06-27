@@ -52,12 +52,7 @@ struct ExtAuthzFilterStats {
 
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtAuthzLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata,
-                               const std::chrono::microseconds latency,
-                               absl::optional<uint64_t> bytes_sent,
-                               absl::optional<uint64_t> bytes_received,
-                               Upstream::ClusterInfoConstSharedPtr cluster_info,
-                               Upstream::HostDescriptionConstSharedPtr upstream_host)
+  explicit ExtAuthzLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
       : filter_metadata_(filter_metadata) {}
 
   const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }

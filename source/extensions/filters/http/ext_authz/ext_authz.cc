@@ -795,10 +795,7 @@ void Filter::setLoggingInfo() {
       decoder_callbacks_->streamInfo().filterState();
   if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
     filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(
-                              config_->filterMetadata(), latency, bytes_sent, bytes_received,
-                              cluster_info ? std::move(*cluster_info) : nullptr,
-                              std::move(upstream_host)),
+                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::ReadOnly,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }
