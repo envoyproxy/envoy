@@ -3550,6 +3550,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":http2_core_priority_write_scheduler_lib",
         ":quic_core_ack_listener_interface_lib",

@@ -5,6 +5,9 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
+
+#include "quiche/quic/core/quic_packets.h"
 
 namespace Envoy {
 /**
@@ -81,6 +84,24 @@ public:
 };
 
 #ifdef ENVOY_ENABLE_QUIC
+
+class TestFirstPacketReceivedFilterState : public StreamInfo::FilterState::Object {
+public:
+  explicit TestFirstPacketReceivedFilterState() {}
+  static const absl::string_view key() { return "test.filter_state.quic_first_packet_received"; }
+  void incrementPacketCount() { packet_count_++; }
+  void setPacketLength(size_t packet_length) { packet_length_ = packet_length; }
+
+  // FilterState::Object
+  absl::optional<std::string> serializeAsString() const override {
+    return absl::StrCat(packet_count_, ",", packet_length_);
+  }
+
+private:
+  uint32_t packet_count_ = 0;
+  size_t packet_length_ = 0;
+};
+
 /**
  * Test QUIC listener filter which add a new filter state.
  */
@@ -95,7 +116,10 @@ public:
   explicit TestQuicListenerFilter(std::string added_value, bool allow_server_migration,
                                   bool allow_client_migration)
       : added_value_(added_value), allow_server_migration_(allow_server_migration),
-        allow_client_migration_(allow_client_migration) {}
+        allow_client_migration_(allow_client_migration) {
+    test_first_packet_received_filter_state_ =
+        std::make_shared<TestFirstPacketReceivedFilterState>();
+  }
 
   // Network::QuicListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
@@ -103,6 +127,9 @@ public:
                              std::make_unique<TestStringFilterState>(added_value_),
                              StreamInfo::FilterState::StateType::ReadOnly,
                              StreamInfo::FilterState::LifeSpan::Connection);
+    cb.filterState().setData(
+        TestFirstPacketReceivedFilterState::key(), test_first_packet_received_filter_state_,
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
     dispatcher_ = &cb.dispatcher();
     return Network::FilterStatus::Continue;
   }
@@ -119,12 +146,18 @@ public:
                      "Migration to a new address which is not compatible with this filter.");
     return Network::FilterStatus::StopIteration;
   }
+  Network::FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket& packet) override {
+    test_first_packet_received_filter_state_->incrementPacketCount();
+    test_first_packet_received_filter_state_->setPacketLength(packet.length());
+    return Network::FilterStatus::Continue;
+  }
 
 private:
   const std::string added_value_;
   const bool allow_server_migration_;
   Event::Dispatcher* dispatcher_{nullptr};
   const bool allow_client_migration_;
+  std::shared_ptr<TestFirstPacketReceivedFilterState> test_first_packet_received_filter_state_;
 };
 
 #endif

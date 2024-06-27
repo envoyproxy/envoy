@@ -296,6 +296,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_packets_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
     ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
@@ -365,6 +366,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
+        "@com_github_google_quiche//:quic_core_packets_lib",
     ],
 )
 

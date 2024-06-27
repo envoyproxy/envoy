@@ -7,6 +7,7 @@
 #include "source/common/quic/quic_network_connection.h"
 
 #include "quiche/quic/core/quic_connection.h"
+#include "quiche/quic/core/quic_packets.h"
 
 namespace Envoy {
 namespace Quic {
@@ -40,6 +41,12 @@ public:
       return Network::FilterStatus::Continue;
     }
     return listener_filter_->onPeerAddressChanged(new_address, connection);
+  }
+  Network::FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket& packet) override {
+    if (on_accept_by_passed_) {
+      return Network::FilterStatus::Continue;
+    }
+    return listener_filter_->onFirstPacketReceived(packet);
   }
 
 private:
@@ -107,6 +114,14 @@ public:
       }
     }
   }
+  void onFirstPacketReceived(const quic::QuicReceivedPacket& packet) override {
+    for (auto& accept_filter : accept_filters_) {
+      Network::FilterStatus status = accept_filter->onFirstPacketReceived(packet);
+      if (status == Network::FilterStatus::StopIteration) {
+        return;
+      }
+    }
+  }
 
 private:
   Network::ConnectionSocket& socket_;
@@ -134,6 +149,7 @@ public:
   void OnCanWrite() override;
 
   bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
+  void OnFirstPacketReceived(const quic::QuicReceivedPacket& packet);
 
 protected:
   void OnEffectivePeerMigrationValidated(bool is_migration_linkable) override;

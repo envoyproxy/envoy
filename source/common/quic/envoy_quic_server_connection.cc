@@ -4,6 +4,8 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
+#include "quiche/quic/core/quic_packets.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -55,6 +57,12 @@ void EnvoyQuicServerConnection::OnEffectivePeerMigrationValidated(bool is_migrat
   if (listener_filter_manager_ != nullptr && networkConnection() != nullptr) {
     // This connection might become closed after this call.
     listener_filter_manager_->onPeerAddressChanged(effective_peer_address(), *networkConnection());
+  }
+}
+
+void EnvoyQuicServerConnection::OnFirstPacketReceived(const quic::QuicReceivedPacket& packet) {
+  if (listener_filter_manager_ != nullptr) {
+    listener_filter_manager_->onFirstPacketReceived(packet);
   }
 }
 
