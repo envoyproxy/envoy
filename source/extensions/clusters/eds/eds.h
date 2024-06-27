@@ -41,9 +41,11 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
 
-private:
+protected:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                  ClusterFactoryContext& cluster_context, absl::Status& creation_status);
+
+private:
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                               const std::string& version_info) override;

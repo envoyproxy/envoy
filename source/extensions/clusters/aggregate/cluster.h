@@ -49,12 +49,14 @@ public:
   Random::RandomGenerator& random_;
   const ClusterSetConstSharedPtr clusters_;
 
-private:
-  friend class ClusterFactory;
-  friend class AggregateClusterTest;
+protected:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context, absl::Status& creation_status);
+
+private:
+  friend class ClusterFactory;
+  friend class AggregateClusterTest;
 
   // Upstream::ClusterImplBase
   void startPreInit() override { onPreInitComplete(); }

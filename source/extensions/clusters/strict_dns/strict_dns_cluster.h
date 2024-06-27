@@ -21,11 +21,12 @@ public:
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
          Network::DnsResolverSharedPtr dns_resolver);
 
-private:
+protected:
   StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                        ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
                        absl::Status& creation_status);
 
+private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
                   const std::string& dns_address, const uint32_t dns_port,
