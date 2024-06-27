@@ -323,7 +323,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMat
 }
 
 // Test to check if the cert has an OtherName SAN
-// with a BMPString type value "BMPStringExample".
+// with a `BMPString` type value "BMPStringExample".
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBmpStringTypeMatched) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
