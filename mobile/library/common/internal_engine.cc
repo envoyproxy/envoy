@@ -166,8 +166,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
           if (!hasIpV6Connectivity()) {
             connectivity_manager_->dnsCache()->setIpVersionToRemove(
                 {Network::Address::IpVersion::v6});
-          } else {
-            connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
           }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
@@ -281,6 +279,8 @@ envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
         Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+    // The IP version to remove flag must be set first before refreshing the DNS cache so that
+    // the DNS cache will be updated with whether or not the IPv6 addresses will need to be removed.
     if (!hasIpV6Connectivity()) {
       connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
     } else {

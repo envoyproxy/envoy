@@ -1361,6 +1361,8 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 }
 #endif
 
+// This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
+// doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   initialize();
