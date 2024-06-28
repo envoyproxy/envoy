@@ -6289,17 +6289,16 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www3.lyft.com", "/foo", "GET");
     EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _)).WillRepeatedly(Return(true));
+    // total weight will be 140
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster1", 30))
         .WillRepeatedly(Return(10));
-
-    // We return an invalid value here, one that is greater than 100
-    // Expect any random value > 10 to always land in cluster2.
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster2", 30))
         .WillRepeatedly(Return(120));
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster3", 40))
         .WillRepeatedly(Return(10));
 
-    EXPECT_EQ("cluster1", config.route(headers, 1005)->routeEntry()->clusterName());
+    // 1005 % total weight == 25
+    EXPECT_EQ("cluster2", config.route(headers, 1005)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 82)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 92)->routeEntry()->clusterName());
   }
