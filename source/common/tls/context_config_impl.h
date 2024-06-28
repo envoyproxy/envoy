@@ -64,7 +64,7 @@ public:
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
   Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
 
-  Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
+  absl::StatusOr<Ssl::CertificateValidationContextConfigPtr> getCombinedValidationContextConfig(
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
           dynamic_cvc);
 
@@ -73,7 +73,8 @@ protected:
                     const unsigned default_min_protocol_version,
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
-                    Server::Configuration::TransportSocketFactoryContext& factory_context);
+                    Server::Configuration::TransportSocketFactoryContext& factory_context,
+                    absl::Status& creation_status);
   Api::Api& api_;
   const Server::Options& options_;
   Singleton::Manager& singleton_manager_;
@@ -121,9 +122,9 @@ public:
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_CURVES;
 
-  ClientContextConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
+  static absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>>
+  create(const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
+         Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
@@ -132,6 +133,11 @@ public:
   bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
 
 private:
+  ClientContextConfigImpl(
+      const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      absl::Status& creation_status);
+
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
 
@@ -143,9 +149,9 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ServerContextConfig {
 public:
-  ServerContextConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
+  static absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>>
+  create(const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
+         Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
@@ -175,6 +181,11 @@ public:
   Ssl::TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const override;
 
 private:
+  ServerContextConfigImpl(
+      const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      absl::Status& creation_status);
+
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
   static const std::string DEFAULT_CIPHER_SUITES;
@@ -187,9 +198,10 @@ private:
   Envoy::Common::CallbackHandlePtr stk_update_callback_handle_;
   Envoy::Common::CallbackHandlePtr stk_validation_callback_handle_;
 
-  std::vector<ServerContextConfig::SessionTicketKey> getSessionTicketKeys(
+  absl::StatusOr<std::vector<ServerContextConfig::SessionTicketKey>> getSessionTicketKeys(
       const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys);
-  ServerContextConfig::SessionTicketKey getSessionTicketKey(const std::string& key_data);
+  absl::StatusOr<ServerContextConfig::SessionTicketKey>
+  getSessionTicketKey(const std::string& key_data);
   static OcspStaplePolicy ocspStaplePolicyFromProto(
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
           policy);

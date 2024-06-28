@@ -148,6 +148,8 @@ private:
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
               std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
+              std::make_shared<envoy::config::core::v3::Metadata>(
+                  parent.localityLbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),

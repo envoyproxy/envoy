@@ -8,6 +8,8 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -23,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // These are stats Envoy reports to the management server at a frequency defined by
 // :ref:`LoadStatsResponse.load_reporting_interval<envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`.
 // Stats per upstream region/zone and optionally per subzone.
-// [#next-free-field: 9]
+// [#next-free-field: 12]
 message UpstreamLocalityStats {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.UpstreamLocalityStats";
@@ -47,6 +49,31 @@ message UpstreamLocalityStats {
   // the last report. This information is aggregated over all the
   // upstream endpoints in the locality.
   uint64 total_issued_requests = 8;
+
+  // The total number of connections in an established state at the time of the
+  // report. This field is aggregated over all the upstream endpoints in the
+  // locality.
+  // In Envoy, this information may be based on ``upstream_cx_active metric``.
+  // [#not-implemented-hide:]
+  uint64 total_active_connections = 9 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // The total number of connections opened since the last report.
+  // This field is aggregated over all the upstream endpoints in the locality.
+  // In Envoy, this information may be based on ``upstream_cx_total`` metric
+  // compared to itself between start and end of an interval, i.e.
+  // ``upstream_cx_total``(now) - ``upstream_cx_total``(now -
+  // load_report_interval).
+  // [#not-implemented-hide:]
+  uint64 total_new_connections = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // The total number of connection failures since the last report.
+  // This field is aggregated over all the upstream endpoints in the locality.
+  // In Envoy, this information may be based on ``upstream_cx_connect_fail``
+  // metric compared to itself between start and end of an interval, i.e.
+  // ``upstream_cx_connect_fail``(now) - ``upstream_cx_connect_fail``(now -
+  // load_report_interval).
+  // [#not-implemented-hide:]
+  uint64 total_fail_connections = 11 [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // Stats for multi-dimensional load balancing.
   repeated EndpointLoadMetricStats load_metric_stats = 5;

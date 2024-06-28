@@ -207,6 +207,8 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(const HostLbPolicyDataPtr&, lbPolicyData, (), (const));
 
   bool disable_active_health_check_ = false;
 };
