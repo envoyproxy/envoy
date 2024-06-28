@@ -64,8 +64,7 @@ public:
         filter_.deferred_reset_ = true;
         return;
       }
-      if (reason == Http::StreamResetReason::LocalReset) {
-        ASSERT(transport_failure_reason.empty());
+      if (reason == Http::StreamResetReason::LocalReset && transport_failure_reason.empty()) {
         // Use this to communicate to the upstream request to not force-terminate.
         transport_failure_reason = "codec_error";
       }
