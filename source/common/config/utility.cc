@@ -12,6 +12,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -68,11 +70,13 @@ namespace {
 /**
  * Check the grpc_services and cluster_names for API config sanity. Throws on error.
  * @param api_config_source the config source to validate.
+ * @param max_grpc_services the maximal number of grpc services allowed.
  * @return an invalid status when an API config has the wrong number of gRPC
  * services or cluster names, depending on expectations set by its API type.
  */
 absl::Status
-checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source,
+                          int max_grpc_services) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
        api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
@@ -89,10 +93,10 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
           fmt::format("{}::(DELTA_)GRPC must not have a cluster name specified: {}",
                       api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
-    if (api_config_source.grpc_services().size() > 1) {
-      return absl::InvalidArgumentError(
-          fmt::format("{}::(DELTA_)GRPC must have a single gRPC service specified: {}",
-                      api_config_source.GetTypeName(), api_config_source.DebugString()));
+    if (api_config_source.grpc_services_size() > max_grpc_services) {
+      return absl::InvalidArgumentError(fmt::format(
+          "{}::(DELTA_)GRPC must have no more than {} gRPC services specified: {}",
+          api_config_source.GetTypeName(), max_grpc_services, api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {
@@ -133,7 +137,9 @@ absl::Status Utility::checkApiConfigSourceSubscriptionBackingCluster(
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
     return absl::OkStatus();
   }
-  RETURN_IF_NOT_OK(checkApiConfigSourceNames(api_config_source));
+  RETURN_IF_NOT_OK(checkApiConfigSourceNames(
+      api_config_source,
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
 
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -153,6 +159,14 @@ absl::Status Utility::checkApiConfigSourceSubscriptionBackingCluster(
           primary_clusters, api_config_source.grpc_services()[0].envoy_grpc().cluster_name(),
           api_config_source.GetTypeName()));
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") &&
+        api_config_source.grpc_services_size() == 2 &&
+        api_config_source.grpc_services()[1].has_envoy_grpc()) {
+      // If an Envoy failover gRPC exists, we validate its cluster name.
+      RETURN_IF_NOT_OK(Utility::validateClusterName(
+          primary_clusters, api_config_source.grpc_services()[1].envoy_grpc().cluster_name(),
+          api_config_source.GetTypeName()));
+    }
   }
   // Otherwise, there is no cluster name to validate.
   return absl::OkStatus();
@@ -161,15 +175,23 @@ absl::Status Utility::checkApiConfigSourceSubscriptionBackingCluster(
 absl::optional<std::string>
 Utility::getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   if (api_config_source.grpc_services_size() > 0) {
-    // Only checking for the first entry in grpc_services, because Envoy's xDS implementation
-    // currently only considers the first gRPC endpoint and ignores any other xDS management servers
-    // specified in an ApiConfigSource.
+    std::string res = "";
+    // In case more than one grpc service is defined, concatenate the names for
+    // a unique GrpcControlPlane identifier.
     if (api_config_source.grpc_services(0).has_envoy_grpc()) {
-      return api_config_source.grpc_services(0).envoy_grpc().cluster_name();
+      res = api_config_source.grpc_services(0).envoy_grpc().cluster_name();
+    } else if (api_config_source.grpc_services(0).has_google_grpc()) {
+      res = api_config_source.grpc_services(0).google_grpc().target_uri();
     }
-    if (api_config_source.grpc_services(0).has_google_grpc()) {
-      return api_config_source.grpc_services(0).google_grpc().target_uri();
+    // Concatenate the failover gRPC service.
+    if (api_config_source.grpc_services_size() == 2) {
+      if (api_config_source.grpc_services(1).has_envoy_grpc()) {
+        absl::StrAppend(&res, ",", api_config_source.grpc_services(1).envoy_grpc().cluster_name());
+      } else if (api_config_source.grpc_services(1).has_google_grpc()) {
+        absl::StrAppend(&res, ",", api_config_source.grpc_services(1).google_grpc().target_uri());
+      }
     }
+    return res;
   }
   return absl::nullopt;
 }
@@ -204,8 +226,10 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
-    bool skip_cluster_check) {
-  RETURN_IF_NOT_OK(checkApiConfigSourceNames(api_config_source));
+    bool skip_cluster_check, int grpc_service_idx) {
+  RETURN_IF_NOT_OK(checkApiConfigSourceNames(
+      api_config_source,
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
 
   if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
       api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
@@ -214,8 +238,13 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
                                                   api_config_source.DebugString()));
   }
 
+  if (grpc_service_idx >= api_config_source.grpc_services_size()) {
+    // No returned factory in case there's no entry.
+    return nullptr;
+  }
+
   envoy::config::core::v3::GrpcService grpc_service;
-  grpc_service.MergeFrom(api_config_source.grpc_services(0));
+  grpc_service.MergeFrom(api_config_source.grpc_services(grpc_service_idx));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
 }

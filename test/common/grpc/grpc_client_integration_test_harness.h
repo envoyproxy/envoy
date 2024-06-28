@@ -357,6 +357,8 @@ public:
           envoy_grpc_max_recv_msg_length);
     }
 
+    config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
+
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
@@ -394,6 +396,22 @@ public:
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
+
+    // "x-envoy-internal" and `x-forward-for` headers are only available in envoy gRPC path.
+    // They will be removed when either envoy gRPC config or stream option is false.
+    if (getClientType() == ClientType::EnvoyGrpc) {
+      if (!skip_envoy_headers_ && send_internal_header_stream_option_) {
+        EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
+      } else {
+        EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+      }
+      if (!skip_envoy_headers_ && send_xff_header_stream_option_) {
+        EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
+      } else {
+        EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
+      }
+    }
+
     for (const auto& value : initial_metadata) {
       EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
@@ -471,6 +489,8 @@ public:
     envoy::config::core::v3::Metadata m;
     (*m.mutable_filter_metadata())["com.foo.bar"] = {};
     options.setMetadata(m);
+    options.setSendInternal(send_internal_header_stream_option_);
+    options.setSendXff(send_xff_header_stream_option_);
     stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
@@ -533,6 +553,9 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
+  bool skip_envoy_headers_{false};
+  bool send_internal_header_stream_option_{true};
+  bool send_xff_header_stream_option_{true};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.
