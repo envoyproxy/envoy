@@ -306,6 +306,11 @@ new_features:
     to specify headers that should never be sent to the external authentication service. Overrides
     :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`
     if a header matches both.
+- area: http
+  change: |
+    Added :ref:`<envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.proxy_address>,
+    which allows for specification of the HTTP proxy address in the actual transport socket config.
+    Previously, this was only configurable via the filter state metadata.
 - area: upstream
   change: |
     Added a new field to LocalityLbEndpoints, :ref:`LocalityLbEndpoints.Metadata
