@@ -32,12 +32,12 @@ void SharedRequestManager::onDecodingSuccess(ResponseHeaderFramePtr header_frame
   const bool end_stream = header_frame->frameFlags().endStream();
 
   auto it = pending_requests_.find(stream_id);
-  auto cb = it->second;
-
   if (it == pending_requests_.end()) {
     ENVOY_LOG(error, "generic proxy: id {} not found for frame", stream_id);
     return;
   }
+
+  auto cb = it->second;
 
   // If the response stream is end, remove the callbacks from the map because we
   // no longer need to track the response.

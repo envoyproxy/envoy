@@ -405,7 +405,7 @@ void RouterFilter::completeAndSendLocalReply(absl::Status status, absl::string_v
 }
 
 void RouterFilter::kickOffNewUpstreamRequest() {
-  ASSERT(upstream_request_ != nullptr);
+  ASSERT(upstream_request_ == nullptr);
 
   num_retries_++;
 
