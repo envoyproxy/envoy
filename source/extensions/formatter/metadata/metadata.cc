@@ -46,7 +46,7 @@ public:
             }) {}
 };
 
-// Metadata formatter for listener metadata.
+// Metadata formatter for virtual host metadata.
 class VirtualHostMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
 public:
   VirtualHostMetadataFormatter(const std::string& filter_namespace,
