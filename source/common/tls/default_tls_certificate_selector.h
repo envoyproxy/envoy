@@ -27,7 +27,7 @@ public:
   DefaultTlsCertificateSelector(const Ssl::ServerContextConfig& config,
                                 Ssl::TlsCertificateSelectorCallback& cb);
 
-  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
+  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
 
   // Finds the best matching context. The returned context will have the same lifetime as

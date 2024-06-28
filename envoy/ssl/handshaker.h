@@ -176,11 +176,11 @@ public:
 
 struct SelectionResult {
   enum class SelectionStatus {
-    // TLS handshake should continue.
+    // A certificate was successfully selected.
     Success,
-    // TLS handshake should wait for the selection to happen asynchronously.
+    // Certificate selection will complete asynchronously later.
     Pending,
-    // TLS handshake should be aborted.
+    // Certificate selection failed.
     Failed,
   };
   SelectionStatus status; // Status of the certificate selection.
@@ -219,7 +219,7 @@ public:
   /**
    * select TLS context based on the client hello.
    */
-  virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello,
+  virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                            CertificateSelectionCallbackPtr cb) PURE;
 
   // Finds the best matching context. The returned context will have the same lifetime as

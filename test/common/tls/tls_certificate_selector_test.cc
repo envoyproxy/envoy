@@ -85,7 +85,7 @@ public:
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
   }
-  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO*,
+  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO&,
                                         Ssl::CertificateSelectionCallbackPtr cb) override {
     ENVOY_LOG_MISC(info, "debug: select context");
 

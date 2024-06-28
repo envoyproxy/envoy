@@ -100,7 +100,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   if (!creation_status.ok()) {
     return;
   }
-  // After checked creation_status, so that the cert selector doesn't need to handle it.
+  // If creation failed, do not create the selector.
   tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(config, *this);
 
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
@@ -477,7 +477,7 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
             static_cast<int>(selection_result));
 
   const auto result = tls_certificate_selector_->selectTlsContext(
-      ssl_client_hello, extended_socket_info->createCertificateSelectionCallback());
+      *ssl_client_hello, extended_socket_info->createCertificateSelectionCallback());
 
   ENVOY_LOG(trace,
             "TLS context selection result: {}, after selectTlsContext, selection result status: {}",

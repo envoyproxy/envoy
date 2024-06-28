@@ -463,11 +463,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       "envoy.tls.certificate_selectors.default");
   if (!factory) {
     IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
-  } else {
-    const ProtobufWkt::Any any;
-    tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
-        any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
+    return;
   }
+
+  const ProtobufWkt::Any any;
+  tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
+      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {

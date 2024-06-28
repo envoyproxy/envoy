@@ -201,7 +201,7 @@ public:
   virtual bool fullScanCertsOnSNIMismatch() const PURE;
 
   /**
-   * @return a callback which can be used to create TLS context provider instances.
+   * @return a factory which can be used to create TLS context provider instances.
    */
   virtual TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
 };
