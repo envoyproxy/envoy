@@ -64,6 +64,37 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   dispatcher_helper_.runDispatcher();
 }
 
+// A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
+// are removed due to grpc service configuration.
+TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeaders) {
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  skip_envoy_headers_ = true;
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
+// are removed due to per stream options which overrides the gRPC service configuration.
+TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeadersWithStreamOption) {
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  send_internal_header_stream_option_ = false;
+  send_xff_header_stream_option_ = false;
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that a simple request-reply stream works with bytes metering in Envoy gRPC.
 TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
   // Currently, only Envoy gRPC's bytes metering is based on the bytes meter in Envoy.

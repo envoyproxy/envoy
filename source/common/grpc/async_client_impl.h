@@ -44,6 +44,7 @@ public:
 
 private:
   const uint32_t max_recv_message_length_;
+  const bool skip_envoy_headers_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
