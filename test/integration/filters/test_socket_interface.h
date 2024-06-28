@@ -32,9 +32,9 @@ public:
 
   TestIoSocketHandle(ConnectOverrideProc connect_override_proc,
                      WriteOverrideProc write_override_proc, ReadOverrideProc read_override_proc,
-                     os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                     absl::optional<int> domain = absl::nullopt)
-      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
+                     size_t address_cache_max_capacity, os_fd_t fd = INVALID_SOCKET,
+                     bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
+      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain, address_cache_max_capacity),
         connect_override_(connect_override_proc), write_override_(write_override_proc),
         read_override_(read_override_proc) {
     int type;
@@ -119,8 +119,8 @@ public:
 
 private:
   // SocketInterfaceImpl
-  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
-                         absl::optional<int> domain) const override;
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+                         const SocketCreationOptions& options) const override;
 
   const TestIoSocketHandle::ConnectOverrideProc connect_override_proc_;
   const TestIoSocketHandle::WriteOverrideProc write_override_proc_;
