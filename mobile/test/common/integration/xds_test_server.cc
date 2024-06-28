@@ -70,8 +70,8 @@ XdsTestServer::XdsTestServer()
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
   tls_cert->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
+                                                                                 factory_context_);
   auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager_, *stats_store_.rootScope(), std::vector<std::string>{});
   xds_upstream_ = std::make_unique<FakeUpstream>(std::move(context), 0, version_, upstream_config_);

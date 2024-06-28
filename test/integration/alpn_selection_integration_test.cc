@@ -68,7 +68,7 @@ require_client_certificate: true
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     TestUtility::loadFromYaml(yaml, tls_context);
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(

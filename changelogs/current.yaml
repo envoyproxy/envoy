@@ -39,10 +39,20 @@ behavior_changes:
     unchanged and the stream is reset if the upstream server completes response before the downstream. The stream is also
     reset if the upstream server responds with an error status before the downstream. This behavior is disabled by default
     and can be enabled by setting the ``envoy.reloadable_features.allow_multiplexed_upstream_half_close`` runtime key to true.
+- area: composite_filter
+  change: |
+    Adding support for
+    :ref:`sample_percent <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.sample_percent>`.
+    It specifies the probability of the action execution. If not specified, it is 100%.
 - area: golang
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
+- area: ext_proc
+  change: |
+    Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
+    is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode that can be used by external
+    processor to observe Envoy data and status.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -101,6 +111,11 @@ minor_behavior_changes:
     This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.consistent_header_validation`` to false.
 - area: quic
   change: |
+    Cache source/destination address instances in a LUR cache for packet read to improve performance.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read`` to false.
+- area: quic
+  change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
 - area: config
   change: |
@@ -110,6 +125,11 @@ minor_behavior_changes:
 - area: filters
   change: |
     Set ``WWW-Authenticate`` header for 401 responses from the Basic Auth filter.
+- area: jwt_authn
+  change: |
+    jwt_authn now validates provider URIs. If the validation is too strict it can temporarily be
+    disabled by setting the runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` to
+    false.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
@@ -205,6 +225,10 @@ bug_fixes:
   change: |
     Fixed missing :ref:`additional addresses <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`
     for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
+- area: http
+  change: |
+    Fixed a bug where additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`
+    are not sent properly to clients.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -289,6 +313,11 @@ new_features:
     to specify headers that should never be sent to the external authentication service. Overrides
     :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`
     if a header matches both.
+- area: upstream
+  change: |
+    Added a new field to LocalityLbEndpoints, :ref:`LocalityLbEndpoints.Metadata
+    <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`, that may be used for transport socket
+    matching groups of endpoints.
 - area: quic
   change: |
     Added support for QUIC server preferred address when there is a DNAT between the client and Envoy. See
@@ -376,11 +405,28 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: ext_authz
+  change: |
+    Added
+    :ref:`enable_dynamic_metadata_ingestion
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.enable_dynamic_metadata_ingestion>`,
+    which allows ext_authz to be configured to ignore dynamic metadata in ext_authz responses.
 - area: rbac
   change: |
     The RBAC filter will now log the enforced rule to the dynamic metadata field
     "enforced_effective_policy_id" and the result to the dynamic metadata field
     "enforced_engine_result". These are only populated if a non-shadow engine exists.
+- area: jwt_authn
+  change: |
+    Added :ref:`strip_failure_response
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
+    to allow stripping the failure response details from the JWT authentication filter.
+- area: tls
+  change: |
+    added support to match against ``OtherName`` SAN Type under :ref:`match_typed_subject_alt_names
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
+    An additional field ``oid`` is added to :ref:`SubjectAltNameMatcher
+    <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>` to support this change.
 
 deprecated:
 - area: tracing

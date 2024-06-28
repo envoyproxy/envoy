@@ -108,7 +108,7 @@ public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                            ProcessContextOptRef context);
+                            Server::Configuration::ServerFactoryContext& context);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -154,7 +154,7 @@ private:
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
-  ProcessContextOptRef context_;
+  Server::Configuration::ServerFactoryContext& context_;
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };

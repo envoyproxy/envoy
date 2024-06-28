@@ -122,7 +122,7 @@ FixedServerPreferredAddressConfig::getServerPreferredAddresses(
 Quic::EnvoyQuicServerPreferredAddressConfigPtr
 FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
     const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validation_visitor,
-    ProcessContextOptRef /*context*/) {
+    Server::Configuration::ServerFactoryContext& /*context*/) {
   auto& config =
       MessageUtil::downcastAndValidate<const envoy::extensions::quic::server_preferred_address::v3::
                                            FixedServerPreferredAddressConfig&>(message,
