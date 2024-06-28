@@ -41,7 +41,8 @@ namespace ExtAuthz {
   COUNTER(error)                                                                                   \
   COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)                                                                    \
-  COUNTER(invalid)
+  COUNTER(invalid)                                                                                 \
+  COUNTER(ignored_dynamic_metadata)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -101,6 +102,8 @@ public:
   bool hasDecoderHeaderMutationRules() const {
     return decoder_header_mutation_checker_.has_value();
   }
+
+  bool enableDynamicMetadataIngestion() const { return enable_dynamic_metadata_ingestion_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -195,6 +198,7 @@ private:
   const bool validate_mutations_;
   Stats::Scope& scope_;
   const absl::optional<Filters::Common::MutationRules::Checker> decoder_header_mutation_checker_;
+  const bool enable_dynamic_metadata_ingestion_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
