@@ -88,12 +88,8 @@ using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
 
 class MMDBWrapper {
 public:
-  MMDBWrapper(const MMDB_s& mmdb) { mmdb_ = mmdb; }
-
-  ~MMDBWrapper() {
-      MMDB_close(&mmdb_);
-  }
-
+  MMDBWrapper(MMDB_s&& mmdb) { mmdb_ = mmdb; }
+  ~MMDBWrapper() { MMDB_close(&mmdb_); }
   const MMDB_s* getMMDB() const { return &mmdb_; }
 
 private:

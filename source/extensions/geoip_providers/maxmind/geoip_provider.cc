@@ -165,7 +165,8 @@ void GeoipProvider::lookupInCityDb(
     auto city_db = getCityDb();
     RELEASE_ASSERT(city_db, "Maxmind city database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        city_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        city_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -207,7 +208,8 @@ void GeoipProvider::lookupInAsnDb(
     auto isp_db = getIspDb();
     RELEASE_ASSERT(isp_db, "Maxmind asn database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        isp_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -235,7 +237,8 @@ void GeoipProvider::lookupInAnonDb(
     auto anon_db = getAnonDb();
     RELEASE_ASSERT(anon_db, "Maxmind anon database must be initialised for performing lookups");
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        anon_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        anon_db->getMMDB(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -286,7 +289,7 @@ MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
                    fmt::format("Unable to open Maxmind database file {}. Error {}", db_path,
                                std::string(MMDB_strerror(result_code))));
     ENVOY_LOG(info, "Succeeded to reload Maxmind database {} from file {}.", db_type, db_path);
-    return std::make_shared<MMDB_s>(maxmind_db);
+    return std::make_shared<MMDBWrapper>(std::move(maxmind_db));
   }
 }
 
