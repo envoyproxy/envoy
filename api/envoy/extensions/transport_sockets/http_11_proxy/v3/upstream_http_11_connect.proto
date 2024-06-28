@@ -37,12 +37,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   filter, this only applies to TLS connections.
 // * Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
 //
-// This transport socket is not compatible with HTTP/3, plaintext HTTP/2.
+// .. warning::
+//     This transport socket is not compatible with HTTP/3, plaintext HTTP/2.
 message Http11ProxyUpstreamTransport {
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
 
-  // The address of the proxy to connect to. If set, stream info set by an
-  // intermediate filter will be ignored.
+  // The address of the proxy to connect to. If set, stream info set by an intermediate filter will
+  // be ignored.
   config.core.v3.SocketAddress proxy_address = 2;
 }
