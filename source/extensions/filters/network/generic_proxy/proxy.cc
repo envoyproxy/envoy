@@ -66,15 +66,15 @@ ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
 
   parent_.stats_helper_.onRequest();
 
-  connection_manager_tracing_config_ = parent_.config_->tracingConfig();
+  conn_manager_tracing_config_ = parent_.config_->tracingConfig();
 
   auto tracer = parent_.config_->tracingProvider();
 
-  if (!connection_manager_tracing_config_.has_value() || !tracer.has_value()) {
+  if (!conn_manager_tracing_config_.has_value() || !tracer.has_value()) {
     return;
   }
 
-  auto decision = tracingDecision(connection_manager_tracing_config_.value(), parent_.runtime_);
+  auto decision = tracingDecision(conn_manager_tracing_config_.value(), parent_.runtime_);
   if (decision.traced) {
     stream_info_.setTraceReason(decision.reason);
   }
@@ -84,28 +84,28 @@ ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
 }
 
 Tracing::OperationName ActiveStream::operationName() const {
-  ASSERT(connection_manager_tracing_config_.has_value());
-  return connection_manager_tracing_config_->operationName();
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->operationName();
 }
 
 const Tracing::CustomTagMap* ActiveStream::customTags() const {
-  ASSERT(connection_manager_tracing_config_.has_value());
-  return &connection_manager_tracing_config_->getCustomTags();
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return &conn_manager_tracing_config_->getCustomTags();
 }
 
 bool ActiveStream::verbose() const {
-  ASSERT(connection_manager_tracing_config_.has_value());
-  return connection_manager_tracing_config_->verbose();
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->verbose();
 }
 
 uint32_t ActiveStream::maxPathTagLength() const {
-  ASSERT(connection_manager_tracing_config_.has_value());
-  return connection_manager_tracing_config_->maxPathTagLength();
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->maxPathTagLength();
 }
 
 bool ActiveStream::spawnUpstreamSpan() const {
-  ASSERT(connection_manager_tracing_config_.has_value());
-  return connection_manager_tracing_config_->spawnUpstreamSpan();
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->spawnUpstreamSpan();
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
@@ -275,18 +275,18 @@ void ActiveStream::processRequestCommonFrame() {
   ENVOY_LOG(debug, "Generic proxy: complete decoder filters for common frame (end_stream: {})",
             request_common_frame_->frameFlags().endStream());
 
-  // Transfer the active common frame to the request stream frame handler.
-  if (request_stream_frames_handler_ != nullptr) {
-    request_stream_frames_handler_->onRequestCommonFrame(std::move(request_common_frame_));
-    if (stream_reset_or_complete_) {
-      stop_decoder_filter_chain_ = true;
-      return;
-    }
-  }
-
+  RequestCommonFramePtr local_common_frame = std::move(request_common_frame_);
   // Reset the iterator and frame for the next common frame.
   request_common_frame_ = nullptr;
   decoder_filter_iter_common_ = decoder_filters_.begin();
+
+  // Transfer the active common frame to the request stream frame handler.
+  if (request_stream_frames_handler_ != nullptr) {
+    request_stream_frames_handler_->onRequestCommonFrame(std::move(local_common_frame));
+    if (stream_reset_or_complete_) {
+      stop_decoder_filter_chain_ = true;
+    }
+  }
 }
 
 void ActiveStream::processResponseHeaderFrame() {
@@ -354,15 +354,15 @@ void ActiveStream::processResponseCommonFrame() {
     ENVOY_LOG(debug, "Generic proxy: complete encoder filters for common frame (end_stream: {})",
               response_common_frame_->frameFlags().endStream());
 
-    // Send the common frame to downstream.
-    if (!sendFrameToDownstream(*response_common_frame_, false)) {
-      stop_encoder_filter_chain_ = true;
-      return;
-    }
-
+    auto local_common_frame = std::move(response_common_frame_);
     // Reset the iterator and frame for the next common frame.
     response_common_frame_ = nullptr;
     encoder_filter_iter_common_ = encoder_filters_.begin();
+
+    // Send the common frame to downstream.
+    if (!sendFrameToDownstream(*local_common_frame, false)) {
+      stop_encoder_filter_chain_ = true;
+    }
   };
 
   // Handle the special case where no filter is added to the encoder filter chain.
@@ -435,16 +435,19 @@ void ActiveStream::continueDecoding() {
     return;
   }
 
-  // Handle the active request common frame if exists.
+  // Handle the active request common frame first if exists.
   if (request_common_frame_ != nullptr) {
     processRequestCommonFrame();
-  }
-  if (stop_decoder_filter_chain_) {
-    return;
   }
 
   // Handle the other request common frames if exists.
   while (!request_common_frames_.empty()) {
+    // Check the stop flag first because the filter chain may be
+    // stopped by the previous active request frame.
+    if (stop_decoder_filter_chain_) {
+      break;
+    }
+
     ASSERT(request_common_frame_ == nullptr);
     ASSERT(decoder_filter_iter_common_ == decoder_filters_.begin());
 
@@ -454,9 +457,6 @@ void ActiveStream::continueDecoding() {
     request_common_frame_ = std::move(frame);
 
     processRequestCommonFrame();
-    if (stop_decoder_filter_chain_) {
-      break;
-    }
   }
 }
 
@@ -540,16 +540,19 @@ void ActiveStream::continueEncoding() {
     return;
   }
 
-  // Handle the active response common frame if exists.
+  // Handle the active response common frame first if exists.
   if (response_common_frame_ != nullptr) {
     processResponseCommonFrame();
-  }
-  if (stop_encoder_filter_chain_) {
-    return;
   }
 
   // Handle the other response common frames if exists.
   while (!response_common_frames_.empty()) {
+    // Check the stop flag first because the filter chain may be
+    // stopped by the previous active response frame.
+    if (stop_encoder_filter_chain_) {
+      break;
+    }
+
     ASSERT(response_common_frame_ == nullptr);
     ASSERT(encoder_filter_iter_common_ == encoder_filters_.begin());
 
@@ -559,9 +562,6 @@ void ActiveStream::continueEncoding() {
     response_common_frame_ = std::move(frame);
 
     processResponseCommonFrame();
-    if (stop_encoder_filter_chain_) {
-      break;
-    }
   }
 }
 
@@ -612,7 +612,8 @@ void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> re
   stream_info_.onRequestComplete();
 
   bool error_reply = false;
-  // This response frame may be nullptr if the request is one-way.
+  // This response frame may be nullptr if the request is one-way or the response is not
+  // sent to the downstream.
   if (response_header_frame_ != nullptr) {
     error_reply = !response_header_frame_->status().ok();
   }
@@ -654,6 +655,12 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool 
 
 void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
                                absl::optional<StartTime> start_time) {
+  if (request_header_frame == nullptr) {
+    ENVOY_LOG(error, "generic proxy: request header frame from codec is null");
+    onDecodingFailure();
+    return;
+  }
+
   const uint64_t stream_id = request_header_frame->frameFlags().streamId();
 
   if (!frame_handlers_.empty()) { // Quick empty check to avoid the map lookup.
@@ -668,6 +675,12 @@ void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
 }
 
 void Filter::onDecodingSuccess(RequestCommonFramePtr request_common_frame) {
+  if (request_common_frame == nullptr) {
+    ENVOY_LOG(error, "generic proxy: request common frame from codec is null");
+    onDecodingFailure();
+    return;
+  }
+
   const uint64_t stream_id = request_common_frame->frameFlags().streamId();
   // One existing stream expects this frame.
   if (auto iter = frame_handlers_.find(stream_id); iter != frame_handlers_.end()) {
@@ -703,15 +716,8 @@ OptRef<Network::Connection> Filter::connection() {
 }
 
 void Filter::registerFrameHandler(uint64_t stream_id, ActiveStream* raw_stream) {
-  // If the stream expects variable length frames, then add it to the frame
-  // handler map.
-  // This map entry will be removed when the request or response end frame is
-  // received.
-  if (frame_handlers_.contains(stream_id)) {
-    ENVOY_LOG(error, "generic proxy: repetitive stream id: {} at same time", stream_id);
-    onDecodingFailure();
-    return;
-  }
+  // Repeated stream id will be detected in the onDecodingSuccess method.
+  ASSERT(frame_handlers_.find(stream_id) == frame_handlers_.end());
   frame_handlers_[stream_id] = raw_stream;
 }
 

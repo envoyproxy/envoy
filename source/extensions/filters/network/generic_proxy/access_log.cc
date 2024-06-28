@@ -146,10 +146,7 @@ private:
                      return std::string(optional_view.value());
                    });
              }},
-            // A formatter for the response status code. This supports the case where the response
-            // code is minus value and will override the common RESPONSE_CODE formatter for generic
-            // proxy.
-            {"RESPONSE_CODE",
+            {"GENERIC_RESPONSE_CODE",
              [](absl::string_view, absl::optional<size_t>) -> FormatterProviderPtr {
                return std::make_unique<GenericStatusCodeFormatterProvider>();
              }},

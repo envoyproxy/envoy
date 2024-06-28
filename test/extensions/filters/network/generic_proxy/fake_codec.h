@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/generic_proxy/access_log.h"
 #include "source/extensions/filters/network/generic_proxy/interface/codec.h"
 
 namespace Envoy {
@@ -418,6 +419,30 @@ public:
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
+};
+
+class FakeAccessLogExtensionFilter : public AccessLogFilter {
+  bool evaluate(const FormatterContext&, const StreamInfo::StreamInfo&) const override {
+    return true;
+  }
+};
+
+class FakeAccessLogExtensionFilterFactory : public AccessLogFilterFactory {
+public:
+  // AccessLogFilterFactory
+  AccessLogFilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
+                                  Server::Configuration::FactoryContext&) override {
+    return std::make_unique<FakeAccessLogExtensionFilter>();
+  }
+
+  std::set<std::string> configTypes() override {
+    return {"envoy.generic_proxy.access_log.fake.type"};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+  std::string name() const override { return "envoy.generic_proxy.access_log.fake"; }
 };
 
 } // namespace GenericProxy

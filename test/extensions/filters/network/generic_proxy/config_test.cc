@@ -26,7 +26,6 @@ namespace {
 
 using ::testing::Return;
 
-// Keep empty until merge the latest API from main.
 TEST(FactoryTest, FactoryTest) {
   const std::string yaml_config = R"EOF(
     stat_prefix: config_test
@@ -434,6 +433,114 @@ TEST(BasicFilterConfigTest, TestConfigurationWithAccessLog) {
 
   NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  Factory factory;
+
+  envoy::extensions::filters::network::generic_proxy::v3::GenericProxy config;
+  TestUtility::loadFromYaml(config_yaml, config);
+
+  auto mock_codec_factory = std::make_unique<NiceMock<MockCodecFactory>>();
+
+  EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
+
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, factory_context).value();
+  EXPECT_NE(nullptr, cb);
+  NiceMock<Network::MockFilterManager> filter_manager;
+  cb(filter_manager);
+}
+
+TEST(BasicFilterConfigTest, TestConfigurationWithAccessLogAndLogFilter1) {
+  const std::string config_yaml = R"EOF(
+    stat_prefix: ingress
+    filters:
+    - name: envoy.filters.generic.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
+    codec_config:
+      name: mock
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: envoy.generic_proxy.codecs.mock.type
+        value: {}
+    generic_rds:
+      config_source: { ads: {} }
+      route_config_name: test_route
+    access_log:
+    - name: envoy.generic_proxy.access_loggers.file
+      filter:
+        not_health_check_filter: {}
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        path: "/dev/stdout"
+        log_format:
+          text_format_source:
+            inline_string: "%METHOD% %PATH% %HOST% %PROTOCOL% %REQUEST_PROPERTY(key)% RESPONSE_PROPERTY(key)\n"
+    )EOF";
+
+  NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  Factory factory;
+
+  envoy::extensions::filters::network::generic_proxy::v3::GenericProxy config;
+  TestUtility::loadFromYaml(config_yaml, config);
+
+  auto mock_codec_factory = std::make_unique<NiceMock<MockCodecFactory>>();
+
+  EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
+
+  EXPECT_THROW_WITH_MESSAGE(
+      { auto status_or = factory.createFilterFactoryFromProto(config, factory_context); },
+      EnvoyException,
+      "Access log filter: only extension filter is supported by non-HTTP access loggers.");
+}
+
+TEST(BasicFilterConfigTest, TestConfigurationWithAccessLogAndLogFilter2) {
+  const std::string config_yaml = R"EOF(
+    stat_prefix: ingress
+    filters:
+    - name: envoy.filters.generic.router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.router.v3.Router
+    codec_config:
+      name: mock
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: envoy.generic_proxy.codecs.mock.type
+        value: {}
+    generic_rds:
+      config_source: { ads: {} }
+      route_config_name: test_route
+    access_log:
+    - name: envoy.generic_proxy.access_loggers.file
+      filter:
+        extension_filter:
+          name: envoy.generic_proxy.access_log.fake
+          typed_config:
+            "@type": type.googleapis.com/xds.type.v3.TypedStruct
+            type_url: envoy.generic_proxy.access_log.fake.type
+            value: {}
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        path: "/dev/stdout"
+        log_format:
+          text_format_source:
+            inline_string: "%METHOD% %PATH% %HOST% %PROTOCOL% %REQUEST_PROPERTY(key)% RESPONSE_PROPERTY(key)\n"
+    )EOF";
+
+  NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  FakeAccessLogExtensionFilterFactory fake_access_log_extension_filter_factory;
+  Registry::InjectFactory<AccessLogFilterFactory> registration_log(
+      fake_access_log_extension_filter_factory);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 

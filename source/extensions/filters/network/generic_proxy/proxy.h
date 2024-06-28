@@ -145,7 +145,6 @@ public:
       }
       return nullptr;
     }
-    const StreamInfo::StreamInfo& streamInfo() const override { return parent_.stream_info_; }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.stream_info_; }
     Tracing::Span& activeSpan() override { return parent_.activeSpan(); }
     OptRef<const Tracing::Config> tracingConfig() const override { return parent_.tracingConfig(); }
@@ -275,7 +274,7 @@ public:
   }
 
   OptRef<const Tracing::Config> tracingConfig() const {
-    if (connection_manager_tracing_config_.has_value()) {
+    if (conn_manager_tracing_config_.has_value()) {
       return {*this};
     }
     return {};
@@ -348,7 +347,7 @@ private:
 
   StreamInfo::StreamInfoImpl stream_info_;
 
-  OptRef<const Tracing::ConnectionManagerTracingConfig> connection_manager_tracing_config_;
+  OptRef<const Tracing::ConnectionManagerTracingConfig> conn_manager_tracing_config_;
   Tracing::SpanPtr active_span_;
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

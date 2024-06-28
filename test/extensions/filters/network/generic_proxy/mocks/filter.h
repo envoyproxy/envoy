@@ -106,7 +106,6 @@ public:
   MOCK_METHOD(const CodecFactory&, codecFactory, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
-  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));

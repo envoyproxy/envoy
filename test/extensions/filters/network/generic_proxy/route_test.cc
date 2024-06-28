@@ -44,14 +44,16 @@ protected:
 };
 
 /**
- * Test the method that get cluster name from route entry.
+ * Test the method that get route name and cluster name from route entry.
  */
-TEST_F(RouteEntryImplTest, SimpleClusterName) {
+TEST_F(RouteEntryImplTest, SimpleRouteNameAndClusterName) {
   const std::string yaml_config = R"EOF(
+    name: route_0
     cluster: cluster_0
   )EOF";
   initialize(yaml_config);
 
+  EXPECT_EQ(route_->name(), "route_0");
   EXPECT_EQ(route_->clusterName(), "cluster_0");
 };
 
@@ -342,6 +344,20 @@ protected:
   std::unique_ptr<RouteMatcherImpl> route_matcher_;
 };
 
+TEST(NullRouteMatcherTest, NullRouteMatcherTest) {
+  NullRouteMatcherImpl matcher;
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  FakeStreamCodecFactory::FakeRequest fake_request_0;
+  fake_request_0.host_ = "service_0";
+  fake_request_0.method_ = "method_0";
+  fake_request_0.data_.insert({"key_0", "value_0"});
+  const MatchInput match_input_0(fake_request_0, stream_info, MatchAction::RouteAction);
+
+  EXPECT_EQ(nullptr, matcher.routeEntry(match_input_0));
+}
+
 static const std::string RouteConfigurationYaml = R"EOF(
 name: test_matcher_tree
 virtual_hosts:
@@ -589,6 +605,19 @@ TEST_F(RouteMatcherImplTest, RouteMatch) {
     EXPECT_EQ(route_entry_0->clusterName(), "cluster_1");
   }
 
+  // Suffix host searching but not match.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    FakeStreamCodecFactory::FakeRequest fake_request_0;
+    fake_request_0.host_ = "suffix";
+    fake_request_0.method_ = "method_0";
+    const MatchInput match_input_0(fake_request_0, stream_info, MatchAction::RouteAction);
+
+    EXPECT_EQ("catch_all", route_matcher_->findVirtualHost(match_input_0)->name());
+    EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input_0));
+  }
+
   // Suffix host searching.
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -655,6 +684,7 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
     fake_request.data_.insert({"key_0", "value_0"});
     const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
+    EXPECT_EQ("prefix", route_matcher_->findVirtualHost(match_input)->name());
     EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 
@@ -666,6 +696,7 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
     fake_request.data_.insert({"key_0", "value_0"});
     const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
+    EXPECT_EQ("service", route_matcher_->findVirtualHost(match_input)->name());
     EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 
@@ -676,6 +707,7 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
     fake_request.method_ = "method_0";
     const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
+    EXPECT_EQ("service", route_matcher_->findVirtualHost(match_input)->name());
     EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 }

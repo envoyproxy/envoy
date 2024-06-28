@@ -138,6 +138,8 @@ public:
 
   absl::string_view name() const { return name_; }
 
+  const VirtualHostImpl* findVirtualHost(const MatchInput& request) const;
+
 private:
   using WildcardVirtualHosts =
       std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
@@ -145,8 +147,6 @@ private:
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
-
-  const VirtualHostImpl* findVirtualHost(const MatchInput& request) const;
 
   std::string name_;
 

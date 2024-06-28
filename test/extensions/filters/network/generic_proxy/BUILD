@@ -17,6 +17,7 @@ envoy_cc_test_library(
     hdrs = ["fake_codec.h"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/network/generic_proxy:access_log_lib",
         "//source/extensions/filters/network/generic_proxy/interface:codec_interface",
     ],
 )
@@ -143,5 +144,27 @@ envoy_cc_test(
     ],
     deps = [
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
+    ],
+)
+
+envoy_cc_test(
+    name = "tracing_test",
+    srcs = [
+        "tracing_test.cc",
+    ],
+    deps = [
+        ":fake_codec_lib",
+        "//source/extensions/filters/network/generic_proxy:tracing_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stats_test",
+    srcs = [
+        "stats_test.cc",
+    ],
+    deps = [
+        "//source/extensions/filters/network/generic_proxy:stats_lib",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )

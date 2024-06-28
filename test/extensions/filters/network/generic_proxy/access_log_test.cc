@@ -11,6 +11,53 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+TEST(GenericStatusCodeFormatterProviderTest, GenericStatusCodeFormatterProviderTest) {
+  FormatterContext context;
+  GenericStatusCodeFormatterProvider formatter;
+  StreamInfo::MockStreamInfo stream_info;
+
+  EXPECT_EQ(formatter.formatWithContext(context, stream_info), absl::nullopt);
+  EXPECT_TRUE(formatter.formatValueWithContext(context, stream_info).has_null_value());
+
+  FakeStreamCodecFactory::FakeResponse response;
+  response.status_ = {1234, false};
+  context.response_ = &response;
+
+  EXPECT_EQ(formatter.formatWithContext(context, stream_info).value(), "1234");
+  EXPECT_EQ(formatter.formatValueWithContext(context, stream_info).number_value(), 1234.0);
+}
+
+TEST(StringValueFormatterProviderTest, StringValueFormatterProviderTest) {
+  {
+
+    FormatterContext context;
+    StringValueFormatterProvider formatter(
+        [](const FormatterContext& context,
+           const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
+          if (context.request_ == nullptr) {
+            return absl::nullopt;
+          }
+          return std::string(context.request_->path());
+        },
+        9);
+    StreamInfo::MockStreamInfo stream_info;
+
+    EXPECT_EQ(formatter.formatWithContext(context, stream_info), absl::nullopt);
+    EXPECT_TRUE(formatter.formatValueWithContext(context, stream_info).has_null_value());
+
+    FakeStreamCodecFactory::FakeRequest request;
+    request.path_ = "ANYTHING";
+    context.request_ = &request;
+
+    EXPECT_EQ(formatter.formatWithContext(context, stream_info).value(), "ANYTHING");
+    EXPECT_EQ(formatter.formatValueWithContext(context, stream_info).string_value(), "ANYTHING");
+
+    request.path_ = "ANYTHING_LONGER_THAN_9";
+    EXPECT_EQ(formatter.formatWithContext(context, stream_info).value(), "ANYTHING_");
+    EXPECT_EQ(formatter.formatValueWithContext(context, stream_info).string_value(), "ANYTHING_");
+  }
+}
+
 TEST(AccessLogFormatterTest, AccessLogFormatterTest) {
 
   {
@@ -110,11 +157,9 @@ TEST(AccessLogFormatterTest, AccessLogFormatterTest) {
   }
 
   {
-    // Test for %RESPONSE_CODE%.
-    // This command overrides the default one which is defined in the
-    // source/common/formatter/stream_info_formatter.cc.
+    // Test for %GENERIC_RESPONSE_CODE%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%RESPONSE_CODE%");
+    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%GENERIC_RESPONSE_CODE%");
     StreamInfo::MockStreamInfo stream_info;
 
     EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
