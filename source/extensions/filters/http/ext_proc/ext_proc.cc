@@ -1358,20 +1358,21 @@ void Filter::mergePerRouteConfig() {
 
 void DeferredDeletableStream::closeStreamOnTimer() {
   // Close the stream.
+  // ExternalProcessorStream* raw_stream = nullptr;
   if (stream_) {
     ENVOY_LOG(debug, "Closing the stream");
     if (stream_->close()) {
       stats.streams_closed_.inc();
     }
     parent.erase(stream_.get());
-    stream_.reset();
+    // stream_.reset();
 
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
 
   // Erase this entry from the map.
-  // parent.erase(stream_id);
+  // parent.erase(raw_stream);
 }
 
 // In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
