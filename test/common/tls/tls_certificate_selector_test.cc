@@ -224,8 +224,8 @@ protected:
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
     // provider factory callback will be Called here.
-    auto server_cfg = std::make_unique<Tls::ServerContextConfigImpl>(
-        server_tls_context, transport_socket_factory_context);
+    auto server_cfg =
+        *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context);
 
     provider_factory_.mod_ = mod;
 
@@ -254,8 +254,7 @@ protected:
         client_factory_context;
     ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
 
-    auto client_cfg =
-        std::make_unique<Tls::ClientContextConfigImpl>(client_tls_context, client_factory_context);
+    auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, client_factory_context);
     auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
         std::move(client_cfg), manager, *client_stats_store.rootScope());
     Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
