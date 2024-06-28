@@ -2922,14 +2922,22 @@ TEST_P(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  EXPECT_CALL(response_decoder, decode1xxHeaders_(_));
+  // As per Resumable Uploads for HTTP draft, the upload-draft-interop-version header
+  // must be passed through with 104 responses.
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_))
+      .WillOnce(Invoke([&](ResponseHeaderMapPtr& headers) {
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version")).size(), 1);
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]->value().getStringView(), "4");
+      }));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
-  Buffer::OwnedImpl initial_response("HTTP/1.1 104 Upload Resumption Supported\r\n\r\n");
+
+  Buffer::OwnedImpl initial_response("HTTP/1.1 104 Upload Resumption Supported\r\nUpload-Draft-Interop-Version: 4\r\n\r\n");
   auto status = codec_->dispatch(initial_response);
   EXPECT_TRUE(status.ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
   status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
