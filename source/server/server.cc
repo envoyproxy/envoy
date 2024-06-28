@@ -818,8 +818,9 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
