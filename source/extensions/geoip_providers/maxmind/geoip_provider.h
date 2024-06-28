@@ -92,7 +92,7 @@ class MaxmindDb {
 public:
   MaxmindDb(MMDB_s&& db) : db_(db) {}
   ~MaxmindDb() { MMDB_close(&db_); }
-  const MMDB_s& get() const { return db_; }
+  const MMDB_s* mmdb() const { return &db_; }
 
 private:
   MMDB_s db_;
