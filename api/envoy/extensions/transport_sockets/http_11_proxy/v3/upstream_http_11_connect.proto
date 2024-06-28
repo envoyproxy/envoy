@@ -28,14 +28,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // method of configuration will only preface H1 CONNECT headers to TLS
 // connections.
 //
-// When the transport socket is configured:
-// * Upstream connections will be directed to the specified proxy address rather
-//   than the host's address
-// * Upstream connections will have a raw HTTP/1.1 CONNECT header prefaced
-//   to the payload, and 200 response stripped (if less than 200 bytes). In the
-//   case of proxy addresses read from stream info set by an intermediate
-//   filter, this only applies to TLS connections.
-// * Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
+// When the transport socket is configured, upstream connections will be directed to the specified
+// proxy address rather than the host's address and will have a raw HTTP/1.1 CONNECT header prefaced
+// to the payload, and 200 response stripped (if less than 200 bytes). In the case of proxy
+// addresses read from stream info set by an intermediate filter, this only applies to TLS
+// connections. Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
 //
 // .. warning::
 //     This transport socket is not compatible with HTTP/3, plaintext HTTP/2.

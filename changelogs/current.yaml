@@ -308,8 +308,9 @@ new_features:
     if a header matches both.
 - area: http
   change: |
-    Added
-    :ref:`<envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.proxy_address>`,
+    Added a new field to
+    :ref:`Http11ProxyUpstreamTransport
+    <envoy_v3_api_msg_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport>`,
     which allows for specification of the HTTP proxy address in the actual transport socket config.
     Previously, this was only configurable via the filter state metadata.
 - area: upstream
