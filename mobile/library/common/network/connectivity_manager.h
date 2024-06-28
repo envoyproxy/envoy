@@ -119,11 +119,6 @@ public:
   virtual envoy_netconf_t getConfigurationKey() PURE;
 
   /**
-   * Updates the configuration key representing an update to the network tate.
-   */
-  virtual envoy_netconf_t updateConfigurationKey() PURE;
-
-  /**
    *
    * @return the current proxy settings.
    */
@@ -226,7 +221,6 @@ public:
   NetworkType getPreferredNetwork() override;
   SocketMode getSocketMode() override;
   envoy_netconf_t getConfigurationKey() override;
-  envoy_netconf_t updateConfigurationKey() override;
   Envoy::Network::ProxySettingsConstSharedPtr getProxySettings() override;
   void reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault) override;
   void setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) override;

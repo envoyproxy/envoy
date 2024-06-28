@@ -166,6 +166,8 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
           if (!hasIpV6Connectivity()) {
             connectivity_manager_->dnsCache()->setIpVersionToRemove(
                 {Network::Address::IpVersion::v6});
+          } else {
+            connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
           }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
@@ -276,15 +278,13 @@ envoy_status_t InternalEngine::resetConnectivityState() {
 }
 
 envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
-  return dispatcher_->post(
-      [&, network]() -> void { Network::ConnectivityManagerImpl::setPreferredNetwork(network); });
-}
-
-void InternalEngine::onNetworkChanged() {
-  dispatcher_->post([&]() -> void {
-    envoy_netconf_t configuration_key = connectivity_manager_->updateConfigurationKey();
+  return dispatcher_->post([&, network]() -> void {
+    envoy_netconf_t configuration_key =
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     if (!hasIpV6Connectivity()) {
       connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
+    } else {
+      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
     }
     connectivity_manager_->refreshDns(configuration_key, true);
   });

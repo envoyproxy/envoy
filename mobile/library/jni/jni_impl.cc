@@ -1338,13 +1338,6 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*e
       static_cast<Envoy::NetworkType>(network));
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkChanged(JNIEnv* /*env*/,
-                                                                  jclass, // class
-                                                                  jlong engine) {
-  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkChanged();
-}
-
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(
     JNIEnv* env,
     jclass, // class

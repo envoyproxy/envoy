@@ -70,9 +70,6 @@ public interface EnvoyEngine {
    */
   void setPreferredNetwork(EnvoyNetworkType network);
 
-  /** A callback for the network change event. */
-  void onNetworkChanged();
-
   /**
    * Update proxy settings.
    *

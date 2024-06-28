@@ -103,18 +103,17 @@ public:
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
   envoy_status_t setProxySettings(const char* host, const uint16_t port);
   envoy_status_t resetConnectivityState();
-  envoy_status_t setPreferredNetwork(NetworkType network);
-
   /**
    * This function does the following on a network change event (such as switching from WiFI to
    * cellular, WIFi A to WiFI B, etc.).
    *
+   * - Sets the preferred network.
    * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
    *   `setIpVersionToRemove` in the DNS cache implementation to remove the IPv6 addresses from
    *   the DNS response in the subsequent DNS resolutions.
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    */
-  void onNetworkChanged();
+  envoy_status_t setPreferredNetwork(NetworkType network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -150,6 +149,7 @@ private:
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
+  /** Returns true if there is an IPv6 connectivity. */
   static bool hasIpV6Connectivity();
 
   Thread::PosixThreadFactoryPtr thread_factory_;
