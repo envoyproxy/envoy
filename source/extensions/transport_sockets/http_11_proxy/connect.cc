@@ -157,6 +157,7 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
   }
 
   return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host,
+
                                                        !proto_proxy_address_.has_value());
 }
 
@@ -166,6 +167,9 @@ void UpstreamHttp11ConnectSocketFactory::hashKey(
 
   if (proto_proxy_address_.has_value()) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(proto_proxy_address_.value()), key);
+  } else if (options->http11ProxyInfo().has_value()) {
+    auto proxy_addr = options->http11ProxyInfo()->proxy_address->asStringView();
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(proxy_addr), key);
   }
 }
 
