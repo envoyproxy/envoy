@@ -122,21 +122,7 @@ absl::StatusOr<HeaderParserPtr> HeaderParser::configure(
 absl::StatusOr<HeaderParserPtr>
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
                         const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
-  auto parser_or_error = configure(headers_to_add);
-  RETURN_IF_STATUS_NOT_OK(parser_or_error);
-  HeaderParserPtr header_parser = std::move(parser_or_error.value());
-
-  for (const auto& header : headers_to_remove) {
-    // We reject :-prefix (e.g. :path) removal here. This is dangerous, since other aspects of
-    // request finalization assume their existence and they are needed for well-formedness in most
-    // cases.
-    if (!Http::HeaderUtility::isRemovableHeader(header)) {
-      return absl::InvalidArgumentError(":-prefixed or host headers may not be removed");
-    }
-    header_parser->headers_to_remove_.emplace_back(header);
-  }
-
-  return header_parser;
+  return configure(headers_to_add, headers_to_remove, absl::nullopt);
 }
 
 absl::StatusOr<HeaderParserPtr>
