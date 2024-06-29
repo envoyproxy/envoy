@@ -191,7 +191,7 @@ struct SelectionResult {
 };
 
 /**
- * Used to return the result from an synchronous/asynchronous cert selection.
+ * Used to return the result from an asynchronous cert selection.
  */
 class CertificateSelectionCallback {
 public:
@@ -247,7 +247,7 @@ using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
   /**
-   * @returns a callback to create a TlsCertificateSelector. Accepts the |config| and
+   * @returns a factory to create a TlsCertificateSelector. Accepts the |config| and
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
    */

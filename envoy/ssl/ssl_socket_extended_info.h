@@ -102,6 +102,7 @@ public:
    * Called after the cert selection completes either synchronously or asynchronously.
    * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
    * @param async true if the validation is completed asynchronously.
+   * @param staple true when need to set OCSP response.
    */
   virtual void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx,
                                                bool staple, bool async) PURE;

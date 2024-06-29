@@ -89,8 +89,8 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
                                                 Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni =
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-  const bool client_ecdsa_capable = server_ctx_.isClientEcdsaCapable(&ssl_client_hello);
-  const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(&ssl_client_hello);
+  const bool client_ecdsa_capable = server_ctx_.isClientEcdsaCapable(ssl_client_hello);
+  const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
 
   auto [selected_ctx, ocsp_staple_action] =
       findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable, nullptr);

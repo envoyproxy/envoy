@@ -359,23 +359,23 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   }
 }
 
-bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello) const {
+bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
   CBS client_hello;
-  CBS_init(&client_hello, ssl_client_hello->client_hello, ssl_client_hello->client_hello_len);
+  CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
 
   // This is the TLSv1.3 case (TLSv1.2 on the wire and the supported_versions extensions present).
   // We just need to look at signature algorithms.
-  const uint16_t client_version = ssl_client_hello->version;
+  const uint16_t client_version = ssl_client_hello.version;
   if (client_version == TLS1_2_VERSION && tls_max_version_ == TLS1_3_VERSION) {
     // If the supported_versions extension is found then we assume that the client is competent
     // enough that just checking the signature_algorithms is sufficient.
     const uint8_t* supported_versions_data;
     size_t supported_versions_len;
-    if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_versions,
+    if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_versions,
                                              &supported_versions_data, &supported_versions_len)) {
       const uint8_t* signature_algorithms_data;
       size_t signature_algorithms_len;
-      if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_signature_algorithms,
+      if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_signature_algorithms,
                                                &signature_algorithms_data,
                                                &signature_algorithms_len)) {
         CBS signature_algorithms_ext, signature_algorithms;
@@ -397,7 +397,7 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   // ECDSA and also for a compatible cipher suite. https://tools.ietf.org/html/rfc4492#section-5.1.1
   const uint8_t* curvelist_data;
   size_t curvelist_len;
-  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
+  if (!SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_groups,
                                             &curvelist_data, &curvelist_len)) {
     return false;
   }
@@ -412,7 +412,7 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
 
   // The client must have offered an ECDSA ciphersuite that we like.
   CBS cipher_suites;
-  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+  CBS_init(&cipher_suites, ssl_client_hello.cipher_suites, ssl_client_hello.cipher_suites_len);
 
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher_id;
@@ -429,10 +429,10 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   return false;
 }
 
-bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello) const {
+bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
   const uint8_t* status_request_data;
   size_t status_request_len;
-  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_status_request,
+  if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_status_request,
                                            &status_request_data, &status_request_len)) {
     return true;
   }

@@ -64,8 +64,8 @@ public:
                                                                           bool client_ecdsa_capable,
                                                                           bool client_ocsp_capable,
                                                                           bool* cert_matched_sni);
-  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello) const;
-  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello) const;
+  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
+  bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
 private:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
