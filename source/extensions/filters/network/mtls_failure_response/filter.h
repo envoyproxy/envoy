@@ -14,7 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MtlsFailureResponse {
 
-class MtlsFailureResponseFilter : public Network::ReadFilter {
+class MtlsFailureResponseFilter : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
   MtlsFailureResponseFilter(
       const envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse&
@@ -22,16 +22,26 @@ public:
       Server::Configuration::FactoryContext& context,
       std::shared_ptr<SharedTokenBucketImpl> token_bucket);
 
-  Network::FilterStatus onData(Buffer::Instance&, bool) override;
-  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return (stop_iteration_ ? Network::FilterStatus::StopIteration
+                            : Network::FilterStatus::Continue);
+  }
+
+  Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
+    callbacks_->connection().addConnectionCallbacks(*this);
   }
+
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   const envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse config_;
   Network::ReadFilterCallbacks* callbacks_{};
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
+  bool stop_iteration_{false};
 };
 
 } // namespace MtlsFailureResponse

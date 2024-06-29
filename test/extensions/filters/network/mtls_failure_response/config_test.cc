@@ -31,9 +31,10 @@ public:
         factory.createFilterFactoryFromProto(proto_config, context_).value();
     Network::MockConnection connection;
 
-    EXPECT_CALL(connection, addReadFilter(_)).WillOnce(Invoke([&](Network::ReadFilterSharedPtr filter) {
-      filter_ = std::dynamic_pointer_cast<MtlsFailureResponseFilter>(filter);
-    }));
+    EXPECT_CALL(connection, addReadFilter(_))
+        .WillOnce(Invoke([&](Network::ReadFilterSharedPtr filter) {
+          filter_ = std::dynamic_pointer_cast<MtlsFailureResponseFilter>(filter);
+        }));
 
     cb(connection);
     proto_config_ = proto_config;
@@ -48,8 +49,7 @@ public:
 class MtlsFailureResponseFilterTest : public MtlsFailureResponseTestBase {
 public:
   struct ActiveFilter {
-    ActiveFilter(std::shared_ptr<MtlsFailureResponseFilter> filter)
-        : filter_(std::move(filter)) {
+    ActiveFilter(std::shared_ptr<MtlsFailureResponseFilter> filter) : filter_(std::move(filter)) {
       filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     }
 
@@ -57,7 +57,6 @@ public:
     std::shared_ptr<MtlsFailureResponseFilter> filter_;
   };
 };
-
 
 TEST_F(MtlsFailureResponseFilterTest, ValidateConfigCloseConnectionOnFailure) {
   const std::string filter_yaml = R"EOF(
@@ -96,7 +95,8 @@ TEST_F(MtlsFailureResponseFilterTest, ValidateConfigKeepConnectionOpenWithTokens
                 KEEP_CONNECTION_OPEN);
   EXPECT_TRUE(proto_config_.has_token_bucket());
   EXPECT_EQ(proto_config_.token_bucket().max_tokens(), 10);
-  EXPECT_EQ(static_cast<::uint32_t>(proto_config_.token_bucket().tokens_per_fill().value()), static_cast<::uint32_t>(1));
+  EXPECT_EQ(static_cast<::uint32_t>(proto_config_.token_bucket().tokens_per_fill().value()),
+            static_cast<::uint32_t>(1));
   EXPECT_EQ(proto_config_.token_bucket().fill_interval().seconds(), 5);
 }
 
@@ -123,8 +123,7 @@ TEST_F(MtlsFailureResponseFilterTest, InvalidConfig) {
   failure_mode: CLOSE_CONNECTION
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(initialize(filter_yaml), EnvoyException,
-                          "INVALID_ARGUMENT");
+  EXPECT_THROW_WITH_REGEX(initialize(filter_yaml), EnvoyException, "INVALID_ARGUMENT");
 }
 
 } // namespace

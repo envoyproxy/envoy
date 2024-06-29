@@ -14,7 +14,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":mtls_failure_response",
+        ":mtls_failure_response_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/common/common:shared_token_bucket_impl_lib",
@@ -25,7 +25,7 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
-    name = "mtls_failure_response",
+    name = "mtls_failure_response_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [

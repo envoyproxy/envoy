@@ -31,9 +31,9 @@ Network::FilterFactoryCb MtlsFailureResponseConfigFactory::createFilterFactoryFr
   }
 
   return [config, &context, token_bucket_](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<MtlsFailureResponseFilter>(config, context, token_bucket_));
+    filter_manager.addReadFilter(
+        std::make_shared<MtlsFailureResponseFilter>(config, context, token_bucket_));
   };
-
 };
 
 /**

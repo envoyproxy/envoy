@@ -18,13 +18,25 @@ MtlsFailureResponseFilter::MtlsFailureResponseFilter(
     Server::Configuration::FactoryContext&, std::shared_ptr<SharedTokenBucketImpl> token_bucket)
     : config_(config), token_bucket_(token_bucket) {}
 
-Network::FilterStatus MtlsFailureResponseFilter::onData(Buffer::Instance&, bool) {
+Network::FilterStatus MtlsFailureResponseFilter::onNewConnection() {
+  // Continue if connection is not using TLS
+  if (!callbacks_->connection().ssl()) {
+    return Network::FilterStatus::Continue;
+  } else {
+    // Wait for handshake to be completed if connection is using TLS
+    return Network::FilterStatus::StopIteration;
+  }
+}
+
+void MtlsFailureResponseFilter::onEvent(Network::ConnectionEvent event) {
+  if (event != Network::ConnectionEvent::Connected) {
+    return;
+  }
   bool cert_valid = false;
   auto ssl = callbacks_->connection().ssl();
 
-
   if (!ssl) {
-    return Network::FilterStatus::Continue;
+    return;
   }
 
   if (config_.validation_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::
@@ -35,20 +47,25 @@ Network::FilterStatus MtlsFailureResponseFilter::onData(Buffer::Instance&, bool)
                  VALIDATED) {
     cert_valid = ssl->peerCertificateValidated();
   }
-
-if (!cert_valid) {
-    if (config_.failure_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::CLOSE_CONNECTION) {
-        callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "client_cert_validation_failure");
-    } else if (config_.failure_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::KEEP_CONNECTION_OPEN) {
-        if (token_bucket_ && !token_bucket_->consume(1, false)) {
-            callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "client_cert_validation_failure_no_token");
-        }
+  if (!cert_valid) {
+    if (config_.failure_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::
+                                      MtlsFailureResponse::CLOSE_CONNECTION) {
+      callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                     "client_cert_validation_failure");
+    } else if (config_.failure_mode() ==
+               envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::
+                   KEEP_CONNECTION_OPEN) {
+      if (token_bucket_ && !token_bucket_->consume(1, false)) {
+        callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                       "client_cert_validation_failure_no_token");
+      } else {
+        stop_iteration_ = true;
+      }
     }
-    return Network::FilterStatus::StopIteration;
-}
+    return;
+  }
 
-
-  return Network::FilterStatus::Continue;
+  return;
 }
 } // namespace MtlsFailureResponse
 } // namespace NetworkFilters
