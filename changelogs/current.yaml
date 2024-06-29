@@ -367,6 +367,12 @@ new_features:
     cluster.
 - area: ext_authz
   change: |
+    implemented
+    :ref:`more_chunks <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.more_chunks>`
+    response API to support sending multiple response chunks for one received chunk from the external processing server
+    in STREAMED mode.
+- area: ext_proc
+  change: |
     added
     :ref:`decoder_header_mutation_rules <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
     which allows you to configure what decoder header mutations are allowed from the ext_authz
