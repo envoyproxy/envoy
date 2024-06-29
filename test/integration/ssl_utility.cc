@@ -47,8 +47,11 @@ void initializeUpstreamTlsContextConfig(
     chain = rundir + "/test/config/integration/certs/clientcert.pem";
     key = rundir + "/test/config/integration/certs/clientkey.pem";
   }
-  certs->mutable_certificate_chain()->set_filename(chain);
-  certs->mutable_private_key()->set_filename(key);
+
+  if (!options.client_with_no_cert_) {
+    certs->mutable_certificate_chain()->set_filename(chain);
+    certs->mutable_private_key()->set_filename(key);
+  }
 
   auto* common_context = tls_context.mutable_common_tls_context();
 

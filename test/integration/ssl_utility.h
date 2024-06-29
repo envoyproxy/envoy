@@ -59,6 +59,10 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setClientWithNoCert(bool no_cert) {
+    client_with_no_cert_ = no_cert;
+    return *this;
+  }
   ClientSslTransportOptions& setCustomCertValidatorConfig(
       envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
     custom_validator_config_ = custom_validator_config;
@@ -75,6 +79,7 @@ struct ClientSslTransportOptions {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
   bool use_expired_spiffe_cert_{false};
   bool client_with_intermediate_cert_{false};
+  bool client_with_no_cert_{false};
   // It is owned by the caller that invokes `setCustomCertValidatorConfig()`.
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
 };
