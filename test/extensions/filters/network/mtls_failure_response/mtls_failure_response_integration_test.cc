@@ -79,7 +79,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MtlsFailureResponseIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Test if the filter closes the connection when the client certificate is not presented
-TEST_P(MtlsFailureResponseIntegrationTest, InvalidClientCertificateWithCloseConnectionOnPresentationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       InvalidClientCertificateWithCloseConnectionOnPresentationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -99,7 +100,8 @@ typed_config:
 }
 
 // Test if the filter keeps the connection open when the client certificate is presented
-TEST_P(MtlsFailureResponseIntegrationTest, ValidClientCertificateWithCloseConnectionOnPresentationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       ValidClientCertificateWithCloseConnectionOnPresentationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -120,7 +122,8 @@ typed_config:
 }
 
 // Test if the filter closes the connection when the client certificate is invalid
-TEST_P(MtlsFailureResponseIntegrationTest, InvalidClientCertificateWithCloseConnectionOnValidationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       InvalidClientCertificateWithCloseConnectionOnValidationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -132,14 +135,16 @@ typed_config:
 )EOF");
 
   initialize();
-  auto conn = makeSslClientConnection({Ssl::ClientSslTransportOptions().setUseExpiredSpiffeCer(true)});
+  auto conn =
+      makeSslClientConnection({Ssl::ClientSslTransportOptions().setUseExpiredSpiffeCer(true)});
   IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
   ASSERT_TRUE(codec->waitForDisconnect(std::chrono::milliseconds(500)));
   codec->close();
 }
 
 // Test if the filter continues the connection when the client certificate is valid
-TEST_P(MtlsFailureResponseIntegrationTest, ValidClientCertificateWithCloseConnectionOnValidationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       ValidClientCertificateWithCloseConnectionOnValidationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -160,7 +165,8 @@ typed_config:
 }
 
 // Test if the filter responds back when the client certificate is valid
-TEST_P(MtlsFailureResponseIntegrationTest, ValidClientCertificateWithKeepConnectionOpenOnValidationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       ValidClientCertificateWithKeepConnectionOpenOnValidationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -180,7 +186,8 @@ typed_config:
 }
 
 // Test if the filter fails to respond back when the client certificate is invalid
-TEST_P(MtlsFailureResponseIntegrationTest, InvalidClientCertificateWithKeepConnectionOpenOnValidationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       InvalidClientCertificateWithKeepConnectionOpenOnValidationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -196,12 +203,13 @@ typed_config:
   };
 
   // Test the router request and response with the body sizes
-  EXPECT_DEATH(testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator),"Timed out waiting for new connection.");
+  EXPECT_DEATH(testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator),
+               "Timed out waiting for new connection.");
 }
 
-
 // Test if the filter fails to respond back when the client certificate is invalid
-TEST_P(MtlsFailureResponseIntegrationTest, MultipleInvalidClientCertificateConnectionsWithKeepConnectionOpenOnValidationFailure) {
+TEST_P(MtlsFailureResponseIntegrationTest,
+       MultipleInvalidClientCertificateConnectionsWithKeepConnectionOpenOnValidationFailure) {
 
   config_helper_.addNetworkFilter(
       R"EOF(
@@ -218,11 +226,13 @@ typed_config:
 
   initialize();
 
-  auto conn1 = makeSslClientConnection({Ssl::ClientSslTransportOptions().setUseExpiredSpiffeCer(true)});
+  auto conn1 =
+      makeSslClientConnection({Ssl::ClientSslTransportOptions().setUseExpiredSpiffeCer(true)});
   IntegrationCodecClientPtr codec1 = makeHttpConnection(std::move(conn1));
   ASSERT_TRUE(codec1->connected());
 
-  auto conn2 = makeSslClientConnection({Ssl::ClientSslTransportOptions().setUseExpiredSpiffeCer(true)});
+  auto conn2 =
+      makeSslClientConnection({Ssl::ClientSslTransportOptions().setUseExpiredSpiffeCer(true)});
   IntegrationCodecClientPtr codec2 = makeHttpConnection(std::move(conn2));
   ASSERT_TRUE(codec2->disconnected());
   codec1->close();
