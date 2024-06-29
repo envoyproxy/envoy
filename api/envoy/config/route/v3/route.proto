@@ -4,6 +4,7 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/any.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -155,6 +156,11 @@ message RouteConfiguration {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
+
+  // Specifies a collection of Formatter plugins that can be called from request_headers_to_add and
+  // response_headers_to_add operations.
+  // [#extension-category: envoy.formatter]
+  repeated core.v3.TypedExtensionConfig formatters = 18;
 }
 
 message Vhds {

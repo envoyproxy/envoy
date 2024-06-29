@@ -58,7 +58,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   proxy_substitution_format_config.mutable_text_format_source()->set_inline_string(
       config.proxy_host());
   proxy_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      proxy_substitution_format_config, context);
+      proxy_substitution_format_config, context.serverFactoryContext());
 
   if (config.has_proxy_port()) {
     uint32_t port = config.proxy_port().value();
@@ -73,7 +73,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   target_substitution_format_config.mutable_text_format_source()->set_inline_string(
       config.target_host());
   target_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      target_substitution_format_config, context);
+      target_substitution_format_config, context.serverFactoryContext());
 }
 
 UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(

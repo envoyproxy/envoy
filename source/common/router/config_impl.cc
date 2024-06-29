@@ -32,6 +32,8 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
@@ -2226,6 +2228,8 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
     }
   }
 
+  auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(config.formatters(),
+                                                                            factory_context);
   // Initialize all cluster specifier plugins before creating route matcher. Because the route may
   // reference it by name.
   for (const auto& plugin_proto : config.cluster_specifier_plugins()) {
@@ -2242,14 +2246,14 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (!config.request_headers_to_add().empty() || !config.request_headers_to_remove().empty()) {
     request_headers_parser_ =
         THROW_OR_RETURN_VALUE(HeaderParser::configure(config.request_headers_to_add(),
-                                                      config.request_headers_to_remove()),
+                                                      config.request_headers_to_remove(), commands),
                               Router::HeaderParserPtr);
   }
   if (!config.response_headers_to_add().empty() || !config.response_headers_to_remove().empty()) {
-    response_headers_parser_ =
-        THROW_OR_RETURN_VALUE(HeaderParser::configure(config.response_headers_to_add(),
-                                                      config.response_headers_to_remove()),
-                              Router::HeaderParserPtr);
+    response_headers_parser_ = THROW_OR_RETURN_VALUE(
+        HeaderParser::configure(config.response_headers_to_add(),
+                                config.response_headers_to_remove(), commands),
+        Router::HeaderParserPtr);
   }
 
   if (config.has_metadata()) {

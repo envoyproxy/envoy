@@ -51,7 +51,7 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
     }
     value.skip_if_empty_ = proto_value.skip_if_empty();
     value.value_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-        proto_value.format_string(), context);
+        proto_value.format_string(), context.serverFactoryContext());
     values.push_back(std::move(value));
   }
   return values;

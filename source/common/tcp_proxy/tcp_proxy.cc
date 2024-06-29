@@ -708,7 +708,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
   substitution_format_config.mutable_text_format_source()->set_inline_string(
       config_message.tunneling_config().hostname());
   hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      substitution_format_config, context);
+      substitution_format_config, context.serverFactoryContext());
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {

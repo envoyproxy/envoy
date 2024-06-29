@@ -24,7 +24,8 @@ public:
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
                 Server::Configuration::GenericFactoryContext& context)
-      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context)),
+      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+            config, context.serverFactoryContext())),
         content_type_(
             !config.content_type().empty() ? config.content_type()
             : config.format_case() ==

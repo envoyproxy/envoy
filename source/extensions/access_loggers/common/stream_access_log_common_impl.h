@@ -18,8 +18,8 @@ createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::Filter
       MessageUtil::downcastAndValidate<const T&>(config, context.messageValidationVisitor());
   Formatter::FormatterPtr formatter;
   if (fal_config.access_log_format_case() == T::AccessLogFormatCase::kLogFormat) {
-    formatter =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(), context);
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+        fal_config.log_format(), context.serverFactoryContext());
   } else if (fal_config.access_log_format_case() ==
              T::AccessLogFormatCase::ACCESS_LOG_FORMAT_NOT_SET) {
     formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();

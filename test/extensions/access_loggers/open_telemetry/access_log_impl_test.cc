@@ -83,8 +83,8 @@ public:
           EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
           return logger_;
         });
-    auto commands =
-        Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
+    auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+        config_.formatters(), context_.serverFactoryContext());
 
     return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, commands);
   }

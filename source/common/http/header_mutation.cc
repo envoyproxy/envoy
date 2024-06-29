@@ -16,7 +16,7 @@ using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 class AppendMutation : public HeaderEvaluator, public Envoy::Router::HeadersToAddEntry {
 public:
   AppendMutation(const HeaderValueOption& header_value_option, absl::Status& creation_status)
-      : HeadersToAddEntry(header_value_option, creation_status),
+      : HeadersToAddEntry(header_value_option, creation_status, absl::nullopt),
         header_name_(header_value_option.header().key()) {}
 
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& context,
