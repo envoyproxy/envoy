@@ -490,13 +490,6 @@ ValidationResults ContextImpl::customVerifyCertChain(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl) {
   ASSERT(extended_socket_info);
   STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
-  // if (cert_chain == nullptr){
-  //   extended_socket_info->setCertificateValidationStatus(Ssl::ClientValidationStatus::NotValidated);
-  //   return {ValidationResults::ValidationStatus::Successful,
-  //   Ssl::ClientValidationStatus::NotValidated,
-  //           absl::nullopt, absl::nullopt};
-  // }
-
   if (cert_chain == nullptr) {
     extended_socket_info->setCertificateValidationStatus(Ssl::ClientValidationStatus::NotValidated);
     stats_.fail_verify_error_.inc();
