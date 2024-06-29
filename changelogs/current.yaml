@@ -291,6 +291,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
 
 new_features:
 - area: hot_restart
