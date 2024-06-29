@@ -332,7 +332,8 @@ new_features:
     which, when set to true, will set the downstream request ``:scheme`` to match the upstream transport protocol.
 - area: http
   change: |
-    Added field :ref:`formatters <envoy_v3_api_field_config.route.v3.Route.formatters>` which enables the ability to use formatters extensiosn in header mutation.
+    Added field :ref:`formatters <envoy_v3_api_field_config.route.v3.Route.formatters>` which adds the ability
+    to use formatter extensions in header mutation.
 - area: redis
   change: |
     Added support for `inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_.
