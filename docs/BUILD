@@ -194,14 +194,6 @@ genrule(
     ],
 )
 
-# TODO(phlax): this appears unused, fix or remove
-pkg_files(
-    name = "google_vrp_config",
-    srcs = ["//configs:google-vrp/envoy-edge.yaml"],
-    prefix = "config/best_practices",
-    strip_prefix = "/configs",
-)
-
 pkg_files(
     name = "repo_configs",
     srcs = ["//configs"],
