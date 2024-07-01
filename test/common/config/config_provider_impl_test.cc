@@ -195,7 +195,7 @@ public:
 
   // Envoy::Config::ConfigProviderManager
   ConfigProviderPtr
-  createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&& configs,
+  createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& configs,
                              Server::Configuration::ServerFactoryContext& factory_context,
                              const OptionalArg&) override {
     auto config = dynamic_cast<const test::common::config::DummyConfig&>(*configs[0]);
