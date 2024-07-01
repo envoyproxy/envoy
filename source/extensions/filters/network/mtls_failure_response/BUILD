@@ -29,10 +29,8 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
-        "//source/common/common:minimal_logger_lib",
         "//source/common/common:shared_token_bucket_impl_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

@@ -13,7 +13,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/mtls_failure_response/v3;mtls_failure_responsev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: MTLS Failure Response]
+// [#protodoc-title: mTLS Failure Response]
 // [#extension: envoy.filters.network.mtls_failure_response]
 
 // Configuration for the mTLS Failure Response filter. As opposed to returning a SSL failure to a client after failed

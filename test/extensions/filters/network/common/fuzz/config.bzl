@@ -8,6 +8,7 @@ READFILTER_FUZZ_FILTERS = [
     # test/common/http/conn_manager_impl_fuzz_test.cc
     "envoy.filters.network.http_connection_manager",
     "envoy.filters.network.local_ratelimit",
+    "envoy.filters.network.mtls_failure_response",
     "envoy.filters.network.ratelimit",
     "envoy.filters.network.rbac",
 ]

@@ -682,7 +682,7 @@ envoy.filters.network.mongo_proxy:
 envoy.filters.network.mtls_failure_response:
   categories:
   - envoy.filters.network
-  security_posture: robust_to_untrusted_downstream_and_upstream
+  security_posture: robust_to_untrusted_downstream
   status: wip
   type_urls:
   - envoy.extensions.filters.network.mtls_failure_response.v3.MtlsFailureResponse
