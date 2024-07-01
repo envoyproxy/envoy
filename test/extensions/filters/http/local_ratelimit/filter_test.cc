@@ -1,9 +1,12 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 
+#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -75,8 +78,9 @@ public:
 
     envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, *stats_.rootScope(),
-                                             runtime_, per_route);
+    config_ =
+        std::make_shared<FilterConfig>(config, local_info_, dispatcher_, cm_, singleton_manager_,
+                                       *stats_.rootScope(), runtime_, per_route);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -100,6 +104,9 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  Singleton::ManagerImpl singleton_manager_;
+
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
   std::shared_ptr<Filter> filter_2_;
@@ -308,6 +315,22 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(FilterTest, RequestRateLimitedXRateLimitHeadersWithoutRunningDecodeHeaders) {
+  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
+
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-reset"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-reset"));
 }
 
 static constexpr absl::string_view descriptor_config_yaml = R"(

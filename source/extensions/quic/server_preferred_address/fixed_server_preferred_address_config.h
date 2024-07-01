@@ -35,7 +35,7 @@ public:
   Quic::EnvoyQuicServerPreferredAddressConfigPtr
   createServerPreferredAddressConfig(const Protobuf::Message& message,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                     ProcessContextOptRef context) override;
+                                     Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new envoy::extensions::quic::server_preferred_address::v3::

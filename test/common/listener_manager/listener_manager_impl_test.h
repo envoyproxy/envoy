@@ -225,7 +225,7 @@ protected:
                   const std::string& source_address, uint16_t source_port,
                   std::string direct_source_address = "") {
     if (absl::StartsWith(destination_address, "/")) {
-      local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
+      local_address_ = *Network::Address::PipeInstance::create(destination_address);
     } else {
       local_address_ =
           Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port);
@@ -240,7 +240,7 @@ protected:
         .WillByDefault(ReturnRef(application_protocols));
 
     if (absl::StartsWith(source_address, "/")) {
-      remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
+      remote_address_ = *Network::Address::PipeInstance::create(source_address);
     } else {
       remote_address_ = Network::Utility::parseInternetAddressNoThrow(source_address, source_port);
     }
@@ -250,8 +250,7 @@ protected:
       direct_source_address = source_address;
     }
     if (absl::StartsWith(direct_source_address, "/")) {
-      direct_remote_address_ =
-          std::make_shared<Network::Address::PipeInstance>(direct_source_address);
+      direct_remote_address_ = *Network::Address::PipeInstance::create(direct_source_address);
     } else {
       direct_remote_address_ =
           Network::Utility::parseInternetAddressNoThrow(direct_source_address, source_port);

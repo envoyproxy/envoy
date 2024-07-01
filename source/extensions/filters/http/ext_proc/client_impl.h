@@ -49,6 +49,12 @@ public:
   // actually closed it.
   bool close() override;
 
+  void notifyFilterDestroy() override {
+    // When the filter object is being destroyed,  `callbacks_` (which is a OptRef to filter object)
+    // should be reset to avoid the dangling reference.
+    callbacks_.reset();
+  }
+
   // AsyncStreamCallbacks
   void onReceiveMessage(ProcessingResponsePtr&& message) override;
 
@@ -67,7 +73,8 @@ private:
   // if it failed to start.
   bool startStream(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
                    const Http::AsyncClient::StreamOptions& options);
-  ExternalProcessorCallbacks& callbacks_;
+  // Optional reference to filter object.
+  OptRef<ExternalProcessorCallbacks> callbacks_;
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> client_;
   Grpc::AsyncStream<ProcessingRequest> stream_;
   Http::AsyncClient::ParentContext grpc_context_;

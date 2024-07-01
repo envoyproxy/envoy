@@ -274,6 +274,7 @@ private:
   std::string refresh_token_;
   std::string expires_in_;
   std::string expires_refresh_token_in_;
+  std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
@@ -295,6 +296,8 @@ private:
   std::string getEncodedToken() const;
   std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
                                             const std::chrono::seconds& expires_in) const;
+  std::string getExpiresTimeForIdToken(const std::string& id_token,
+                                       const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

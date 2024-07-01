@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/logger.h"

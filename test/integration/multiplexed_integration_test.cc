@@ -1118,8 +1118,6 @@ TEST_P(MultiplexedIntegrationTest, GoAway) {
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
@@ -1159,8 +1157,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
@@ -1187,8 +1183,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyRes
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResetsForLongStreams) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   const int stream_lifetime_seconds = 2;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
@@ -1843,6 +1837,45 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSe
             response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15; HttpOnly"));
+      });
+  EXPECT_EQ(set_cookies.size(), 1);
+}
+
+TEST_P(MultiplexedRingHashIntegrationTest,
+       CookieRoutingNoCookieWithNonzeroTtlSetAndWithAttributes) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+        cookie->mutable_ttl()->set_seconds(15);
+        auto* attribute_1 = cookie->mutable_attributes()->Add();
+        attribute_1->set_name("test1");
+        attribute_1->set_value("value1");
+        auto* attribute_2 = cookie->mutable_attributes()->Add();
+        attribute_2->set_name("test2");
+        attribute_2->set_value("value2");
+      });
+
+  std::set<std::string> set_cookies;
+  sendMultipleRequests(
+      1024,
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_EQ("200", response.headers().getStatusValue());
+        std::string value(
+            response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
+        set_cookies.insert(value);
+        EXPECT_THAT(value,
+                    MatchesRegex("foo=.*; Max-Age=15; test1=value1; test2=value2; HttpOnly"));
       });
   EXPECT_EQ(set_cookies.size(), 1);
 }
