@@ -118,7 +118,7 @@ TEST_P(Http11ConnectTest, ProxyAddressConfigBehaviorLegacy) {
   // Hostname of the upstream that the CONNECT proxy would send to.
   const std::string hostname = "www.foo.com";
 
-  // Build a proxy info struct with a filterstate-specific address. This is what
+  // Build a proxy info struct with an address specific to filter state. This is what
   // would be populated if some intermediate filter added the metadata to the
   // stream info.
   const std::string fs_proxy_address_str = "filterstate.proxy.address";
