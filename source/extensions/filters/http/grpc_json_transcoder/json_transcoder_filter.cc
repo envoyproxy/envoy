@@ -219,7 +219,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   const auto& print_config = proto_config.print_options();
   response_translate_options_.json_print_options.add_whitespace = print_config.add_whitespace();
-  response_translate_options_.json_print_options.always_print_primitive_fields =
+  response_translate_options_.json_print_options.always_print_fields_with_no_presence =
       print_config.always_print_primitive_fields();
   response_translate_options_.json_print_options.always_print_enums_as_ints =
       print_config.always_print_enums_as_ints();
