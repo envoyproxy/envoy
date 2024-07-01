@@ -367,8 +367,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
     {
       absl::MutexLock lock{&ip_version_to_remove_lock_};
-      absl::optional<Network::Address::IpVersion> ip_version_to_remove = *ip_version_to_remove_;
-      if (ip_version_to_remove.has_value()) {
+      if (ip_version_to_remove_.has_value()) {
+        auto ip_version_to_remove = *ip_version_to_remove_;
         response.remove_if([ip_version_to_remove](const Network::DnsResponse& dns_resp) {
           // Ignore the loopback address because a socket interface can still support both IPv4 and
           // IPv6 but has no outgoing IPv4/IPv6 connectivity.
