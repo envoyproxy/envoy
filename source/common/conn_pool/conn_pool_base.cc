@@ -26,13 +26,21 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transpo
   if (upstream_http_protocol_options && upstream_http_protocol_options->auto_sni_from_upstream()) {
     const absl::string_view hostname = host->hostname();
     if (!hostname.empty()) {
+      Network::TransportSocketOptionsConstSharedPtr options_with_decorated_server_name;
       if (transport_socket_options) {
-        return std::make_shared<Network::ServerNameDecoratingTransportSocketOptions>(
-            hostname, transport_socket_options);
+        options_with_decorated_server_name =
+            std::make_shared<Network::ServerNameDecoratingTransportSocketOptions>(
+                hostname, transport_socket_options);
       } else {
-        return std::make_shared<Network::TransportSocketOptionsImpl>(
+        options_with_decorated_server_name = std::make_shared<Network::TransportSocketOptionsImpl>(
             hostname, std::vector<std::string>{}, std::vector<std::string>{},
             std::vector<std::string>{});
+      }
+      if (upstream_http_protocol_options->auto_san_validation()) {
+        return std::make_shared<Network::SubjectAltNamesDecoratingTransportSocketOptions>(
+            std::vector<std::string>{std::string(hostname)}, options_with_decorated_server_name);
+      } else {
+        return options_with_decorated_server_name;
       }
     } else {
       return transport_socket_options;
