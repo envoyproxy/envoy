@@ -163,9 +163,12 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
-          if (!hasIpV6Connectivity()) {
-            connectivity_manager_->dnsCache()->setIpVersionToRemove(
-                {Network::Address::IpVersion::v6});
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+            if (!hasIpV6Connectivity()) {
+              connectivity_manager_->dnsCache()->setIpVersionToRemove(
+                  {Network::Address::IpVersion::v6});
+            }
           }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
@@ -279,12 +282,16 @@ envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
         Network::ConnectivityManagerImpl::setPreferredNetwork(network);
-    // The IP version to remove flag must be set first before refreshing the DNS cache so that
-    // the DNS cache will be updated with whether or not the IPv6 addresses will need to be removed.
-    if (!hasIpV6Connectivity()) {
-      connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
-    } else {
-      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+      // The IP version to remove flag must be set first before refreshing the DNS cache so that
+      // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
+      // removed.
+      if (!hasIpV6Connectivity()) {
+        connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
+      } else {
+        connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+      }
     }
     connectivity_manager_->refreshDns(configuration_key, true);
   });
@@ -392,6 +399,11 @@ void InternalEngine::logInterfaces(absl::string_view event,
 }
 
 bool InternalEngine::hasIpV6Connectivity() {
+  // This probing IPv6 logic is borrowed from Chromium.
+  // -
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=154-157;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
+  // -
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=1467-1488;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
   ENVOY_LOG(trace, "Checking for IPv6 connectivity.");
   int domain = AF_INET6;
   const Api::SysCallSocketResult socket_result =

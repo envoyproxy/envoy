@@ -149,7 +149,7 @@ private:
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
-  /** Returns true if there is an IPv6 connectivity. */
+  /** Returns true if there is IPv6 connectivity. */
   static bool hasIpV6Connectivity();
 
   Thread::PosixThreadFactoryPtr thread_factory_;
