@@ -19,10 +19,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for HTTP/1.1 proxy transport sockets.
 //
-// If this transport socket is configured with the `proxy_address` field set,
+// If this transport socket is configured with the proxy_address field set,
 // then the proxy address will be used for upstream connections.
 //
-// If the `proxy_address` field is not set, then the proxy address will be
+// If the proxy_address field is not set, then the proxy address will be
 // read from the stream info set by an intermediate filter (as the test filter
 // does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`). This
 // method of configuration will only preface H1 CONNECT headers to TLS
