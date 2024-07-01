@@ -227,6 +227,9 @@ bug_fixes:
   change: |
     Fixed a bug where additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`
     are not sent properly to clients.
+- area: datadog
+  change: |
+    Bumped the version of datadog to resolve a crashing bug in earlier versions of the library.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
