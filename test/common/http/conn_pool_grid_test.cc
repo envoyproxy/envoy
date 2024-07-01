@@ -177,8 +177,8 @@ public:
         std::make_unique<PersistentQuicInfo>();
 #endif
     host_ = std::make_shared<Upstream::HostImpl>(
-        cluster_, "hostname", *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), nullptr, 1,
-        envoy::config::core::v3::Locality(),
+        cluster_, "hostname", *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), nullptr,
+        nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
         envoy::config::core::v3::UNKNOWN, simTime(), address_list_);
 
