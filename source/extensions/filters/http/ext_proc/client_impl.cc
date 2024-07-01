@@ -65,7 +65,11 @@ bool ExternalProcessorStreamImpl::close() {
 }
 
 void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& response) {
-  callbacks_.onReceiveMessage(std::move(response));
+  if (!callbacks_.has_value()) {
+    ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
+    return;
+  }
+  callbacks_->onReceiveMessage(std::move(response));
 }
 
 void ExternalProcessorStreamImpl::onCreateInitialMetadata(Http::RequestHeaderMap&) {}
@@ -75,12 +79,18 @@ void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTraile
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  callbacks_.logGrpcStreamInfo();
   stream_closed_ = true;
+
+  if (!callbacks_.has_value()) {
+    ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
+    return;
+  }
+
+  callbacks_->logGrpcStreamInfo();
   if (status == Grpc::Status::Ok) {
-    callbacks_.onGrpcClose();
+    callbacks_->onGrpcClose();
   } else {
-    callbacks_.onGrpcError(status);
+    callbacks_->onGrpcError(status);
   }
 }
 

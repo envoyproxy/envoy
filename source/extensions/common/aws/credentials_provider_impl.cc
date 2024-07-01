@@ -133,60 +133,52 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       initialization_timer_(initialization_timer), debug_name_(cluster_name) {
   // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
-    // Check if this is a new cluster or we're configured twice, in which case we reuse the same
-    // cluster
-    if (!context_->clusterManager().clusters().hasCluster(cluster_name_)) {
 
-      init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
-        tls_slot_ = ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(
-            context_->threadLocal());
-        tls_slot_->set([&](Event::Dispatcher&) {
-          return std::make_shared<ThreadLocalCredentialsCache>(*this);
-        });
+    // Set up metadata credentials statistics
+    scope_ = context_->api().rootScope().createScope(
+        fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
+    stats_ = std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
+        ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
+    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
-        auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
-        // Async credential refresh timer
-        cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
-          if (stats_) {
-            stats_->credential_refreshes_performed_.inc();
-          }
-          refresh();
-        });
+    init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
+      tls_slot_ =
+          ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
+      tls_slot_->set(
+          [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
 
-        // Store the timer in pending cluster list for use in onClusterAddOrUpdate
-        cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
-            (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
-
-        // TODO(suniltheta): use random number generator here for cluster version.
-        // While adding multiple clusters make sure that change in random version number across
-        // multiple clusters won't make Envoy delete/replace previously registered internal
-        // cluster.
-        context_->clusterManager().addOrUpdateCluster(cluster, "12345");
-
-        const auto cluster_type_str =
-            envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
-                ->FindValueByNumber(cluster.type())
-                ->name();
-        absl::string_view host_port;
-        absl::string_view path;
-        Http::Utility::extractHostPathFromUri(uri_, host_port, path);
-        ENVOY_LOG_MISC(info,
-                       "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
-                       "credentials",
-                       cluster_type_str, cluster_name_, host_port);
-        // Set up metadata credentials statistics
-        scope_ = context_->api().rootScope().createScope(
-            fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
-        stats_ =
-            std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
-                ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
-        stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
-
-        init_target_->ready();
-        init_target_.reset();
+      auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
+      // Async credential refresh timer
+      cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
+        stats_->credential_refreshes_performed_.inc();
+        refresh();
       });
-      context_->initManager().add(*init_target_);
-    }
+
+      // Store the timer in pending cluster list for use in onClusterAddOrUpdate
+      cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
+          (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
+
+      // TODO(suniltheta): use random number generator here for cluster version.
+      // While adding multiple clusters make sure that change in random version number across
+      // multiple clusters won't make Envoy delete/replace previously registered internal
+      // cluster.
+      context_->clusterManager().addOrUpdateCluster(cluster, "12345");
+
+      const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
+                                        ->FindValueByNumber(cluster.type())
+                                        ->name();
+      absl::string_view host_port;
+      absl::string_view path;
+      Http::Utility::extractHostPathFromUri(uri_, host_port, path);
+      ENVOY_LOG_MISC(info,
+                     "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
+                     "credentials",
+                     cluster_type_str, cluster_name_, host_port);
+
+      init_target_->ready();
+      init_target_.reset();
+    });
+    context_->initManager().add(*init_target_);
   }
 };
 
@@ -231,9 +223,12 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-  if (useHttpAsyncClient() && context_ && tls_slot_) {
-    // If server factory context was supplied then we would have thread local slot initialized.
-    return *(*tls_slot_)->credentials_.get();
+  if (useHttpAsyncClient()) {
+    if (tls_slot_) {
+      return *(*tls_slot_)->credentials_.get();
+    } else {
+      return Credentials();
+    }
   } else {
     // Refresh for non async case
     refreshIfNeeded();
@@ -337,12 +332,17 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   secret_access_key = elements.find(AWS_SECRET_ACCESS_KEY)->second;
   session_token = elements.find(AWS_SESSION_TOKEN)->second;
 
-  ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
-            profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
-            session_token.empty() ? "" : "*****");
+  if (access_key_id.empty() || secret_access_key.empty()) {
+    // Return empty credentials if we're unable to retrieve from profile
+    cached_credentials_ = Credentials();
+  } else {
+    ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
+              profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+              secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+              session_token.empty() ? "" : "*****");
 
-  cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
+    cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
+  }
   last_updated_ = api_.timeSource().systemTime();
 }
 
@@ -532,9 +532,7 @@ void InstanceProfileCredentialsProvider::extractCredentials(
   if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-    if (stats_) {
-      stats_->credential_refreshes_succeeded_.inc();
-    }
+    stats_->credential_refreshes_succeeded_.inc();
     if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
       ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
       refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
@@ -553,10 +551,7 @@ void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& b
 }
 
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
-  if (stats_) {
-
-    stats_->credential_refreshes_failed_.inc();
-  }
+  stats_->credential_refreshes_failed_.inc();
   if (continue_on_async_fetch_failure_) {
     ENVOY_LOG(warn, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
               metadata_fetcher_->failureToString(reason));
@@ -703,17 +698,13 @@ void ContainerCredentialsProvider::extractCredentials(
 }
 
 void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  if (stats_) {
-    stats_->credential_refreshes_succeeded_.inc();
-  }
+  stats_->credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void ContainerCredentialsProvider::onMetadataError(Failure reason) {
-  if (stats_) {
-    stats_->credential_refreshes_failed_.inc();
-  }
+  stats_->credential_refreshes_failed_.inc();
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }
@@ -872,17 +863,13 @@ void WebIdentityCredentialsProvider::extractCredentials(
 }
 
 void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  if (stats_) {
-    stats_->credential_refreshes_succeeded_.inc();
-  }
+  stats_->credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
-  if (stats_) {
-    stats_->credential_refreshes_failed_.inc();
-  }
+  stats_->credential_refreshes_failed_.inc();
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   handleFetchDone();
 }

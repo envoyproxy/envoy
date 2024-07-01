@@ -833,7 +833,7 @@ tcp_logs:
       downstream_local_address:
         socket_address:
           address: {0}
-      downstream_transport_failure_reason: "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end:TLS_error_end"
+      downstream_transport_failure_reason: "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end"
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
@@ -895,7 +895,7 @@ tcp_logs:
       downstream_local_address:
         socket_address:
           address: {0}
-      downstream_transport_failure_reason: "TLS_error:|268435640:SSL routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end:TLS_error_end"
+      downstream_transport_failure_reason: "TLS_error:|268435640:SSL routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end"
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
@@ -952,7 +952,7 @@ tcp_logs:
       downstream_local_address:
         socket_address:
           address: {0}
-      downstream_transport_failure_reason: "TLS_error:|268435696:SSL routines:OPENSSL_internal:UNSUPPORTED_PROTOCOL:TLS_error_end:TLS_error_end"
+      downstream_transport_failure_reason: "TLS_error:|268435696:SSL routines:OPENSSL_internal:UNSUPPORTED_PROTOCOL:TLS_error_end"
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
