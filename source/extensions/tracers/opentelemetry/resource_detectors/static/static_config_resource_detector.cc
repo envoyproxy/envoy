@@ -20,7 +20,7 @@ Resource StaticConfigResourceDetector::detect() {
   Resource resource;
   resource.schema_url_ = "";
 
-  for (const auto& pair : config_.attributes()) {
+  for (const auto& pair : attributes_) {
     const std::string& key = pair.first;
     const std::string& value = pair.second;
     if (value.empty()) {

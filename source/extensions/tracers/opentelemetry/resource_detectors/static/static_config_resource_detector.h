@@ -21,12 +21,11 @@ public:
   StaticConfigResourceDetector(const envoy::extensions::tracers::opentelemetry::resource_detectors::
                                    v3::StaticConfigResourceDetectorConfig& config,
                                Server::Configuration::TracerFactoryContext&)
-      : config_(config) {}
+      : attributes_(config.attributes().begin(), config.attributes().end()) {}
   Resource detect() override;
 
 private:
-  const envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
-      StaticConfigResourceDetectorConfig config_;
+  const absl::flat_hash_map<std::string, std::string> attributes_;
 };
 
 } // namespace OpenTelemetry
