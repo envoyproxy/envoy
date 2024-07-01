@@ -198,6 +198,9 @@ public:
   createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& configs,
                              Server::Configuration::ServerFactoryContext& factory_context,
                              const OptionalArg&) override {
+    // Currently, the dummy config provider only supports a single static config. We can extend this
+    // to support multiple static configs if needed.
+    ASSERT(configs.size() == 1);
     auto config = dynamic_cast<const test::common::config::DummyConfig&>(*configs[0]);
     return std::make_unique<StaticDummyConfigProvider>(config, factory_context, *this);
   }
