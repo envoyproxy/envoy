@@ -73,7 +73,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StaticConfigResourceDetectorIntegrationTest
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify Envoy starts even when the Static Config resource detector doesn't have attributes
+// Verify Custom attributes in resource object are inserted
 TEST_P(StaticConfigResourceDetectorIntegrationTest, TestResourceAttributeSet) {
 
   const std::string yaml_string = R"EOF(
