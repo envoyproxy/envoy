@@ -463,6 +463,7 @@ public:
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
   void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
+  void onHeadersTransmittedToUpstream(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return *config_; }
@@ -601,6 +602,7 @@ private:
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;
+  bool upstream_request_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;

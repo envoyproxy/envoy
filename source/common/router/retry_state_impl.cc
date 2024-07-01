@@ -209,6 +209,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
       ret |= RetryPolicy::RETRY_ON_RESET;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.ResetBeforeRequest) {
+      ret |= RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure) {
       ret |= RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE;
     } else {
@@ -477,7 +479,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
              "0-RTT was attempted on non-Quic connection and failed.");
       return RetryDecision::RetryImmediately;
     }
-    if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE)) {
+    if (retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) {
       // This is a pool failure.
       return RetryDecision::RetryWithBackoff;
     }
@@ -490,6 +492,10 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
+    return RetryDecision::RetryWithBackoff;
+  }
+
+  if (retry_on_ & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST) {
     return RetryDecision::RetryWithBackoff;
   }
 

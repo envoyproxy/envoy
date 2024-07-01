@@ -1185,6 +1185,10 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 }
 
+void Filter::onHeadersTransmittedToUpstream(UpstreamRequest& _) {
+  upstream_request_started_ = true;
+}
+
 void Filter::onPerTryIdleTimeout(UpstreamRequest& upstream_request) {
   onPerTryTimeoutCommon(upstream_request,
                         cluster_->trafficStats()->upstream_rq_per_try_idle_timeout_,
@@ -1330,6 +1334,12 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                           ? RetryState::Http3Used::Yes
                           : RetryState::Http3Used::No;
   }
+
+  // If the retry policy is RESET_BEFORE_REQUEST we've already proxied
+  // the request headers to the upstream, then don't retry
+  if (route_entry_->retryPolicy().retryOn() & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST && upstream_request_started_) {
+    return false;
+  }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_http3,
       [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
@@ -1384,6 +1394,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
     updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
                            absl::nullopt);
   }
+
 
   if (maybeRetryReset(reset_reason, upstream_request, TimeoutRetry::No)) {
     return;
