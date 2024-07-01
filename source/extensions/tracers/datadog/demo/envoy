@@ -1,4 +1,0 @@
-#!/bin/sh
-
-here=$(dirname "$0")
-"$here"/../../../../../bazel-bin/source/exe/envoy-static --config-path "$here"/envoy.yaml "$@"
