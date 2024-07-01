@@ -12,4 +12,4 @@ to a node it is interested in getting the load reports for. Envoy in this node w
 :ref:`LoadStatsRequest <envoy_v3_api_msg_service.load_stats.v3.LoadStatsRequest>`. This is done periodically
 based on the :ref:`load reporting interval <envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`
 
-Envoy config with LRS can be found at `envoy.yaml <_include/load-reporting-service/envoy.yaml>`.
+Envoy config with LRS can be found at :download:`envoy.yaml <_include/load-reporting-service/envoy.yaml>`.
