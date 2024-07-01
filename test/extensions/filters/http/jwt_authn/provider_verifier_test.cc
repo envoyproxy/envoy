@@ -168,7 +168,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://pubkey-server/pubkey-path
         cluster: pubkey_cluster
     forward_payload_header: example-auth-userinfo
     claim_to_headers:

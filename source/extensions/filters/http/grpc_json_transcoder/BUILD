@@ -15,7 +15,10 @@ envoy_extension_package()
 envoy_cc_library(
     name = "json_transcoder_filter_lib",
     srcs = ["json_transcoder_filter.cc"],
-    hdrs = ["json_transcoder_filter.h"],
+    hdrs = [
+        "json_transcoder_filter.h",
+        "stats.h",
+    ],
     external_deps = [
         "path_matcher",
         "grpc_transcoding",

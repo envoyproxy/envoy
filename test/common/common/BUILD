@@ -274,7 +274,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:utility_lib",
-        "//test/common/stats:stat_test_utility_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
@@ -291,7 +291,7 @@ envoy_cc_test(
     srcs = ["packed_struct_test.cc"],
     deps = [
         "//source/common/common:packed_struct_lib",
-        "//test/common/stats:stat_test_utility_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
