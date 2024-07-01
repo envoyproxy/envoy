@@ -372,7 +372,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     }
     if (ip_version_to_remove.has_value()) {
       response.remove_if([ip_version_to_remove](const Network::DnsResponse& dns_resp) {
-        // Ignore the loopback address because a socket interface can still support both IPv4
+        // Ignore the loopback address because a socket interface can still support both IPv4 and
         // IPv6 but has no outgoing IPv4/IPv6 connectivity.
         return !Network::Utility::isLoopbackAddress(*dns_resp.addrInfo().address_) &&
                dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
