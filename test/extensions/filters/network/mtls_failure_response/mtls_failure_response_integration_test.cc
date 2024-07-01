@@ -21,12 +21,11 @@ namespace MtlsFailureResponse {
 
 namespace {
 
-class MtlsFailureResponseIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public HttpIntegrationTest {
+class MtlsFailureResponseIntegrationTest : public testing::TestWithParam<Http::CodecType>,
+                                           public HttpIntegrationTest {
 public:
   MtlsFailureResponseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(GetParam(), Network::Address::IpVersion::v4) {}
 
   void initialize() override {
 
@@ -75,8 +74,8 @@ protected:
   std::unique_ptr<Ssl::ContextManager> context_manager_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, MtlsFailureResponseIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+INSTANTIATE_TEST_SUITE_P(H1H2Codecs, MtlsFailureResponseIntegrationTest,
+                         ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2));
 
 // Test if the filter closes the connection when the client certificate is not presented
 TEST_P(MtlsFailureResponseIntegrationTest,
@@ -207,7 +206,7 @@ typed_config:
                "Timed out waiting for new connection.");
 }
 
-// Test if the filter fails to respond back when the client certificate is invalid
+// Test the token limiting feature with the filter
 TEST_P(MtlsFailureResponseIntegrationTest,
        MultipleInvalidClientCertificateConnectionsWithKeepConnectionOpenOnValidationFailure) {
 

@@ -39,6 +39,7 @@ void MtlsFailureResponseFilter::onEvent(Network::ConnectionEvent event) {
     return;
   }
 
+  // Based on validation mode config, check if mTLS is valid
   if (config_.validation_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::
                                        MtlsFailureResponse::PRESENTED) {
     cert_valid = ssl->peerCertificatePresented();
@@ -47,26 +48,31 @@ void MtlsFailureResponseFilter::onEvent(Network::ConnectionEvent event) {
                  VALIDATED) {
     cert_valid = ssl->peerCertificateValidated();
   }
+
+  // Based on failure mode config, respond back to client
   if (!cert_valid) {
     if (config_.failure_mode() == envoy::extensions::filters::network::mtls_failure_response::v3::
                                       MtlsFailureResponse::CLOSE_CONNECTION) {
-      callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+      callbacks_->connection().close(Network::ConnectionCloseType::Abort,
                                      "client_cert_validation_failure");
     } else if (config_.failure_mode() ==
                envoy::extensions::filters::network::mtls_failure_response::v3::MtlsFailureResponse::
                    KEEP_CONNECTION_OPEN) {
       if (token_bucket_ && !token_bucket_->consume(1, false)) {
-        callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+        callbacks_->connection().close(Network::ConnectionCloseType::Abort,
                                        "client_cert_validation_failure_no_token");
       } else {
         stop_iteration_ = true;
       }
     }
-    return;
   }
-
   return;
 }
+
+Network::FilterStatus MtlsFailureResponseFilter::onData(Buffer::Instance&, bool) {
+  return stop_iteration_ ? Network::FilterStatus::StopIteration : Network::FilterStatus::Continue;
+}
+
 } // namespace MtlsFailureResponse
 } // namespace NetworkFilters
 } // namespace Extensions

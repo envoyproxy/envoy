@@ -22,10 +22,7 @@ public:
       Server::Configuration::FactoryContext& context,
       std::shared_ptr<SharedTokenBucketImpl> token_bucket);
 
-  Network::FilterStatus onData(Buffer::Instance&, bool) override {
-    return (stop_iteration_ ? Network::FilterStatus::StopIteration
-                            : Network::FilterStatus::Continue);
-  }
+  Network::FilterStatus onData(Buffer::Instance&, bool) override;
 
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
