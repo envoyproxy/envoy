@@ -406,6 +406,9 @@ new_features:
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
     to bypass the overload manager for a listener. When set to true, the listener will not be subject to overload protection.
+- area: geoip
+  change: |
+    Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
 - area: ext_authz
   change: |
     Added
