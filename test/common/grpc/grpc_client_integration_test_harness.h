@@ -271,20 +271,24 @@ public:
 
 using HelloworldRequestPtr = std::unique_ptr<HelloworldRequest>;
 
-class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
+// Integration test base that can be used with time system variants.
+template <class TimeSystemVariant> class GrpcClientIntegrationTestBase {
 public:
-  GrpcClientIntegrationTest()
+  GrpcClientIntegrationTestBase()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(stats_store_, test_time_.timeSystem())),
+        api_(Api::createApiForTest(stats_store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {}
+
+  virtual Network::Address::IpVersion getIpVersion() const PURE;
+  virtual ClientType getClientType() const PURE;
 
   virtual void initialize(uint32_t envoy_grpc_max_recv_msg_length = 0) {
     if (fake_upstream_ == nullptr) {
       fake_upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), fake_upstream_config_);
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, getIpVersion(), fake_upstream_config_);
     }
-    switch (clientType()) {
+    switch (getClientType()) {
     case ClientType::EnvoyGrpc:
       grpc_client_ = createAsyncClientImpl(envoy_grpc_max_recv_msg_length);
       break;
@@ -302,7 +306,7 @@ public:
     timeout_timer_->enableTimer(std::chrono::milliseconds(10000));
   }
 
-  void TearDown() override {
+  virtual ~GrpcClientIntegrationTestBase() {
     if (fake_connection_) {
       AssertionResult result = fake_connection_->close();
       RELEASE_ASSERT(result, result.message());
@@ -353,6 +357,8 @@ public:
           envoy_grpc_max_recv_msg_length);
     }
 
+    config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
+
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
@@ -390,6 +396,22 @@ public:
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
     EXPECT_EQ("trailers", stream_headers_->get_("te"));
+
+    // "x-envoy-internal" and `x-forward-for` headers are only available in envoy gRPC path.
+    // They will be removed when either envoy gRPC config or stream option is false.
+    if (getClientType() == ClientType::EnvoyGrpc) {
+      if (!skip_envoy_headers_ && send_internal_header_stream_option_) {
+        EXPECT_FALSE(stream_headers_->get_("x-envoy-internal").empty());
+      } else {
+        EXPECT_TRUE(stream_headers_->get_("x-envoy-internal").empty());
+      }
+      if (!skip_envoy_headers_ && send_xff_header_stream_option_) {
+        EXPECT_FALSE(stream_headers_->get_("x-forwarded-for").empty());
+      } else {
+        EXPECT_TRUE(stream_headers_->get_("x-forwarded-for").empty());
+      }
+    }
+
     for (const auto& value : initial_metadata) {
       EXPECT_EQ(value.second, stream_headers_->get_(value.first));
     }
@@ -467,6 +489,8 @@ public:
     envoy::config::core::v3::Metadata m;
     (*m.mutable_filter_metadata())["com.foo.bar"] = {};
     options.setMetadata(m);
+    options.setSendInternal(send_internal_header_stream_option_);
+    options.setSendXff(send_xff_header_stream_option_);
     stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
@@ -487,8 +511,8 @@ public:
     return stream;
   }
 
-  DangerousDeprecatedTestTime test_time_;
-  FakeUpstreamConfig fake_upstream_config_{test_time_.timeSystem()};
+  Event::DelegatingTestTimeSystem<TimeSystemVariant> time_system_;
+  FakeUpstreamConfig fake_upstream_config_{time_system_};
   std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
@@ -529,6 +553,34 @@ public:
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
+  bool skip_envoy_headers_{false};
+  bool send_internal_header_stream_option_{true};
+  bool send_xff_header_stream_option_{true};
+};
+
+// The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.
+class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest,
+                                  public GrpcClientIntegrationTestBase<Event::TestRealTimeSystem> {
+public:
+  virtual Network::Address::IpVersion getIpVersion() const override {
+    return GrpcClientIntegrationParamTest::ipVersion();
+  }
+  virtual ClientType getClientType() const override {
+    return GrpcClientIntegrationParamTest::clientType();
+  };
+};
+
+// The integration test for Envoy gRPC flow control. It uses `SimulatedTime`.
+class EnvoyGrpcFlowControlTest
+    : public EnvoyGrpcClientIntegrationParamTest,
+      public GrpcClientIntegrationTestBase<Event::SimulatedTimeSystemHelper> {
+public:
+  virtual Network::Address::IpVersion getIpVersion() const override {
+    return EnvoyGrpcClientIntegrationParamTest::ipVersion();
+  }
+  virtual ClientType getClientType() const override {
+    return EnvoyGrpcClientIntegrationParamTest::clientType();
+  };
 };
 
 // SSL connection credential validation tests.
@@ -542,7 +594,13 @@ public:
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
     // doesn't like dangling contexts at destruction.
-    GrpcClientIntegrationTest::TearDown();
+    if (fake_connection_) {
+      AssertionResult result = fake_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fake_connection_.reset();
+    }
     fake_upstream_.reset();
     async_client_transport_socket_.reset();
     client_connection_.reset();
@@ -568,7 +626,7 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
 
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         tls_context, factory_context_);
 
     mock_host_description_->socket_factory_ =
@@ -576,7 +634,7 @@ public:
             std::move(cfg), context_manager_, *stats_store_.rootScope());
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr, nullptr);
-    FakeUpstreamConfig config(test_time_.timeSystem());
+    FakeUpstreamConfig config(time_system_);
     config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =
         std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
@@ -607,7 +665,7 @@ public:
           envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
     }
 
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();

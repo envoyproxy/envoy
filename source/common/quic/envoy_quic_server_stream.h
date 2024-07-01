@@ -73,7 +73,8 @@ public:
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
-  void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
+                          quic::ConnectionCloseSource source) override;
   void CloseWriteSide() override;
 
   void clearWatermarkBuffer();

@@ -41,14 +41,6 @@
 namespace Envoy {
 namespace Platform {
 
-namespace {
-
-// This is the same value Cronet uses for QUIC:
-// https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
-constexpr int32_t SocketReceiveBufferSize = 1024 * 1024; // 1MB
-
-} // namespace
-
 #ifdef ENVOY_MOBILE_XDS
 XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
     : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
@@ -330,6 +322,11 @@ EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) 
 
 EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
   use_gro_if_available_ = use_gro_if_available;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setSocketReceiveBufferSize(int32_t size) {
+  socket_receive_buffer_size_ = size;
   return *this;
 }
 
@@ -827,8 +824,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
     sock_opt->set_name(SO_RCVBUF);
     sock_opt->set_level(SOL_SOCKET);
-    sock_opt->set_int_value(SocketReceiveBufferSize);
-    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", SocketReceiveBufferSize, " bytes"));
+    sock_opt->set_int_value(socket_receive_buffer_size_);
+    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
   }
 
   // Set up stats.

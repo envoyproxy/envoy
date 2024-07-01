@@ -57,12 +57,35 @@ public:
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
+    last_local_address_ = local_address;
+    last_peer_address_ = peer_address;
+    EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
+                                             receive_time, tos);
+    ++num_packets_received_;
+  }
+
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes ietf_error,
                const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
 
+  Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
+    return last_local_address_;
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastPeerAddress() const { return last_peer_address_; }
+
+  uint32_t packetsReceived() const { return num_packets_received_; }
+
   using EnvoyQuicClientConnection::connectionStats;
+
+private:
+  Network::Address::InstanceConstSharedPtr last_local_address_;
+  Network::Address::InstanceConstSharedPtr last_peer_address_;
+  uint32_t num_packets_received_{0};
 };
 
 class EnvoyQuicClientSessionTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
@@ -572,6 +595,43 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
     // received with ECN marks.
     EXPECT_GT(stats.num_ecn_marks_received.ect1, 0);
   }
+}
+
+TEST_P(EnvoyQuicClientSessionTest, UseSocketAddressCache) {
+  envoy_quic_session_->connect();
+  // The first six bytes of a server hello, which is enough for the client to
+  // process the packet successfully.
+  char server_hello[] = {
+      0x02, 0x00, 0x00, 0x56, 0x03, 0x03,
+  };
+  auto packet = absl::WrapUnique<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
+      quic_connection_->client_connection_id(), quic_connection_->connection_id(),
+      /*version_flag=*/true, /*reset_flag=*/false, /*packet_number=*/1,
+      std::string(server_hello, sizeof(server_hello)), /*full_padding=*/false,
+      quic::CONNECTION_ID_PRESENT, quic::CONNECTION_ID_PRESENT, quic::PACKET_1BYTE_PACKET_NUMBER,
+      &quic_version_, quic::Perspective::IS_SERVER));
+
+  Buffer::RawSlice slice;
+  slice.mem_ = const_cast<char*>(packet->data());
+  slice.len_ = packet->length();
+
+  // Send the same packet twice and ensure both times processPacket() gets the same address
+  // instances.
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+  while (quic_connection_->packetsReceived() < 1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  Network::Address::InstanceConstSharedPtr last_peer_address =
+      quic_connection_->getLastPeerAddress();
+  Network::Address::InstanceConstSharedPtr last_local_address =
+      quic_connection_->getLastLocalAddress();
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+  while (quic_connection_->packetsReceived() < 2) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(last_local_address.get(), quic_connection_->getLastLocalAddress().get());
+  EXPECT_EQ(last_peer_address.get(), quic_connection_->getLastPeerAddress().get());
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {

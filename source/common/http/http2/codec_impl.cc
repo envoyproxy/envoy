@@ -775,7 +775,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   reset_reason_ = reason;
 
   // Higher layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(reason);
+  runResetCallbacks(reason, absl::string_view());
 
   // If we've bufferedOnStreamClose for this stream, we shouldn't propagate this
   // reset as nghttp2 will have forgotten about the stream.
@@ -1437,7 +1437,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         }
       }
 
-      stream->runResetCallbacks(reason);
+      stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (stream->defer_processing_backedup_streams_ && !stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
