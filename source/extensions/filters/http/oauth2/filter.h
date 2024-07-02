@@ -147,6 +147,7 @@ public:
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
   }
+  bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -164,15 +165,16 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const bool forward_bearer_token_ : 1;
-  const bool preserve_authorization_header_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
-  const bool use_refresh_token_{};
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const bool forward_bearer_token_ : 1;
+  const bool preserve_authorization_header_ : 1;
+  const bool use_refresh_token_ : 1;
+  const bool disable_id_token_set_cookie_ : 1;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

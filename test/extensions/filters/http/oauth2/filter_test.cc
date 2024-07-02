@@ -85,10 +85,12 @@ public:
 
 class OAuth2Test : public testing::TestWithParam<int> {
 public:
-  OAuth2Test() : request_(&cm_.thread_local_cluster_.async_client_) {
+  OAuth2Test(bool run_init = true) : request_(&cm_.thread_local_cluster_.async_client_) {
     factory_context_.server_factory_context_.cluster_manager_.initializeClusters(
         {"auth.example.com"}, {});
-    init();
+    if (run_init) {
+      init();
+    }
   }
 
   void init() { init(getConfig()); }
@@ -112,7 +114,8 @@ public:
             ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type =
                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                     OAuth2Config_AuthType_URL_ENCODED_BODY,
-            int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false) {
+            int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
+            bool disable_id_token_set_cookie = false) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -124,6 +127,7 @@ public:
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(forward_bearer_token);
     p.set_preserve_authorization_header(preserve_authorization_header);
+    p.set_disable_id_token_set_cookie(disable_id_token_set_cookie);
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
     useRefreshToken->set_value(use_refresh_token);
@@ -161,17 +165,6 @@ public:
         p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
 
     return c;
-  }
-
-  Http::AsyncClient::Callbacks* popPendingCallback() {
-    if (callbacks_.empty()) {
-      // Can't use ASSERT_* as this is not a test function
-      throw std::underflow_error("empty deque");
-    }
-
-    auto callbacks = callbacks_.front();
-    callbacks_.pop_front();
-    return callbacks;
   }
 
   // Validates the behavior of the cookie validator.
@@ -1513,6 +1506,92 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
   filter_->finishGetAccessTokenFlow();
+}
+
+class DisabledIdTokenTests : public OAuth2Test {
+public:
+  DisabledIdTokenTests() : OAuth2Test(false) {
+    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+    test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+    request_headers_ = {
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_oauth"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+    };
+
+    // Note no IdToken cookie below.
+    expected_headers_ = {
+        {Http::Headers::get().Status.get(), "302"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthHMAC=" + hmac_without_id_token_ + ";path=/;Max-Age=600;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "BearerToken=" + access_code_ + ";path=/;Max-Age=600;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "RefreshToken=" + refresh_token_ + ";path=/;Max-Age=600;secure;HttpOnly"},
+    };
+
+    init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+                   ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                       OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
+                   600 /* default_refresh_token_expires_in */,
+                   false /* preserve_authorization_header */,
+                   true /* disable_id_token_set_cookie */));
+
+    EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(hmac_without_id_token_));
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  }
+
+  std::string hmac_without_id_token_{"kEbe8eYQkIkoHDQSzf1e38bSXNrgFCSEUWHZtEX6Q4c="};
+  const std::string access_code_{"access_code"};
+  const std::string id_token_{"some-id-token"};
+  const std::string refresh_token_{"some-refresh-token"};
+  const std::chrono::seconds expires_in_{600};
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestResponseHeaderMapImpl expected_headers_;
+};
+
+// When disable_id_token_set_cookie is `true`, then during the access token flow the filter should
+// *not* set the IdToken cookie in the 302 response and should produce an HMAC that does not
+// consider the id-token.
+TEST_F(DisabledIdTokenTests, SetCookieIgnoresIdTokenWhenDisabledAccessToken) {
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  expected_headers_.addCopy(Http::Headers::get().Location.get(), "");
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers_), true));
+
+  // An ID token is still received from the IdP, but not set in the response headers above.
+  filter_->onGetAccessTokenSuccess(access_code_, id_token_, refresh_token_, expires_in_);
+}
+
+// When disable_id_token_set_cookie is `true`, then during the refresh token flow the filter should
+// *not* set the IdToken request header that's forwarded, the response headers that are returned,
+// and should produce an HMAC that does not consider the id-token.
+TEST_F(DisabledIdTokenTests, SetCookieIgnoresIdTokenWhenDisabledRefreshToken) {
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // An ID token is still received from the IdP, but not set in the request headers that are
+  // forwarded.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->onRefreshAccessTokenSuccess(access_code_, id_token_, refresh_token_, expires_in_);
+  auto cookies = Http::Utility::parseCookies(request_headers_);
+  const auto cookie_names = config_->cookieNames();
+  EXPECT_EQ(cookies[cookie_names.oauth_hmac_], hmac_without_id_token_);
+  EXPECT_EQ(cookies[cookie_names.oauth_expires_],
+            "1600"); // Uses default_refresh_token_expires_in since not a legitimate JWT.
+  EXPECT_EQ(cookies[cookie_names.bearer_token_], access_code_);
+  EXPECT_EQ(cookies[cookie_names.refresh_token_], refresh_token_);
+  EXPECT_EQ(cookies.contains(cookie_names.id_token_), false);
+
+  // And ensure when the response comes back, it has the same cookies in the `expected_headers_`.
+  Http::TestResponseHeaderMapImpl response_headers = {{Http::Headers::get().Status.get(), "302"}};
+  filter_->encodeHeaders(response_headers, false);
+  EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_headers_));
 }
 
 /**

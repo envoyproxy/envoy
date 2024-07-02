@@ -192,16 +192,17 @@ FilterConfig::FilterConfig(
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
-      forward_bearer_token_(proto_config.forward_bearer_token()),
-      preserve_authorization_header_(proto_config.preserve_authorization_header()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
-      use_refresh_token_(proto_config.use_refresh_token().value()),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)) {
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
+      forward_bearer_token_(proto_config.forward_bearer_token()),
+      preserve_authorization_header_(proto_config.preserve_authorization_header()),
+      use_refresh_token_(proto_config.use_refresh_token().value()),
+      disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -535,10 +536,16 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+// Called after fetching access/refresh tokens.
 void OAuth2Filter::updateTokens(const std::string& access_token, const std::string& id_token,
                                 const std::string& refresh_token, std::chrono::seconds expires_in) {
   access_token_ = access_token;
-  id_token_ = id_token;
+  if (!config_->disableIdTokenSetCookie()) {
+    // Preventing this here excludes all other ID Token functionality
+    // * setting the cookie
+    // * omitting from HMAC computation (for setting, not for validating)
+    id_token_ = id_token;
+  }
   refresh_token_ = refresh_token;
   expires_in_ = std::to_string(expires_in.count());
   expires_refresh_token_in_ = getExpiresTimeForRefreshToken(refresh_token, expires_in);
