@@ -158,10 +158,6 @@ public:
                Init::Manager& init_manager, const std::string& stat_prefix,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
-              (const Protobuf::Message& config_proto,
-               Server::Configuration::ServerFactoryContext& factory_context,
-               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
-  MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
                Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
