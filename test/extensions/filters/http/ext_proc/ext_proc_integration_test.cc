@@ -534,8 +534,8 @@ protected:
                                    return true;
                                  });
     // Verify the new timer is not started and the original timer timeouts,
-    // and downstream receives 500.
-    verifyDownstreamResponse(*response, 500);
+    // and downstream receives 504.
+    verifyDownstreamResponse(*response, 504);
   }
 
   void addMutationSetHeaders(const int count,
@@ -1059,9 +1059,9 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
         return true;
       });
 
-  // The routing to upstream is expected to fail and 500 is returned to downstream client, since no
+  // The routing to upstream is expected to fail and 504 is returned to downstream client, since no
   // route is found for mismatched vhost.
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
@@ -2375,7 +2375,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
                                });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
@@ -2419,7 +2419,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
       << "expected traceparent header";
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
@@ -2438,7 +2438,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
                                });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 // Same as the previous test but on the response path, since there are separate
@@ -2459,7 +2459,7 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeout) {
                                 });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutWithLogging) {
@@ -2480,7 +2480,7 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutWithLogging) {
                                 });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 // Send a request,  wait longer than the "message timeout" before sending a response
