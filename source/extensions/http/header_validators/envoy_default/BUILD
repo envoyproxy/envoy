@@ -158,8 +158,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     extra_visibility = [
-        "//source/exe:__subpackages__",
-        "//source/extensions/filters/network/http_connection_manager:__subpackages__",
         "//source/server/admin:__subpackages__",
     ],
     deps = [
