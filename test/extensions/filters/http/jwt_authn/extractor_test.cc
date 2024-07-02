@@ -1,9 +1,11 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
@@ -202,7 +204,27 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
-  tokens[0]->removeJwt(headers);
+  // Test token remove from the query parameter
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "false"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), true);
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "true"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), false);
+  }
 }
 
 // Test extracting token from the custom header: "token-header"
@@ -319,7 +341,26 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
-  tokens[0]->removeJwt(headers);
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "false"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), true);
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "true"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), false);
+  }
 }
 
 // Test extracting token from a cookie
