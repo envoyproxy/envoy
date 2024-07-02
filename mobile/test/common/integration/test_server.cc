@@ -386,6 +386,7 @@ void TestServer::start(TestServerType type) {
   Network::DownstreamTransportSocketFactoryPtr factory;
 
   Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
+  Extensions::TransportSockets::Tls::forceRegisterTlsCertificateSelectorConfigFactoryImpl();
   switch (type) {
   case TestServerType::HTTP3:
     // Make sure if extensions aren't statically linked QUIC will work.
