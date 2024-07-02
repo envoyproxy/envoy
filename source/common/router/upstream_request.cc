@@ -433,7 +433,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   filter_manager_->streamInfo().setRequestHeaders(*parent_.downstreamHeaders());
   filter_manager_->decodeHeaders(*parent_.downstreamHeaders(), end_stream);
   // Invoke the callback now that we've transmitted headers to the upstream.
-  this->parent_.onHeadersTransmittedToUpstream(*this);
+  this->parent_.onHeadersTransmittedToUpstream();
 }
 
 void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {

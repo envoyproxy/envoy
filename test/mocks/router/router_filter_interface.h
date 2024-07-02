@@ -35,6 +35,7 @@ public:
   MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request));
   MOCK_METHOD(void, onPerTryIdleTimeout, (UpstreamRequest & upstream_request));
   MOCK_METHOD(void, onStreamMaxDurationReached, (UpstreamRequest & upstream_request));
+  MOCK_METHOD(void, onHeadersTransmittedToUpstream, ());
 
   MOCK_METHOD(Envoy::Http::StreamDecoderFilterCallbacks*, callbacks, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, ());

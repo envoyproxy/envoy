@@ -973,6 +973,10 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   EXPECT_EQ(512U, response->body().size());
 }
 
+void HttpIntegrationTest::testRetryOnResetBeforeRequest() {
+
+}
+
 void HttpIntegrationTest::testRetry() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -281,6 +281,7 @@ protected:
 
   void testAddEncodedTrailers();
   void testRetry();
+  void testRetryOnResetBeforeRequest();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
   void testGrpcRetry();

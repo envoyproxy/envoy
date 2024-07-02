@@ -1185,7 +1185,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 }
 
-void Filter::onHeadersTransmittedToUpstream(UpstreamRequest& _) {
+void Filter::onHeadersTransmittedToUpstream() {
   upstream_request_started_ = true;
 }
 
@@ -1337,7 +1337,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 
   // If the retry policy is RESET_BEFORE_REQUEST we've already proxied
   // the request headers to the upstream, then don't retry
-  if (route_entry_->retryPolicy().retryOn() & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST && upstream_request_started_) {
+  if (route_entry_->retryPolicy().retryOn() & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST &&
+      upstream_request_started_) {
     return false;
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
@@ -1394,7 +1395,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
     updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
                            absl::nullopt);
   }
-
 
   if (maybeRetryReset(reset_reason, upstream_request, TimeoutRetry::No)) {
     return;

@@ -463,7 +463,7 @@ public:
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
   void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
-  void onHeadersTransmittedToUpstream(UpstreamRequest& upstream_request) override;
+  void onHeadersTransmittedToUpstream() override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return *config_; }
