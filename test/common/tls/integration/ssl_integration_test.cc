@@ -765,13 +765,13 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
 
   auto log_result = waitForAccessLog(listener_access_log_name_);
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
-    EXPECT_THAT(log_result,
-                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435709:SSL_routines:"
-                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS:TLS_error_end"));
+    EXPECT_EQ(log_result,
+              "DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435709:SSL_routines:"
+              "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS:TLS_error_end FILTER_CHAIN_NAME=-");
   } else {
-    EXPECT_THAT(log_result,
-                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435640:"
-                           "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end"));
+    EXPECT_EQ(log_result,
+              "DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435640:"
+              "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end FILTER_CHAIN_NAME=-");
   }
 }
 
@@ -791,12 +791,11 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLogOrigin
 
   auto log_result = waitForAccessLog(listener_access_log_name_);
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
-    EXPECT_THAT(log_result,
-                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435709:SSL_routines:"
-                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS"));
+    EXPECT_EQ(log_result, "DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435709:SSL_routines:"
+                          "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS FILTER_CHAIN_NAME=-");
   } else {
-    EXPECT_THAT(log_result, StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435640:"
-                                       "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER"));
+    EXPECT_EQ(log_result, "DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435640:"
+                          "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER FILTER_CHAIN_NAME=-");
   }
 }
 
