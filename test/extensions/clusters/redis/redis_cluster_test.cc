@@ -132,11 +132,11 @@ protected:
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
-    cluster_ = std::make_shared<RedisCluster>(
+    cluster_ = std::shared_ptr<RedisCluster>(*RedisCluster::create(
         cluster_config,
         TestUtility::downcastAndValidate<
             const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
-        cluster_factory_context, *this, dns_resolver_, cluster_callback_);
+        cluster_factory_context, *this, dns_resolver_, cluster_callback_));
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = cluster_->redis_discovery_session_.get();

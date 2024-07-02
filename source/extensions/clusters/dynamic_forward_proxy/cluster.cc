@@ -56,8 +56,9 @@ Cluster::Cluster(
     Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Upstream::ClusterFactoryContext& context,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager)
-    : Upstream::BaseDynamicClusterImpl(cluster, context),
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+    absl::Status& creation_status)
+    : Upstream::BaseDynamicClusterImpl(cluster, context, creation_status),
       dns_cache_manager_(std::move(cache_manager)), dns_cache_(std::move(cache)),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
       local_info_(context.serverFactoryContext().localInfo()),
@@ -500,9 +501,11 @@ ClusterFactory::createClusterWithConfig(
   auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
   RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
 
-  auto new_cluster =
-      std::shared_ptr<Cluster>(new Cluster(cluster_config, std::move(dns_cache_or_error.value()),
-                                           proto_config, context, std::move(cache_manager)));
+  absl::Status creation_status = absl::OkStatus();
+  auto new_cluster = std::shared_ptr<Cluster>(
+      new Cluster(cluster_config, std::move(dns_cache_or_error.value()), proto_config, context,
+                  std::move(cache_manager), creation_status));
+  RETURN_IF_NOT_OK(creation_status);
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       context.serverFactoryContext().singletonManager());
