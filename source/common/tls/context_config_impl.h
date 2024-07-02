@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "source/common/tls/session_cache/session_cache.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"
@@ -13,6 +12,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
+#include "source/common/tls/session_cache/session_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -179,9 +179,7 @@ public:
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
-  SessionCache::ClientPtr getTlsSessionCacheClient() const {
-    return tls_session_cache_client_;
-  }
+  SessionCache::ClientPtr getTlsSessionCacheClient() const { return tls_session_cache_client_; }
 
 private:
   ServerContextConfigImpl(

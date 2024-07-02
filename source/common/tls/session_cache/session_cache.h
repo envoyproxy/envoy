@@ -1,13 +1,13 @@
 #pragma once
 
+#include <openssl/ssl.h>
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <openssl/ssl.h>
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -31,8 +31,10 @@ class RequestCallbacks {
 public:
   virtual ~RequestCallbacks() = default;
 
-  virtual void onStoreCompletion(const std::string& session_id, const std::string& session_data) PURE;
-  virtual void onFetchCompletion(const std::string& session_id, const std::string& session_data) PURE;
+  virtual void onStoreCompletion(const std::string& session_id,
+                                 const std::string& session_data) PURE;
+  virtual void onFetchCompletion(const std::string& session_id,
+                                 const std::string& session_data) PURE;
 };
 
 class Client {
@@ -49,9 +51,13 @@ public:
    * @param stream_info supplies the stream info for the request.
    *
    */
-  virtual void storeTlsSessionCache(Network::TransportSocketCallbacks* callbacks, SSL* ssl, int index, const std::string& session_id, const uint8_t* session_data, std::size_t len) PURE;
+  virtual void storeTlsSessionCache(Network::TransportSocketCallbacks* callbacks, SSL* ssl,
+                                    int index, const std::string& session_id,
+                                    const uint8_t* session_data, std::size_t len) PURE;
 
-  virtual void fetchTlsSessionCache(Network::TransportSocketCallbacks* callbacks, SSL* ssl, int index, const std::string& session_id, uint8_t* session_data, std::size_t* len) PURE;
+  virtual void fetchTlsSessionCache(Network::TransportSocketCallbacks* callbacks, SSL* ssl,
+                                    int index, const std::string& session_id, uint8_t* session_data,
+                                    std::size_t* len) PURE;
 };
 
 using ClientPtr = std::shared_ptr<Client>;

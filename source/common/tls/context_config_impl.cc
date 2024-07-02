@@ -489,7 +489,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   }
   auto session_cache_timeout = std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(config.session_cache_service().timeout()));
-  tls_session_cache_client_ = SessionCache::tlsSessionCacheClient(factory_context, config.session_cache_service().grpc_service(), session_cache_timeout);
+  tls_session_cache_client_ = SessionCache::tlsSessionCacheClient(
+      factory_context, config.session_cache_service().grpc_service(), session_cache_timeout);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
