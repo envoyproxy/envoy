@@ -14,7 +14,7 @@ based on the :ref:`load reporting interval <envoy_v3_api_field_service.load_stat
 
 Example of an Envoy config with LRS:
 
-.. literalinclude:: _include/load-reporting-service/envoy.yaml
+.. literalinclude:: /start/sandboxes/_include/load-reporting-service/envoy.yaml
     :language: yaml
     :linenos:
     :caption: :download:`envoy.yaml </start/sandboxes/_include/load-reporting-service/envoy.yaml>`
