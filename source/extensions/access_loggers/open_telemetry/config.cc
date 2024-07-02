@@ -41,8 +41,8 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  auto commands =
-      Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context);
+  auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+      proto_config.formatters(), context.serverFactoryContext());
 
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

@@ -36,7 +36,7 @@ public:
    */
   virtual CommandParserPtr
   createCommandParserFromProto(const Protobuf::Message& config,
-                               Server::Configuration::GenericFactoryContext& context) PURE;
+                               Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.formatter"; }
 };

@@ -31,7 +31,7 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static std::vector<CommandParserBasePtr<FormatterContext>>
   parseFormatters(const FormattersConfig& formatters,
-                  Server::Configuration::GenericFactoryContext& context) {
+                  Server::Configuration::ServerFactoryContext& context) {
     std::vector<CommandParserBasePtr<FormatterContext>> commands;
     for (const auto& formatter : formatters) {
       auto* factory =
@@ -58,7 +58,7 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static FormatterBasePtr<FormatterContext>
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
-                  Server::Configuration::GenericFactoryContext& context) {
+                  Server::Configuration::ServerFactoryContext& context) {
     // Instantiate formatter extensions.
     auto commands = parseFormatters<FormatterContext>(config.formatters(), context);
     switch (config.format_case()) {
@@ -72,9 +72,9 @@ public:
           commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
       return std::make_unique<FormatterBaseImpl<FormatterContext>>(
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(config.text_format_source(), true,
-                                                         context.serverFactoryContext().api()),
-                                std::string),
+          THROW_OR_RETURN_VALUE(
+              Config::DataSource::read(config.text_format_source(), true, context.api()),
+              std::string),
           config.omit_empty_values(), commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;

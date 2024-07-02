@@ -916,7 +916,7 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
     )EOF",
                               otel_config);
     auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
-        otel_config.formatters(), context);
+        otel_config.formatters(), context.serverFactoryContext());
 
     OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);
 

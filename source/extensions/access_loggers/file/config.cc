@@ -28,6 +28,8 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       config, context.messageValidationVisitor());
   Formatter::FormatterPtr formatter;
 
+  auto& server_factory_context = context.serverFactoryContext();
+
   switch (fal_config.access_log_format_case()) {
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
     if (fal_config.format().empty()) {
@@ -35,7 +37,8 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     } else {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
       sff_config.mutable_text_format_source()->set_inline_string(fal_config.format());
-      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context);
+      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config,
+                                                                            server_factory_context);
     }
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
@@ -46,12 +49,13 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       kTypedJsonFormat: {
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     *sff_config.mutable_json_format() = fal_config.typed_json_format();
-    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context);
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config,
+                                                                          server_factory_context);
     break;
   }
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kLogFormat:
-    formatter =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(), context);
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(),
+                                                                          server_factory_context);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       ACCESS_LOG_FORMAT_NOT_SET:
