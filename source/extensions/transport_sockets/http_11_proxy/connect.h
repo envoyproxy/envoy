@@ -35,6 +35,8 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
+  absl::string_view proxyAddress() const { return proxy_address_; }
+  bool legacyBehavior() const { return legacy_behavior_; }
 
 private:
   void legacyConstructor();

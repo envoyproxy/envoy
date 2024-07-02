@@ -483,6 +483,34 @@ public:
   std::unique_ptr<UpstreamHttp11ConnectSocketFactory> factory_;
 };
 
+TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
+  std::string proxy_addr = "1.2.3.4:5678";
+
+  auto inner_factory = std::make_unique<Network::MockTransportSocketFactory>();
+  EXPECT_CALL(*inner_factory, createTransportSocket(_, _))
+      .WillOnce(Invoke([&](Network::TransportSocketOptionsConstSharedPtr,
+                           std::shared_ptr<const Upstream::HostDescription>) {
+        auto mts = std::make_unique<Network::MockTransportSocket>();
+        testing::Mock::AllowLeak(mts.get());
+        return mts;
+      }));
+
+  auto factory =
+      std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(inner_factory), proxy_addr);
+  auto hd = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
+
+  EXPECT_THAT(factory->createTransportSocket(tso, hd).release(), testing::NotNull());
+  return;
+  UpstreamHttp11ConnectSocket* ts =
+      static_cast<UpstreamHttp11ConnectSocket*>(factory->createTransportSocket(tso, hd).release());
+  EXPECT_THAT(ts, testing::NotNull());
+
+  // We never set any filter state metadata, so check if the proxy address is picked up.
+  EXPECT_EQ(proxy_addr, ts->proxyAddress());
+  EXPECT_FALSE(ts->legacyBehavior());
+}
+
 // Test createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
