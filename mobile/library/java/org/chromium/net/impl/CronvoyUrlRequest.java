@@ -778,7 +778,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       List<String> statuses = headers.get(":status");
       final int responseCode =
           statuses != null && !statuses.isEmpty() ? Integer.valueOf(statuses.get(0)) : -1;
-      final String locationField = null;
+      String locationField = null;
       if (responseCode >= 300 && responseCode < 400) {
         setUrlResponseInfo(headers, responseCode);
         List<String> locationFields = mUrlResponseInfo.getAllHeaders().get("location");
