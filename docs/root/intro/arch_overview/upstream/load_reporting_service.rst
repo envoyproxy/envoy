@@ -17,4 +17,5 @@ Example of an Envoy config with LRS:
 .. literalinclude:: /start/sandboxes/_include/load-reporting-service/envoy.yaml
     :language: yaml
     :linenos:
+    :emphasize-lines: 60-64
     :caption: :download:`envoy.yaml </start/sandboxes/_include/load-reporting-service/envoy.yaml>`
