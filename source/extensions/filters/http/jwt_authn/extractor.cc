@@ -8,6 +8,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/btree_map.h"
@@ -92,7 +93,7 @@ public:
                     const LowerCaseString& header)
       : JwtLocationBase(token, issuer_checker), header_(header) {}
 
-  void removeJwt(Http::HeaderMap& headers) const override { headers.remove(header_); }
+  void removeJwt(Http::RequestHeaderMap& headers) const override { headers.remove(header_); }
 
 private:
   // the header name the JWT is extracted from.
@@ -103,12 +104,26 @@ private:
 class JwtParamLocation : public JwtLocationBase {
 public:
   JwtParamLocation(const std::string& token, const JwtIssuerChecker& issuer_checker,
-                   const std::string&)
-      : JwtLocationBase(token, issuer_checker) {}
+                   const std::string& param)
+      : JwtLocationBase(token, issuer_checker), param_(param) {}
 
-  void removeJwt(Http::HeaderMap&) const override {
-    // TODO(qiwzhang): remove JWT from parameter.
+  void removeJwt(Http::RequestHeaderMap& headers) const override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params")) {
+      absl::string_view path = headers.getPathValue();
+      Http::Utility::QueryParamsMulti query_params =
+          Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+
+      query_params.remove(param_);
+
+      const auto updated_path = query_params.replaceQueryString(headers.Path()->value());
+      headers.setPath(updated_path);
+    }
   }
+
+private:
+  // the param name the JWT is extracted from.
+  const std::string& param_;
 };
 
 // The JwtLocation for cookie extraction.
@@ -117,7 +132,7 @@ public:
   JwtCookieLocation(const std::string& token, const JwtIssuerChecker& issuer_checker)
       : JwtLocationBase(token, issuer_checker) {}
 
-  void removeJwt(Http::HeaderMap&) const override {
+  void removeJwt(Http::RequestHeaderMap&) const override {
     // TODO(theshubhamp): remove JWT from cookies.
   }
 };
@@ -136,7 +151,7 @@ public:
 
   std::vector<JwtLocationConstPtr> extract(const Http::RequestHeaderMap& headers) const override;
 
-  void sanitizeHeaders(Http::HeaderMap& headers) const override;
+  void sanitizeHeaders(Http::RequestHeaderMap& headers) const override;
 
 private:
   // add a header config
@@ -332,7 +347,7 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   return value_str.substr(starting);
 }
 
-void ExtractorImpl::sanitizeHeaders(Http::HeaderMap& headers) const {
+void ExtractorImpl::sanitizeHeaders(Http::RequestHeaderMap& headers) const {
   for (const auto& header : headers_to_sanitize_) {
     headers.remove(header);
   }

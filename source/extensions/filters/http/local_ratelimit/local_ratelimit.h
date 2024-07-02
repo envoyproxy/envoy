@@ -163,7 +163,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(config) {}
+  Filter(FilterConfigSharedPtr config) : config_(config), used_config_(config_.get()) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -188,8 +188,10 @@ private:
   uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
-  const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
+  // Actual config used for the current request. Is config_ by default, but can be overridden by
+  // per-route config.
+  const FilterConfig* used_config_{};
 
   absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
   VhRateLimitOptions vh_rate_limits_;
