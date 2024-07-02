@@ -396,6 +396,12 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
+  void encodeComplete() override {
+    if (config_->observabilityMode()) {
+      logGrpcStreamInfo();
+    }
+  }
+
   // ExternalProcessorCallbacks
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;

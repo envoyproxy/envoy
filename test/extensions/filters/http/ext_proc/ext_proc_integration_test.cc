@@ -611,6 +611,31 @@ protected:
     }
   }
 
+  void TestGetAndFailStream() {
+    HttpIntegrationTest::initialize();
+    auto response = sendDownstreamRequest(absl::nullopt);
+
+    ProcessingRequest request_headers_msg;
+    waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+    // Fail the stream immediately
+    processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
+    verifyDownstreamResponse(*response, 500);
+  }
+
+  void TestGetAndCloseStream() {
+    HttpIntegrationTest::initialize();
+    auto response = sendDownstreamRequest(absl::nullopt);
+
+    ProcessingRequest request_headers_msg;
+    waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+    // Just close the stream without doing anything
+    processor_stream_->startGrpcStream();
+    processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+    handleUpstreamRequest();
+    verifyDownstreamResponse(*response, 200);
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -633,17 +658,7 @@ INSTANTIATE_TEST_SUITE_P(
 // by immediately closing the stream.
 TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  ProcessingRequest request_headers_msg;
-  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
-  // Just close the stream without doing anything
-  processor_stream_->startGrpcStream();
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-
-  handleUpstreamRequest();
-  verifyDownstreamResponse(*response, 200);
+  TestGetAndCloseStream();
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
@@ -689,17 +704,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
   initializeConfig(config_option);
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  ProcessingRequest request_headers_msg;
-  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
-  // Just close the stream without doing anything
-  processor_stream_->startGrpcStream();
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-
-  handleUpstreamRequest();
-  verifyDownstreamResponse(*response, 200);
+  TestGetAndCloseStream();
 }
 
 // Test the filter using the default configuration by connecting to
@@ -707,14 +712,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
 // by returning a failure before the first stream response can be sent.
 TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  ProcessingRequest request_headers_msg;
-  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
-  // Fail the stream immediately
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
-  verifyDownstreamResponse(*response, 500);
+  TestGetAndFailStream();
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
@@ -760,14 +758,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithLogging) {
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
   initializeConfig(config_option);
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  ProcessingRequest request_headers_msg;
-  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
-  // Fail the stream immediately
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
-  verifyDownstreamResponse(*response, 500);
+  TestGetAndFailStream();
 }
 
 // Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
@@ -4293,9 +4284,42 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
 }
 
-TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLoggingFailStream) {
+  proto_config_.set_observability_mode(true);
+
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  initializeConfig(config_option);
+  TestGetAndFailStream();
+}
+
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLoggingCloseStream) {
+  proto_config_.set_observability_mode(true);
+
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  initializeConfig(config_option);
+  TestGetAndCloseStream();
+}
+
+TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
+  proto_config_.set_observability_mode(true);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
 
@@ -4305,7 +4329,6 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
-
   handleUpstreamRequest();
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));
