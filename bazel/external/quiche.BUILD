@@ -5519,6 +5519,7 @@ envoy_cc_library(
         ":quiche_balsa_balsa_enums_lib",
         ":quiche_balsa_header_api_lib",
         ":quiche_balsa_header_properties_lib",
+        ":quiche_balsa_http_validation_policy_lib",
         ":quiche_balsa_standard_header_map_lib",
         ":quiche_common_callbacks",
         ":quiche_common_platform_bug_tracker",
