@@ -11,6 +11,7 @@
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
@@ -574,18 +575,21 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
       "envoy.network.dns_resolver.apple");
 #else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
   if (use_cares_) {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.cares");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
   } else {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
   }
 #endif
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
