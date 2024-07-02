@@ -5,7 +5,7 @@
 
 #include "envoy/http/header_map.h"
 
-#include "source/common/common/utility.h"
+#include "source/common/common/trie_lookup_table.h"
 #include "source/common/http/headers.h"
 
 #include "benchmark/benchmark.h"

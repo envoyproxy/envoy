@@ -458,6 +458,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trie_lookup_table_lib",
+    hdrs = ["trie_lookup_table.h"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

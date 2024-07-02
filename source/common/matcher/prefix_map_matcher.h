@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/common/utility.h"
+#include "source/common/common/trie_lookup_table.h"
 #include "source/common/matcher/map_matcher.h"
 
 namespace Envoy {
