@@ -23,6 +23,17 @@ class SetEventTrackerTest {
   @Test
   fun `set eventTracker`() {
     val countDownLatch = CountDownLatch(1)
+    val config_proto =
+      envoymobile.extensions.filters.http.test_event_tracker.Filter.TestEventTracker.newBuilder()
+        .putAttributes("foo", "bar")
+        .build()
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker"
+        )
+        .setValue(config_proto.toByteString())
+        .build()
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
@@ -34,10 +45,7 @@ class SetEventTrackerTest {
           }
           countDownLatch.countDown()
         }
-        .addNativeFilter(
-          "envoy.filters.http.test_event_tracker",
-          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
-        )
+        .addNativeFilter("envoy.filters.http.test_event_tracker", String(any_proto.toByteArray()))
         .build()
 
     val client = engine.streamClient()
@@ -61,12 +69,20 @@ class SetEventTrackerTest {
   @Test
   fun `engine should continue to run if no eventTracker is set and event is emitted`() {
     val countDownLatch = CountDownLatch(1)
+    val config_proto =
+      envoymobile.extensions.filters.http.test_event_tracker.Filter.TestEventTracker.newBuilder()
+        .putAttributes("foo", "bar")
+        .build()
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker"
+        )
+        .setValue(config_proto.toByteString())
+        .build()
     val engine =
       EngineBuilder()
-        .addNativeFilter(
-          "envoy.filters.http.test_event_tracker",
-          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
-        )
+        .addNativeFilter("envoy.filters.http.test_event_tracker", String(any_proto.toByteArray()))
         .build()
 
     val client = engine.streamClient()

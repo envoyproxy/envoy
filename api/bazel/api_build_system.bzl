@@ -22,6 +22,7 @@ _CC_PROTO_DESCRIPTOR_SUFFIX = "_cc_proto_descriptor"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
+_JAVA_PROTO_SUFFIX = "_java_proto"
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",
@@ -107,6 +108,12 @@ def api_cc_py_proto_library(
         # Actual dependencies are resolved automatically from the proto_library dep tree.
         deps = [relative_name],
         visibility = ["//visibility:public"],
+    )
+
+    native.java_proto_library(
+        name = name + _JAVA_PROTO_SUFFIX,
+        visibility = ["//visibility:public"],
+        deps = [relative_name],
     )
 
     # Optionally define gRPC services

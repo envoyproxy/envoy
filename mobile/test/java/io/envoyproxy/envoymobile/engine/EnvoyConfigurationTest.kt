@@ -99,7 +99,15 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"), EnvoyNativeFilterConfig("buffer_filter_2", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }")),
+    filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1",
+        String(com.google.protobuf.Any.newBuilder()
+          .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+          .setValue(com.google.protobuf.ByteString.empty())
+        .build().toByteArray())), EnvoyNativeFilterConfig("buffer_filter_2",
+        String(com.google.protobuf.Any.newBuilder()
+          .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+          .setValue(com.google.protobuf.ByteString.empty())
+        .build().toByteArray()))),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enablePlatformCertificatesValidation: Boolean = false,

@@ -57,16 +57,27 @@ class KeyValueStoreTest {
         }
       }
 
+    val config_proto =
+      envoymobile.extensions.filters.http.test_kv_store.Filter.TestKeyValueStore.newBuilder()
+        .setKvStoreName("envoy.key_value.platform_test")
+        .setTestKey("$TEST_KEY")
+        .setTestValue("$TEST_VALUE")
+        .build()
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore"
+        )
+        .setValue(config_proto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .addKeyValueStore("envoy.key_value.platform_test", testKeyValueStore)
-        .addNativeFilter(
-          "envoy.filters.http.test_kv_store",
-          "[type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore] { kv_store_name: 'envoy.key_value.platform_test', test_key: '$TEST_KEY', test_value: '$TEST_VALUE'}"
-        )
+        .addNativeFilter("envoy.filters.http.test_kv_store", String(any_proto.toByteArray()))
         .build()
     val client = engine.streamClient()
 

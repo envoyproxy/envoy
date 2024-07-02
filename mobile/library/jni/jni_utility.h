@@ -93,12 +93,11 @@ void javaByteArrayToByteVector(JniHelper& jni_helper, jbyteArray array, std::vec
 void javaByteArrayToString(JniHelper& jni_helper, jbyteArray jbytes, std::string* out);
 
 /** Parses the proto from Java byte array and stores the output into `dest` proto. */
-void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
-                          Envoy::Protobuf::MessageLite* dest);
+void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source, Envoy::Protobuf::Message* dest);
 
 /** Converts from Proto to Java byte array. */
 LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
-                                                   const Envoy::Protobuf::MessageLite& source);
+                                                   const Envoy::Protobuf::Message& source);
 
 /** Converts from Java `String` to C++ `std::string`. */
 std::string javaStringToCppString(JniHelper& jni_helper, jstring java_string);

@@ -85,6 +85,12 @@ class ReceiveErrorTest {
         )
         .build()
 
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl(LOCAL_ERROR_FILTER_TYPE)
+        .setValue(com.google.protobuf.ByteString.empty())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
@@ -93,7 +99,7 @@ class ReceiveErrorTest {
           name = FILTER_NAME,
           factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
         )
-        .addNativeFilter("envoy.filters.http.local_error", "[$LOCAL_ERROR_FILTER_TYPE]{}")
+        .addNativeFilter("envoy.filters.http.local_error", String(any_proto.toByteArray()))
         .build()
 
     var errorCode: Int? = null
