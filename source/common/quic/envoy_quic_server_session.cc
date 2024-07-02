@@ -5,13 +5,32 @@
 #include <type_traits>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/scope_tracker.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Quic {
+
+namespace {
+class EnvoyQuicConnectionContextListener : public quic::QuicConnectionContextListener {
+public:
+  EnvoyQuicConnectionContextListener(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
+      : object_(object), tracker_(tracker) {}
+
+private:
+  void Activate() override { state_.emplace(object_, tracker_); }
+  void Deactivate() override { state_.reset(); }
+
+  const ScopeTrackedObject* object_;
+  Event::ScopeTracker& tracker_;
+  absl::optional<ScopeTrackerScopeState> state_;
+};
+} // namespace
 
 EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
@@ -40,6 +59,8 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this, streamInfo());
     quic_connection_->set_debug_visitor(debug_visitor_.get());
   }
+  quic_connection_->set_context_listener(
+      std::make_unique<EnvoyQuicConnectionContextListener>(this, dispatcher));
 }
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
