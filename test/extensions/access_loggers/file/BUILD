@@ -14,9 +14,13 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_names = ["envoy.access_loggers.file"],
+    extension_names = [
+        "envoy.access_loggers.file",
+        "envoy.formatter.metadata",
+    ],
     deps = [
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/formatter/metadata:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
