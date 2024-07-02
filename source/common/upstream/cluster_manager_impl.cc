@@ -2132,6 +2132,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
     option->hashKey(hash_key);
   }
 
+  // If configured, use the downstream connection id in pool hash key
+  if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
+      context->downstreamConnection()) {
+    ENVOY_LOG(trace, "honoring connection_pool_per_downstream_connection");
+    context->downstreamConnection()->hashKey(hash_key);
+  }
+
   bool have_transport_socket_options = false;
   if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
     have_transport_socket_options = true;
