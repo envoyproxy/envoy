@@ -766,7 +766,7 @@ TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
   driveToCompletion();
 };
 
-// 104 headers etc. are passed to the response encoder (who is responsibly for deciding to
+// 105 headers etc. are passed to the response encoder (who is responsibly for deciding to
 // upgrade, ignore, etc.).
 TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
   initialize();
@@ -777,7 +777,7 @@ TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 
-  TestResponseHeaderMapImpl other_headers{{":status", "104"}};
+  TestResponseHeaderMapImpl other_headers{{":status", "105"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(other_headers, false);
   driveToCompletion();

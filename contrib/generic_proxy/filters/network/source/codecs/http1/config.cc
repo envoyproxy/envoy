@@ -604,6 +604,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
     // 101 Switching Protocols response. Ignore it because we don't support upgrade for now.
     // 102 Processing response. Ignore it.
     // 103 Early Hints response. Ignore it.
+    // 104 Upload Resumption Supported response. Ignore it.
 
     // Return success to continue parsing the actual response.
     return Http::Http1::CallbackResult::Success;
