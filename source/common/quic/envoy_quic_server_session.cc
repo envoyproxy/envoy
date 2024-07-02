@@ -11,7 +11,7 @@
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 
-#include "third_party/absl/types/optional.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Quic {
