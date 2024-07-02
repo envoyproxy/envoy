@@ -38,6 +38,18 @@ TEST_P(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
 }
 
+TEST_P(ConnectionSocketImplTest, RequestedApplicationProtocols) {
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11,
+                                                   Http::Utility::AlpnNames::get().Http2c};
+  auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
+  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
+  conn_socket_.setRequestedApplicationProtocols(alpn_protos);
+  EXPECT_EQ(Http::Utility::AlpnNames::get().Http11,
+            conn_socket_.requestedApplicationProtocols()[0]);
+  EXPECT_EQ(Http::Utility::AlpnNames::get().Http2c,
+            conn_socket_.requestedApplicationProtocols()[1]);
+}
+
 TEST_P(ConnectionSocketImplTest, IpVersion) {
   ClientSocketImpl socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
   EXPECT_EQ(socket.ipVersion(), GetParam());
