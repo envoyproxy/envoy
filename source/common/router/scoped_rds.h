@@ -73,7 +73,6 @@ public:
     return out_protos;
   }
 
-  std::string getConfigVersion() const override { return ""; }
   ConfigConstSharedPtr getConfig() const override { return config_; }
 
 private:
