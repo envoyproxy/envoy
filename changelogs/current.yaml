@@ -434,6 +434,11 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: quic
+  change: |
+    Added :ref:`DataSourceServerPreferredAddressConfig
+    <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig>` for cases when
+    the control plane does not know the correct configuration for the server preferred address.
 - area: tls
   change: |
     added support to match against ``OtherName`` SAN Type under :ref:`match_typed_subject_alt_names
