@@ -31,10 +31,14 @@ using ::Envoy::StatusHelpers::StatusIs;
 TEST(InternalParsing, ParsedPathDebugString) {
   ParsedPathPattern patt1 = {
       {
+          "/",
           "abc",
+          "/",
           "def",
+          "/",
           Operator::PathGlob,
-          Variable("var", {Operator::PathGlob, "ghi", Operator::TextGlob}),
+          "/",
+          Variable("var", {Operator::PathGlob, "/", "ghi", "/", Operator::TextGlob}),
       },
       ".test",
       {},
@@ -42,6 +46,7 @@ TEST(InternalParsing, ParsedPathDebugString) {
   EXPECT_EQ(patt1.debugString(), "/abc/def/*/{var=*/ghi/**}.test");
 
   ParsedPathPattern patt2 = {{
+                                 "/",
                                  Variable("var", {}),
                              },
                              "",
@@ -172,10 +177,10 @@ INSTANTIATE_TEST_SUITE_P(
                     "/api/*/{resource=*}/{method=**}", "/v1/**", "/media/{country}/{lang=*}/**",
                     "/{foo}/{bar}/{fo}/{fum}/*", "/{foo=*}/{bar=*}/{fo=*}/{fum=*}/*",
                     "/media/{id=*}/*", "/media/{contentId=**}",
-                    "/api/{version}/projects/{project}/locations/{location}/{resource}/"
-                    "{name}",
+                    "/api/{version}/projects/{project}/locations/{location}/{resource}/{name}",
                     "/api/{version=*}/{url=**}", "/api/{VERSION}/{version}/{verSION}",
-                    "/api/1234/abcd", "/media/abcd/%10%20%30/{v1=*/%10%20}_suffix", "/"));
+                    "/api/1234/abcd", "/media/abcd/%10%20%30/{v1=*/%10%20}_suffix", "/",
+                    "/MyFunction('{id}')"));
 
 TEST_P(ParsePathPatternSyntaxSuccess, ParsePathPatternSyntaxSuccessTest) {
   std::string pattern = GetParam();
@@ -190,16 +195,15 @@ class ParsePathPatternSyntaxFailure : public testing::TestWithParam<std::string>
 
 INSTANTIATE_TEST_SUITE_P(
     ParsePathPatternSyntaxFailureTestSuite, ParsePathPatternSyntaxFailure,
-    testing::Values("/api/v*/1234", "/api/{version=v*}/1234", "/api/v{versionNum=*}/1234",
-                    "/api/{version=*beta}/1234", "/media/eff456/ll-sd-out.{ext}",
-                    "/media/eff456/ll-sd-out.{ext=*}", "/media/eff456/ll-sd-out.**",
-                    "/media/{country=**}/{lang=*}/**", "/media/**/*/**", "/link/{id=*}/asset*",
-                    "/link/{id=*}/{asset=asset*}", "/media/{id=/*}/*", "/media/{contentId=/**}",
-                    "/api/{version}/{version}", "/api/{version.major}/{version.minor}",
-                    "/media/***", "/media/*{*}*", "/media/{*}/", "/media/*/index?a=2", "media",
-                    "/\001\002\003\004\005\006\007", "/*(/**", "/**/{var}",
-                    "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
-                    "/{var12345678901234=*}"));
+    testing::Values("/api/v*/1234", "/api/{version=v*}/1234", "/api/{version=*beta}/1234",
+                    "/media/eff456/ll-sd-out.**", "/media/{country=**}/{lang=*}/**",
+                    "/media/**/*/**", "/link/{id=*}/asset*", "/link/{id=*}/{asset=asset*}",
+                    "/media/{id=/*}/*", "/media/{contentId=/**}", "/api/{version}/{version}",
+                    "/api/{version.major}/{version.minor}", "/media/***", "/media/*{*}*",
+                    "/media/{*}/", "/media/*/index?a=2", "media", "/\001\002\003\004\005\006\007",
+                    "/**/{var}",
+                    "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", // Too long. max 5 allowed.
+                    "/{=*}", "/{var12345678901234=*}"));
 
 TEST_P(ParsePathPatternSyntaxFailure, ParsePathPatternSyntaxFailureTest) {
   std::string pattern = GetParam();
@@ -292,9 +296,10 @@ TEST(InternalRegexGen, TextGlobRegex) {
 
 TEST(InternalRegexGen, VariableRegexPattern) {
   EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)");
-  EXPECT_EQ(toRegexPattern(Variable("var2", {Operator::PathGlob, "abc", Operator::TextGlob})),
-            "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@=]+/abc/"
-            "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*)");
+  EXPECT_EQ(
+      toRegexPattern(Variable("var2", {Operator::PathGlob, "/", "abc", "/", Operator::TextGlob})),
+      "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@=]+/abc/"
+      "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*)");
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultMatch) {
