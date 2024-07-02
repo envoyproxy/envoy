@@ -1218,21 +1218,6 @@ dynamic_scoped_route_configs:
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump7));
 }
 
-TEST_F(ScopedRdsTest, DeltaStaticConfigProviderOnly) {
-  // Use match all regex due to lack of distinctive matchable output for
-  // coverage test.
-  EXPECT_DEATH(config_provider_manager_->createStaticConfigProvider(
-                   parseScopedRouteConfigurationFromYaml(R"EOF(
-name: dynamic-foo
-route_configuration_name: static-foo-route-config
-key:
-  fragments: { string_key: "172.30.30.10" }
-)EOF"),
-                   server_factory_context_,
-                   Envoy::Config::ConfigProviderManager::NullOptionalArg()),
-               ".*");
-}
-
 // Tests whether scope key conflict with updated scopes is ignored.
 TEST_F(ScopedRdsTest, IgnoreConflictWithUpdatedScopeDelta) {
   setup();

@@ -57,7 +57,7 @@ public:
      *
      * @return the request headers.
      */
-    virtual Http::HeaderMap& headers() const PURE;
+    virtual Http::RequestHeaderMap& headers() const PURE;
 
     /**
      * Returns the active span wrapped in this context.

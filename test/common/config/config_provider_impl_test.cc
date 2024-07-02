@@ -195,19 +195,14 @@ public:
 
   // Envoy::Config::ConfigProviderManager
   ConfigProviderPtr
-  createStaticConfigProvider(const Protobuf::Message& config_proto,
+  createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& configs,
                              Server::Configuration::ServerFactoryContext& factory_context,
-                             const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
-    return std::make_unique<StaticDummyConfigProvider>(
-        dynamic_cast<const test::common::config::DummyConfig&>(config_proto), factory_context,
-        *this);
-  }
-  ConfigProviderPtr
-  createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&&,
-                             Server::Configuration::ServerFactoryContext&,
                              const OptionalArg&) override {
-    ASSERT(false, "this provider does not expect multiple config protos");
-    return nullptr;
+    // Currently, the dummy config provider only supports a single static config. We can extend this
+    // to support multiple static configs if needed.
+    ASSERT(configs.size() == 1);
+    auto config = dynamic_cast<const test::common::config::DummyConfig&>(*configs[0]);
+    return std::make_unique<StaticDummyConfigProvider>(config, factory_context, *this);
   }
 };
 
@@ -248,6 +243,13 @@ protected:
 test::common::config::DummyConfig parseDummyConfigFromYaml(const std::string& yaml) {
   test::common::config::DummyConfig config;
   TestUtility::loadFromYaml(yaml, config);
+  return config;
+}
+
+std::unique_ptr<test::common::config::DummyConfig>
+parseDummyConfigPtrFromYaml(const std::string& yaml) {
+  auto config = std::make_unique<test::common::config::DummyConfig>();
+  TestUtility::loadFromYaml(yaml, *config);
   return config;
 }
 
@@ -431,12 +433,12 @@ dynamic_dummy_configs:
   EXPECT_EQ(expected_config_dump.DebugString(), dummy_config_dump.DebugString());
 
   // Static config dump only.
-  std::string config_yaml = "a: a static dummy config";
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
+  ProtobufTypes::ConstMessagePtrVector configs;
+  configs.push_back(parseDummyConfigPtrFromYaml("a: a static dummy config"));
   ConfigProviderPtr static_config = provider_manager_->createStaticConfigProvider(
-      parseDummyConfigFromYaml(config_yaml), server_factory_context_,
-      ConfigProviderManager::NullOptionalArg());
+      std::move(configs), server_factory_context_, ConfigProviderManager::NullOptionalArg());
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump2 =
@@ -481,9 +483,10 @@ dynamic_dummy_configs:
                             expected_config_dump);
   EXPECT_EQ(expected_config_dump.DebugString(), dummy_config_dump3.DebugString());
 
+  ProtobufTypes::ConstMessagePtrVector configs2;
+  configs2.push_back(parseDummyConfigPtrFromYaml("a: another static dummy config"));
   ConfigProviderPtr static_config2 = provider_manager_->createStaticConfigProvider(
-      parseDummyConfigFromYaml("a: another static dummy config"), server_factory_context_,
-      ConfigProviderManager::NullOptionalArg());
+      std::move(configs2), server_factory_context_, ConfigProviderManager::NullOptionalArg());
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump4 =
@@ -665,6 +668,12 @@ public:
 
     return std::make_unique<DeltaDummyDynamicConfigProvider>(std::move(subscription));
   }
+
+  ConfigProviderPtr createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&&,
+                                               Server::Configuration::ServerFactoryContext&,
+                                               const OptionalArg&) override {
+    return nullptr;
+  };
 };
 
 DeltaDummyConfigSubscription::DeltaDummyConfigSubscription(
