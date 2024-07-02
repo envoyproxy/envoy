@@ -130,7 +130,8 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
         StreamInfo::CoreResponseFlag::UpstreamProtocolError);
     read_callbacks_->connection().streamInfo().setResponseCodeDetails(AuthDigestNoMatch);
     config_->stats().auth_digest_no_match_.inc();
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                        "auth_digest_no_match");
     return;
   }
 
