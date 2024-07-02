@@ -38,7 +38,7 @@ const std::regex& SubstitutionFormatParser::commandWithArgsRegex() {
   //                              ____________________  _____________________ _____________
   //                              |                  |  |                   | |           |
   CONSTRUCT_ON_FIRST_USE(std::regex,
-                         R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\(([^\)]*|[^\}]*)\))?(?::([0-9]+))?%)EOF");
+                         R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\(([^\)]*|[^\%]*)\))?(?::([0-9]+))?%)EOF");
   //                             |__________________|     |______________|        |______|
   //                                      |                      |                   |
   // Capturing group specifying COMMAND --                       |                   |
