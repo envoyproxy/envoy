@@ -75,9 +75,6 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "datasource_server_preferred_address_config_factory_config",
-    extra_visibility = [
-        "//test:__subpackages__",
-    ],
     tags = ["nofips"],
     deps = select(
         {
