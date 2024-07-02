@@ -44,7 +44,6 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
     deps = [
-        "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:config",
         "//test/integration:http_integration_lib",

@@ -20,9 +20,7 @@ Resource StaticConfigResourceDetector::detect() {
   Resource resource;
   resource.schema_url_ = "";
 
-  for (const auto& pair : attributes_) {
-    const std::string& key = pair.first;
-    const std::string& value = pair.second;
+  for (const auto& [key, value] : attributes_) {
     if (value.empty()) {
       ENVOY_LOG(warn, "Attribute {} cannot be empty.", key);
       continue;
