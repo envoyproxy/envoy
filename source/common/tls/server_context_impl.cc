@@ -195,7 +195,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
       }
     } else {
       auto response_or_error =
-          Ocsp::OcspResponseWrapper::create(ocsp_resp_bytes, factory_context_.timeSource());
+          Ocsp::OcspResponseWrapperImpl::create(ocsp_resp_bytes, factory_context_.timeSource());
       THROW_IF_STATUS_NOT_OK(response_or_error, throw);
       if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
         throw EnvoyException("OCSP response does not match its TLS certificate");
