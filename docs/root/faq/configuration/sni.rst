@@ -76,6 +76,8 @@ To derive SNI from a downstream HTTP header like, ``host`` or ``:authority``, tu
 :ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` to override the fixed SNI in
 :ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`. A custom header other than the ``host`` or ``:authority`` can also be supplied using the optional
 :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>` field.
+Alternatively :ref:`hostnames <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` of cluster's endpoints can be used as the value for SNI.
+Turn on :ref:`auto_sni_from_upstream <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni_from_upstream>` to enable this mechanism.
 If upstream will present certificates with the hostname in SAN, turn on
 :ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>` too.
 It still needs a trust CA in validation context in :ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` for trust anchor.
