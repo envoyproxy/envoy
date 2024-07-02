@@ -90,7 +90,6 @@ envoy_cc_library(
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
-        "//source/extensions/http/header_validators/envoy_default:config",
         "//source/extensions/request_id/uuid:config",
         "//source/server:null_overload_manager_lib",
     ] + envoy_select_admin_html([
