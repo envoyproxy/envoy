@@ -282,6 +282,9 @@ envoy_cc_library(
         "envoy_quic_server_session.h",
         "envoy_quic_server_stream.h",
     ],
+    external_deps = [
+        "abseil_optional",
+    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_debug_visitor_factory_interface",
