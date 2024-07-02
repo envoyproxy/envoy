@@ -93,6 +93,8 @@ private:
   ServerNamesMap server_names_map_;
   bool has_rsa_{false};
   bool full_scan_certs_on_sni_mismatch_;
+
+  SessionCache::ClientPtr tls_session_cache_client_;
 };
 
 class ServerContextFactoryImpl : public ServerContextFactory {

@@ -149,6 +149,9 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   MOCK_METHOD(bool, fullScanCertsOnSNIMismatch, (), (const));
+  MOCK_METHOD(bool, enableTlsSessionCache, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, tlsSessionCacheGrpcTimeout, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::GrpcService&, tlsSessionCacheGrpcService, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};

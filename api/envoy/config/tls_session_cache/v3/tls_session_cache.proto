@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.config.tls_session_cache.v3;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.tls_session_cache.v3";
+option java_outer_classname = "TlsSessionCacheProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/tls_session_cache/v3;tls_session_cachev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TLS session cache service]
+
+message TlsSessionCacheConfig {
+  // The timeout in milliseconds for the TLS session cache service RPC. If not
+  // set, this defaults to 20ms.
+  google.protobuf.Duration timeout = 1;
+
+  // Specifies the gRPC service that hosts the TLS session cache service. The client
+  // will connect to this cluster when it needs to look up TLS session.
+  core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+}

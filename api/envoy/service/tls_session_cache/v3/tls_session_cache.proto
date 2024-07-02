@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package envoy.service.tls_session_cache.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.service.tls_session_cache.v3";
+option java_outer_classname = "TlsSessionCacheProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/tls_session_cache/v3;tls_session_cachev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TLS session cache service]
+
+service TlsSessionCacheService {
+  rpc TlsSession(TlsSessionRequest) returns (TlsSessionResponse) {
+  }
+}
+
+enum TYPE {
+  // The request type to store a session to the cache.
+  STORE = 0;
+
+  // The request type to fetch a session from the cache.
+  FETCH = 1;
+}
+
+enum CODE {
+  // The response code to notify that the session id is added .
+  OK = 0;
+
+  // The session id already exits in the session cache, unlikely to happen.
+  ALEADY_EXIST = 1;
+
+  // The response code to notify that the session id is not found in session cache.
+  NOT_FOUND = 2;
+}
+
+message TlsSessionRequest {
+  TYPE type = 1;
+
+  // The TLS session id
+  string session_id = 2;
+
+  bytes session_data = 3;
+}
+
+message TlsSessionResponse {
+  TYPE type = 1;
+
+  CODE code = 2;
+
+  string session_id = 3;
+
+  bytes session_data = 4;
+}

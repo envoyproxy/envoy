@@ -18,4 +18,5 @@ Services
   runtime/v3/*
   ../config/tap/v3/*
   tap/v3/*
+  tls_session_cache/v3/*
   trace/v3/*

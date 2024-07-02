@@ -430,6 +430,14 @@ int ContextImpl::sslSocketIndex() {
   }());
 }
 
+int ContextImpl::sslSessionCacheIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_session_cache_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_session_cache_index >= 0, "");
+    return ssl_session_cache_index;
+  }());
+}
+
 std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_protocols,
                                                      absl::Status& parse_status) {
   if (alpn_protocols.empty()) {
@@ -552,6 +560,7 @@ void ContextImpl::logHandshake(SSL* ssl) const {
 
   if (SSL_session_reused(ssl)) {
     stats_.session_reused_.inc();
+    ENVOY_LOG(debug, "Handshake with session resumption: {}", SSL_get_version(ssl));
   }
 
   incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl), unknown_ssl_cipher_);

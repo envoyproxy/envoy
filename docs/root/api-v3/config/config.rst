@@ -48,3 +48,4 @@ Extensions
   watchdog/watchdog
   load_balancing_policies/load_balancing_policies
   cluster_specifier/cluster_specifier
+  tls_session_cache/tls_session_cache

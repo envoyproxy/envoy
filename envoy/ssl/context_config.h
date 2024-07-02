@@ -199,6 +199,12 @@ public:
    * downstream TLS handshake, false otherwise.
    */
   virtual bool fullScanCertsOnSNIMismatch() const PURE;
+
+  virtual bool enableTlsSessionCache() const PURE;
+
+  virtual const envoy::config::core::v3::GrpcService& tlsSessionCacheGrpcService() const PURE;
+
+  virtual std::chrono::milliseconds tlsSessionCacheGrpcTimeout() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
