@@ -61,10 +61,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
-  private final String mNodeId = "";
-  private final String mNodeRegion = "";
-  private final String mNodeZone = "";
-  private final String mNodeSubZone = "";
+
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
   /**
@@ -253,11 +250,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
-        /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
-        /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,
-        Struct.getDefaultInstance(), /*cdsResourcesLocator=*/"", /*cdsTimeoutSeconds=*/0,
-        /*enableCds=*/false);
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni);
   }
 }
