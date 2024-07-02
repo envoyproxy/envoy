@@ -104,9 +104,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                  transport_socket_factory_->supportedAlpnProtocols().end());
   }
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
-    http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
-  }
+  http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
 }
 
