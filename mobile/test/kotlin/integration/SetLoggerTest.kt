@@ -1,6 +1,7 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import envoymobile.extensions.filters.http.test_logger.Filter.TestLogger
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
@@ -23,14 +24,21 @@ class SetLoggerTest {
   fun `set logger`() {
     val countDownLatch = CountDownLatch(1)
     val logEventLatch = CountDownLatch(1)
+    val config_proto =
+      envoymobile.extensions.filters.http.test_logger.Filter.TestLogger.newBuilder()
+        .getDefaultInstanceForType()
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger"
+        )
+        .setValue(config_proto.toByteString())
+        .build()
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
-        .addNativeFilter(
-          "test_logger",
-          "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"
-        )
+        .addNativeFilter("test_logger", String(any_proto.toByteArray()))
         .setLogger { _, msg ->
           if (msg.contains("starting main dispatch loop")) {
             countDownLatch.countDown()
@@ -58,6 +66,14 @@ class SetLoggerTest {
   fun `engine should continue to run if no logger is set`() {
     val countDownLatch = CountDownLatch(1)
     val logEventLatch = CountDownLatch(1)
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger"
+        )
+        .setValue(com.google.protobuf.ByteString.empty())
+        .build()
+
     val engine =
       EngineBuilder()
         .setEventTracker { event ->
@@ -66,10 +82,7 @@ class SetLoggerTest {
           }
         }
         .setLogLevel(LogLevel.DEBUG)
-        .addNativeFilter(
-          "test_logger",
-          "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger] {}"
-        )
+        .addNativeFilter("test_logger", String(any_proto.toByteArray()))
         .setOnEngineRunning { countDownLatch.countDown() }
         .build()
 

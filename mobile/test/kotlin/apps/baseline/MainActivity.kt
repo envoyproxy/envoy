@@ -45,16 +45,21 @@ class MainActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
+    val config =
+      String(
+        com.google.protobuf.Any.newBuilder()
+          .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+          .setValue(com.google.protobuf.ByteString.empty())
+          .build()
+          .toByteArray()
+      )
 
     engine =
       AndroidEngineBuilder(application)
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> Log.d(TAG, msg) }
         .addPlatformFilter(::DemoFilter)
-        .addNativeFilter(
-          "envoy.filters.http.buffer",
-          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
-        )
+        .addNativeFilter("envoy.filters.http.buffer", config)
         .addStringAccessor("demo-accessor", { "PlatformString" })
         .setOnEngineRunning { Log.d(TAG, "Envoy async internal setup completed") }
         .setEventTracker({

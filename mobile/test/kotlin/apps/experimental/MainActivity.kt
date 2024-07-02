@@ -68,7 +68,13 @@ class MainActivity : Activity() {
         // .enablePlatformCertificatesValidation(true)
         .addNativeFilter(
           "envoy.filters.http.buffer",
-          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
+          String(
+            com.google.protobuf.Any.newBuilder()
+              .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+              .setValue(com.google.protobuf.ByteString.empty())
+              .build()
+              .toByteArray()
+          )
         )
         .addStringAccessor("demo-accessor", { "PlatformString" })
         .setOnEngineRunning { Log.d(TAG, "Envoy async internal setup completed") }

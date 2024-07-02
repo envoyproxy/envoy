@@ -31,6 +31,7 @@
 #include "fmt/core.h"
 #include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
+#include "library/common/extensions/filters/http/platform_bridge/filter.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
@@ -283,10 +284,23 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
 }
 
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
+#ifdef ENVOY_ENABLE_FULL_PROTOS
   return absl::StrCat("[type.googleapis.com/"
                       "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
                       "platform_filter_name: \"",
                       name, "\" }");
+#else
+  envoymobile::extensions::filters::http::platform_bridge::PlatformBridge proto_config;
+  proto_config.set_platform_filter_name(name);
+  std::string ret;
+  proto_config.SerializeToString(&ret);
+  ProtobufWkt::Any any_config;
+  any_config.set_type_url(
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge");
+  any_config.set_value(ret);
+  any_config.SerializeToString(&ret);
+  return ret;
+#endif
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
@@ -359,7 +373,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
                    "Failed to parse: " + (*filter).typed_config_);
 #else
-    IS_ENVOY_BUG("Native filter support not implemented for this build");
+    RELEASE_ASSERT(native_filter->mutable_typed_config()->ParseFromString((*filter).typed_config_),
+                   "Failed to parse binary proto: " + (*filter).typed_config_);
 #endif // !ENVOY_ENABLE_FULL_PROTOS
   }
 

@@ -211,9 +211,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   @VisibleForTesting
   public CronvoyEngineBuilderImpl addUrlInterceptorsForTesting() {
-    nativeFilterChain.add(new EnvoyNativeFilterConfig(
-        "envoy.filters.http.test_read",
-        "[type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead] {}"));
+    com.google.protobuf.Any anyProto =
+        com.google.protobuf.Any.newBuilder()
+            .setTypeUrl(
+                "type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead")
+            .setValue(com.google.protobuf.ByteString.empty())
+            .build();
+    String config = new String(anyProto.toByteArray());
+    nativeFilterChain.add(new EnvoyNativeFilterConfig("envoy.filters.http.test_read", config));
     return this;
   }
 

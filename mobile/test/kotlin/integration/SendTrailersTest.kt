@@ -21,16 +21,6 @@ import org.robolectric.RobolectricTestRunner
 
 private const val MATCHER_TRAILER_NAME = "test-trailer"
 private const val MATCHER_TRAILER_VALUE = "test.code"
-private const val ASSERTION_FILTER_TEXT_PROTO =
-  """
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-    match_config: {
-      http_request_trailers_match: {
-        headers: { name: 'test-trailer', exact_match: 'test.code' }
-      }
-    }
-  }
-"""
 
 @RunWith(RobolectricTestRunner::class)
 class SendTrailersTest {
@@ -53,16 +43,36 @@ class SendTrailersTest {
   @Test
   fun `successful sending of trailers`() {
     val expectation = CountDownLatch(1)
+    val match = io.envoyproxy.envoy.type.matcher.v3.StringMatcher.newBuilder().setExact("test.code")
+    val trailers =
+      io.envoyproxy.envoy.config.route.v3.HeaderMatcher.newBuilder()
+        .setName("test-trailer")
+        .setStringMatch(match)
+        .build()
+    val headers_match =
+      io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch.newBuilder()
+        .addHeaders(trailers)
+        .build()
+    val match_config =
+      io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate.newBuilder()
+        .setHttpRequestTrailersMatch(headers_match)
+        .build()
+    val config_proto =
+      envoymobile.extensions.filters.http.assertion.Filter.Assertion.newBuilder()
+        .setMatchConfig(match_config)
+        .build()
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
+        .setValue(config_proto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
-        .addNativeFilter(
-          "envoy.filters.http.buffer",
-          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 65000 } }"
-        )
+        .addNativeFilter("envoy.filters.http.assertion", String(any_proto.toByteArray()))
         .build()
 
     val client = engine.streamClient()
