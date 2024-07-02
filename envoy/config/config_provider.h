@@ -117,7 +117,7 @@ protected:
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
-  virtual ConfigProtoVector getConfigProtos() const PURE;
+  virtual ConfigProtoVector getConfigProtos() const { PANIC("not implemented"); }
 
   /**
    * Returns the config implementation associated with the provider.
