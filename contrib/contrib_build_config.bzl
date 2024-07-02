@@ -29,6 +29,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
+    "envoy.filters.network.smtp_proxy":                         "//contrib/smtp_proxy/filters/network/source:config",
 
     #
     # Sip proxy

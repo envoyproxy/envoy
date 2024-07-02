@@ -156,3 +156,8 @@ envoy.router.cluster_specifier_plugin.golang:
   - envoy.router.cluster_specifier_plugin
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.network.smtp_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
