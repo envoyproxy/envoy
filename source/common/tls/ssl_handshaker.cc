@@ -97,6 +97,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
       return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
+    case SSL_ERROR_PENDING_SESSION:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:

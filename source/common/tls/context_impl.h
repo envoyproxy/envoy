@@ -22,6 +22,7 @@
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ocsp/ocsp.h"
+#include "source/common/tls/session_cache/session_cache.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -96,6 +97,8 @@ public:
   static int sslExtendedSocketInfoIndex();
 
   static int sslSocketIndex();
+
+  static int sslSessionCacheIndex();
   // Ssl::Context
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;

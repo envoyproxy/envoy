@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/tls/session_cache/session_cache_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
 #include "openssl/ssl.h"
@@ -486,6 +487,10 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     session_timeout_ =
         std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
+  auto session_cache_timeout = std::chrono::milliseconds(
+      DurationUtil::durationToMilliseconds(config.session_cache_service().timeout()));
+  tls_session_cache_client_ = SessionCache::tlsSessionCacheClient(
+      factory_context, config.session_cache_service().grpc_service(), session_cache_timeout);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {

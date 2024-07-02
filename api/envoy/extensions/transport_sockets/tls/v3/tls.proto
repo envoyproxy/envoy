@@ -4,6 +4,7 @@ package envoy.extensions.transport_sockets.tls.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/tls_session_cache/v3/tls_session_cache.proto";
 import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
@@ -63,7 +64,7 @@ message UpstreamTlsContext {
   google.protobuf.BoolValue enforce_rsa_key_usage = 5;
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -140,6 +141,9 @@ message DownstreamTlsContext {
   // If the client provides SNI but no such cert matched, it will decide to full scan certificates or not based on this config.
   // Defaults to false. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
   google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
+
+  // Config for external TLS session cache.
+  config.tls_session_cache.v3.TlsSessionCacheConfig session_cache_service = 11;
 }
 
 // TLS key log configuration.

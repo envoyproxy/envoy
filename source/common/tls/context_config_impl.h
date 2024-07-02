@@ -12,6 +12,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
+#include "source/common/tls/session_cache/session_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -178,6 +179,8 @@ public:
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
+  SessionCache::ClientPtr getTlsSessionCacheClient() const { return tls_session_cache_client_; }
+
 private:
   ServerContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
@@ -208,6 +211,7 @@ private:
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
+  SessionCache::ClientPtr tls_session_cache_client_;
 };
 
 } // namespace Tls
