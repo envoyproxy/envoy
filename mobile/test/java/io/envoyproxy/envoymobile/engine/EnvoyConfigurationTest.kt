@@ -104,20 +104,6 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enablePlatformCertificatesValidation: Boolean = false,
     upstreamTlsSni: String = "",
-    rtdsResourceName: String = "",
-    rtdsTimeoutSeconds: Int = 0,
-    xdsAddress: String = "",
-    xdsPort: Int = 0,
-    xdsGrpcInitialMetadata: Map<String, String> = emptyMap(),
-    xdsSslRootCerts: String = "",
-    nodeId: String = "",
-    nodeRegion: String = "",
-    nodeZone: String = "",
-    nodeSubZone: String = "",
-    nodeMetadata: Struct = Struct.getDefaultInstance(),
-    cdsResourcesLocator: String = "",
-    cdsTimeoutSeconds: Int = 0,
-    enableCds: Boolean = false,
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -158,20 +144,6 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
-      rtdsResourceName,
-      rtdsTimeoutSeconds,
-      xdsAddress,
-      xdsPort,
-      xdsGrpcInitialMetadata,
-      xdsSslRootCerts,
-      nodeId,
-      nodeRegion,
-      nodeZone,
-      nodeSubZone,
-      nodeMetadata,
-      cdsResourcesLocator,
-      cdsTimeoutSeconds,
-      enableCds
     )
   }
 
@@ -302,11 +274,6 @@ class EnvoyConfigurationTest {
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca")
-
-    // ADS and RTDS not included by default
-    assertThat(resolvedTemplate).doesNotContain("rtds_layer");
-    assertThat(resolvedTemplate).doesNotContain("ads_config");
-    assertThat(resolvedTemplate).doesNotContain("cds_config");
   }
 
   @Test
@@ -320,101 +287,5 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("test_feature_false")
     assertThat(resolvedTemplate).contains("test_feature_true")
-  }
-
-  @Test
-  fun `test adding RTDS`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
-    assertThat(resolvedTemplate).contains("fake_rtds_layer");
-    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5432 }")
-  }
-
-  @Test
-  fun `test adding RTDS and CDS`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
-    )
-
-    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
-    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 356 }")
-  }
-
-  @Test
-  fun `test not using enableCds`() {
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 123456, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
-
-    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
-    assertThat(resolvedTemplate).doesNotContain("1234356");
-  }
-
-  @Test
-  fun `test enableCds with default string`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("cds_config");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5 }")
-  }
-
-  @Test
-  fun `test RTDS default timeout`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5 }")
-  }
-
-  @Test
-  fun `test node metadata`() {
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      nodeMetadata = Struct.newBuilder()
-        .putFields("metadata_field", Value.newBuilder().setStringValue("metadata_value").build())
-        .build()
-    )
-
-    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("metadata_field")
-    assertThat(resolvedTemplate).contains("metadata_value")
   }
 }
