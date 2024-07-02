@@ -69,38 +69,6 @@ jobs:
             --config=mobile-remote-ci-cc-full-protos-enabled
             //test/common/... //test/cc/...
 
-  build:
-    permissions:
-      contents: read
-      packages: read
-    uses: ./.github/workflows/_run.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-compile-time-options }}
-    needs: load
-    with:
-      args: ${{ matrix.args }}
-      command: ./bazelw
-      container-command:
-      request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
-      source: ${{ matrix.source }}
-      steps-pre: ${{ matrix.steps-pre }}
-      target: ${{ matrix.target || matrix.name }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
-      timeout-minutes: 120
-      working-directory: mobile
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - name: swift-build
-          args: >-
-            build
-            --config=mobile-remote-ci-macos-swift
-            //library/swift:ios_framework
-          source: |
-            source ./ci/mac_ci_setup.sh
-            ./bazelw shutdown
-
   request:
     secrets:
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
