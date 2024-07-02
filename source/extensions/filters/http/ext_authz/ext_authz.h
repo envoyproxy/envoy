@@ -51,6 +51,17 @@ struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  explicit ExtAuthzLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+      : filter_metadata_(filter_metadata) {}
+
+  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+
+private:
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
+};
+
 /**
  * Configuration for the External Authorization (ext_authz) filter.
  */
@@ -139,6 +150,8 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
+  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
@@ -189,6 +202,7 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
+  const ProtobufWkt::Struct filter_metadata_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
@@ -318,11 +332,18 @@ private:
   // code.
   void rejectResponse();
 
+  // Convenience function for setting logging info (if unset) and then send local reply.
+  void sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                      std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
+
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
+  void setLoggingInfo();
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

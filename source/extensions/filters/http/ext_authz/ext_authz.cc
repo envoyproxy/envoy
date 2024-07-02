@@ -87,6 +87,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       enable_dynamic_metadata_ingestion_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
+      filter_metadata_(config.filter_metadata()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -238,9 +239,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
-          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+      sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                     Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
@@ -404,6 +404,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
+
+  setLoggingInfo();
 
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {
@@ -714,7 +716,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // setResponseFlag must be called before sendLocalReply
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-    decoder_callbacks_->sendLocalReply(
+    sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
          &callbacks = *decoder_callbacks_](Http::HeaderMap& response_headers) -> void {
@@ -759,9 +761,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
-          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+      sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                     Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
@@ -778,9 +779,17 @@ void Filter::rejectResponse() {
   stats_.invalid_.inc();
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-  decoder_callbacks_->sendLocalReply(
-      status, EMPTY_STRING, nullptr, absl::nullopt,
-      Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
+  sendLocalReply(status, EMPTY_STRING, nullptr, absl::nullopt,
+                 Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzInvalid);
+}
+
+void Filter::sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                            std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                            absl::string_view details) {
+  setLoggingInfo();
+  decoder_callbacks_->sendLocalReply(response_code, body_text, modify_headers, grpc_status,
+                                     details);
 }
 
 bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
@@ -795,6 +804,18 @@ bool Filter::isBufferFull(uint64_t num_bytes_processing) const {
   }
 
   return num_bytes_buffered >= max_request_bytes_;
+}
+
+void Filter::setLoggingInfo() {
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if (filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    return;
+  }
+  filter_state->setData(decoder_callbacks_->filterConfigName(),
+                        std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                        Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+                        Envoy::StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void Filter::continueDecoding() {
