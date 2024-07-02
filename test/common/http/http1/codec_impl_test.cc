@@ -4839,10 +4839,11 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
-// When receiving header value with obsolete line folding, `obs-fold` should be replaced by SP.
-// This is http-parser's behavior. BalsaParser does not support obsolete line folding and rejects
-// such messages (also permitted by the specification). See RFC9110 Section 5.5:
-// https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
+// When receiving a message with obsolete line folding, `obs-fold` should be replaced by one or more
+// SP characters, see RFC9110 Section 5.5:
+// https://www.rfc-editor.org/rfc/rfc9112.html#name-obsolete-line-folding.
+// However, both http-parser and BalsaParser simply strip the `\r\n`, and keep the SP or TAB at the
+// beginning of the next line.
 TEST_P(Http1ServerConnectionImplTest, ObsFold) {
   // SPELLCHECKER(off)
   initialize();
