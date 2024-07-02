@@ -11,6 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/tls_se
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: TLS session cache service]
+
 service TlsSessionCacheService {
   rpc TlsSession(TlsSessionRequest) returns (TlsSessionResponse) {
   }
