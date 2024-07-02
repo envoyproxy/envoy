@@ -2433,6 +2433,133 @@ server_config:
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
 }
 
+TEST_F(DnsFilterTest, WildcardName) {
+  InSequence s;
+
+  const std::string wildcard_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foobaz.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+)EOF";
+  setup(wildcard_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.1"};
+  const std::string domain("www.foobaz.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardSubdomainPrevails) {
+  InSequence s;
+
+  const std::string wildcard_with_subdomain_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+      - name: "*.foo2.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.2"
+)EOF";
+  setup(wildcard_with_subdomain_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.2"};
+  const std::string domain("www.foo2.foo1.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardExactNamePrevails) {
+  InSequence s;
+
+  const std::string wildcard_and_exact_name_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+      - name: "bar.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.2"
+)EOF";
+  setup(wildcard_and_exact_name_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.2"};
+  const std::string domain("bar.foo1.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters
