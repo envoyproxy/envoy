@@ -434,6 +434,9 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: access_log
+  change: |
+    added formatters for :ref:`METADATA(VIRTUAL_HOST)<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>`.
 - area: tls
   change: |
     added support to match against ``OtherName`` SAN Type under :ref:`match_typed_subject_alt_names

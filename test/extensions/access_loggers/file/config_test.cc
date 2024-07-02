@@ -176,6 +176,33 @@ TEST_F(FileAccessLogTest, LogFormatJson) {
       true);
 }
 
+TEST_F(FileAccessLogTest, VirtualHostMetadata) {
+  // Setup the metadata for virtual host.
+  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
+  std::shared_ptr<Router::MockRouteEntry> route_entry{new NiceMock<Router::MockRouteEntry>()};
+  EXPECT_CALL(*route, routeEntry()).WillRepeatedly(testing::Return(route_entry.get()));
+  std::shared_ptr<Router::MockVirtualHost> virtual_host{new NiceMock<Router::MockVirtualHost>()};
+  EXPECT_CALL(*route_entry, virtualHost()).WillRepeatedly(testing::ReturnRef(*virtual_host));
+  envoy::config::core::v3::Metadata vhost_metadata;
+  (*vhost_metadata.mutable_filter_metadata())["metadata.namespace"] =
+      MessageUtil::keyValueStruct("envoy", "proxy");
+  EXPECT_CALL(*virtual_host, metadata()).WillRepeatedly(testing::ReturnRef(vhost_metadata));
+
+  runTest(
+      R"(
+  path: "/"
+  log_format:
+    formatters:
+    - name: envoy.formatter.metadata
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.metadata.v3.Metadata
+    text_format_source:
+      inline_string: "%REQ(:path)% metadata=%METADATA(VIRTUAL_HOST:metadata.namespace:envoy)%"
+)",
+      "/bar/foo metadata=proxy", false);
+}
+
 } // namespace
 } // namespace File
 } // namespace AccessLoggers
