@@ -234,6 +234,11 @@ public:
   // callbacks to the CacheFilter after having onDestroy() invoked.
   virtual void onDestroy() PURE;
 
+  /**
+   * @return the key associated with the LookupRequest from which the context was created.
+   */
+  virtual const Key& key() const PURE;
+
   virtual ~LookupContext() = default;
 };
 using LookupContextPtr = std::unique_ptr<LookupContext>;

@@ -6,6 +6,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: HTTP Cache Filter]
 
 // [#extension: envoy.filters.http.cache]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cache.v2alpha.CacheConfig";
@@ -48,6 +49,51 @@ message CacheConfig {
     // or more of its matchers are excluded from the cache key (even if also
     // matched by ``query_parameters_included``), and will not affect cache lookup.
     repeated config.route.v3.QueryParameterMatcher query_parameters_excluded = 4;
+  }
+
+  message ThunderingHerdHandler {
+    message BlockUntilCompletion {
+      // If ``parallel_requests`` is set, then this many requests may be
+      // sent upstream simultaneously. This may address the problem where one slow or
+      // flaky client can potentially block all clients for the same resource, while still
+      // limiting the impact of thundering herd.
+      //
+      // If unset, defaults to 1.
+      uint32 parallel_requests = 1;
+
+      // If a positive ``unblock_additional_request_period`` is set, then while requests
+      // are blocked, if the given period expires, an additional request will be allowed
+      // through. This is to mitigate a problem potentially caused by the
+      // ``BlockUntilCompletion``, in which, because the filter writes to client and cache
+      // in parallel, a particularly slow client being selected as the "primary" can
+      // prevent the cache from becoming populated in a timely fashion. Allowing a trickle
+      // of additional requests improves the chance of the cache getting populated.
+      //
+      // If ``unblock_additional_requests_period`` and ``parallel_requests`` are both set,
+      // each parallel request runs its own timer to unblock an additional request,
+      // i.e. with ``parallel_requests=2`` and ``unblock_additional_requests_period=5s``,
+      // if one request arrives at T=0 and one arrives at T=1, and neither successfully
+      // populate the cache, an additional queued request will be released at T=5,
+      // and another at T=6.
+      //
+      // If unset, blocked requests remain blocked until a previous request finishes.
+      google.protobuf.Duration unblock_additional_request_period = 2;
+    }
+
+    oneof handler {
+      // The ``BlockUntilCompletion`` handler will allow one request (or a configured number)
+      // to go to the upstream, then additional requests for that resource will be blocked until
+      // one of those initial requests completes, or a configurable timeout.
+      //
+      // After a request completes and a cache entry is written, all the blocked requests will be
+      // released to undergo the initial cache check again.
+      //
+      // If a request fails to complete, one additional request will be unblocked.
+      //
+      // If a response is not cacheable, all blocked requests are released and all subsequent
+      // requests for that cache entry become pass-through.
+      BlockUntilCompletion block_until_completion = 1;
+    }
   }
 
   // Config specific to the cache storage implementation. Required unless ``disabled``
@@ -93,4 +139,14 @@ message CacheConfig {
   // causes the cache to validate with its upstream even if the lookup is a hit. Setting this
   // to true will ignore these headers.
   bool ignore_request_cache_control_header = 6;
+
+  // The selected ThunderingHerdHandler determines what the filter should do when
+  // multiple requests for the same cacheable not-currently-cached item arrive.
+  //
+  // The default is none, which allows every request while the cache is not populated
+  // to attempt a cache insert, with the corresponding request to the upstream.
+  // This is the situation often described as "the thundering herd problem", in that
+  // many requests in a short time may overload the upstream server in a way one might
+  // expect a cache to prevent.
+  ThunderingHerdHandler thundering_herd_handler = 7;
 }

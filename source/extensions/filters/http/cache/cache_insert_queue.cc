@@ -68,11 +68,13 @@ private:
 
 CacheInsertQueue::CacheInsertQueue(std::shared_ptr<HttpCache> cache,
                                    Http::StreamEncoderFilterCallbacks& encoder_callbacks,
-                                   InsertContextPtr insert_context, AbortInsertCallback abort)
+                                   InsertContextPtr insert_context, AbortInsertCallback abort,
+                                   InsertFinishedCallback finished)
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
       low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
       high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()),
-      encoder_callbacks_(encoder_callbacks), abort_callback_(abort), cache_(cache) {}
+      encoder_callbacks_(encoder_callbacks), abort_callback_(abort), finished_callback_(finished),
+      cache_(cache) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {
@@ -132,6 +134,8 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
     if (aborting_) {
       // Parent filter was destroyed, so we can quit this operation.
       fragments_.clear();
+      finished_callback_(false);
+      finished_callback_ = nullptr;
       self_ownership_.reset();
       return;
     }
@@ -156,6 +160,8 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
       // Clearing self-ownership might provoke the destructor, so take a copy of the
       // abort callback to avoid reading from 'this' after it may be deleted.
       auto abort_callback = abort_callback_;
+      finished_callback_(false);
+      finished_callback_ = nullptr;
       self_ownership_.reset();
       abort_callback();
       return;
@@ -163,6 +169,8 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
     if (end_stream) {
       ASSERT(fragments_.empty(), "ending a stream with the queue not empty is a bug");
       ASSERT(!watermarked_, "being over the high watermark when the queue is empty makes no sense");
+      finished_callback_(true);
+      finished_callback_ = nullptr;
       self_ownership_.reset();
       return;
     }
@@ -190,6 +198,10 @@ void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
   encoder_callbacks_.reset();
   if (fragments_.empty() && !fragment_in_flight_) {
     // If the queue is already empty we can just let it be destroyed immediately.
+    if (finished_callback_ != nullptr) {
+      finished_callback_(false);
+      finished_callback_ = nullptr;
+    }
     return;
   }
   if (!end_stream_queued_) {
@@ -203,6 +215,9 @@ void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
 CacheInsertQueue::~CacheInsertQueue() {
   ASSERT(!watermarked_, "should not have a watermarked status when the queue is destroyed");
   ASSERT(fragments_.empty(), "queue should be empty by the time the destructor is run");
+  ASSERT(
+      !finished_callback_,
+      "finished_callback_ should have been called and cleared by the time the destructor is run");
   insert_context_->onDestroy();
 }
 

@@ -58,6 +58,7 @@ public:
   }
 
   const LookupRequest& request() const { return request_; }
+  const Key& key() const override { return request().key(); }
   void onDestroy() override {}
 
 private:

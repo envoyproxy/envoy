@@ -42,17 +42,32 @@ struct CacheResponseCodeDetailValues {
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
 CacheFilterConfig::CacheFilterConfig(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowed_vary_headers,
+    bool ignore_request_cache_control_header,
+    std::shared_ptr<ThunderingHerdHandler> thundering_herd_handler,
+    Server::Configuration::CommonFactoryContext& context)
+    : vary_allow_list_(allowed_vary_headers, context), time_source_(context.timeSource()),
+      ignore_request_cache_control_header_(ignore_request_cache_control_header),
+      thundering_herd_handler_(std::move(thundering_herd_handler)) {}
+
+CacheFilterConfig::CacheFilterConfig(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     Server::Configuration::CommonFactoryContext& context)
-    : vary_allow_list_(config.allowed_vary_headers(), context), time_source_(context.timeSource()),
-      ignore_request_cache_control_header_(config.ignore_request_cache_control_header()) {}
+    : CacheFilterConfig(config.allowed_vary_headers(), config.ignore_request_cache_control_header(),
+                        ThunderingHerdHandler::create(config.thundering_herd_handler(), context),
+                        context) {}
 
 CacheFilter::CacheFilter(std::shared_ptr<const CacheFilterConfig> config,
                          std::shared_ptr<HttpCache> http_cache)
     : cache_(http_cache), config_(config) {}
 
+void CacheFilter::setFilterState(FilterState state) {
+  ASSERT(filter_state_ != FilterState::Destroyed);
+  filter_state_ = state;
+}
+
 void CacheFilter::onDestroy() {
-  filter_state_ = FilterState::Destroyed;
+  setFilterState(FilterState::Destroyed);
   if (lookup_ != nullptr) {
     lookup_->onDestroy();
   }
@@ -67,6 +82,10 @@ void CacheFilter::onDestroy() {
     insert_queue_->setSelfOwned(std::move(insert_queue_));
     insert_queue_.reset();
   }
+  if (thundering_herd_in_flight_) {
+    config_->thunderingHerdHandler().handleInsertFinished(
+        key_, ThunderingHerdHandler::InsertResult::Failed);
+  }
 }
 
 void CacheFilter::onStreamComplete() {
@@ -80,8 +99,11 @@ void CacheFilter::onStreamComplete() {
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
+  if (filter_state_ == FilterState::Destroyed) {
+    return Http::FilterHeadersStatus::Continue;
+  }
   if (!cache_) {
-    filter_state_ = FilterState::NotServingFromCache;
+    setFilterState(FilterState::NotServingFromCache);
     return Http::FilterHeadersStatus::Continue;
   }
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
@@ -90,13 +112,13 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         debug,
         "CacheFilter::decodeHeaders ignoring request because it has body and/or trailers: {}",
         *decoder_callbacks_, headers);
-    filter_state_ = FilterState::NotServingFromCache;
+    setFilterState(FilterState::NotServingFromCache);
     return Http::FilterHeadersStatus::Continue;
   }
   if (!CacheabilityUtils::canServeRequestFromCache(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
-    filter_state_ = FilterState::NotServingFromCache;
+    setFilterState(FilterState::NotServingFromCache);
     insert_status_ = InsertStatus::NoInsertRequestNotCacheable;
     return Http::FilterHeadersStatus::Continue;
   }
@@ -110,6 +132,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   lookup_ = cache_->makeLookupContext(std::move(lookup_request), *decoder_callbacks_);
 
   ASSERT(lookup_);
+  key_ = lookup_->key();
   getHeaders(headers);
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
 
@@ -138,7 +161,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     ENVOY_BUG(Http::Utility::getResponseStatus(headers) !=
                   Envoy::enumToInt(Http::Code::RequestTimeout),
               "Request timed out while cache lookup was outstanding.");
-    filter_state_ = FilterState::NotServingFromCache;
+    setFilterState(FilterState::NotServingFromCache);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -163,13 +186,19 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
       // The callbacks passed to CacheInsertQueue are all called through the dispatcher,
       // so they're thread-safe. During CacheFilter::onDestroy the queue is given ownership
       // of itself and all the callbacks are cancelled, so they are also filter-destruction-safe.
-      insert_queue_ =
-          std::make_unique<CacheInsertQueue>(cache_, *encoder_callbacks_, std::move(insert_context),
-                                             // Cache aborted callback.
-                                             [this]() {
-                                               insert_queue_ = nullptr;
-                                               insert_status_ = InsertStatus::InsertAbortedByCache;
-                                             });
+      insert_queue_ = std::make_unique<CacheInsertQueue>(
+          cache_, *encoder_callbacks_, std::move(insert_context),
+          // Cache aborted callback.
+          [this]() {
+            insert_queue_ = nullptr;
+            insert_status_ = InsertStatus::InsertAbortedByCache;
+          },
+          [thh = config_->sharedThunderingHerdHandler(), key = key_](bool write_completed) {
+            thh->handleInsertFinished(key, write_completed
+                                               ? ThunderingHerdHandler::InsertResult::Inserted
+                                               : ThunderingHerdHandler::InsertResult::Failed);
+          });
+      thundering_herd_in_flight_ = false;
       // Add metadata associated with the cached response. Right now this is only response_time;
       const ResponseMetadata metadata = {config_->timeSource().systemTime()};
       insert_queue_->insertHeaders(headers, metadata, end_stream);
@@ -180,9 +209,12 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     // insert_status_ remains absl::nullopt if end_stream == false, as we have not completed the
     // insertion yet.
   } else {
+    thundering_herd_in_flight_ = false;
+    config_->thunderingHerdHandler().handleInsertFinished(
+        key_, ThunderingHerdHandler::InsertResult::NotCacheable);
     insert_status_ = InsertStatus::NoInsertResponseNotCacheable;
   }
-  filter_state_ = FilterState::NotServingFromCache;
+  setFilterState(FilterState::NotServingFromCache);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -300,6 +332,11 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
                                   filter_state));
   }
   return LookupStatus::Unknown;
+}
+
+void CacheFilter::retryHeaders(Http::RequestHeaderMap& request_headers) {
+  thundering_herd_in_flight_ = false;
+  getHeaders(request_headers);
 }
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
@@ -422,10 +459,14 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     handleCacheHit();
     return;
   case CacheEntryStatus::Unusable:
-    decoder_callbacks_->continueDecoding();
+    thundering_herd_in_flight_ = true;
+    config_->thunderingHerdHandler().handleUpstreamRequest(weak_from_this(), decoder_callbacks_,
+                                                           key_, request_headers);
+    // The filter may have been destroyed here, as continueDecoding may have been called during
+    // handleUpstreamRequest.
     return;
   case CacheEntryStatus::LookupError:
-    filter_state_ = FilterState::NotServingFromCache;
+    setFilterState(FilterState::NotServingFromCache);
     insert_status_ = InsertStatus::NoInsertLookupError;
     decoder_callbacks_->continueDecoding();
     return;
@@ -467,6 +508,11 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
       ? decoder_callbacks_->encodeData(*body, end_stream)
       : encoder_callbacks_->addEncodedData(*body, true);
 
+  // Filter can be destroyed during encodeData.
+  if (filter_state_ == FilterState::Destroyed) {
+    return;
+  }
+
   if (!remaining_ranges_.empty()) {
     getBody();
   } else if (response_has_trailers_) {
@@ -485,15 +531,23 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   }
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
+    // Filter can potentially be destroyed during encodeTrailers.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
   } else {
     Http::ResponseTrailerMap& response_trailers = encoder_callbacks_->addEncodedTrailers();
+    // Filter can potentially be destroyed during addEncodedTrailers.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
     response_trailers = std::move(*trailers);
   }
   finalizeEncodingCachedResponse();
 }
 
 void CacheFilter::handleCacheHit() {
-  filter_state_ = FilterState::DecodeServingFromCache;
+  setFilterState(FilterState::DecodeServingFromCache);
   insert_status_ = InsertStatus::NoInsertCacheHit;
   encodeCachedResponse();
 }
@@ -505,7 +559,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
     return;
   }
   if (!lookup_result_->range_details_->satisfiable_) {
-    filter_state_ = FilterState::DecodeServingFromCache;
+    setFilterState(FilterState::DecodeServingFromCache);
     insert_status_ = InsertStatus::NoInsertCacheHit;
     lookup_result_->headers_->setStatus(
         static_cast<uint64_t>(Envoy::Http::Code::RangeNotSatisfiable));
@@ -532,7 +586,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
     return;
   }
 
-  filter_state_ = FilterState::DecodeServingFromCache;
+  setFilterState(FilterState::DecodeServingFromCache);
   insert_status_ = InsertStatus::NoInsertCacheHit;
 
   lookup_result_->headers_->setStatus(static_cast<uint64_t>(Envoy::Http::Code::PartialContent));
@@ -549,7 +603,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
 }
 
 void CacheFilter::handleCacheHitWithValidation(Envoy::Http::RequestHeaderMap& request_headers) {
-  filter_state_ = FilterState::ValidatingCachedResponse;
+  setFilterState(FilterState::ValidatingCachedResponse);
   injectValidationHeaders(request_headers);
   decoder_callbacks_->continueDecoding();
 }
@@ -565,7 +619,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   // Check whether the cached entry should be updated before modifying the 304 response.
   const bool should_update_cached_entry = shouldUpdateCachedEntry(response_headers);
 
-  filter_state_ = FilterState::EncodeServingFromCache;
+  setFilterState(FilterState::EncodeServingFromCache);
 
   // Replace the 304 response status code with the cached status code.
   response_headers.setStatus(lookup_result_->headers_->getStatusValue());
@@ -677,9 +731,12 @@ void CacheFilter::encodeCachedResponse() {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
                                       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
   }
   if (filter_state_ == FilterState::EncodeServingFromCache && is_head_request_) {
-    filter_state_ = FilterState::ResponseServedFromCache;
+    setFilterState(FilterState::ResponseServedFromCache);
     return;
   }
   if (lookup_result_->content_length_ > 0 && !is_head_request_) {
@@ -698,8 +755,12 @@ void CacheFilter::finalizeEncodingCachedResponse() {
     // encodeHeaders returned StopIteration waiting for finishing encoding the cached response --
     // continue encoding.
     encoder_callbacks_->continueEncoding();
+    // Filter can potentially be destroyed during continueEncoding.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
   }
-  filter_state_ = FilterState::ResponseServedFromCache;
+  setFilterState(FilterState::ResponseServedFromCache);
 }
 
 LookupStatus CacheFilter::lookupStatus() const {
