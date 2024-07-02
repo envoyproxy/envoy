@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
+        "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
