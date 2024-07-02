@@ -27,10 +27,10 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 #include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
-#include ""
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"

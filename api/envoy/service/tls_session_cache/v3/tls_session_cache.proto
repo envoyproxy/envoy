@@ -17,7 +17,7 @@ service TlsSessionCacheService {
   }
 }
 
-enum Type {
+enum TYPE {
   // The request type to store a session to the cache.
   STORE = 0;
 
@@ -26,7 +26,7 @@ enum Type {
 }
 
 message TlsSessionRequest {
-  Type type = 1;
+  TYPE type = 1;
 
   // The TLS session id
   string session_id = 2;
@@ -35,7 +35,7 @@ message TlsSessionRequest {
 }
 
 message TlsSessionResponse {
-  enum Code {
+  enum CODE {
     // The response code to notify that the session id is added .
     OK = 0;
 
@@ -46,9 +46,9 @@ message TlsSessionResponse {
     NOT_FOUND = 2;
   }
 
-  Type type = 1;
+  TYPE type = 1;
 
-  Code code = 2;
+  CODE code = 2;
 
   string session_id = 3;
 

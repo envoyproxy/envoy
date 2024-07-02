@@ -78,12 +78,12 @@ void GrpcClientImpl::onSuccess(
   if (response->type() == envoy::service::tls_session_cache::v3::FETCH) {
     // Copy the session data into the provided buffer.
     switch (response->code()) {
-    case envoy::service::tls_session_cache::v3::TlsSessionResponse_Code_NOT_FOUND: {
+    case envoy::service::tls_session_cache::v3::TlsSessionResponse_CODE_NOT_FOUND: {
       ENVOY_LOG(debug, "Session not found, set session cache index");
       SSL_set_ex_data(ssl_, index_, static_cast<void*>(callbacks_));
       break;
     }
-    case envoy::service::tls_session_cache::v3::TlsSessionResponse_Code_OK: {
+    case envoy::service::tls_session_cache::v3::TlsSessionResponse_CODE_OK: {
       ENVOY_LOG(debug, "fetching session succeed");
       auto len = response->session_data().length();
       if (len > 0) {
@@ -120,11 +120,11 @@ void GrpcClientImpl::onSuccess(
     // The response is a STORE response, which means the session was successfully stored.
     // Nothing to do here.
     switch (response->code()) {
-    case envoy::service::tls_session_cache::v3::TlsSessionResponse_Code_OK: {
+    case envoy::service::tls_session_cache::v3::TlsSessionResponse_CODE_OK: {
       ENVOY_LOG(debug, "Session stored successfully");
       break;
     }
-    case envoy::service::tls_session_cache::v3::TlsSessionResponse_Code_ALEADY_EXIST: {
+    case envoy::service::tls_session_cache::v3::TlsSessionResponse_CODE_ALEADY_EXIST: {
       ENVOY_LOG(debug, "Session already exists");
       break;
     }
