@@ -547,9 +547,9 @@ message HttpConnectionManager {
   // race with the final GOAWAY frame. During this grace period, Envoy will
   // continue to accept new streams. After the grace period, a final GOAWAY
   // frame is sent and Envoy will start refusing new streams. Draining occurs
-  // both when a connection hits the idle timeout or during general server
-  // draining. The default grace period is 5000 milliseconds (5 seconds) if this
-  // option is not specified.
+  // for a connection when there are no active streams and the idle timeout
+  // is reached, or during general server draining. The default grace period is
+  // 5000 milliseconds (5 seconds) if this option is not specified.
   google.protobuf.Duration drain_timeout = 12;
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
