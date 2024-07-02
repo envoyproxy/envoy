@@ -197,6 +197,9 @@ TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) 
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(500);
+}
 TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }

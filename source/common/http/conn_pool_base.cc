@@ -177,6 +177,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   case StreamResetReason::RemoteRefusedStreamReset:
   case StreamResetReason::Overflow:
   case StreamResetReason::ConnectError:
+  case StreamResetReason::Http1PrematureUpstreamHalfClose:
     break;
   }
 }

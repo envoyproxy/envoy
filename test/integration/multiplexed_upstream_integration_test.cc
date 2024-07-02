@@ -78,6 +78,10 @@ TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestCo
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(400);
+}
+
 TEST_P(MultiplexedUpstreamIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }

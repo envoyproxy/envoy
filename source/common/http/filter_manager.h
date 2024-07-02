@@ -657,7 +657,10 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_) << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
+       << DUMP_MEMBER(state_.remote_decode_complete_) << DUMP_MEMBER(state_.remote_encode_complete_)
+       << DUMP_MEMBER(state_.encoder_end_stream_) << DUMP_MEMBER(state_.stream_closed_)
+       << DUMP_MEMBER(state_.should_stop_decoding_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -748,6 +751,7 @@ public:
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
     state_.remote_decode_complete_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
+    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -758,6 +762,7 @@ public:
   void decodeData(Buffer::Instance& data, bool end_stream) {
     state_.remote_decode_complete_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -767,6 +772,7 @@ public:
   void decodeTrailers(RequestTrailerMap& trailers) {
     state_.remote_decode_complete_ = true;
     decodeTrailers(nullptr, trailers);
+    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -782,6 +788,8 @@ public:
    * @param end_stream whether encoding is complete.
    */
   void maybeEndEncode(bool end_stream);
+
+  void checkAndCloseStreamIfFullyClosed();
 
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -862,21 +870,36 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
+  void stopDecoding() { state_.should_stop_decoding_ = true; }
+
 protected:
   struct State {
     State()
-        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
-          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
-          is_grpc_request_(false), non_100_response_headers_encoded_(false),
-          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
-          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
+        : remote_decode_complete_(false), remote_encode_complete_(false),
+          encoder_end_stream_(false), local_complete_(false), has_1xx_headers_(false),
+          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
+          saw_downstream_reset_(false), stream_closed_(false), should_stop_decoding_(false) {}
     uint32_t filter_call_state_{0};
 
-    bool remote_decode_complete_ : 1;
-    bool remote_encode_complete_ : 1;
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
+    bool remote_decode_complete_ : 1; // Set when decoder filter chain iteration has completed. All
+                                      // decoder filters have completed and end_stream was observed.
+    bool remote_encode_complete_ : 1; // Set when encoder filter chain iteration has completed. All
+                                      // decoder filters have completed and end_stream was observed.
+    // TODO(yanavlasov): always use encoder_end_stream_ for tracking end_stream state during encoder
+    // filter iteration.
+    bool encoder_end_stream_ : 1; // This is set the first time the end_stream is observed during
+                                  // encoder filter chain iteration and used only to set the
+                                  // end_stream flag when resuming encoder filter chain iteration.
+                                  // It is only used when the
+                                  // `allow_multiplexed_upstream_half_close` runtime flag is true.
+    bool local_complete_ : 1; // This indicates that request is complete prior to filter processing.
+                              // This flag terminates decoder filter chain iteration.
+                              // It is also used to track the `end_stream` state during encoder
+                              // filter chain iteration when `allow_multiplexed_upstream_half_close`
+                              // runtime flag is false. A filter can still stop the stream from
+                              // being complete as seen by the codec.
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
     bool has_1xx_headers_ : 1;
@@ -893,6 +916,11 @@ protected:
     bool decoder_filter_chain_aborted_ : 1;
     bool encoder_filter_chain_aborted_ : 1;
     bool saw_downstream_reset_ : 1;
+    bool stream_closed_ : 1; // Set when both remote_decode_complete_ and remote_encode_complete_ is
+                             // true observed for the first time and prevents ending the stream
+                             // multiple times. Only set when allow_upstream_half_close is enabled.
+    bool should_stop_decoding_ : 1; // Set to indicate that decoding on the stream should be stopped
+                                    // due to either local reply or error response from the server.
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
