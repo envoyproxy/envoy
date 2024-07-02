@@ -29,6 +29,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:metadata_lib",

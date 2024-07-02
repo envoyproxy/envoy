@@ -1249,6 +1249,9 @@ UDP
   * UdpPeriodic - On any UDP Proxy filter periodic log record.
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
 
+%UNIQUE_ID%
+   A unique identifier (UUID) that is generated dynamically.
+
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.
