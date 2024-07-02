@@ -18,19 +18,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-private const val ASSERTION_FILTER_TEXT_PROTO =
-  """
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-  match_config {
-    http_request_generic_body_match: {
-      patterns: {
-        string_match: 'request body'
-      }
-    }
-  }
-}
-"""
-
 @RunWith(RobolectricTestRunner::class)
 class SendDataTest {
   init {
@@ -58,12 +45,36 @@ class SendDataTest {
   @Test
   fun `successful sending data`() {
     val expectation = CountDownLatch(1)
+
+    val string_match =
+      io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch.GenericTextMatch
+        .newBuilder()
+        .setStringMatch("request body")
+        .build()
+    val match =
+      io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch.newBuilder()
+        .addPatterns(string_match)
+        .build()
+    val match_config =
+      io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate.newBuilder()
+        .setHttpRequestGenericBodyMatch(match)
+        .build()
+    val config_proto =
+      envoymobile.extensions.filters.http.assertion.Filter.Assertion.newBuilder()
+        .setMatchConfig(match_config)
+        .build()
+    var any_proto =
+      com.google.protobuf.Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
+        .setValue(config_proto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
+        .addNativeFilter("envoy.filters.http.assertion", String(any_proto.toByteArray()))
         .build()
 
     val client = engine.streamClient()
