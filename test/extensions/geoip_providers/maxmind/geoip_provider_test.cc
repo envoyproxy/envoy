@@ -380,6 +380,55 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   TestEnvironment::renameFile(city_db_path + "1", city_db_path);
 }
 
+TEST_F(GeoipProviderTest, DbReloadError) {
+  constexpr absl::string_view config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+    city_db_path: {}
+  )EOF";
+  std::string city_db_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb");
+  std::string reloaded_invalid_city_db_path =
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/extensions/geoip_providers/maxmind/test_data/"
+                                  "libmaxminddb-offset-integer-overflow.mmdb");
+  const std::string formatted_config =
+      fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
+  initializeProvider(formatted_config);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(3, captured_lookup_response_.size());
+  const auto& city_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Boxford", city_it->second);
+  TestEnvironment::renameFile(city_db_path, city_db_path + "1");
+  TestEnvironment::renameFile(reloaded_invalid_city_db_path, city_db_path);
+  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  // On mmdb reload error the old mmdb instance should be used for subsequent lookup requests.
+  expectReloadStats("city_db", 0, 1);
+  captured_lookup_response_.clear();
+  EXPECT_EQ(0, captured_lookup_response_.size());
+  remote_address = Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
+  auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
+  EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
+  const auto& city1_it = captured_lookup_response_.find("x-geo-city");
+  EXPECT_EQ("Boxford", city1_it->second);
+  // Clean up modifications to mmdb file names.
+  TestEnvironment::renameFile(city_db_path, reloaded_invalid_city_db_path);
+  TestEnvironment::renameFile(city_db_path + "1", city_db_path);
+}
+
 using GeoipProviderDeathTest = GeoipProviderTest;
 
 TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {

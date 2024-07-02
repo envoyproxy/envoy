@@ -210,8 +210,7 @@ void GeoipProvider::lookupInAsnDb(
     RELEASE_ASSERT(isp_db_ptr, "Maxmind asn database must be initialised for performing lookups");
     auto isp_db = isp_db_ptr.get();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-        &mmdb_error);
+        isp_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
@@ -240,7 +239,7 @@ void GeoipProvider::lookupInAnonDb(
     RELEASE_ASSERT(anon_db_ptr, "Maxmind anon database must be initialised for performing lookups");
     auto anon_db = anon_db_ptr.get();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-       anon_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        anon_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
         &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
@@ -301,12 +300,15 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
   if (reloaded_db) {
     if (db_type == CITY_DB_TYPE) {
       updateCityDb(reloaded_db);
+      // synchronizer_.syncPoint("mmdb_city_reload_pre_complete");
       config_->incDbReloadSuccess(db_type);
     } else if (db_type == ISP_DB_TYPE) {
       updateIspDb(reloaded_db);
+      // synchronizer_.syncPoint("mmdb_isp_reload_pre_complete");
       config_->incDbReloadSuccess(db_type);
     } else if (db_type == ANON_DB_TYPE) {
       updateAnonDb(reloaded_db);
+      // synchronizer_.syncPoint("mmdb_anon_reload_pre_complete");
       config_->incDbReloadSuccess(db_type);
     } else {
       ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
