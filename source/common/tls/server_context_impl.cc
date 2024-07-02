@@ -27,10 +27,10 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 #include "source/common/tls/cert_validator/factory.h"
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
+#include ""
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
@@ -182,9 +182,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     if (tls_session_cache_client_ != nullptr) {
       int mode = SSL_CTX_get_session_cache_mode(ctx.ssl_ctx_.get());
       ENVOY_LOG(info, "ssl session cache mode: {:x}", mode);
-
-      // SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(), mode |
-      // SSL_SESS_CACHE_NO_INTERNAL_STORE);
 
       SSL_CTX_sess_set_new_cb(ctx.ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
         (void)ssl;

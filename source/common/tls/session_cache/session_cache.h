@@ -42,7 +42,7 @@ public:
   virtual ~Client() = default;
 
   /**
-   * Request to store/fetchdd a TLS session to/from remote cache.
+   * Request to store/fetch a TLS session to/from remote cache.
    * NOTE: It is possible for the completion callback to be called immediately on the same stack
    *       frame. Calling code should account for this.
    * @param callbacks supplies the completion callbacks.
