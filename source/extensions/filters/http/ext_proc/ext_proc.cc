@@ -343,7 +343,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(true);
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options);
+        client_->start(*this, config_with_hash_key_, options, decoder_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called

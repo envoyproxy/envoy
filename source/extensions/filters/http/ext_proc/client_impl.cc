@@ -11,24 +11,30 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
                                                          Stats::Scope& scope)
     : client_manager_(client_manager), scope_(scope) {}
 
-ExternalProcessorStreamPtr
-ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
-                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                   const Http::AsyncClient::StreamOptions& options) {
+ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
+    ExternalProcessorCallbacks& callbacks,
+    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+    const Http::AsyncClient::StreamOptions& options,
+    Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) {
   auto client_or_error =
       client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
   THROW_IF_STATUS_NOT_OK(client_or_error, throw);
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(client_or_error.value());
-  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, options);
+  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, options,
+                                             decoder_watermark_callbacks);
 }
 
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options) {
+    ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
+    Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) {
   auto stream =
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
   if (stream->startStream(std::move(client), options)) {
+    if (stream->grpcSidestreamFlowControl()) {
+      stream->stream_->setWatermarkCallbacks(*decoder_watermark_callbacks);
+    }
     return stream;
   }
   // Return nullptr on the start failure.
@@ -56,6 +62,9 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
 bool ExternalProcessorStreamImpl::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
+    if (grpc_side_stream_flow_control_) {
+      stream_.removeWatermarkCallbacks();
+    }
     stream_.closeStream();
     stream_closed_ = true;
     stream_.resetStream();

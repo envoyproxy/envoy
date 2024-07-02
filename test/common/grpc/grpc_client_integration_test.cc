@@ -19,23 +19,23 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EnvoyGrpcFlowControlTest,
                          EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
-  GrpcClientIntegrationTestBase::initialize(0);
+  // Configure the connection buffer limit to 1KB
+  connection_buffer_limits_ = 1024;
+  // Create large request string that will trigger watermark given buffer limit above.
+  std::string large_request = std::string(64 * 1024, 'a');
+
+  initialize();
   auto stream = createStream(empty_metadata_);
 
   testing::StrictMock<Http::MockStreamDecoderFilterCallbacks> watermark_callbacks;
 
-  // TODO(tyxia) Uncomment this section in https://github.com/envoyproxy/envoy/pull/34769
-  // Registering a new watermark callback should note that the high watermark
-  // has already been hit.
-  // stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
+  // Registering the new watermark callback.
+  stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
+  // Expect that flow control kicks in and watermark calls are triggered.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
 
-  // EXPECT_CALL(watermark_callbacks,
-  //             onDecoderFilterAboveWriteBufferHighWatermark());
-  // EXPECT_CALL(watermark_callbacks,
-  //             onDecoderFilterBelowWriteBufferLowWatermark());
-
-  // Create the send request.
-  std::string large_request = std::string(64 * 1024, 'a');
+  // Create send request with large request string.
   helloworld::HelloRequest request_msg;
   request_msg.set_name(large_request);
 

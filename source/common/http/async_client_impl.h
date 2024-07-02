@@ -128,7 +128,7 @@ public:
   }
 
   void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) override {
-    ASSERT(!watermark_callbacks_);
+    ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
       watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
@@ -136,7 +136,7 @@ public:
   }
 
   void removeWatermarkCallbacks() override {
-    ASSERT(watermark_callbacks_);
+    ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
       watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
     }

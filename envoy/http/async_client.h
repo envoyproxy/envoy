@@ -189,12 +189,13 @@ public:
      * Register a callback to be called when high/low write buffer watermark events occur on the
      * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
      * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
-     * will ASSERT-fail.
+     * will trigger ENVOY_BUG.
      */
     virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
 
     /***
-     * Remove previously set watermark callbacks.
+     * Remove previously set watermark callbacks. If there's no watermark callback registered, this
+     * method will trigger ENVOY_BUG.
      */
     virtual void removeWatermarkCallbacks() PURE;
 
