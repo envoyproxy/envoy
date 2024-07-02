@@ -766,6 +766,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         can_use_http3, false /*enable_half_close*/);
+  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() && ensure_connection_retry_) {
+    upstream_request->addUpstreamCallbacks(*this);
+    increased_retry_shadow_buffer_limit_until_got_connection_ = true;
+    // Set to the maximum between the current limit and the cluster connection buffer limit plus
+    // 1 MiB. That is to ensure we do not reach this limit until the connection get establish, the
+    // upstream request will pause the read on the downstream connection but this is a soft limit,
+    // so it might goes above this limit.
+    retry_connection_failure_buffer_limit_ = std::max(
+        retry_shadow_buffer_limit_, std::min(cluster_->perConnectionBufferLimitBytes() + 1048576,
+                                             std::numeric_limits<uint32_t>::max()));
+  }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (streaming_shadows_) {
@@ -859,6 +870,34 @@ void Filter::sendNoHealthyUpstreamResponse() {
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
+void Filter::giveUpRetryAndShadow() {
+  cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
+  retry_state_.reset();
+  active_shadow_policies_.clear();
+  request_buffer_overflowed_ = true;
+}
+
+void Filter::onUpstreamConnectionEstablished() {
+  ENVOY_LOG(trace, "Got connection with upstream.");
+  increased_retry_shadow_buffer_limit_until_got_connection_ = false;
+  if (!request_buffer_overflowed_ &&
+      getLength(callbacks_->decodingBuffer()) > retry_shadow_buffer_limit_) {
+    ENVOY_LOG(debug,
+              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
+              "up on the retry/shadow.",
+              getLength(callbacks_->decodingBuffer()), retry_shadow_buffer_limit_);
+    // Disabling retry and shadow: the request is to big.
+    giveUpRetryAndShadow();
+    if (getLength(callbacks_->decodingBuffer()) > callbacks_->decoderBufferLimit()) {
+      ENVOY_LOG(trace,
+                "Increasing decoding buffer limit to enable read on downstream connection. new "
+                "limit={} old limit={}.",
+                getLength(callbacks_->decodingBuffer()), retry_shadow_buffer_limit_);
+      callbacks_->setDecoderBufferLimit(getLength(callbacks_->decodingBuffer()));
+    }
+  }
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
@@ -871,16 +910,17 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                    (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
-      getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
+      ((!increased_retry_shadow_buffer_limit_until_got_connection_ &&
+        getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) ||
+       (increased_retry_shadow_buffer_limit_until_got_connection_ &&
+        getLength(callbacks_->decodingBuffer()) + data.length() >
+            retry_connection_failure_buffer_limit_))) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
               "up on the retry/shadow.",
               getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
-    cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
-    retry_state_.reset();
     buffering = false;
-    active_shadow_policies_.clear();
-    request_buffer_overflowed_ = true;
+    giveUpRetryAndShadow();
 
     // If we had to abandon buffering and there's no request in progress, abort the request and
     // clean up. This happens if the initial upstream request failed, and we are currently waiting
@@ -2010,6 +2050,10 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         can_use_http3, false /*enable_tcp_tunneling*/);
+  if (retry_state_ && retry_state_->shouldRetryOnConnectionFailure() &&
+      increased_retry_shadow_buffer_limit_until_got_connection_ && ensure_connection_retry_) {
+    upstream_request->addUpstreamCallbacks(*this);
+  }
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

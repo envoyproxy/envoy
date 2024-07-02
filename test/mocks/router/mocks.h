@@ -221,6 +221,7 @@ public:
   MOCK_METHOD(RetryStatus, shouldRetryReset,
               (const Http::StreamResetReason reset_reason, Http3Used alternate_protocol_used,
                DoRetryResetCallback callback));
+  MOCK_METHOD(bool, shouldRetryOnConnectionFailure, (), (const));
   MOCK_METHOD(RetryStatus, shouldHedgeRetryPerTryTimeout, (DoRetryCallback callback));
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
