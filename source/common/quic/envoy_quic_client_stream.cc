@@ -257,7 +257,7 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-                      absl::string_view());
+                      quic::QuicRstStreamErrorCodeToString(error.internal_code()));
   }
   return true;
 }
@@ -355,7 +355,8 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   quic::QuicSpdyClientStream::OnStreamReset(frame);
   ASSERT(read_side_closed());
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code), absl::string_view());
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
+                      quic::QuicRstStreamErrorCodeToString(frame.error_code));
   }
 }
 
@@ -364,7 +365,7 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-                    absl::string_view());
+                    quic::QuicRstStreamErrorCodeToString(error.internal_code()));
   if (session()->connection()->connected()) {
     quic::QuicSpdyClientStream::ResetWithError(error);
   }
