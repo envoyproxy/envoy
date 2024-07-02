@@ -15,7 +15,8 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     urls.push_back(argv[i]);
   }
-  client.fetch(urls);
+  std::vector<Envoy::Http::Protocol> protocols;
+  client.fetch(urls, /* quic_hints=*/{}, /* protocols= */ protocols);
 
   exit(0);
 }

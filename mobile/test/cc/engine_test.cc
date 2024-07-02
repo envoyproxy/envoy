@@ -190,4 +190,31 @@ TEST(EngineTest, TerminateWithoutWaitingForOnEngineRunning) {
   engine->terminate();
 }
 
+TEST(EngineTest, EnableSetIpVersionToRemoveWithDnsPreresolveHostnames) {
+  absl::Notification engine_running;
+  auto engine_callbacks = std::make_unique<EngineCallbacks>();
+  engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
+
+  Platform::EngineBuilder engine_builder;
+  EXPECT_ENVOY_BUG(engine_builder.setLogLevel(Logger::Logger::trace)
+                       .addRuntimeGuard("dns_cache_set_ip_version_to_remove", true)
+                       .addDnsPreresolveHostnames({"www.google.com"})
+                       .build(),
+                   "Preresolve hostnames feature is not supported when "
+                   "'dns_cache_set_ip_version_to_remove' is enabled.");
+}
+
+TEST(EngineTest, DisableSetIpVersionToRemoveWithDnsPreresolveHostnames) {
+  absl::Notification engine_running;
+  auto engine_callbacks = std::make_unique<EngineCallbacks>();
+  engine_callbacks->on_engine_running_ = [&] { engine_running.Notify(); };
+
+  Platform::EngineBuilder engine_builder;
+  auto engine = engine_builder.setLogLevel(Logger::Logger::trace)
+                    .addRuntimeGuard("dns_cache_set_ip_version_to_remove", false)
+                    .addDnsPreresolveHostnames({"www.google.com"})
+                    .build();
+  engine->terminate();
+}
+
 } // namespace Envoy
