@@ -265,6 +265,7 @@ test:mobile-remote-ci-cc-full-protos-enabled --define=envoy_full_protos=enabled
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
 
+# TODO(alyssar) remove in a follow-up PR
 build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-swift --config=mobile-test-ios
 build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False

@@ -661,6 +661,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",
+        "//envoy/server:factory_context_interface",
         "@com_github_google_quiche//:quic_platform_socket_address",
     ],
 )
