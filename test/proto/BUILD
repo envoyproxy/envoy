@@ -14,8 +14,8 @@ exports_files(["bookstore.proto"])
 envoy_proto_library(
     name = "deprecated_proto",
     srcs = [":deprecated.proto"],
-    deps = ["@envoy_api//envoy/annotations:pkg"],
     java = False,
+    deps = ["@envoy_api//envoy/annotations:pkg"],
 )
 
 envoy_proto_library(
@@ -68,9 +68,9 @@ envoy_proto_descriptor(
 envoy_proto_library(
     name = "sensitive_proto",
     srcs = [":sensitive.proto"],
+    java = False,
     deps = [
         "@com_github_cncf_xds//udpa/annotations:pkg",
         "@com_github_cncf_xds//xds/type/v3:pkg",
     ],
-    java = False,
 )
