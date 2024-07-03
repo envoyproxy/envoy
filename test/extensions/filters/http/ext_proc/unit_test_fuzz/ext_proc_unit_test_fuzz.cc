@@ -94,10 +94,11 @@ DEFINE_PROTO_FUZZER(
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
-  EXPECT_CALL(*client, start(_, _, _))
+  EXPECT_CALL(*client, start(_, _, _, _))
       .WillRepeatedly(Invoke([&](ExternalProcessing::ExternalProcessorCallbacks&,
                                  const Grpc::GrpcServiceConfigWithHashKey&,
-                                 const Envoy::Http::AsyncClient::StreamOptions&)
+                                 const Envoy::Http::AsyncClient::StreamOptions&,
+                                 Envoy::Http::DecoderFilterWatermarkCallbacks*)
                                  -> ExternalProcessing::ExternalProcessorStreamPtr {
         auto stream = std::make_unique<MockStream>();
         EXPECT_CALL(*stream, send(_, _))

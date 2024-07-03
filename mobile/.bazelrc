@@ -29,7 +29,6 @@ build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
-build --define=envoy_mobile_xds=disabled
 build --define=envoy_yaml=disabled
 
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
@@ -79,9 +78,6 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
-# enabled for //test/kotlin/integration:xds_test and
-# //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
-build:mobile-test-android --define=envoy_mobile_xds=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -114,9 +110,6 @@ build:mobile-remote-release-clang-android-publish --config=mobile-remote-release
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
 build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
-
-build:mobile-remote-release-clang-android-publish-xds --config=mobile-remote-release-clang-android-publish
-build:mobile-remote-release-clang-android-publish-xds --define=envoy_mobile_xds=enabled
 
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
@@ -253,10 +246,6 @@ test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
-
-build:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-xds-enabled --define=envoy_mobile_xds=enabled
 
 build:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
 test:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
