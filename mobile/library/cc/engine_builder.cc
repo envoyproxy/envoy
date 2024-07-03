@@ -575,6 +575,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
   dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
       "envoy.network.dns_resolver.apple");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #else
   if (use_cares_) {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
