@@ -296,6 +296,8 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
 
   EXPECT_NE(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DummyDynamicConfigProvider&>(*provider3).subscription());
+  EXPECT_NE(provider1->config<const DummyConfig>().get(),
+            provider3->config<const DummyConfig>().get());
 
   ASSERT_TRUE(dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
                   .subscription()
@@ -722,12 +724,8 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   EXPECT_EQ(
       provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().config_protos_,
       provider2->configProtoInfoVector<test::common::config::DummyConfig>().value().config_protos_);
-  EXPECT_EQ(provider1->configProtoInfoVector<test::common::config::DummyConfig>()
-                .value()
-                .config_protos_[0],
-            provider2->configProtoInfoVector<test::common::config::DummyConfig>()
-                .value()
-                .config_protos_[0]);
+  EXPECT_EQ(provider1->config<const DummyConfig>().get(),
+            provider2->config<const DummyConfig>().get());
   // Validate that the config protos are propagated to the thread local config implementation.
   EXPECT_EQ(provider1->config<const DummyConfig>()->numProtos(), 2);
 
@@ -736,12 +734,8 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "2").ok());
   // NOTE: the config implementation is append only and _does not_ track updates/removals to the
   // config proto set, so the expectation is to double the size of the set.
-  EXPECT_EQ(provider1->configProtoInfoVector<test::common::config::DummyConfig>()
-                .value()
-                .config_protos_[0],
-            provider2->configProtoInfoVector<test::common::config::DummyConfig>()
-                .value()
-                .config_protos_[0]);
+  EXPECT_EQ(provider1->config<const DummyConfig>().get(),
+            provider2->config<const DummyConfig>().get());
   EXPECT_EQ(provider1->config<const DummyConfig>()->numProtos(), 4);
 }
 
