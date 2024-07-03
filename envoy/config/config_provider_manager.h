@@ -59,23 +59,6 @@ public:
                           const OptionalArg& optarg) PURE;
 
   /**
-   * Returns a ConfigProvider associated with a statically specified configuration.
-   * @param config_proto supplies the configuration proto.
-   * @param factory_context is the context to use for the provider.
-   * @param optarg supplies an optional argument with data specific to the concrete class.
-   * @return ConfigProviderPtr a newly allocated static config provider.
-   */
-  virtual ConfigProviderPtr
-  createStaticConfigProvider(const Protobuf::Message& config_proto,
-                             Server::Configuration::ServerFactoryContext& factory_context,
-                             const OptionalArg& optarg) {
-    UNREFERENCED_PARAMETER(config_proto);
-    UNREFERENCED_PARAMETER(factory_context);
-    UNREFERENCED_PARAMETER(optarg);
-    return nullptr;
-  }
-
-  /**
    * Returns a ConfigProvider associated with a statically specified configuration. This is intended
    * to be used when a set of configuration protos is required to build the full configuration.
    * @param config_protos supplies a vector of configuration protos.
@@ -86,12 +69,7 @@ public:
   virtual ConfigProviderPtr
   createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                              Server::Configuration::ServerFactoryContext& factory_context,
-                             const OptionalArg& optarg) {
-    UNREFERENCED_PARAMETER(config_protos);
-    UNREFERENCED_PARAMETER(factory_context);
-    UNREFERENCED_PARAMETER(optarg);
-    return nullptr;
-  }
+                             const OptionalArg& optarg) PURE;
 };
 
 } // namespace Config

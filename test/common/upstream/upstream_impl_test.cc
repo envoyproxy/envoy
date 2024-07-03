@@ -195,12 +195,13 @@ public:
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     if (numerator <= 100) {
-      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
-      EXPECT_EQ(drop_ratio, cluster.dropOverload().value());
+      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+      EXPECT_EQ(drop_ratio, cluster->dropOverload().value());
     } else {
-      EXPECT_THROW_WITH_MESSAGE(
-          StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver),
-          EnvoyException,
+      EXPECT_EQ(
+          StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+              .status()
+              .message(),
           fmt::format("load_balancing_policy.drop_overload_limit runtime key config {} is invalid. "
                       "The valid range is 0~100",
                       numerator));
@@ -243,11 +244,11 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
 
-  cluster.initialize([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  cluster->initialize([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
@@ -272,8 +273,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
-  EXPECT_EQ(0.000035f, cluster.dropOverload().value());
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(0.000035f, cluster->dropOverload().value());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
@@ -298,8 +299,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
-  EXPECT_EQ(0.1f, cluster.dropOverload().value());
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(0.1f, cluster->dropOverload().value());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
@@ -325,9 +326,10 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  EXPECT_THROW_WITH_MESSAGE(
-      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
-      "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
+  EXPECT_EQ(StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+                .status()
+                .message(),
+            "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
@@ -353,8 +355,10 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  EXPECT_THROW_WITH_MESSAGE(
-      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
+  EXPECT_EQ(
+      StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+          .status()
+          .message(),
       "Cluster drop_overloads config is invalid. drop_ratio=2(Numerator 200 / Denominator 100). "
       "The valid range is 0~1.");
 }
@@ -384,9 +388,10 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  EXPECT_THROW_WITH_MESSAGE(
-      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver), EnvoyException,
-      "Cluster drop_overloads config has 2 categories. Envoy only support one.");
+  EXPECT_EQ(StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+                .status()
+                .message(),
+            "Cluster drop_overloads config has 2 categories. Envoy only support one.");
 }
 
 // Drop overload runtime key configuration test
@@ -430,11 +435,11 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
   EXPECT_CALL(initialized, ready());
-  cluster.initialize([&]() -> void { initialized.ready(); });
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  cluster->initialize([&]() -> void { initialized.ready(); });
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 // Resolve zero hosts, while using health checking.
@@ -463,19 +468,19 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  cluster.setHealthChecker(health_checker);
-  cluster.initialize([&]() -> void { initialized.ready(); });
+  cluster->setHealthChecker(health_checker);
+  cluster->initialize([&]() -> void { initialized.ready(); });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "", {});
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
@@ -507,16 +512,16 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher initialized;
 
   // Initialized without completing DNS resolution.
   EXPECT_CALL(initialized, ready());
-  cluster.initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> void { initialized.ready(); });
 
   ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
         return absl::OkStatus();
@@ -588,48 +593,49 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43))
       .Times(AnyNumber());
-  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(43U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("circuit_breakers.name.default.max_pending_requests", 57));
   EXPECT_EQ(57U,
-            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+            cluster->info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
-  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(50U, cluster->info()->resourceManager(ResourcePriority::Default).requests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
-  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(10U, cluster->info()->resourceManager(ResourcePriority::Default).retries().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
-  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(1U, cluster->info()->resourceManager(ResourcePriority::High).connections().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
-  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(2U, cluster->info()->resourceManager(ResourcePriority::High).pendingRequests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(3U, cluster->info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
-  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
+  EXPECT_EQ(4U, cluster->info()->resourceManager(ResourcePriority::High).retries().max());
+  EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
+  EXPECT_EQ(0U, cluster->info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
-            cluster.info()->http1Settings().header_key_format_);
-  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
-  EXPECT_EQ(990U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
+            cluster->info()->http1Settings().header_key_format_);
+  EXPECT_EQ(1U,
+            cluster->info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
+  EXPECT_EQ(990U, cluster->info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
 
-  cluster.info()->trafficStats()->upstream_rq_total_.inc();
+  cluster->info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
-  EXPECT_FALSE(cluster.info()->maintenanceMode());
+  EXPECT_FALSE(cluster->info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
         return absl::OkStatus();
       });
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -638,9 +644,9 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
@@ -649,7 +655,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
@@ -658,7 +664,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -667,7 +673,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -676,17 +682,17 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
-  EXPECT_EQ(1UL,
-            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
-  for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
-    EXPECT_EQ(cluster.info().get(), &host->cluster());
+  for (const HostSharedPtr& host : cluster->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    EXPECT_EQ(cluster->info().get(), &host->cluster());
   }
 
   // Empty response. With successful but empty response the host list deletes the address.
@@ -698,7 +704,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({}));
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Empty response. With failing but empty response the host list does not delete the address.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -709,7 +715,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                           TestUtility::makeDnsResponse({}));
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver_);
@@ -723,7 +729,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 
   // Test per host connection limits: as it's set to 1, the host can create connections initially.
-  auto& host = cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  auto& host = cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
   EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
   // If one connection exists to that host, canCreateConnection will fail.
   host->stats().cx_active_.inc();
@@ -756,13 +762,13 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  cluster.setHealthChecker(health_checker);
-  cluster.initialize([&]() -> void {});
+  cluster->setHealthChecker(health_checker);
+  cluster->initialize([&]() -> void {});
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
@@ -773,7 +779,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   // clear the flag to simulate that these endpoints have been successfully health
   // checked.
   {
-    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
 
     for (const auto& host : hosts) {
@@ -787,7 +793,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
-  const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(1UL, hosts.size());
 }
 
@@ -816,14 +822,14 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  cluster.setHealthChecker(health_checker);
+  cluster->setHealthChecker(health_checker);
   ReadyWatcher initialized;
-  cluster.initialize([&initialized]() { initialized.ready(); });
+  cluster->initialize([&initialized]() { initialized.ready(); });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
@@ -834,7 +840,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   // clear the flag to simulate that these endpoints have been successfully health
   // checked.
   {
-    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
 
     for (size_t i = 0; i < 2; ++i) {
@@ -853,7 +859,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   {
-    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
@@ -865,7 +871,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   // Unlike EDS we will not remove if HC is failing but will wait until the next polling interval.
   // This may change in the future.
   {
-    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
   }
 }
@@ -895,14 +901,14 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  cluster.setHealthChecker(health_checker);
+  cluster->setHealthChecker(health_checker);
   ReadyWatcher initialized;
-  cluster.initialize([&initialized]() { initialized.ready(); });
+  cluster->initialize([&initialized]() { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -911,14 +917,14 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   {
-    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-    EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
-    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+    EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+    EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
   }
 
   // Re-resolve the DNS name with only one record, we should have 1 host.
@@ -926,13 +932,13 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   {
-    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(1UL, hosts.size());
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-    EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
-    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+    EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+    EXPECT_EQ(1UL, cluster->info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
   }
 }
 
@@ -1009,43 +1015,43 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
-  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_EQ(43U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("circuit_breakers.name.default.max_pending_requests", 57));
   EXPECT_EQ(57U,
-            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+            cluster->info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
-  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(50U, cluster->info()->resourceManager(ResourcePriority::Default).requests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
-  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(10U, cluster->info()->resourceManager(ResourcePriority::Default).retries().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
-  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(1U, cluster->info()->resourceManager(ResourcePriority::High).connections().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
-  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(2U, cluster->info()->resourceManager(ResourcePriority::High).pendingRequests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(3U, cluster->info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
-  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
+  EXPECT_EQ(4U, cluster->info()->resourceManager(ResourcePriority::High).retries().max());
+  EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
+  EXPECT_EQ(0U, cluster->info()->http2Options().hpack_table_size().value());
 
-  cluster.info()->trafficStats()->upstream_rq_total_.inc();
+  cluster->info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
-  EXPECT_FALSE(cluster.info()->maintenanceMode());
+  EXPECT_FALSE(cluster->info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
         return absl::OkStatus();
       });
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1054,15 +1060,15 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
-  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
-  EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+  EXPECT_TRUE(cluster->prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
+  EXPECT_EQ(100, cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->coarseHealth());
+            cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->coarseHealth());
 
   // This is the first time we received an update for localhost1, we expect to rebuild.
   EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
@@ -1074,9 +1080,9 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
-  EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_TRUE(cluster->prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
+  EXPECT_EQ(100, cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   // Since no change for localhost1, we expect no rebuild.
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
@@ -1088,9 +1094,9 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
-  EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_TRUE(cluster->prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
+  EXPECT_EQ(100, cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   // Since no change for localhost1, we expect no rebuild.
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_no_rebuild").value());
@@ -1100,7 +1106,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
 
-  // We received a new set of hosts for localhost2. Should rebuild the cluster.
+  // We received a new set of hosts for localhost2. Should rebuild the cluster->
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver_);
@@ -1119,7 +1125,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1127,13 +1133,13 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
-  EXPECT_EQ(1UL,
-            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   // Make sure that we *don't* de-dup between resolve targets.
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1141,29 +1147,29 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                           TestUtility::makeDnsResponse({"10.0.0.1"}));
 
-  const auto hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  const auto hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002", "10.0.0.1:11002"}),
               ContainerEq(hostListToAddresses(hosts)));
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
-  EXPECT_EQ(1UL,
-            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   // Ensure that all host objects in the host list are unique.
   for (const auto& host : hosts) {
     EXPECT_EQ(1, std::count(hosts.begin(), hosts.end(), host));
   }
 
-  for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
-    EXPECT_EQ(cluster.info().get(), &host->cluster());
+  for (const HostSharedPtr& host : cluster->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    EXPECT_EQ(cluster->info().get(), &host->cluster());
   }
 
   // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
-  auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb2 = cluster->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector& hosts_removed) {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
@@ -1253,16 +1259,16 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
         return absl::OkStatus();
       });
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1271,9 +1277,9 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("localhost1", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
@@ -1282,7 +1288,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
@@ -1291,7 +1297,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1300,7 +1306,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1309,15 +1315,15 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
-  EXPECT_EQ(1UL,
-            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+  EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
-  for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
-    EXPECT_EQ(cluster.info().get(), &host->cluster());
+  for (const HostSharedPtr& host : cluster->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    EXPECT_EQ(cluster->info().get(), &host->cluster());
   }
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1328,7 +1334,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   // Make sure we have multiple priorities.
   EXPECT_THAT(
       std::list<std::string>({"192.168.1.1:11003", "192.168.1.2:11003"}),
-      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[1]->hosts())));
+      ContainerEq(hostListToAddresses(cluster->prioritySet().hostSetsPerPriority()[1]->hosts())));
 
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver_);
@@ -1372,8 +1378,8 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
       false);
 
   EXPECT_THROW_WITH_MESSAGE(
-      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_), EnvoyException,
-      "STRICT_DNS clusters must NOT have a custom resolver name set");
+      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
@@ -1404,9 +1410,9 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
   // Failing response kicks the failure refresh backoff strategy.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -1452,16 +1458,16 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
         return absl::OkStatus();
       });
 
-  cluster.initialize([] {});
+  cluster->initialize([] {});
 
   // TTL is recorded when the DNS response is successful and not empty
   EXPECT_CALL(membership_updated, ready());
@@ -1535,7 +1541,8 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
       false);
 
   EXPECT_THROW_WITH_REGEX(
-      StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver_), EnvoyException,
+      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      EnvoyException,
       R"(the \{hpack_table_size\} HTTP/2 SETTINGS parameter\(s\) can not be configured through)"
       " both");
 }
@@ -3751,9 +3758,9 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  StrictDnsClusterImpl cluster(cluster_config, factory_context, dns_resolver);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
 
-  EXPECT_TRUE(cluster.info()->features() &
+  EXPECT_TRUE(cluster->info()->features() &
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
 }
 
@@ -3961,7 +3968,9 @@ public:
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    return std::make_unique<StrictDnsClusterImpl>(cluster_config_, factory_context, dns_resolver_);
+    return THROW_OR_RETURN_VALUE(
+        StrictDnsClusterImpl::create(cluster_config_, factory_context, dns_resolver_),
+        std::unique_ptr<StrictDnsClusterImpl>);
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
