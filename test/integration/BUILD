@@ -1206,6 +1206,7 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
+        "//source/common/tls:server_context_config_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",

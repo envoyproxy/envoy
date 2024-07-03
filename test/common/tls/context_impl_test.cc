@@ -11,6 +11,7 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/utility.h"
 
