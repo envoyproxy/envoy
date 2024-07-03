@@ -2132,9 +2132,6 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "scoped_rds_lib",
     size = "large",
-    srcs = [
-        "scoped_rds_integration_test.cc",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
