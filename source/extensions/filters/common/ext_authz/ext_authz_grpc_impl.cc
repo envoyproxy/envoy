@@ -115,7 +115,9 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       copyOkResponseMutations(authz_response, ok_response);
     }
   } else if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::PermissionDenied ||
-             response->status().code() == Grpc::Status::WellKnownGrpcStatus::Unauthenticated) {
+             response->status().code() == Grpc::Status::WellKnownGrpcStatus::Unauthenticated ||
+             !Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.process_ext_authz_grpc_error_codes_as_errors")) {
     // The request was explicitly forbidden by the external authz server.
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
