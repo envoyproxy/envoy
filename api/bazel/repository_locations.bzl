@@ -173,6 +173,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         release_date = "2023-12-14",
     ),
+    rules_jvm_external = dict(
+        project_name = "Java Rules for Bazel",
+        project_desc = "Bazel rules for Java",
+        project_url = "https://github.com/bazelbuild/rules_jvm_external",
+        version = "6.1",
+        sha256 = "08ea921df02ffe9924123b0686dc04fd0ff875710bfadb7ad42badb931b0fd50",
+        urls = ["https://github.com/bazelbuild/rules_jvm_external/releases/download/{version}/rules_jvm_external-{version}.tar.gz"],
+        release_date = "2024-10-26",
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_jvm_external/blob/{version}/LICENSE",
+    ),
     envoy_toolshed = dict(
         project_name = "envoy_toolshed",
         project_desc = "Tooling, libraries, runners and checkers for Envoy proxy's CI",
