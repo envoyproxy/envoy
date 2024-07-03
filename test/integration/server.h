@@ -553,7 +553,8 @@ protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
                         const std::string& config_path,
                         std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto)
-      : time_system_(time_system), api_(api), config_path_(config_path), config_proto_(std::move(config_proto)) {}
+      : time_system_(time_system), api_(api), config_path_(config_path),
+        config_proto_(std::move(config_proto)) {}
 
   // Create the running envoy server. This function will call serverReady() when the virtual
   // functions server(), statStore(), and adminAddress() may be called, but before the server
@@ -604,9 +605,10 @@ private:
 // Default implementation of IntegrationTestServer
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
-  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path, bool real_stats = false,
-                            std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
+  IntegrationTestServerImpl(
+      Event::TestTimeSystem& time_system, Api::Api& api, const std::string& config_path,
+      bool real_stats = false,
+      std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
 
   ~IntegrationTestServerImpl() override;
 
