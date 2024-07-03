@@ -788,6 +788,8 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
         } else {
           locationField = null;
         }
+      } else {
+        locationField = null;
       }
       @State
       int desiredNextState =
