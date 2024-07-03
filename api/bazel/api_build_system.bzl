@@ -68,7 +68,8 @@ def api_cc_py_proto_library(
         srcs = [],
         deps = [],
         linkstatic = 0,
-        has_services = 0):
+        has_services = 0,
+        java = True):
     relative_name = ":" + name
     proto_library(
         name = name,
@@ -110,11 +111,12 @@ def api_cc_py_proto_library(
         visibility = ["//visibility:public"],
     )
 
-    native.java_proto_library(
-        name = name + _JAVA_PROTO_SUFFIX,
-        visibility = ["//visibility:public"],
-        deps = [relative_name],
-    )
+    if java:
+      native.java_proto_library(
+          name = name + _JAVA_PROTO_SUFFIX,
+          visibility = ["//visibility:public"],
+          deps = [relative_name],
+      )
 
     # Optionally define gRPC services
     if has_services:

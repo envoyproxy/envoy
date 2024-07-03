@@ -15,16 +15,19 @@ envoy_proto_library(
     name = "deprecated_proto",
     srcs = [":deprecated.proto"],
     deps = ["@envoy_api//envoy/annotations:pkg"],
+    java = False,
 )
 
 envoy_proto_library(
     name = "helloworld_proto",
     srcs = [":helloworld.proto"],
+    java = False,
 )
 
 envoy_proto_library(
     name = "apikeys_proto",
     srcs = [":apikeys.proto"],
+    java = False,
 )
 
 envoy_proto_descriptor(
@@ -43,6 +46,7 @@ envoy_proto_descriptor(
 envoy_proto_library(
     name = "bookstore_proto",
     srcs = [":bookstore.proto"],
+    java = False,
 )
 
 envoy_proto_descriptor(
@@ -68,4 +72,5 @@ envoy_proto_library(
         "@com_github_cncf_xds//udpa/annotations:pkg",
         "@com_github_cncf_xds//xds/type/v3:pkg",
     ],
+    java = False,
 )
