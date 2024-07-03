@@ -47,7 +47,8 @@ public:
   void setSampled(bool sampled) override;
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
-  std::string getTraceIdAsHex() const override;
+  std::string getTraceId() const override;
+  std::string getSpanId() const override;
 
 private:
   datadog::tracing::Optional<datadog::tracing::Span> span_;

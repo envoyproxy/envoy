@@ -266,6 +266,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       listener_init_target_(fmt::format("Listener-init-target {}", name),
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
@@ -400,6 +401,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       // listener_init_target_ is not used during in place update because we expect server started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
@@ -581,7 +583,7 @@ void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Li
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, listener_factory_context_->serverFactoryContext().processContext());
+        validation_visitor_, listener_factory_context_->serverFactoryContext());
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from

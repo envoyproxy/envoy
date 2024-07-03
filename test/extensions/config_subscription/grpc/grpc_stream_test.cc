@@ -377,6 +377,47 @@ TEST_F(GrpcStreamTest, RetryOnRemoteClose) {
   }
 }
 
+// Validate that closeStream disables the retry timer.
+TEST_F(GrpcStreamTest, CloseStreamDisablesRetryTimer) {
+  // TODO(adisuissa): add the test.
+  // Create a gRPC stream object with a timer.
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)));
+
+  // Make random generator deterministic for testing.
+  NiceMock<Random::MockRandomGenerator> random;
+  ON_CALL(random, random()).WillByDefault(Return(27));
+
+  // retry_initial_delay_ms = 25ms, retry_max_delay_ms = 30 ms.
+  setUpCustomBackoffRetryTimer(25, 30, random);
+
+  // Simulate an established stream (note that for xDS-stream only after
+  // receiving a response it implies that the server is available).
+  {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(callbacks_, onStreamEstablished());
+    grpc_stream_->establishNewStream();
+    EXPECT_TRUE(grpc_stream_->grpcStreamAvailable());
+  }
+
+  // Intentionally close the stream (expecting timer disablement).
+  EXPECT_CALL(*grpc_stream_retry_timer, disableTimer());
+  EXPECT_CALL(async_stream_, resetStream());
+  grpc_stream_->closeStream();
+
+  // After closing the stream, it should not be available.
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+
+  // Simulate an establishment failure that will not recreate the timer.
+  EXPECT_CALL(callbacks_, onEstablishmentFailure());
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _)).Times(0);
+  grpc_stream_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable, "");
+  EXPECT_FALSE(grpc_stream_->grpcStreamAvailable());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

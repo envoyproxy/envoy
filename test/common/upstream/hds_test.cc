@@ -625,8 +625,10 @@ TEST_F(HdsTest, TestSocketContext) {
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.
-        socket_matcher = std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
-            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
+        socket_matcher =
+            Envoy::Upstream::TransportSocketMatcherImpl::create(
+                params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope)
+                .value();
 
         // But still use the fake cluster_info_.
         return cluster_info_;
@@ -651,7 +653,7 @@ TEST_F(HdsTest, TestSocketContext) {
   // Check that our match hits.
   HealthCheckerImplBase* health_checker_base = dynamic_cast<HealthCheckerImplBase*>(hcs[0].get());
   const auto match =
-      socket_matcher->resolve(health_checker_base->transportSocketMatchMetadata().get());
+      socket_matcher->resolve(health_checker_base->transportSocketMatchMetadata().get(), nullptr);
   EXPECT_EQ(match.name_, "test_socket");
 }
 
@@ -1114,8 +1116,10 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
             std::make_unique<Network::MockTransportSocketFactory>();
 
         // set socket_matcher object in test scope.
-        socket_matchers.push_back(std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
-            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope));
+        socket_matchers.push_back(
+            Envoy::Upstream::TransportSocketMatcherImpl::create(
+                params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope)
+                .value());
 
         // But still use the fake cluster_info_.
         return cluster_info_;
@@ -1137,8 +1141,8 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   // Check that our fails so it uses default.
   HealthCheckerImplBase* first_health_checker_base =
       dynamic_cast<HealthCheckerImplBase*>(first_hcs[0].get());
-  const auto first_match =
-      socket_matchers[0]->resolve(first_health_checker_base->transportSocketMatchMetadata().get());
+  const auto first_match = socket_matchers[0]->resolve(
+      first_health_checker_base->transportSocketMatchMetadata().get(), nullptr);
   EXPECT_EQ(first_match.name_, "default");
 
   // Create a new Message, this time with a good match.
@@ -1161,8 +1165,8 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   HealthCheckerImplBase* second_health_checker_base =
       dynamic_cast<HealthCheckerImplBase*>(second_hcs[0].get());
   ASSERT_EQ(socket_matchers.size(), 2);
-  const auto second_match =
-      socket_matchers[1]->resolve(second_health_checker_base->transportSocketMatchMetadata().get());
+  const auto second_match = socket_matchers[1]->resolve(
+      second_health_checker_base->transportSocketMatchMetadata().get(), nullptr);
   EXPECT_EQ(second_match.name_, "test_socket");
 
   // Create a new Message, this we leave the transport socket the same but change the health check's
@@ -1190,8 +1194,8 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   // Check that our socket matchers is still a size 2. This is because createClusterInfo(_) is never
   // called again since there was no update to transportSocketMatches.
   ASSERT_EQ(socket_matchers.size(), 2);
-  const auto third_match =
-      socket_matchers[1]->resolve(third_health_checker_base->transportSocketMatchMetadata().get());
+  const auto third_match = socket_matchers[1]->resolve(
+      third_health_checker_base->transportSocketMatchMetadata().get(), nullptr);
   // Since this again does not match, it uses default.
   EXPECT_EQ(third_match.name_, "default");
 }

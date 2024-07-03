@@ -78,7 +78,7 @@ class UpstreamTcpStatsConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public TcpStatsConfigFactory {
 public:
-  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config = MessageUtil::downcastAndValidate<
@@ -91,10 +91,11 @@ public:
         Envoy::Config::Utility::translateToFactoryConfig(outer_config.transport_socket(),
                                                          context.messageValidationVisitor(),
                                                          inner_config_factory);
-    auto inner_transport_factory =
+    auto factory_or_error =
         inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
+    RETURN_IF_STATUS_NOT_OK(factory_or_error);
     return std::make_unique<UpstreamTcpStatsSocketFactory>(context, outer_config,
-                                                           std::move(inner_transport_factory));
+                                                           std::move(factory_or_error.value()));
   }
 };
 
@@ -102,7 +103,7 @@ class DownstreamTcpStatsConfigFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
       public TcpStatsConfigFactory {
 public:
-  Network::DownstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override {
@@ -116,10 +117,11 @@ public:
         Envoy::Config::Utility::translateToFactoryConfig(outer_config.transport_socket(),
                                                          context.messageValidationVisitor(),
                                                          inner_config_factory);
-    auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
+    auto factory_or_error = inner_config_factory.createTransportSocketFactory(
         *inner_factory_config, context, server_names);
+    RETURN_IF_STATUS_NOT_OK(factory_or_error);
     return std::make_unique<DownstreamTcpStatsSocketFactory>(context, outer_config,
-                                                             std::move(inner_transport_factory));
+                                                             std::move(factory_or_error.value()));
   }
 };
 

@@ -26,6 +26,7 @@ envoy_cc_mock(
         "//source/common/stats:deferred_creation",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

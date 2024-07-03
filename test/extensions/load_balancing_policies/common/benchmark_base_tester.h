@@ -13,11 +13,10 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/types/optional.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace LoadBalancingPolices {
-namespace Common {
+namespace Upstream {
 
 class BaseTester : public Event::TestUsingSimulatedTime {
 public:
@@ -49,7 +48,38 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
 };
 
-} // namespace Common
-} // namespace LoadBalancingPolices
-} // namespace Extensions
+class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
+public:
+  // Upstream::LoadBalancerContext
+  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+
+  absl::optional<uint64_t> hash_key_;
+};
+
+inline void computeHitStats(::benchmark::State& state,
+                            const absl::node_hash_map<std::string, uint64_t>& hit_counter) {
+  double mean = 0;
+  for (const auto& pair : hit_counter) {
+    mean += pair.second;
+  }
+  mean /= hit_counter.size();
+
+  double variance = 0;
+  for (const auto& pair : hit_counter) {
+    variance += std::pow(pair.second - mean, 2);
+  }
+  variance /= hit_counter.size();
+  const double stddev = std::sqrt(variance);
+
+  state.counters["mean_hits"] = mean;
+  state.counters["stddev_hits"] = stddev;
+  state.counters["relative_stddev_hits"] = (stddev / mean);
+}
+
+inline uint64_t hashInt(uint64_t i) {
+  // Hack to hash an integer.
+  return HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)));
+}
+
+} // namespace Upstream
 } // namespace Envoy

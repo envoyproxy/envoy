@@ -30,6 +30,7 @@ struct GrpcInitializeConfigOpts {
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
+  bool validate_mutations = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -108,6 +109,7 @@ public:
 
       proto_config_.set_failure_mode_allow(opts.failure_mode_allow);
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
+      proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
       // Add labels and verify they are passed.
@@ -170,9 +172,11 @@ public:
         {"x-duplicate", "three"},
         {"allowed-prefix-one", "one"},
         {"allowed-prefix-two", "two"},
+        {"allowed-prefix-denied", "denied"},
         {"not-allowed", "nope"},
         {"regex-food", "food"},
         {"regex-fool", "fool"},
+        {"disallow-mutation-downstream-req", "authz resp cannot set or append to this header"},
         // If the below header exists in the downstream request, it is NOT copied in authz request.
         {Envoy::Extensions::Filters::Common::ExtAuthz::Headers::get().EnvoyAuthPartialBody.get(),
          "shouldn't be visible in authz request"},
@@ -262,6 +266,7 @@ public:
                    .EnvoyAuthPartialBody.get(),
                "shouldn't be visible in authz request"},
               {"not-allowed", std::nullopt},
+              {"allowed-prefix-denied", std::nullopt},
           };
       for (const auto& [key, value] : unexpected_headers) {
         bool found = false;
@@ -283,6 +288,7 @@ public:
       EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
       EXPECT_EQ("food", (*http_request->mutable_headers())["regex-food"]);
       EXPECT_EQ("fool", (*http_request->mutable_headers())["regex-fool"]);
+      EXPECT_FALSE(http_request->headers().contains("allowed-prefix-denied"));
       EXPECT_FALSE(http_request->headers().contains("not-allowed"));
     }
 
@@ -316,6 +322,7 @@ public:
     upstream_request_->encodeHeaders(
         Http::TestResponseHeaderMapImpl{{":status", "200"},
                                         {"replaceable", "set-by-upstream"},
+                                        {"replaceable2", "set-by-upstream"},
                                         {"set-cookie", "cookie1=snickerdoodle"}},
         false);
     upstream_request_->encodeData(response_size_, true);
@@ -324,6 +331,11 @@ public:
       EXPECT_THAT(upstream_request_->headers(),
                   Http::HeaderValueOf("x-envoy-auth-failure-mode-allowed", "true"));
     }
+    // Check that ext_authz didn't remove this downstream header which should be immune to
+    // mutations.
+    EXPECT_THAT(upstream_request_->headers(),
+                Http::HeaderValueOf("disallow-mutation-downstream-req",
+                                    "authz resp cannot set or append to this header"));
 
     for (const auto& header_to_add : opts.headers_to_add) {
       EXPECT_THAT(upstream_request_->headers(),
@@ -391,7 +403,9 @@ public:
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
                             const Headers& response_headers_to_append,
-                            const Headers& response_headers_to_set = {}) {
+                            const Headers& response_headers_to_set,
+                            const Headers& response_headers_to_append_if_absent,
+                            const Headers& response_headers_to_set_if_exists = {}) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
@@ -462,6 +476,31 @@ public:
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_set {}={}", key, value);
+    }
+
+    for (const auto& response_header_to_add_if_absent : response_headers_to_append_if_absent) {
+      auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+      const auto key = std::string(response_header_to_add_if_absent.first);
+      const auto value = std::string(response_header_to_add_if_absent.second);
+
+      entry->set_append_action(Router::HeaderValueOption::ADD_IF_ABSENT);
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add_if_absent {}={}", key,
+                     value);
+    }
+
+    for (const auto& response_header_to_set_if_exists : response_headers_to_set_if_exists) {
+      auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+      const auto key = std::string(response_header_to_set_if_exists.first);
+      const auto value = std::string(response_header_to_set_if_exists.second);
+
+      // Replaces the one sent by the upstream.
+      entry->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_set_if_exists {}={}", key,
+                     value);
     }
 
     ext_authz_request_->sendGrpcMessage(check_response);
@@ -535,7 +574,8 @@ attributes:
           std::make_pair(header_to_append.first, header_to_append.second + "-appended"));
     }
     sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append, headers_to_remove,
-                         new_headers_from_upstream, headers_to_append_multiple, Headers{});
+                         new_headers_from_upstream, headers_to_append_multiple, Headers{},
+                         Headers{}, Headers{});
 
     WaitForSuccessfulUpstreamResponseOpts opts{
         updated_headers_to_add,    updated_headers_to_append,  headers_to_remove,
@@ -578,6 +618,13 @@ attributes:
       - prefix: allowed-prefix
       - safe_regex:
           regex: regex-foo.?
+    disallowed_headers:
+      patterns:
+      - prefix: allowed-prefix-denied
+
+    decoder_header_mutation_rules:
+      disallow_expression:
+        regex: ^disallow-mutation.*
 
     with_request_body:
       max_request_bytes: 1024
@@ -608,25 +655,27 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    const auto headers =
-        Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                       {":path", "/"},
-                                       {":scheme", "http"},
-                                       {":authority", "host"},
-                                       {"x-case-sensitive-header", case_sensitive_header_value_},
-                                       {"baz", "foo"},
-                                       {"bat", "foo"},
-                                       {"remove-me", "upstream-should-not-see-me"},
-                                       {"x-duplicate", "one"},
-                                       {"x-duplicate", "two"},
-                                       {"x-duplicate", "three"},
-                                       {"allowed-prefix-one", "one"},
-                                       {"allowed-prefix-two", "two"},
-                                       {"not-allowed", "nope"},
-                                       {"authorization", "legit"},
-                                       {"regex-food", "food"},
-                                       {"regex-fool", "fool"},
-                                       {"x-forwarded-for", "1.2.3.4"}};
+    const auto headers = Http::TestRequestHeaderMapImpl{
+        {":method", "GET"},
+        {":path", "/"},
+        {":scheme", "http"},
+        {":authority", "host"},
+        {"x-case-sensitive-header", case_sensitive_header_value_},
+        {"baz", "foo"},
+        {"bat", "foo"},
+        {"remove-me", "upstream-should-not-see-me"},
+        {"x-duplicate", "one"},
+        {"x-duplicate", "two"},
+        {"x-duplicate", "three"},
+        {"allowed-prefix-one", "one"},
+        {"allowed-prefix-two", "two"},
+        {"allowed-prefix-denied", "blah"},
+        {"not-allowed", "nope"},
+        {"authorization", "legit"},
+        {"regex-food", "food"},
+        {"regex-fool", "fool"},
+        {"disallow-mutation-downstream-req", "authz resp cannot set or append to this header"},
+        {"x-forwarded-for", "1.2.3.4"}};
     if (client_request_body_.empty()) {
       response_ = codec_client_->makeHeaderOnlyRequest(headers);
     } else {
@@ -643,29 +692,19 @@ public:
     result = ext_authz_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    EXPECT_EQ("one", ext_authz_request_->headers()
-                         .get(Http::LowerCaseString(std::string("allowed-prefix-one")))[0]
-                         ->value()
-                         .getStringView());
-    EXPECT_EQ("two", ext_authz_request_->headers()
-                         .get(Http::LowerCaseString(std::string("allowed-prefix-two")))[0]
-                         ->value()
-                         .getStringView());
-    EXPECT_EQ("legit", ext_authz_request_->headers()
-                           .get(Http::LowerCaseString(std::string("authorization")))[0]
-                           ->value()
-                           .getStringView());
+    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("allowed-prefix-one", "one"));
+    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("allowed-prefix-two", "two"));
+    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("authorization", "legit"));
+    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("regex-food", "food"));
+    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("regex-fool", "fool"));
+
     EXPECT_TRUE(ext_authz_request_->headers()
                     .get(Http::LowerCaseString(std::string("not-allowed")))
                     .empty());
-    EXPECT_EQ("food", ext_authz_request_->headers()
-                          .get(Http::LowerCaseString(std::string("regex-food")))[0]
-                          ->value()
-                          .getStringView());
-    EXPECT_EQ("fool", ext_authz_request_->headers()
-                          .get(Http::LowerCaseString(std::string("regex-fool")))[0]
-                          ->value()
-                          .getStringView());
+    EXPECT_TRUE(ext_authz_request_->headers()
+                    .get(Http::LowerCaseString(std::string("allowed-prefix-denied")))
+                    .empty());
+
     if (encodeRawHeaders()) {
       // Duplicate headers should NOT be merged.
       const auto duplicate =
@@ -699,9 +738,12 @@ public:
         {":status", "200"},
         {"baz", "baz"},
         {"bat", "bar"},
+        {"authz-add-disallow-mutation", "this should not be allowed due to disallow_expression"},
         {"x-append-bat", "append-foo"},
         {"x-append-bat", "append-bar"},
         {"x-envoy-auth-headers-to-remove", "remove-me"},
+        // Try to remove this header that should not be able to be removed.
+        {"x-envoy-auth-headers-to-remove", "disallow-mutation-downstream-req"},
     };
     ext_authz_request_->encodeHeaders(response_headers, true);
   }
@@ -790,6 +832,11 @@ public:
     EXPECT_TRUE(upstream_request_->headers()
                     .get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"})
                     .empty());
+    // The side stream tried to add this header that violates the disallow_expression header
+    // mutation rule. Make sure it did not get added.
+    EXPECT_TRUE(upstream_request_->headers()
+                    .get(Http::LowerCaseString{"authz-add-disallow-mutation"})
+                    .empty());
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     ASSERT_TRUE(response_->waitForEndStream());
@@ -806,8 +853,16 @@ public:
   std::string client_request_body_;
   const Http::LowerCaseString case_sensitive_header_name_{"x-case-sensitive-header"};
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
+  // TODO: mutation rule
   const std::string legacy_default_config_ = R"EOF(
-  transport_api_version: V3
+  disallowed_headers:
+    patterns:
+    - prefix: allowed-prefix-denied
+
+  decoder_header_mutation_rules:
+    disallow_expression:
+      regex: disallow-mutation.*
+
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -834,7 +889,6 @@ public:
         - prefix: x-append
   )EOF";
   const std::string default_config_ = R"EOF(
-  transport_api_version: V3
   allowed_headers:
     patterns:
     - exact: X-Case-Sensitive-Header
@@ -843,6 +897,13 @@ public:
     - safe_regex:
         regex: regex-foo.?
     - exact: x-forwarded-for
+  disallowed_headers:
+    patterns:
+    - prefix: allowed-prefix-denied
+
+  decoder_header_mutation_rules:
+    disallow_expression:
+      regex: disallow-mutation.*
 
   http_service:
     server_uri:
@@ -932,12 +993,20 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
 
   // Start a client connection and start request.
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"},           {":path", "/test"},
-      {":scheme", "http"},           {":authority", "host"},
-      {"x-duplicate", "one"},        {"x-duplicate", "two"},
-      {"x-duplicate", "three"},      {"allowed-prefix-one", "one"},
-      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
-      {"regex-food", "food"},        {"regex-fool", "fool"}};
+      {":method", "POST"},
+      {":path", "/test"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-duplicate", "one"},
+      {"x-duplicate", "two"},
+      {"x-duplicate", "three"},
+      {"allowed-prefix-one", "one"},
+      {"allowed-prefix-two", "two"},
+      {"allowed-prefix-denied", "will not be sent"},
+      {"not-allowed", "nope"},
+      {"regex-food", "food"},
+      {"regex-fool", "fool"},
+      {"disallow-mutation-downstream-req", "authz resp cannot set or append to this header"}};
 
   auto conn = makeClientConnection(lookupPort("http"));
   codec_client_ = makeHttpConnection(std::move(conn));
@@ -957,7 +1026,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1, 2000));
 
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{}, Headers{},
+                       Headers{});
 
   // Send the rest of the data and end the stream
   codec_client_->sendData(encoder_decoder.first, final_body, true);
@@ -993,8 +1063,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   sendExtAuthzResponse(
       Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
       Http::TestRequestHeaderMapImpl{},
-      Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
-      Headers{{"replaceable", "by-ext-authz"}});
+      Headers{{"downstream2", "should-be-added"}, {"set-cookie", "cookie2=gingerbread"}},
+      Headers{{"replaceable", "set-by-ext-authz"}},
+      Headers{{"downstream3", "should-be-added"}, {"set-cookie", "cookie3=peanutbutter"}},
+      Headers{{"replaceable2", "set-by-ext-authz"}, {"new-header", "should-not-be-added"}});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
@@ -1008,9 +1080,13 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.
   const std::string expected_body(response_size_, 'a');
   verifyResponse(std::move(response_), "200",
-                 Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                 {"downstream2", "downstream-should-see-me"},
-                                                 {"replaceable", "by-ext-authz"}},
+                 Http::TestResponseHeaderMapImpl{
+                     {":status", "200"},
+                     {"downstream2", "should-be-added"},
+                     {"downstream3", "should-be-added"},
+                     {"replaceable", "set-by-ext-authz"},
+                     {"replaceable2", "set-by-ext-authz"},
+                 },
                  expected_body);
   cleanup();
 }
@@ -1032,6 +1108,31 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+// Test behavior when validate_mutations is true & side stream provides invalid mutations (should
+// respond downstream with HTTP 500 Internal Server Error).
+TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({{"invalid-\nheader-\nname", "blah"}}, {}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
 
   cleanup();
 }
@@ -1078,13 +1179,21 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
   invalid_unicode.append(1, char(0x28));
   invalid_unicode.append("valid_suffix");
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"},           {":path", "/test"},
-      {":scheme", "http"},           {":authority", "host"},
-      {"x-bypass", invalid_unicode}, {"allowed-prefix-one", "one"},
-      {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
-      {"x-duplicate", "one"},        {"x-duplicate", "two"},
-      {"x-duplicate", "three"},      {"regex-food", "food"},
-      {"regex-fool", "fool"}};
+      {":method", "POST"},
+      {":path", "/test"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-bypass", invalid_unicode},
+      {"allowed-prefix-one", "one"},
+      {"allowed-prefix-two", "two"},
+      {"allowed-prefix-denied", "denied"},
+      {"not-allowed", "nope"},
+      {"x-duplicate", "one"},
+      {"x-duplicate", "two"},
+      {"x-duplicate", "three"},
+      {"regex-food", "food"},
+      {"regex-fool", "fool"},
+      {"disallow-mutation-downstream-req", "authz resp cannot set or append to this header"}};
 
   response_ = codec_client_->makeRequestWithBody(headers, {});
 
@@ -1096,7 +1205,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
       Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
       Http::TestRequestHeaderMapImpl{},
       Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
-      Headers{{"replaceable", "by-ext-authz"}});
+      Headers{{"replaceable", "by-ext-authz"}}, Headers{}, Headers{});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
@@ -1190,20 +1299,6 @@ TEST_P(ExtAuthzHttpIntegrationTest, UnmodifiedForwardedForHeader) {
   EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("x-forwarded-for", "1.2.3.4"));
 }
 
-// Verifies that local address is appended to "X-Forwarded-For" header
-// if "envoy.reloadable_features.ext_authz_http_send_original_xff" runtime guard is disabled.
-TEST_P(ExtAuthzHttpIntegrationTest, LegacyAppendLocalAddressToForwardedForHeader) {
-  TestScopedRuntime scoped_runtime_;
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_authz_http_send_original_xff", "false"}});
-
-  setup(false);
-
-  const auto local_address = test_server_->server().localInfo().address()->ip()->addressAsString();
-  EXPECT_THAT(ext_authz_request_->headers(),
-              Http::HeaderValueOf("x-forwarded-for", absl::StrCat("1.2.3.4", ",", local_address)));
-}
-
 // Verifies that by default HTTP service uses the case-sensitive string matcher
 // (uses new config for allowed_headers).
 TEST_P(ExtAuthzHttpIntegrationTest, Body) {
@@ -1241,6 +1336,32 @@ TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("204", response_->headers().Status()->value().getStringView());
+}
+
+// Test exceeding the async client buffer limit.
+TEST_P(ExtAuthzHttpIntegrationTest, ErrorReponseWithDefultBufferLimit) {
+  initializeConfig(false, /*failure_mode_allow=*/false);
+  config_helper_.addRuntimeOverride("http.async_response_buffer_limit", "1024");
+
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"baz", "baz"},
+      {"bat", "bar"},
+      {"x-append-bat", "append-foo"},
+      {"x-append-bat", "append-bar"},
+      {"x-envoy-auth-headers-to-remove", "remove-me"},
+  };
+  ext_authz_request_->encodeHeaders(response_headers, false);
+  ext_authz_request_->encodeData(2048, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  // A forbidden response since the onFailure is called due to the async client buffer limit.
+  EXPECT_EQ("403", response_->headers().Status()->value().getStringView());
 }
 
 // (uses new config for allowed_headers).
@@ -1346,7 +1467,6 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
 
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
     const std::string ext_authz_config = R"EOF(
-  transport_api_version: V3
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -1426,7 +1546,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   initiateClientConnection(4, Headers{}, Headers{});
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{}, Headers{});
 
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
 
@@ -1464,7 +1584,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
               test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{}, Headers{});
 
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());

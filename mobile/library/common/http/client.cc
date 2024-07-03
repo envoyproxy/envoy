@@ -7,8 +7,10 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
@@ -31,16 +33,12 @@ constexpr auto SlowCallbackWarningThreshold = std::chrono::seconds(1);
 } // namespace
 
 Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream,
-                                                     envoy_http_callbacks bridge_callbacks,
+                                                     EnvoyStreamCallbacks&& stream_callbacks,
                                                      Client& http_client)
-    : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks), http_client_(http_client),
-      explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
+    : direct_stream_(direct_stream), stream_callbacks_(std::move(stream_callbacks)),
+      http_client_(http_client), explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
 
-Client::DirectStreamCallbacks::~DirectStreamCallbacks() {
-  if (error_.has_value()) {
-    release_envoy_error(error_.value());
-  }
-}
+Client::DirectStreamCallbacks::~DirectStreamCallbacks() {}
 
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
@@ -80,8 +78,14 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_headers_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers, alpn), end_stream, streamIntel(),
-                               bridge_callbacks_.context);
+  if (alpn.empty()) {
+    stream_callbacks_.on_headers_(headers, end_stream, streamIntel());
+  } else {
+    auto new_headers = ResponseHeaderMapImpl::create();
+    ResponseHeaderMapImpl::copyFrom(*new_headers, headers);
+    new_headers->addCopy(LowerCaseString("x-envoy-upstream-alpn"), alpn);
+    stream_callbacks_.on_headers_(*new_headers, end_stream, streamIntel());
+  }
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -129,7 +133,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   // Send data if in default flow control mode, or if resumeData has been called in explicit
   // flow control mode.
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
-    ASSERT(!hasBufferedData());
+    // We shouldn't be calling sendDataToBridge with newly arrived data if there's buffered data.
+    ASSERT(!response_data_.get() || response_data_->length() == 0);
     sendDataToBridge(data, end_stream);
   }
 
@@ -140,8 +145,6 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
         debug, "[S{}] buffering {} bytes due to explicit flow control. {} total bytes buffered.",
         direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
     response_data_->move(data);
-  } else if (error_.has_value()) {
-    sendErrorToBridge();
   }
 }
 
@@ -166,8 +169,9 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
   // to resumeData. Set before on-data to handle reentrant callbacks.
   bytes_to_send_ = 0;
 
-  bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), send_end_stream,
-                            streamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_data_(data, bytes_to_send, send_end_stream, streamIntel());
+  // We can drain the data up to bytes_to_send since we are done with it.
+  data.drain(bytes_to_send);
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -177,6 +181,8 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
 
   if (send_end_stream) {
     onComplete();
+  } else if (explicit_flow_control_ && data.length() == 0 && error_.has_value()) {
+    onError();
   }
 }
 
@@ -207,8 +213,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_trailers_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_trailers(Utility::toBridgeHeaders(trailers), streamIntel(),
-                                bridge_callbacks_.context);
+  stream_callbacks_.on_trailers_(trailers, streamIntel());
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -232,14 +237,13 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
   // Make sure to send end stream with data only if
   // 1) it has been received from the peer and
   // 2) there are no trailers
-  if (hasBufferedData() ||
-      (remote_end_stream_received_ && !remote_end_stream_forwarded_ && !response_trailers_)) {
+  if (hasDataToSend()) {
     sendDataToBridge(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
     bytes_to_send_ = 0;
   }
 
   // If all buffered data has been sent, send and free up trailers.
-  if (!hasBufferedData() && response_trailers_.get() && bytes_to_send_ > 0) {
+  if (!hasDataToSend() && response_trailers_.get() && bytes_to_send_ > 0) {
     sendTrailersToBridge(*response_trailers_);
     response_trailers_.reset();
     bytes_to_send_ = 0;
@@ -283,7 +287,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_complete_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_complete(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_complete_(streamIntel(), finalStreamIntel());
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -302,7 +306,7 @@ void Client::DirectStreamCallbacks::onError() {
   // TODO(goaway): What is the expected behavior when an error is received, held, and then another
   // error occurs (e.g., timeout)?
 
-  if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
+  if (explicit_flow_control_ && (hasDataToSend() || response_trailers_.get())) {
     ENVOY_LOG(debug, "[S{}] defering remote reset stream due to explicit flow control",
               direct_stream_.stream_handle_);
     if (direct_stream_.parent_.getStream(direct_stream_.stream_handle_,
@@ -338,8 +342,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_error_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_error(error_.value(), streamIntel(), finalStreamIntel(),
-                             bridge_callbacks_.context);
+  stream_callbacks_.on_error_(error_.value(), streamIntel(), finalStreamIntel());
   error_.reset();
 
   callback_time_ms->complete();
@@ -351,7 +354,7 @@ void Client::DirectStreamCallbacks::sendErrorToBridge() {
 
 void Client::DirectStreamCallbacks::onSendWindowAvailable() {
   ENVOY_LOG(debug, "[S{}] remote send window available", direct_stream_.stream_handle_);
-  bridge_callbacks_.on_send_window_available(streamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_send_window_available_(streamIntel());
 }
 
 void Client::DirectStreamCallbacks::onCancel() {
@@ -367,7 +370,7 @@ void Client::DirectStreamCallbacks::onCancel() {
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       http_client_.stats().on_cancel_callback_latency_, http_client_.timeSource());
 
-  bridge_callbacks_.on_cancel(streamIntel(), finalStreamIntel(), bridge_callbacks_.context);
+  stream_callbacks_.on_cancel_(streamIntel(), finalStreamIntel());
 
   callback_time_ms->complete();
   auto elapsed = callback_time_ms->elapsed();
@@ -427,31 +430,48 @@ void Client::DirectStreamCallbacks::latchError() {
   if (error_.has_value()) {
     return; // Only latch error once.
   }
-  error_ = envoy_error();
+  error_ = EnvoyError{};
 
   OptRef<RequestDecoder> request_decoder = direct_stream_.requestDecoder();
   if (!request_decoder) {
-    error_->message = envoy_nodata;
+    error_->message_ = "";
     return;
   }
   const auto& info = request_decoder->streamInfo();
 
+  std::vector<std::string> error_msg_details;
   if (info.responseCode().has_value()) {
-    error_->error_code = Bridge::Utility::errorCodeFromLocalStatus(
+    error_->error_code_ = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("rc: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
-    error_->error_code = ENVOY_REQUEST_TIMEOUT;
+    error_->error_code_ = ENVOY_REQUEST_TIMEOUT;
   } else {
-    error_->error_code = ENVOY_STREAM_RESET;
+    error_->error_code_ = ENVOY_STREAM_RESET;
   }
 
-  if (info.responseCodeDetails().has_value()) {
-    error_->message = Data::Utility::copyToBridgeData(info.responseCodeDetails().value());
-  } else {
-    error_->message = envoy_nodata;
+  error_msg_details.push_back(absl::StrCat("ec: ", error_->error_code_));
+  std::vector<std::string> response_flags(info.responseFlags().size());
+  std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
+                 [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
+  error_msg_details.push_back(absl::StrCat("rsp_flags: ", absl::StrJoin(response_flags, ",")));
+  if (info.protocol().has_value()) {
+    // https://github.com/envoyproxy/envoy/blob/fbce85914421145b5ae3210c9313eced63e535b0/envoy/http/protocol.h#L13
+    error_msg_details.push_back(absl::StrCat("http: ", *info.protocol()));
   }
-
-  error_->attempt_count = info.attemptCount().value_or(0);
+  if (std::string resp_code_details = info.responseCodeDetails().value_or("");
+      !resp_code_details.empty()) {
+    error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
+  }
+  // The format of the error message propogated to callbacks is:
+  // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
+  //
+  // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
+  // envoy_ec is of the envoy_error_code_t enum type, and gets mapped from envoy_rc.
+  // rsp_flags comes from StreamInfo::responseFlags().
+  // det is the contents of StreamInfo::responseCodeDetails().
+  error_->message_ = absl::StrJoin(std::move(error_msg_details), "|");
+  error_->attempt_count_ = info.attemptCount().value_or(0);
 }
 
 Client::DirectStream::DirectStream(envoy_stream_t stream_handle, Client& http_client)
@@ -483,7 +503,7 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
   saveFinalStreamIntel();   // Take a snapshot now in case the stream gets destroyed.
   callbacks_->latchError(); // Latch the error in case the stream gets destroyed.
-  runResetCallbacks(reason);
+  runResetCallbacks(reason, absl::string_view());
   if (!parent_.getStream(stream_handle_, GetStreamFilters::AllowForAllStreams)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely
     // while still open locally. In this case the stream will already have been removed from
@@ -515,13 +535,13 @@ void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
   ENVOY_LOG(error, "\n{}", ss.str());
 }
 
-void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks,
+void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&& stream_callbacks,
                          bool explicit_flow_control) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
   direct_stream->explicit_flow_control_ = explicit_flow_control;
   direct_stream->callbacks_ =
-      std::make_unique<DirectStreamCallbacks>(*direct_stream, bridge_callbacks, *this);
+      std::make_unique<DirectStreamCallbacks>(*direct_stream, std::move(stream_callbacks), *this);
 
   // Note: streams created by Envoy Mobile are tagged as is_internally_created. This means that
   // the Http::ConnectionManager _will not_ sanitize headers when creating a stream.
@@ -641,7 +661,7 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
   }
 }
 
-void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
+void Client::sendMetadata(envoy_stream_t, envoy_headers) { IS_ENVOY_BUG("not implemented"); }
 
 void Client::sendTrailers(envoy_stream_t stream, RequestTrailerMapPtr trailers) {
   ASSERT(dispatcher_.isThreadSafe());
@@ -698,7 +718,7 @@ void Client::cancelStream(envoy_stream_t stream) {
       // assertions checking stream presence, this is a likely potential culprit. However, it's
       // plausible that upstream guards will protect us here, given that Envoy allows streams to be
       // reset from a wide variety of contexts without apparent issue.
-      direct_stream->runResetCallbacks(StreamResetReason::RemoteReset);
+      direct_stream->runResetCallbacks(StreamResetReason::RemoteReset, absl::string_view());
     }
   }
 }

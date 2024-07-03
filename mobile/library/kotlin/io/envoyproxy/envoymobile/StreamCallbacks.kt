@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.ByteBuffers
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
@@ -12,7 +13,7 @@ import java.util.concurrent.Executor
  *
  * `StreamCallbacks` are bridged through to `EnvoyHTTPCallbacks` to communicate with the engine.
  */
-internal class StreamCallbacks {
+class StreamCallbacks {
   var onHeaders:
     ((headers: ResponseHeaders, endStream: Boolean, streamIntel: StreamIntel) -> Unit)? =
     null
@@ -28,28 +29,47 @@ internal class StreamCallbacks {
  * Class responsible for bridging between the platform-level `StreamCallbacks` and the engine's
  * `EnvoyHTTPCallbacks`.
  */
-internal class EnvoyHTTPCallbacksAdapter(
-  private val executor: Executor,
+class EnvoyHTTPCallbacksAdapter(
+  private val executor: Executor?,
   private val callbacks: StreamCallbacks
 ) : EnvoyHTTPCallbacks {
-  override fun getExecutor(): Executor {
-    return executor
-  }
-
   override fun onHeaders(
     headers: Map<String, List<String>>,
     endStream: Boolean,
     streamIntel: EnvoyStreamIntel
   ) {
-    callbacks.onHeaders?.invoke(ResponseHeaders(headers), endStream, StreamIntel(streamIntel))
+    if (executor != null) {
+      executor.execute {
+        callbacks.onHeaders?.invoke(ResponseHeaders(headers), endStream, StreamIntel(streamIntel))
+      }
+    } else {
+      callbacks.onHeaders?.invoke(ResponseHeaders(headers), endStream, StreamIntel(streamIntel))
+    }
   }
 
   override fun onData(byteBuffer: ByteBuffer, endStream: Boolean, streamIntel: EnvoyStreamIntel) {
-    callbacks.onData?.invoke(byteBuffer, endStream, StreamIntel(streamIntel))
+    if (executor != null) {
+      // The `ByteBuffer` passed into `onData` is a direct `ByteBuffer` managed by the native code
+      // and it will be destroyed upon completing the `onData` call. We need to copy the
+      // `ByteBuffer` when executing the `onData` in a separate thread to avoid a dangling
+      // reference.
+      val copiedBuffer = ByteBuffers.copy(byteBuffer)
+      executor.execute {
+        callbacks.onData?.invoke(copiedBuffer, endStream, StreamIntel(streamIntel))
+      }
+    } else {
+      callbacks.onData?.invoke(byteBuffer, endStream, StreamIntel(streamIntel))
+    }
   }
 
   override fun onTrailers(trailers: Map<String, List<String>>, streamIntel: EnvoyStreamIntel) {
-    callbacks.onTrailers?.invoke(ResponseTrailers((trailers)), StreamIntel(streamIntel))
+    if (executor != null) {
+      executor.execute {
+        callbacks.onTrailers?.invoke(ResponseTrailers((trailers)), StreamIntel(streamIntel))
+      }
+    } else {
+      callbacks.onTrailers?.invoke(ResponseTrailers((trailers)), StreamIntel(streamIntel))
+    }
   }
 
   override fun onError(
@@ -59,21 +79,46 @@ internal class EnvoyHTTPCallbacksAdapter(
     streamIntel: EnvoyStreamIntel,
     finalStreamIntel: EnvoyFinalStreamIntel
   ) {
-    callbacks.onError?.invoke(
-      EnvoyError(errorCode, message, attemptCount),
-      FinalStreamIntel(streamIntel, finalStreamIntel)
-    )
+    if (executor != null) {
+      executor.execute {
+        callbacks.onError?.invoke(
+          EnvoyError(errorCode, message, attemptCount),
+          FinalStreamIntel(streamIntel, finalStreamIntel)
+        )
+      }
+    } else {
+      callbacks.onError?.invoke(
+        EnvoyError(errorCode, message, attemptCount),
+        FinalStreamIntel(streamIntel, finalStreamIntel)
+      )
+    }
   }
 
   override fun onCancel(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
-    callbacks.onCancel?.invoke(FinalStreamIntel(streamIntel, finalStreamIntel))
+    if (executor != null) {
+      executor.execute {
+        callbacks.onCancel?.invoke(FinalStreamIntel(streamIntel, finalStreamIntel))
+      }
+    } else {
+      callbacks.onCancel?.invoke(FinalStreamIntel(streamIntel, finalStreamIntel))
+    }
   }
 
   override fun onSendWindowAvailable(streamIntel: EnvoyStreamIntel) {
-    callbacks.onSendWindowAvailable?.invoke(StreamIntel(streamIntel))
+    if (executor != null) {
+      executor.execute { callbacks.onSendWindowAvailable?.invoke(StreamIntel(streamIntel)) }
+    } else {
+      callbacks.onSendWindowAvailable?.invoke(StreamIntel(streamIntel))
+    }
   }
 
   override fun onComplete(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
-    callbacks.onComplete?.invoke(FinalStreamIntel(streamIntel, finalStreamIntel))
+    if (executor != null) {
+      executor.execute {
+        callbacks.onComplete?.invoke(FinalStreamIntel(streamIntel, finalStreamIntel))
+      }
+    } else {
+      callbacks.onComplete?.invoke(FinalStreamIntel(streamIntel, finalStreamIntel))
+    }
   }
 }

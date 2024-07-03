@@ -126,10 +126,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr co
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_->serverName(),
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
-      max_requests_during_dispatch_(
-          runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
-      refresh_rtt_after_request_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.refresh_rtt_after_request")) {
+      max_requests_during_dispatch_(runtime_.snapshot().getInteger(
+          ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -337,17 +335,6 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.completeRequest();
-
-  // If refresh rtt after request is required explicitly, then try to get rtt again set it into
-  // connection info.
-  if (refresh_rtt_after_request_) {
-    // Set roundtrip time in connectionInfoSetter before OnStreamComplete
-    absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
-    if (t.has_value()) {
-      read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
-    }
-  }
-
   stream.filter_manager_.onStreamComplete();
 
   // For HTTP/3, skip access logging here and add deferred logging info
@@ -682,9 +669,7 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
 // Sends a GOAWAY if too many streams have been reset prematurely on this
 // connection.
 void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.send_goaway_for_premature_rst_streams") ||
-      closed_non_internally_destroyed_requests_ == 0) {
+  if (closed_non_internally_destroyed_requests_ == 0) {
     return;
   }
 
@@ -822,6 +807,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   filter_manager_.streamInfo().setStreamIdProvider(
       std::make_shared<HttpStreamIdProviderImpl>(*this));
+
+  filter_manager_.streamInfo().setShouldSchemeMatchUpstream(
+      connection_manager.config_->shouldSchemeMatchUpstream());
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   static const std::string route_factory = "envoy.route_config_update_requester.default";
@@ -1270,9 +1258,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
-  // Rewrites the host of CONNECT-UDP requests.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      HeaderUtility::isConnectUdpRequest(*request_headers_) &&
+  // Rewrite the host of CONNECT-UDP requests.
+  if (HeaderUtility::isConnectUdpRequest(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
     sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);

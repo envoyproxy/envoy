@@ -47,6 +47,7 @@ TEST(ContextProviderTest, DynamicContextParameters) {
       [&update_count, &last_updated_resource](absl::string_view resource_type_url) {
         ++update_count;
         last_updated_resource = std::string(resource_type_url);
+        return absl::OkStatus();
       });
 
   // Default empty DCP for all types.

@@ -33,7 +33,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/server_connection_factory.h"
-#include "source/common/router/rds_impl.h"
+#include "source/common/router/route_provider_manager.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -297,11 +297,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
-        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.clusterManager(), overload_manager,
         server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
@@ -352,7 +355,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
-      route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
       http3_options_(Http3::Utility::initializeAndValidateOptions(
@@ -533,16 +535,22 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
+    route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
+        // At the creation of a RDS route config provider, the factory_context's initManager is
+        // always valid, though the init manager may go away later when the listener goes away.
+        config.rds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
+    break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
-    route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_.serverFactoryContext(), context_.messageValidationVisitor(),
-        context_.initManager(), stats_prefix_, route_config_provider_manager_);
+    route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
+        config.route_config(), context_.serverFactoryContext(),
+        context_.messageValidationVisitor());
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
     if (!srds_factory || !scoped_routes_config_provider_manager_) {
-      throwEnvoyExceptionOrPanic("SRDS configured but not compiled in");
+      creation_status = absl::InvalidArgumentError("SRDS configured but not compiled in");
+      return;
     }
     scoped_routes_config_provider_ =
         srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
@@ -646,6 +654,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
     scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
+
+    if (config.scheme_header_transformation().match_upstream()) {
+      ENVOY_LOG(warn, "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite");
+    }
+    should_scheme_match_upstream_ = false;
+  } else {
+    should_scheme_match_upstream_ = config.scheme_header_transformation().match_upstream();
   }
 
   if (!config.server_name().empty()) {
@@ -859,11 +874,14 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
 
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
-        server_context.clusterManager(), server_context.overloadManager(),
+        server_context.clusterManager(), overload_manager,
         server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);

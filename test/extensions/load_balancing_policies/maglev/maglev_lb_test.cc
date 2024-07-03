@@ -68,7 +68,7 @@ public:
     }
 
     createLb();
-    lb_->initialize();
+    EXPECT_TRUE(lb_->initialize().ok());
   }
 
   NiceMock<MockPrioritySet> priority_set_;

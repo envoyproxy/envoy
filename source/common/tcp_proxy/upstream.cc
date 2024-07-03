@@ -420,42 +420,41 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
 
 void CombinedUpstream::setRouterUpstreamRequest(
     Router::UpstreamRequestPtr router_upstream_request) {
-  LinkedList::moveIntoList(std::move(router_upstream_request), upstream_requests_);
+  ASSERT(!upstream_request_);
+  upstream_request_ = std::move(router_upstream_request);
 }
 
 void CombinedUpstream::newStream(GenericConnectionPoolCallbacks&) {
-  upstream_requests_.front()->acceptHeadersFromRouter(false);
+  upstream_request_->acceptHeadersFromRouter(false);
 }
 
 void CombinedUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (upstream_requests_.empty()) {
+  if (!upstream_request_) {
     return;
   }
-  upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
+  upstream_request_->acceptDataFromRouter(data, end_stream);
   if (end_stream) {
     doneWriting();
   }
 }
 
 bool CombinedUpstream::readDisable(bool disable) {
-  if (upstream_requests_.empty()) {
+  if (!upstream_request_) {
     return false;
   }
-  if (disable) {
-    upstream_requests_.front()->onAboveWriteBufferHighWatermark();
-  }
+  upstream_request_->readDisableOrDefer(disable);
   return true;
 }
 
 Tcp::ConnectionPool::ConnectionData*
 CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (upstream_requests_.empty()) {
+  if (!upstream_request_) {
     return nullptr;
   }
 
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-    upstream_requests_.front()->resetStream();
+    upstream_request_->resetStream();
   }
   return nullptr;
 }
@@ -481,8 +480,8 @@ bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
 void CombinedUpstream::onResetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-    if (!upstream_requests_.empty()) {
-      upstream_requests_.front()->resetStream();
+    if (upstream_request_) {
+      upstream_request_->resetStream();
     }
   }
 
@@ -537,20 +536,5 @@ void CombinedUpstream::doneWriting() {
     onResetEncoder(Network::ConnectionEvent::LocalClose);
   }
 }
-
-void CombinedUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
-  read_half_closed_ = true;
-  write_half_closed_ = true;
-  onResetEncoder(Network::ConnectionEvent::LocalClose);
-}
-
-void CombinedUpstream::onAboveWriteBufferHighWatermark() {
-  upstream_callbacks_.onAboveWriteBufferHighWatermark();
-}
-
-void CombinedUpstream::onBelowWriteBufferLowWatermark() {
-  upstream_callbacks_.onBelowWriteBufferLowWatermark();
-}
-
 } // namespace TcpProxy
 } // namespace Envoy

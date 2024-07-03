@@ -350,7 +350,7 @@ public:
   // same format as one would expect from a Redis server in
   // an ask/moved redirection error.
 
-  std::string redisAddressAndPort(FakeUpstreamPtr& upstream) {
+  std::string redisAddressAndPortNoThrow(FakeUpstreamPtr& upstream) {
     std::stringstream result;
     if (version_ == Network::Address::IpVersion::v4) {
       result << "127.0.0.1"
@@ -797,11 +797,11 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
   std::string request = makeBulkStringArray({"get", "foo"});
   initialize();
   std::stringstream redirection_error;
-  redirection_error << "-MOVED 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+  redirection_error << "-MOVED 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
 
   redirection_error.str("");
-  redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
 }
 
@@ -831,11 +831,11 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
   FakeUpstreamPtr target_server{std::make_unique<FakeUpstream>(0, version_, upstreamConfig())};
 
   std::stringstream redirection_error;
-  redirection_error << "-MOVED 1111 " << redisAddressAndPort(target_server) << "\r\n";
+  redirection_error << "-MOVED 1111 " << redisAddressAndPortNoThrow(target_server) << "\r\n";
   simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
 
   redirection_error.str("");
-  redirection_error << "-ASK 1111 " << redisAddressAndPort(target_server) << "\r\n";
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(target_server) << "\r\n";
   simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
 }
 
@@ -900,7 +900,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingRe
 
   std::string request = makeBulkStringArray({"get", "foo"});
   std::stringstream redirection_error;
-  redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
 
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -947,8 +947,8 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
   initialize();
   std::string request = makeBulkStringArray({"get", "foo"});
   std::stringstream redirection_error, asking_response;
-  redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
-  asking_response << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[0]) << "\r\n";
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
+  asking_response << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[0]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n",
                     asking_response.str());
 }

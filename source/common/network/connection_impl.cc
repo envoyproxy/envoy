@@ -98,8 +98,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
   socket_->ioHandle().initializeFileEvent(
-      dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        onFileEvent(events);
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 
@@ -1033,7 +1037,9 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
+    setFailureReason(absl::StrCat(
+        "immediate connect error: ", errorDetails(result.errno_),
+        "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

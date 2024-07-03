@@ -28,7 +28,7 @@
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
-#include "source/extensions/transport_sockets/tls/config.h"
+#include "source/extensions/transport_sockets/tls/upstream_config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
@@ -57,12 +57,8 @@
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
 
-#ifdef ENVOY_MOBILE_XDS
-#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
-#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
-#include "source/common/tls/cert_validator/default_validator.h"
+#if !defined(__APPLE__)
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -81,7 +77,7 @@ void ExtensionRegistry::registerFactories() {
 
   // This is the default cluster used by Envoy mobile to establish connections upstream.
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
-  // This allows decompression of brotli-compresssed responses.
+  // This allows decompression of brotli-compressed responses.
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
   // This allows decompression of gzip-decompressed responses.
   Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
@@ -112,7 +108,8 @@ void ExtensionRegistry::registerFactories() {
 
   // This filter applies socket tagging based on the x-envoy-mobile-socket-tag header.
   Extensions::HttpFilters::SocketTag::forceRegisterSocketTagFilterFactory();
-  // The k-v store allows caching things like DNS and prefered protocol across application restarts.
+  // The k-v store allows caching things like DNS and preferred protocol across application
+  // restarts.
   Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
   // This is Envoy's HCM filter, currently required for a functional L7 data plane.
   Extensions::NetworkFilters::HttpConnectionManager::
@@ -156,6 +153,9 @@ void ExtensionRegistry::registerFactories() {
   // Envoy Mobile uses the GetAddrInfo resolver for DNS lookups on android by default.
   // This could be compiled out for iOS.
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
+#if !defined(__APPLE__)
+  Network::forceRegisterCaresDnsResolverFactory();
+#endif
 
   Network::Address::forceRegisterIpResolver();
 
@@ -196,18 +196,6 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 #endif
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
-#endif
-
-#ifdef ENVOY_MOBILE_XDS
-  // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
-  // supports for xDS.
-  Config::forceRegisterAdsConfigSubscriptionFactory();
-  Config::forceRegisterGrpcConfigSubscriptionFactory();
-  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
-  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
-  Config::forceRegisterGrpcMuxFactory();
-  Config::forceRegisterNewGrpcMuxFactory();
-  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
 #endif
 }
 

@@ -2,7 +2,10 @@ package io.envoyproxy.envoymobile
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class HeadersBuilderTest {
   @Test
   fun `adding new header adds to list of header keys`() {

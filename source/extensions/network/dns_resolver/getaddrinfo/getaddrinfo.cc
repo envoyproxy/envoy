@@ -70,8 +70,8 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
   }
 
   std::list<DnsResponse> final_results;
-  switch (query.dns_lookup_family_)
-  case DnsLookupFamily::All: {
+  switch (query.dns_lookup_family_) {
+  case DnsLookupFamily::All:
     final_results = std::move(v4_results);
     final_results.splice(final_results.begin(), v6_results);
     break;
@@ -98,10 +98,10 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
     break;
   }
 
-    ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
-              accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
-                return dns_response.addrInfo().address_->asString();
-              }));
+  ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
+            accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
+              return dns_response.addrInfo().address_->asString();
+            }));
 
   return std::make_pair(ResolutionStatus::Success, final_results);
 }
@@ -114,6 +114,8 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     PendingQuerySharedPtr next_query;
     const bool reresolve =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
+    const bool treat_nodata_noname_as_success =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_nodata_noname_is_success");
     {
       absl::MutexLock guard(&mutex_);
       auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -135,6 +137,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
+    std::string details;
     {
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
@@ -155,44 +158,36 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         absl::MutexLock guard(&mutex_);
         pending_queries_.push_back(next_query);
         continue;
+      } else if (treat_nodata_noname_as_success &&
+                 (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
+        // Treat NONAME and NODATA as DNS records with no results.
+        // NODATA and NONAME are typically not transient failures, so we don't expect success if
+        // the DNS query is retried.
+        // NOTE: this is also how the c-ares resolver treats NONAME and NODATA:
+        // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
+        ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
+                  gai_strerror(rc.return_value_));
+        response = std::make_pair(ResolutionStatus::Success, std::list<DnsResponse>());
       } else {
-        // TODO(mattklein123): Handle some errors differently such as `EAI_NODATA`.
-        ENVOY_LOG(debug, "getaddrinfo failed with rc={} errno={}", gai_strerror(rc.return_value_),
-                  errorDetails(rc.errno_));
+        ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
+                  next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       }
+      details = gai_strerror(rc.return_value_);
     }
 
-    dispatcher_.post(
-        [finished_query = std::move(next_query), response = std::move(response)]() mutable {
-          if (finished_query->cancelled_) {
-            ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
-          } else {
-            finished_query->callback_(response.first, std::move(response.second));
-          }
-        });
+    dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
+                      details = std::string(details)]() mutable {
+      if (finished_query->cancelled_) {
+        ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
+      } else {
+        finished_query->callback_(response.first, std::move(details), std::move(response.second));
+      }
+    });
   }
 
   ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");
 }
-
-// getaddrinfo DNS resolver factory
-class GetAddrInfoDnsResolverFactory : public DnsResolverFactory,
-                                      public Logger::Loggable<Logger::Id::dns> {
-public:
-  std::string name() const override { return {"envoy.network.dns_resolver.getaddrinfo"}; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::network::dns_resolver::getaddrinfo::v3::
-                                         GetAddrInfoDnsResolverConfig()};
-  }
-
-  DnsResolverSharedPtr
-  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<GetAddrInfoDnsResolver>(dispatcher, api);
-  }
-};
 
 // Register the CaresDnsResolverFactory
 REGISTER_FACTORY(GetAddrInfoDnsResolverFactory, DnsResolverFactory);

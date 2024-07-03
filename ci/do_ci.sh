@@ -835,7 +835,7 @@ case $CI_TARGET in
             # define the 'release' builds as canonical and test them only in CI, so the
             # toolchain is kept consistent. This ifdef is checked in
             # test/common/stats/stat_test_utility.cc when computing
-            # Stats::TestUtil::MemoryTest::mode().
+            # Memory::TestUtil::MemoryTest::mode().
             if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
                 BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
             fi

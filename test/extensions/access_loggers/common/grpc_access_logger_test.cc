@@ -45,19 +45,40 @@ const Protobuf::MethodDescriptor& mockMethodDescriptor() {
 // standard Struct and Empty protos.
 class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
-                                      ProtobufWkt::Struct> {
+                                      ProtobufWkt::Struct>,
+      public Grpc::AsyncRequestCallbacks<ProtobufWkt::Struct> {
 public:
   MockGrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
       const Protobuf::MethodDescriptor& service_method, bool stream)
-      : GrpcAccessLogger(std::move(client), config, dispatcher, scope, access_log_prefix,
-                         service_method, stream) {}
+      : GrpcAccessLogger(config, dispatcher, scope, access_log_prefix,
+                         createGrpcAccessLoggClient(stream, client, service_method, config)) {}
+
+  std::unique_ptr<Common::GrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>
+  createGrpcAccessLoggClient(
+      bool stream, const Grpc::RawAsyncClientSharedPtr& client,
+      const Protobuf::MethodDescriptor& service_method,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
+    if (stream)
+      return std::make_unique<
+          Common::StreamingGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
+          client, service_method, GrpcCommon::optionalRetryPolicy(config));
+    return std::make_unique<
+        Common::UnaryGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
+        client, service_method, GrpcCommon::optionalRetryPolicy(config),
+        [this]() -> MockGrpcAccessLoggerImpl& { return *this; });
+  }
 
   int numInits() const { return num_inits_; }
 
   int numClears() const { return num_clears_; }
+
+  void onSuccess(Grpc::ResponsePtr<ProtobufWkt::Struct>&&, Tracing::Span&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+
+  void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override {}
 
 private:
   void mockAddEntry(const std::string& key) {

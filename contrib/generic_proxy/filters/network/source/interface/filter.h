@@ -13,20 +13,20 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-using ResponseUpdateFunction = std::function<void(Response&)>;
+using ResponseUpdateFunction = std::function<void(ResponseHeaderFrame&)>;
 
 /**
- * StreamFrameHandler to handle the frames from the stream (if exists).
+ * RequestFramesHandler to handle the frames from the stream (if exists).
  */
-class StreamFrameHandler {
+class RequestFramesHandler {
 public:
-  virtual ~StreamFrameHandler() = default;
+  virtual ~RequestFramesHandler() = default;
 
   /**
    * Handle the frame from the stream.
    * @param frame frame from the stream.
    */
-  virtual void onStreamFrame(StreamFramePtr frame) PURE;
+  virtual void onRequestCommonFrame(RequestCommonFramePtr frame) PURE;
 };
 
 /**
@@ -79,6 +79,11 @@ public:
    * @return const Network::Connection* downstream connection.
    */
   virtual const Network::Connection* connection() const PURE;
+
+  /**
+   * @return absl::string_view the filter config name that used to create the filter.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
 };
 
 class DecoderFilterCallback : public virtual StreamFilterCallbacks {
@@ -102,27 +107,27 @@ public:
 
   /**
    * Called when the upstream response frame is received. This should only be called once.
-   * @param response supplies the upstream response frame.
+   * @param frame supplies the upstream response frame.
    */
-  virtual void onResponseStart(StreamResponsePtr response) PURE;
+  virtual void onResponseHeaderFrame(ResponseHeaderFramePtr frame) PURE;
 
   /**
-   * Called when the upstream response frame is received. This should only be called once.
+   * Called when the upstream response frame is received.
    * @param frame supplies the upstream frame.
    */
-  virtual void onResponseFrame(StreamFramePtr frame) PURE;
+  virtual void onResponseCommonFrame(ResponseCommonFramePtr frame) PURE;
+
+  using RequestCommonFrameHandler = std::function<void(RequestCommonFramePtr)>;
 
   /**
-   * Register a request frames handler to used to handle the request frames (except the special
-   * StreamRequest frame).
-   * This handler will be Called when the filter chain is completed.
-   * @param handler supplies the request frames handler.
+   * Register a request frames handler to take the ownership of the common frames from the stream
+   * (if exists). This handler will be called after a common frame is processed by the L7 filter
+   * chain.
    *
-   * TODO(wbpcode): this is used by the terminal filter the handle the request frames because
-   * the filter chain doesn't support to handle extra frames. We should remove this when the
-   * filter chain supports to handle extra frames.
+   * @param handler supplies the request frames handler.
+   * NOTE: This handler should be set by the terminal filter only.
    */
-  virtual void setRequestFramesHandler(StreamFrameHandler& handler) PURE;
+  virtual void setRequestFramesHandler(RequestFramesHandler* handler) PURE;
 
   virtual void completeDirectly() PURE;
 };
@@ -132,7 +137,19 @@ public:
   virtual void continueEncoding() PURE;
 };
 
-enum class FilterStatus { Continue, StopIteration };
+// The status of the filter chain.
+// 1. Continue: If Continue is returned, the filter chain will continue to the next filter in the
+//    chain.
+// 2. StopIteration: If StopIteration is returned, the filter chain will stop and not continue
+//    to the next filter in the chain until the continueDecoding/continueEncoding is called.
+enum class HeaderFilterStatus { Continue, StopIteration };
+
+// The status of the filter chain.
+// 1. Continue: If Continue is returned, the filter chain will continue to the next filter in the
+//    chain.
+// 2. StopIteration: If StopIteration is returned, the filter chain will stop and not continue
+//    to the next filter in the chain until the continueDecoding/continueEncoding is called.
+enum class CommonFilterStatus { Continue, StopIteration };
 
 class DecoderFilter {
 public:
@@ -141,7 +158,9 @@ public:
   virtual void onDestroy() PURE;
 
   virtual void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) PURE;
-  virtual FilterStatus onStreamDecoded(StreamRequest& request) PURE;
+
+  virtual HeaderFilterStatus decodeHeaderFrame(RequestHeaderFrame& request) PURE;
+  virtual CommonFilterStatus decodeCommonFrame(RequestCommonFrame& request) PURE;
 };
 
 class EncoderFilter {
@@ -151,7 +170,9 @@ public:
   virtual void onDestroy() PURE;
 
   virtual void setEncoderFilterCallbacks(EncoderFilterCallback& callbacks) PURE;
-  virtual FilterStatus onStreamEncoded(StreamResponse& response) PURE;
+
+  virtual HeaderFilterStatus encodeHeaderFrame(ResponseHeaderFrame& response) PURE;
+  virtual CommonFilterStatus encodeCommonFrame(ResponseCommonFrame& response) PURE;
 };
 
 class StreamFilter : public DecoderFilter, public EncoderFilter {};

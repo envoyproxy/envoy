@@ -1,0 +1,20 @@
+---
+ Makefile    |    2 -
+ 1 files changed, 0(+), 2 deletions(-)
+
+diff --git a/dlb/libdlb/Makefile b/dlb/libdlb/Makefile
+index 0ff7c00..d2429ea 100644
+--- a/dlb/libdlb/Makefile
++++ b/dlb/libdlb/Makefile
+@@ -54,8 +54,6 @@ lib: $(LIB) $(SLIB)
+ 
+ $(BUILD_DIR):
+ 	@mkdir $@
+-	@echo copying dlb2_user.h, please make sure the driver was built.
+-	@cp $(DLB2_USER_HEADER_DIR)/dlb2_user.h .
+ 
+ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
+ 	@echo Compiling $@
+-- 
+2.25.1
+

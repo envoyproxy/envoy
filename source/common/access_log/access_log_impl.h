@@ -270,45 +270,6 @@ public:
    */
   static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3::AccessLog& config,
                                      Server::Configuration::FactoryContext& context);
-
-  /**
-   * Template method to create an access log filter from proto configuration for non-HTTP access
-   * loggers.
-   */
-  template <class Context>
-  static FilterBasePtr<Context>
-  accessLogFilterFromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                           Server::Configuration::FactoryContext& context) {
-    if (!config.has_extension_filter()) {
-      ExceptionUtil::throwEnvoyException(
-          "Access log filter: only extension filter is supported by non-HTTP access loggers.");
-    }
-
-    auto& factory = Config::Utility::getAndCheckFactory<ExtensionFilterFactoryBase<Context>>(
-        config.extension_filter());
-    return factory.createFilter(config.extension_filter(), context);
-  }
-
-  /**
-   * Template method to create an access logger instance from proto configuration for non-HTTP
-   * access loggers.
-   */
-  template <class Context>
-  static InstanceBaseSharedPtr<Context>
-  accessLoggerFromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                        Server::Configuration::FactoryContext& context) {
-    FilterBasePtr<Context> filter;
-    if (config.has_filter()) {
-      filter = accessLogFilterFromProto<Context>(config.filter(), context);
-    }
-
-    auto& factory =
-        Config::Utility::getAndCheckFactory<AccessLogInstanceFactoryBase<Context>>(config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        config, context.messageValidationVisitor(), factory);
-
-    return factory.createAccessLogInstance(*message, std::move(filter), context);
-  }
 };
 
 } // namespace AccessLog

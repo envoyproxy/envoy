@@ -32,11 +32,13 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
       proto_config.credential().typed_config(), context.messageValidationVisitor(),
       *config_factory);
   CredentialInjectorSharedPtr credential_injector =
-      config_factory->createCredentialInjectorFromProto(*message, context);
+      config_factory->createCredentialInjectorFromProto(
+          *message, stats_prefix + "credential_injector.", context);
 
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      std::move(credential_injector), proto_config.overwrite(),
-      proto_config.allow_request_without_credential(), stats_prefix, context.scope());
+  FilterConfigSharedPtr config =
+      std::make_shared<FilterConfig>(std::move(credential_injector), proto_config.overwrite(),
+                                     proto_config.allow_request_without_credential(),
+                                     stats_prefix + "credential_injector.", context.scope());
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CredentialInjectorFilter>(config));
   };

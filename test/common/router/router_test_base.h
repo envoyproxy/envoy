@@ -113,7 +113,7 @@ public:
   Event::MockTimer* per_try_idle_timeout_{};
   Event::MockTimer* max_stream_duration_timer_{};
   Network::Address::InstanceConstSharedPtr host_address_{
-      Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+      *Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   NiceMock<Http::MockRequestEncoder> original_encoder_;
   NiceMock<Http::MockRequestEncoder> second_encoder_;
   NiceMock<Network::MockConnection> connection_;

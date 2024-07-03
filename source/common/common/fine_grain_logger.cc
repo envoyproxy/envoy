@@ -85,7 +85,9 @@ std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
   std::string info =
       absl::StrJoin(*fine_grain_log_map_, "\n", [](std::string* out, const auto& log_pair) {
-        absl::StrAppend(out, "  ", log_pair.first, ": ", log_pair.second->level());
+        auto level_str_view = spdlog::level::to_string_view(log_pair.second->level());
+        absl::StrAppend(out, "  ", log_pair.first, ": ",
+                        absl::string_view(level_str_view.data(), level_str_view.size()));
       });
   return info;
 }

@@ -5,8 +5,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
 
-#include "library/cc/request_headers.h"
-#include "library/cc/request_trailers.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -17,8 +15,6 @@ class Stream {
 public:
   Stream(InternalEngine* engine, envoy_stream_t handle);
 
-  [[deprecated]] Stream& sendHeaders(RequestHeadersSharedPtr headers, bool end_stream);
-
   /**
    * Send the headers over an open HTTP stream. This function can be invoked
    * once and needs to be called before `sendData`.
@@ -28,8 +24,6 @@ public:
    */
   Stream& sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream);
 
-  [[deprecated]] Stream& sendData(envoy_data data);
-
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
    *
@@ -37,9 +31,12 @@ public:
    */
   Stream& sendData(Buffer::InstancePtr buffer);
 
+  /**
+   * Reads the data up to the number of `bytes_to_read`.
+   *
+   * @param bytes_to_read the number of bytes read
+   */
   Stream& readData(size_t bytes_to_read);
-
-  [[deprecated]] void close(RequestTrailersSharedPtr trailers);
 
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
@@ -49,8 +46,6 @@ public:
    */
   void close(Http::RequestTrailerMapPtr trailers);
 
-  [[deprecated]] void close(envoy_data data);
-
   /**
    * Send data over an open HTTP stream and closes the stream.. This method can only be invoked
    * once.
@@ -59,6 +54,7 @@ public:
    */
   void close(Buffer::InstancePtr buffer);
 
+  /** Cancels the stream. */
   void cancel();
 
 private:

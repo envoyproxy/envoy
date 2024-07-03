@@ -100,7 +100,8 @@ public:
                               bool encode_raw_headers, bool include_peer_certificate,
                               bool include_tls_session,
                               const Protobuf::Map<std::string, std::string>& destination_labels,
-                              const MatcherSharedPtr& request_header_matchers);
+                              const MatcherSharedPtr& allowed_headers_matcher,
+                              const MatcherSharedPtr& disallowed_headers_matcher);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -133,14 +134,16 @@ private:
                              const Envoy::Http::RequestHeaderMap& headers,
                              uint64_t max_request_bytes, bool pack_as_bytes,
                              bool encode_raw_headers,
-                             const MatcherSharedPtr& request_header_matchers);
+                             const MatcherSharedPtr& allowed_headers_matcher,
+                             const MatcherSharedPtr& disallowed_headers_matcher);
   static void setAttrContextRequest(
       envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
       const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
       const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-      bool encode_raw_headers, const MatcherSharedPtr& request_header_matchers);
+      bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
+      const MatcherSharedPtr& disallowed_headers_matcher);
   static void setTLSSession(envoy::service::auth::v3::AttributeContext::TLSSession& session,
-                            const Ssl::ConnectionInfoConstSharedPtr ssl_info);
+                            const Envoy::Network::Connection& connection);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };

@@ -3,7 +3,7 @@
 #include "test/common/stats/stat_test_utility.h"
 
 #include "gtest/gtest.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -18,8 +18,8 @@ envoy_stats_tags make_envoy_stats_tags(std::vector<std::pair<std::string, std::s
   new_tags.entries = tags;
 
   for (const auto& pair : pairs) {
-    envoy_data key = Data::Utility::copyToBridgeData(pair.first);
-    envoy_data value = Data::Utility::copyToBridgeData(pair.second);
+    envoy_data key = Bridge::Utility::copyToBridgeData(pair.first);
+    envoy_data value = Bridge::Utility::copyToBridgeData(pair.second);
     new_tags.entries[new_tags.length] = {key, value};
     new_tags.length++;
   }
