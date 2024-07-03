@@ -330,6 +330,10 @@ public:
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr, nullptr);
+    if (connection_buffer_limits_ != 0) {
+      client_connection_->setBufferLimits(connection_buffer_limits_);
+    }
+
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
@@ -556,6 +560,8 @@ public:
   bool skip_envoy_headers_{false};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
+  // Connection buffer limits, 0 means default limit from config is used.
+  uint32_t connection_buffer_limits_{0};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.
