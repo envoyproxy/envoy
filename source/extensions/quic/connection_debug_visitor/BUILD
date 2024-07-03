@@ -22,7 +22,6 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = [
         "//source/common/quic:__subpackages__",
-        "//test:__subpackages__",
     ],
     deps = [
         "//envoy/registry",
