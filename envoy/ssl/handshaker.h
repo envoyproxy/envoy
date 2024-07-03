@@ -197,8 +197,6 @@ class CertificateSelectionCallback {
 public:
   virtual ~CertificateSelectionCallback() = default;
 
-  virtual Event::Dispatcher& dispatcher() PURE;
-
   /**
    * Called when the asynchronous cert selection completes.
    * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.

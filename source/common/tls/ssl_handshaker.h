@@ -53,11 +53,8 @@ private:
 class CertificateSelectionCallbackImpl : public Ssl::CertificateSelectionCallback,
                                          protected Logger::Loggable<Logger::Id::connection> {
 public:
-  CertificateSelectionCallbackImpl(Event::Dispatcher& dispatcher,
-                                   SslExtendedSocketInfoImpl& extended_socket_info)
-      : dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {}
-
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  CertificateSelectionCallbackImpl(SslExtendedSocketInfoImpl& extended_socket_info)
+      : extended_socket_info_(extended_socket_info) {}
 
   void onCertificateSelectionResult(OptRef<const Ssl::TlsContext> selected_ctx,
                                     bool staple) override;
@@ -65,7 +62,6 @@ public:
   void onSslHandshakeCancelled();
 
 private:
-  Event::Dispatcher& dispatcher_;
   OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
 };
 

@@ -113,8 +113,7 @@ void SslExtendedSocketInfoImpl::onCertificateSelectionCompleted(
 
 Ssl::CertificateSelectionCallbackPtr
 SslExtendedSocketInfoImpl::createCertificateSelectionCallback() {
-  auto callback = std::make_unique<CertificateSelectionCallbackImpl>(
-      ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
+  auto callback = std::make_unique<CertificateSelectionCallbackImpl>(*this);
   cert_selection_callback_ = *callback;
   cert_selection_result_ = Ssl::CertificateSelectionStatus::Pending;
   return callback;

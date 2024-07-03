@@ -80,8 +80,9 @@ namespace Tls {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
-  TestTlsCertificateSelector(Ssl::TlsCertificateSelectorCallback& ctx, const Protobuf::Message&)
-      : ctx_(ctx) {}
+  TestTlsCertificateSelector(Event::Dispatcher& dispatcher,
+                             Ssl::TlsCertificateSelectorCallback& ctx, const Protobuf::Message&)
+      : dispatcher_(dispatcher), ctx_(ctx) {}
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
   }
@@ -97,7 +98,7 @@ public:
     case Ssl::SelectionResult::SelectionStatus::Pending:
       ENVOY_LOG_MISC(info, "debug: select cert async");
       cb_ = std::move(cb);
-      cb_->dispatcher().post([this] { selectTlsContextAsync(); });
+      dispatcher_.post([this] { selectTlsContextAsync(); });
       break;
     default:
       break;
@@ -117,6 +118,8 @@ public:
 
   const Ssl::TlsContext& getTlsContext() { return ctx_.getTlsContexts()[0]; }
 
+  // Used to create an async certificate ready event.
+  Event::Dispatcher& dispatcher_;
   Ssl::SelectionResult::SelectionStatus mod_;
 
 private:
@@ -139,7 +142,7 @@ public:
     return
         [&config, this](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorCallback& ctx) {
           ENVOY_LOG_MISC(info, "debug: init provider");
-          auto provider = std::make_unique<TestTlsCertificateSelector>(ctx, config);
+          auto provider = std::make_unique<TestTlsCertificateSelector>(*dispatcher_, ctx, config);
           provider->mod_ = mod_;
           return provider;
         };
@@ -150,6 +153,7 @@ public:
   std::string name() const override { return "test-tls-context-provider"; };
 
   CreateProviderHook selector_cb_;
+  Event::Dispatcher* dispatcher_;
   Ssl::SelectionResult::SelectionStatus mod_;
 };
 
@@ -227,11 +231,12 @@ protected:
     auto server_cfg =
         *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context);
 
+    Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     provider_factory_.mod_ = mod;
+    provider_factory_.dispatcher_ = dispatcher.get();
 
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
-    Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
         std::move(server_cfg), manager, *server_stats_store.rootScope(),
         std::vector<std::string>{});
