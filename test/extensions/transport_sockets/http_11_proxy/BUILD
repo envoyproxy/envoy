@@ -17,12 +17,17 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
+        "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
 

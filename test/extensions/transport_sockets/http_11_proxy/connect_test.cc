@@ -1,17 +1,24 @@
 #include "envoy/api/io_error.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.validate.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/connect.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/environment.h"
@@ -506,8 +513,10 @@ TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
       static_cast<UpstreamHttp11ConnectSocket*>(factory->createTransportSocket(tso, hd).release());
   EXPECT_THAT(ts, testing::NotNull());
 
-  // We never set any filter state metadata, so check if the proxy address is picked up.
-  EXPECT_EQ(proxy_addr, ts->proxyAddress());
+  // We never set any filter state metadata, so check if the factory gets the proxy address and that
+  // it causes us to not use legacy behavior.
+  EXPECT_TRUE(factory->proxyAddress().has_value());
+  EXPECT_EQ(proxy_addr, factory->proxyAddress().value());
   EXPECT_FALSE(ts->legacyBehavior());
 }
 
@@ -652,6 +661,37 @@ TEST(ParseTest, ContentLengthZeroHttp11) {
   EXPECT_THAT(parser.parser().contentLength(), Optional(0));
   EXPECT_FALSE(parser.parser().isChunked());
   EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+class SocketConfigFactoryTest : public testing::Test {};
+
+TEST_F(SocketConfigFactoryTest, VerifyConfigPropagatesProxyAddr) {
+  std::shared_ptr<UpstreamHttp11ConnectSocketConfigFactory> scf =
+      std::make_shared<UpstreamHttp11ConnectSocketConfigFactory>();
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+
+  const std::string addr = "1.1.1.1";
+  const uint32_t port = 1234;
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport cfg;
+  cfg.mutable_proxy_address()->set_port_value(port);
+  cfg.mutable_proxy_address()->set_address(addr);
+
+  auto inner_socket = cfg.mutable_transport_socket();
+  envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+  inner_socket->set_name("raw");
+  inner_socket->mutable_typed_config()->PackFrom(raw_buffer);
+
+  auto factory_result = scf->createTransportSocketFactory(cfg, factory_context);
+  EXPECT_TRUE(factory_result.ok());
+  auto factory = std::move(factory_result.value());
+
+  using MockHost = NiceMock<Upstream::MockHostDescription>;
+  auto host = std::make_shared<MockHost>();
+  auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
+  auto sock = static_cast<UpstreamHttp11ConnectSocket*>(
+      factory->createTransportSocket(tso, host).release());
+
+  EXPECT_FALSE(sock->legacyBehavior());
 }
 
 } // namespace

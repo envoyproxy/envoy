@@ -150,7 +150,6 @@ UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,
     std::shared_ptr<const Upstream::HostDescription> host) const {
-
   auto inner_socket = transport_socket_factory_->createTransportSocket(options, host);
   if (inner_socket == nullptr) {
     return nullptr;

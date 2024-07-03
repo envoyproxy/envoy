@@ -35,7 +35,6 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
-  absl::string_view proxyAddress() const { return proxy_address_; }
   bool legacyBehavior() const { return legacy_behavior_; }
 
 private:
@@ -47,7 +46,6 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   bool need_to_strip_connect_response_{};
-  absl::string_view proxy_address_;
   // The legacy behavior of this transport socket required configuration via filter state metadata
   // and only sent a CONNECT request if using a TLS transport to the target host.
   bool legacy_behavior_{};
@@ -58,6 +56,8 @@ public:
   UpstreamHttp11ConnectSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
       absl::optional<std::string> proto_proxy_address = absl::nullopt);
+
+  absl::optional<std::string> proxyAddress() const { return proto_proxy_address_; }
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
