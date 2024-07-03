@@ -408,25 +408,6 @@ TEST_F(ODCDTest, TestAllocate) {
   EXPECT_NE(handle, nullptr);
 }
 
-// Check that we create a valid handle for valid config source and resource locator.
-TEST_F(ODCDTest, TestAllocateWithLocator) {
-  envoy::config::core::v3::ConfigSource config;
-  ProtobufMessage::MockValidationVisitor mock_visitor;
-
-  config.mutable_api_config_source()->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
-  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
-  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
-  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
-      "static_cluster");
-
-  auto locator =
-      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar")
-          .value();
-  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
-  EXPECT_NE(handle, nullptr);
-}
-
 // Check if requesting for an unknown cluster calls into ODCDS instead of invoking the callback.
 TEST_F(ODCDTest, TestRequest) {
   auto cb = createCallback();

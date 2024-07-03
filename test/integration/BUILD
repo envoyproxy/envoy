@@ -174,25 +174,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "leds_integration_test",
-    size = "large",
-    srcs = ["leds_integration_test.cc"],
-    tags = [
-        "cpu:3",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//test/config:utility_lib",
-        "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_proto_library(
     name = "filter_manager_integration_proto",
     srcs = [":filter_manager_integration_test.proto"],
@@ -1120,9 +1101,10 @@ envoy_cc_test_library(
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_socket_lib",
+        # TODO&NOTE: Extensions shouln't exist here. Move to each standalone test target in order to not only clarify where these exnsions are used,
+        # but also enforce the exntesion visibility policy (See #35026). Extension tests must be placed under test/extensions/** instead of the core testing directory here.
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
-        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -1463,36 +1445,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "hds_integration_test",
-    size = "large",
-    srcs = ["hds_integration_test.cc"],
-    data = [
-        "//test/config/integration/certs",
-    ],
-    tags = [
-        "cpu:3",
-    ],
-    deps = [
-        ":http_integration_lib",
-        ":integration_lib",
-        "//envoy/upstream:upstream_interface",
-        "//source/common/config:metadata_lib",
-        "//source/common/json:json_loader_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:health_checker_lib",
-        "//source/common/upstream:health_discovery_service_lib",
-        "//test/common/upstream:utility_lib",
-        "//test/config:utility_lib",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:resources_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -2177,24 +2129,14 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test_library(
-    name = "scoped_rds_test_lib",
-    hdrs = ["scoped_rds.h"],
-    deps = [
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_cc_test(
     name = "scoped_rds_lib",
     size = "large",
+    srcs = [
+        "scoped_rds_integration_test.cc",
+    ],
     deps = [
         ":http_integration_lib",
-        ":scoped_rds_test_lib",
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
@@ -2204,6 +2146,11 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 

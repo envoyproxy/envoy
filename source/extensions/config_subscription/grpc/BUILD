@@ -101,10 +101,6 @@ envoy_cc_extension(
     name = "grpc_collection_subscription_lib",
     srcs = ["grpc_collection_subscription_factory.cc"],
     hdrs = ["grpc_collection_subscription_factory.h"],
-    extra_visibility = [
-        # previously considered core code.
-        "//test:__subpackages__",
-    ],
     deps = [
         ":grpc_subscription_impl_lib",
         "//envoy/config:subscription_interface",
