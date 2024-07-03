@@ -1369,7 +1369,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveIgnoreIPv4LoopbackAddress) {
   Event::MockTimer* timeout_timer =
       new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
 
-  // Set the IPv6 to be removed.
+  // Set the IPv4 to be removed.
   dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v4);
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
@@ -1449,12 +1449,25 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveWithDnsPreresolveHostnames) {
   Network::DnsResolver::ResolveCb resolve_cb;
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  initialize(/* preresolve_hostnames= */ {{"foo.com", 443}});
-  dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v6);
-  EXPECT_ENVOY_BUG(
-      resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
-                 TestUtility::makeDnsResponse({"::2"})),
-      "Unable to delete IP version addresses when DNS preresolve hostnames are not empty.");
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com:80",
+                                      DnsHostInfoEquals("127.0.0.2:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Success));
+
+  initialize(/* preresolve_hostnames= */ {{"foo.com", 80}});
+
+  dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v4);
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+             TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
+  EXPECT_NE(absl::nullopt, result.host_info_);
 }
 
 // DNS cache manager config tests.

@@ -371,15 +371,15 @@ void DnsCacheImpl::finishResolve(const std::string& host,
         if (config_.preresolve_hostnames_size() > 0) {
           IS_ENVOY_BUG(
               "Unable to delete IP version addresses when DNS preresolve hostnames are not empty.");
-          return;
+        } else {
+          response.remove_if([ip_version_to_remove =
+                                  *ip_version_to_remove_](const Network::DnsResponse& dns_resp) {
+            // Ignore the loopback address because a socket interface can still support both IPv4
+            // and IPv6 but has no outgoing IPv4/IPv6 connectivity.
+            return !Network::Utility::isLoopbackAddress(*dns_resp.addrInfo().address_) &&
+                   dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
+          });
         }
-        response.remove_if(
-            [ip_version_to_remove = *ip_version_to_remove_](const Network::DnsResponse& dns_resp) {
-              // Ignore the loopback address because a socket interface can still support both IPv4
-              // and IPv6 but has no outgoing IPv4/IPv6 connectivity.
-              return !Network::Utility::isLoopbackAddress(*dns_resp.addrInfo().address_) &&
-                     dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
-            });
       }
     }
   }
