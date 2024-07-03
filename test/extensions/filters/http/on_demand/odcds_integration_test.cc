@@ -10,10 +10,10 @@
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/extensions/config_subscription/scoped_rds_integration.h"
 #include "test/integration/ads_integration.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
-#include "test/integration/scoped_rds.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 

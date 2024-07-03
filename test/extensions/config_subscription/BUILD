@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
 )
@@ -9,6 +10,18 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "scoped_rds_integration_lib",
+    hdrs = ["scoped_rds_integration.h"],
+    deps = [
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "scoped_rds_integration",
     size = "large",
@@ -16,6 +29,7 @@ envoy_cc_test(
         "scoped_rds_integration.cc",
     ],
     deps = [
+        ":scoped_rds_integration_lib",
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

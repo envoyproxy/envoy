@@ -10,8 +10,8 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
+#include "test/extensions/config_subscription/scoped_rds_integration.h"
 #include "test/integration/http_integration.h"
-#include "test/integration/scoped_rds.h"
 #include "test/integration/vhds.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
