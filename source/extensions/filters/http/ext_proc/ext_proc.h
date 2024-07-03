@@ -145,19 +145,53 @@ private:
   std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
 };
 
+class ThreadLocalStreamManager;
+// TODO(tyxia) Make it configurable.
+inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 1000;
+
+// Deferred deletable stream wrapper.
+struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
+  explicit DeferredDeletableStream(ExternalProcessorStreamPtr stream,
+                                   ThreadLocalStreamManager& stream_manager,
+                                   const ExtProcFilterStats& stat)
+      : stream_(std::move(stream)), parent(stream_manager), stats(stat) {}
+
+  void deferredClose(Envoy::Event::Dispatcher& dispatcher, uint64_t stream_id);
+
+  void closeStreamOnTimer(uint64_t stream_id);
+  ExternalProcessorStreamPtr stream_;
+  ThreadLocalStreamManager& parent;
+  ExtProcFilterStats stats;
+  Event::TimerPtr derferred_close_timer;
+};
+
+using DeferredDeletableStreamPtr = std::unique_ptr<DeferredDeletableStream>;
+
 class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
-  // Store the ExternalProcessorStreamPtr in the map and return its raw pointer.
-  ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream) {
-    stream_manager_[filter] = std::move(stream);
-    return stream_manager_[filter].get();
+  // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
+  // pointer of ExternalProcessorStream.
+  ExternalProcessorStream* store(uint64_t stream_id, ExternalProcessorStreamPtr stream,
+                                 const ExtProcFilterStats& stat) {
+    stream_manager_[stream_id] =
+        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat);
+    return stream_manager_[stream_id]->stream_.get();
   }
 
-  void erase(Filter* filter) { stream_manager_.erase(filter); }
+  void erase(uint64_t stream_id) { stream_manager_.erase(stream_id); }
+
+  void deferredErase(uint64_t stream_id, Envoy::Event::Dispatcher& dispatcher) {
+    auto it = stream_manager_.find(stream_id);
+    if (it == stream_manager_.end()) {
+      return;
+    }
+
+    it->second->deferredClose(dispatcher, stream_id);
+  }
 
 private:
-  // Map of ExternalProcessorStreamPtrs with filter pointer as key.
-  absl::flat_hash_map<Filter*, ExternalProcessorStreamPtr> stream_manager_;
+  // Map of DeferredDeletableStreamPtrs with stream id as key.
+  absl::flat_hash_map<uint64_t, DeferredDeletableStreamPtr> stream_manager_;
 };
 
 class FilterConfig {
@@ -170,6 +204,8 @@ public:
                Server::Configuration::CommonFactoryContext& context);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool observabilityMode() const { return observability_mode_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
@@ -231,6 +267,7 @@ private:
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
   const bool failure_mode_allow_;
+  const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
       route_cache_action_;
   const std::chrono::milliseconds message_timeout_;
@@ -374,7 +411,8 @@ public:
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
 
-  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
+                    bool observability_mode = false);
   bool inHeaderProcessState() {
     return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
             encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
@@ -407,6 +445,17 @@ private:
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
   void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
+  Http::FilterHeadersStatus
+  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
+                                 bool end_stream);
+  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
+                                                     bool end_stream);
+  void deferredCloseStream();
+
+  envoy::service::ext_proc::v3::ProcessingRequest
+  buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
+                     bool end_stream, bool observability_mode);
+
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
@@ -437,6 +486,7 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
+  Http::StreamFilterCallbacks* filter_callbacks_;
 };
 
 extern std::string responseCaseToString(

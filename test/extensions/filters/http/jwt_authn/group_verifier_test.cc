@@ -82,16 +82,17 @@ public:
     for (const auto& it : statuses) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
-          .WillOnce(Invoke([issuer = it.first, status = it.second](
-                               Http::HeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
-                               SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-                               AuthenticatorCallback callback) {
-            if (status == Status::Ok) {
-              ProtobufWkt::Struct empty_struct;
-              set_extracted_jwt_data_cb(issuer, empty_struct);
-            }
-            callback(status);
-          }));
+          .WillOnce(
+              Invoke([issuer = it.first, status = it.second](
+                         Http::RequestHeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
+                         SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
+                         AuthenticatorCallback callback) {
+                if (status == Status::Ok) {
+                  ProtobufWkt::Struct empty_struct;
+                  set_extracted_jwt_data_cb(issuer, empty_struct);
+                }
+                callback(status);
+              }));
       EXPECT_CALL(*mock_auth, onDestroy());
       mock_auths_[it.first] = std::move(mock_auth);
     }
@@ -114,9 +115,10 @@ public:
     for (const auto& provider : providers) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
-          .WillOnce(Invoke([&, iss = provider](
-                               Http::HeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
-                               SetExtractedJwtDataCallback, AuthenticatorCallback callback) {
+          .WillOnce(Invoke([&, iss = provider](Http::RequestHeaderMap&, Tracing::Span&,
+                                               std::vector<JwtLocationConstPtr>*,
+                                               SetExtractedJwtDataCallback,
+                                               AuthenticatorCallback callback) {
             callbacks_[iss] = std::move(callback);
           }));
       EXPECT_CALL(*mock_auth, onDestroy());

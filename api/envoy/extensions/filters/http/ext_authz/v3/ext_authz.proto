@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -279,6 +279,17 @@ message ExtAuthz {
   // correctness checks for all header / query parameter mutations (e.g. for invalid characters).
   // This field allows the filter to reject mutations to specific headers.
   config.common.mutation_rules.v3.HeaderMutationRules decoder_header_mutation_rules = 26;
+
+  // Enable / disable ingestion of dynamic metadata from ext_authz service.
+  //
+  // If false, the filter will ignore dynamic metadata injected by the ext_authz service. If the
+  // ext_authz service tries injecting dynamic metadata, the filter will log, increment the
+  // ``ignored_dynamic_metadata`` stat, then continue handling the response.
+  //
+  // If true, the filter will ingest dynamic metadata entries as normal.
+  //
+  // If unset, defaults to true.
+  google.protobuf.BoolValue enable_dynamic_metadata_ingestion = 27;
 }
 
 // Configuration for buffering the request data.
