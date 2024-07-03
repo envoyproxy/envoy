@@ -2935,7 +2935,8 @@ TEST_P(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
       }));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
 
-  Buffer::OwnedImpl initial_response("HTTP/1.1 104 Upload Resumption Supported\r\nUpload-Draft-Interop-Version: 4\r\n\r\n");
+  Buffer::OwnedImpl initial_response(
+      "HTTP/1.1 104 Upload Resumption Supported\r\nUpload-Draft-Interop-Version: 4\r\n\r\n");
   auto status = codec_->dispatch(initial_response);
   EXPECT_TRUE(status.ok());
 
