@@ -343,7 +343,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(true);
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options);
+        client_->start(*this, config_with_hash_key_, options, decoder_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -890,7 +890,6 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-// TODO(tyxia) Add logging support for observability mode.
 void Filter::logGrpcStreamInfo() {
   if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
     const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();

@@ -115,7 +115,8 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
-absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
+absl::StatusOr<absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>>
+parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
@@ -123,7 +124,7 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
   for (const auto& it : config.typed_extension_protocol_options()) {
     auto& name = it.first;
     auto object_or_error = createProtocolOptionsConfig(name, it.second, factory_context);
-    THROW_IF_STATUS_NOT_OK(object_or_error, throw);
+    RETURN_IF_STATUS_NOT_OK(object_or_error);
     if (object_or_error.value() != nullptr) {
       options[name] = std::move(object_or_error.value());
     }
@@ -1050,6 +1051,9 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
   return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
 }
 
+using ProtocolOptionsHashMap =
+    absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>;
+
 ClusterInfoImpl::ClusterInfoImpl(
     Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
@@ -1065,7 +1069,8 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.has_eds_cluster_config()
               ? std::make_unique<std::string>(config.eds_cluster_config().service_name())
               : nullptr),
-      extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
+      extension_protocol_options_(THROW_OR_RETURN_VALUE(
+          parseExtensionProtocolOptions(config, factory_context), ProtocolOptionsHashMap)),
       http_protocol_options_(THROW_OR_RETURN_VALUE(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
@@ -1454,7 +1459,8 @@ absl::StatusOr<bool> validateTransportSocketSupportsQuic(
 }
 
 ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
-                                 ClusterFactoryContext& cluster_context)
+                                 ClusterFactoryContext& cluster_context,
+                                 absl::Status& creation_status)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }),
       runtime_(cluster_context.serverFactoryContext().runtime()),
@@ -1476,14 +1482,14 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   transport_factory_context_->setInitManager(init_manager_);
 
   auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);
-  THROW_IF_NOT_OK(socket_factory_or_error.status());
+  SET_AND_RETURN_IF_NOT_OK(socket_factory_or_error.status(), creation_status);
   auto* raw_factory_pointer = socket_factory_or_error.value().get();
 
-  auto socket_matcher =
-      THROW_OR_RETURN_VALUE(TransportSocketMatcherImpl::create(
-                                cluster.transport_socket_matches(), *transport_factory_context_,
-                                socket_factory_or_error.value(), *stats_scope),
-                            std::unique_ptr<TransportSocketMatcherImpl>);
+  auto socket_matcher_or_error = TransportSocketMatcherImpl::create(
+      cluster.transport_socket_matches(), *transport_factory_context_,
+      socket_factory_or_error.value(), *stats_scope);
+  SET_AND_RETURN_IF_NOT_OK(socket_matcher_or_error.status(), creation_status);
+  auto socket_matcher = std::move(*socket_matcher_or_error);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = server_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
@@ -1499,28 +1505,34 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN)) {
     if (!raw_factory_pointer->supportsAlpn()) {
-      throwEnvoyExceptionOrPanic(
+      creation_status = absl::InvalidArgumentError(
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
+      return;
     }
     if (!matcher_supports_alpn &&
         !runtime_.snapshot().featureEnabled(ClusterImplBase::DoNotValidateAlpnRuntimeKey, 0)) {
-      throwEnvoyExceptionOrPanic(fmt::format(
+      creation_status = absl::InvalidArgumentError(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));
+      return;
     }
   }
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
-    if (!THROW_OR_RETURN_VALUE(validateTransportSocketSupportsQuic(cluster.transport_socket()),
-                               bool)) {
-      throwEnvoyExceptionOrPanic(
+    absl::StatusOr<bool> supports_quic =
+        validateTransportSocketSupportsQuic(cluster.transport_socket());
+    SET_AND_RETURN_IF_NOT_OK(supports_quic.status(), creation_status);
+    if (!*supports_quic) {
+      creation_status = absl::InvalidArgumentError(
           fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {} {}",
                       cluster.name(), cluster.transport_socket().DebugString()));
+      return;
     }
 #else
-    throwEnvoyExceptionOrPanic("HTTP3 configured but not enabled in the build.");
+    creation_status = absl::InvalidArgumentError("HTTP3 configured but not enabled in the build.");
+    return;
 #endif
   }
 
@@ -1550,10 +1562,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         return absl::OkStatus();
       });
   // Drop overload configuration parsing.
-  absl::Status status = parseDropOverloadConfig(cluster.load_assignment());
-  if (!status.ok()) {
-    throwEnvoyExceptionOrPanic(std::string(status.message()));
-  }
+  SET_AND_RETURN_IF_NOT_OK(parseDropOverloadConfig(cluster.load_assignment()), creation_status);
 }
 
 namespace {

@@ -223,7 +223,7 @@ MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bo
   // Primitive types such as int32s and enums will not be serialized if they have the default value.
   // This flag disables that behavior.
   if (always_print_primitive_fields) {
-    json_options.always_print_primitive_fields = true;
+    json_options.always_print_fields_with_no_presence = true;
   }
   std::string json;
   if (auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
