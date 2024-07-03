@@ -371,6 +371,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
         if (config_.preresolve_hostnames_size() > 0) {
           IS_ENVOY_BUG(
               "Unable to delete IP version addresses when DNS preresolve hostnames are not empty.");
+          return;
         }
         response.remove_if(
             [ip_version_to_remove = *ip_version_to_remove_](const Network::DnsResponse& dns_resp) {
