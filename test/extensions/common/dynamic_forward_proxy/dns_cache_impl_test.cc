@@ -1455,7 +1455,8 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveWithDnsPreresolveHostnames) {
   EXPECT_CALL(update_callbacks_,
               onDnsResolutionComplete("foo.com:80",
                                       DnsHostInfoEquals("127.0.0.2:80", "foo.com", false),
-                                      Network::DnsResolver::ResolutionStatus::Success));
+                                      Network::DnsResolver::ResolutionStatus::Success))
+      .Times(AtLeast(1));
 
   initialize(/* preresolve_hostnames= */ {{"foo.com", 80}});
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
