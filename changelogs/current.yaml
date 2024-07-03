@@ -422,7 +422,9 @@ new_features:
     <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>` to support this change.
 - area: ext_proc
   change: |
-    Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
+    Added support for observability mode which deprecates
+    :ref:`observability_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.async_mode>`.
+    If enabled, each part of the HTTP request or response specified by ProcessingMode
     is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode that can be used by external
     processor to observe Envoy data and status.
 
