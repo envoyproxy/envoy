@@ -203,6 +203,10 @@ bug_fixes:
   change: |
     Fixed missing :ref:`additional addresses <envoy_v3_api_msg_config.endpoint.v3.Endpoint.AdditionalAddress>`
     for :ref:`LbEndpoint <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.endpoint>` in config dump.
+- area: ext_authz
+  change: |
+    Fixed fail-open behaviour of the failure_mode_allow config option when a grpc external authz server is used.
+    The behaviour can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
