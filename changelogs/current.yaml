@@ -16,6 +16,11 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http3
+  change: |
+    Added a "happy eyeballs" feature to HTTP/3 upstream, where it assuming happy eyeballs sorting results in alternating address
+    families will attempt the first v4 and v6 address before giving up on HTTP/3.  This change can be reverted by setting
+    ``envoy.reloadable_features.http3_happy_eyeballs`` to false.
 - area: http2
   change: |
     Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
@@ -130,6 +135,13 @@ minor_behavior_changes:
   change: |
     Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
     guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
+- area: jwt_authn
+  change: |
+    Changes the behavior of the
+    :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
+    config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
+    used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -422,6 +434,11 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: quic
+  change: |
+    Added :ref:`DataSourceServerPreferredAddressConfig
+    <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig>` for cases when
+    the control plane does not know the correct configuration for the server preferred address.
 - area: tls
   change: |
     added support to match against ``OtherName`` SAN Type under :ref:`match_typed_subject_alt_names
