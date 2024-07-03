@@ -11,6 +11,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
