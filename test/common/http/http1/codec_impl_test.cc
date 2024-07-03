@@ -2928,7 +2928,10 @@ TEST_P(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
   EXPECT_CALL(response_decoder, decode1xxHeaders_(_))
       .WillOnce(Invoke([&](ResponseHeaderMapPtr& headers) {
         EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version")).size(), 1);
-        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]->value().getStringView(), "4");
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]
+                      ->value()
+                      .getStringView(),
+                  "4");
       }));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
 
