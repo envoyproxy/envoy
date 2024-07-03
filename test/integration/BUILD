@@ -1291,7 +1291,6 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/access_loggers/stream:config",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
