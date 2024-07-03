@@ -4,8 +4,6 @@ load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_pr
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@rules_jvm_external//repositories.bzl", "rules_jvm_external_deps")
-
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -17,8 +15,6 @@ load(
 )
 
 EnvoyProtoDepsInfo = provider(fields = ["deps"])
-
-rules_jvm_external_deps()
 
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"

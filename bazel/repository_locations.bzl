@@ -1002,18 +1002,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/opencomputeproject/ocp-diag-core/blob/{version}/LICENSE",
     ),
-    rules_jvm_external = dict(
-        project_name = "Java Rules for Bazel",
-        project_desc = "Bazel rules for Java",
-        project_url = "https://github.com/bazelbuild/rules_jvm_external",
-        version = "6.1",
-        sha256 = "08ea921df02ffe9924123b0686dc04fd0ff875710bfadb7ad42badb931b0fd50",
-        urls = ["https://github.com/bazelbuild/rules_jvm_external/releases/download/{version}/rules_jvm_external-{version}.tar.gz"],
-        release_date = "2024-10-26",
-        use_category = ["build"],
-        license = "Apache-2.0",
-        license_url = "https://github.com/bazelbuild/rules_jvm_external/blob/{version}/LICENSE",
-    ),
     io_bazel_rules_go = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
