@@ -1441,6 +1441,22 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveIgnoreIPv6LoopbackAddress) {
   EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("[::1]:80", "foo.com", false));
 }
 
+TEST_F(DnsCacheImplTest, SetIpVersionToRemoveWithDnsPreresolveHostnames) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
+
+  Network::DnsResolver::ResolveCb resolve_cb;
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  initialize(/* preresolve_hostnames= */ {{"foo.com", 443}});
+  dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v6);
+  EXPECT_ENVOY_BUG(
+      resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+                 TestUtility::makeDnsResponse({"::2"})),
+      "Unable to delete IP version addresses when DNS preresolve hostnames are not empty.");
+}
+
 // DNS cache manager config tests.
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;

@@ -752,13 +752,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
-  for (const auto& [name, is_enabled] : runtime_guards_) {
-    if (name == "dns_cache_set_ip_version_to_remove" && is_enabled &&
-        !dns_preresolve_hostnames_.empty()) {
-      IS_ENVOY_BUG("Preresolve hostnames feature is not supported when "
-                   "'dns_cache_set_ip_version_to_remove' is enabled.");
-    }
-    (*reloadable_features.mutable_fields())[name].set_bool_value(is_enabled);
+  for (auto& guard_and_value : runtime_guards_) {
+    (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
+        guard_and_value.second);
   }
   (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
   (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
