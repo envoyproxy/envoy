@@ -147,10 +147,6 @@ class EnvoyConfigurationTest {
     )
   }
 
-  fun isEnvoyMobileXdsDisabled(): Boolean {
-    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null
-  }
-
   @Test
   fun `configuration default values`() {
     JniLibrary.loadTestLibrary()
