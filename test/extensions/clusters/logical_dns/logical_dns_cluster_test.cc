@@ -55,8 +55,10 @@ protected:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
+    absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<LogicalDnsCluster>(
-        new LogicalDnsCluster(cluster_config, factory_context, dns_resolver_));
+        new LogicalDnsCluster(cluster_config, factory_context, dns_resolver_, creation_status));
+    THROW_IF_NOT_OK(creation_status);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) {
           membership_updated_.ready();

@@ -365,11 +365,12 @@ void EnvoyQuicServerStream::OnConnectionClosed(const quic::QuicConnectionCloseFr
   // Run reset callback before closing the stream so that the watermark change will not trigger
   // callbacks.
   if (!local_end_stream_) {
-    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
-                                                                 session()->OneRttKeysAvailable())
-                          : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
-                      quic::QuicErrorCodeToString(frame.quic_error_code));
+    runResetCallbacks(
+        source == quic::ConnectionCloseSource::FROM_SELF
+            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                   session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+        absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|", frame.error_details));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(frame, source);
 }
