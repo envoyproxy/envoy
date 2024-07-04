@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/extensions/matching/http/metadata_input:metadata_input_lib",
         "@envoy_api//envoy/extensions/matching/input_matchers/metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
