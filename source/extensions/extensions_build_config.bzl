@@ -113,7 +113,7 @@ EXTENSIONS = {
     #
     # Dynamic Metadata Matching Input
     #
-    "envoy.matching.inputs.metadata_data_input":        "//source/extensions/matching/http/metadata_input:metadata_input_lib",
+    "envoy.matching.inputs.dynamic_metadata":           "//source/extensions/matching/http/metadata_input:metadata_input_lib",
 
     #
     # Matching actions
