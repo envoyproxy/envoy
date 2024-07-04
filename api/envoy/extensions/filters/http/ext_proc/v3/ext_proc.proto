@@ -260,7 +260,7 @@ message ExternalProcessor {
   // [#not-implemented-hide:]
   // Specifies the deferred closure timeout for gRPC stream that connects to external processor. Currently, the deferred stream closure
   // is only used in :ref:`observability_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.observability_mode>`.
-  // In observability mode, grpc streams may be held open to the external processor longer than the lifetime of the regular client to
+  // In observability mode, gRPC streams may be held open to the external processor longer than the lifetime of the regular client to
   // backend stream lifetime. In this case, Envoy will eventually timeout the external processor stream according to this time limit.
   // The default value is 5000 milliseconds (5 seconds) if not specified.
   google.protobuf.Duration deferred_close_timeout = 19;
