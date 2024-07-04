@@ -58,6 +58,8 @@ public:
 
   static ExportedFunctions exportedFunctions() { return {{"headers", static_luaHeaders}}; }
 
+  void onMarkDead() override { headers_wrapper_.reset(); }
+
 private:
   /**
    * @return a handle to the headers.
