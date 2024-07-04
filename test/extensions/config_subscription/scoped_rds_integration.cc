@@ -1,3 +1,5 @@
+#include "test/extensions/config_subscription/scoped_rds_integration.h"
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
