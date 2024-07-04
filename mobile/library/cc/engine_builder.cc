@@ -14,6 +14,8 @@
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
+#else
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #endif
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
@@ -458,19 +460,24 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
   dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
       "envoy.network.dns_resolver.apple");
-#else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
-  if (use_cares_) {
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.cares");
-  } else {
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.getaddrinfo");
-  }
-#endif
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
+#else
+  if (use_cares_) {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.cares");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
+  } else {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
+  }
+#endif
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();

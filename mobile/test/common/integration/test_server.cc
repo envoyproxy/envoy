@@ -1,5 +1,9 @@
 #include "test/common/integration/test_server.h"
 
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
+
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
@@ -24,337 +28,92 @@
 namespace Envoy {
 namespace {
 
-inline constexpr absl::string_view HTTP_PROXY_CONFIG = R"EOF(
-static_resources {
-  listeners {
-    name: "listener_proxy"
-    address {
-      socket_address {
-        address: "127.0.0.1"
-        port_value: 0
-      }
-    }
-    filter_chains {
-      filters {
-        name: "envoy.filters.network.http_connection_manager"
-        typed_config {
-          [type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager] {
-            stat_prefix: "remote_hcm"
-            route_config {
-              name: "remote_route"
-              virtual_hosts {
-                name: "remote_service"
-                domains: "*"
-                routes {
-                  match {
-                    prefix: "/"
-                  }
-                  route {
-                    cluster: "cluster_proxy"
-                  }
-                }
-              }
-              response_headers_to_add {
-                header {
-                  key: "x-proxy-response"
-                  value: "true"
-                }
-                append_action: OVERWRITE_IF_EXISTS_OR_ADD
-              }
-            }
-            http_filters {
-              name: "envoy.filters.http.local_error"
-              typed_config {
-                [type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError] {
-                }
-              }
-            }
-            http_filters {
-              name: "envoy.filters.http.dynamic_forward_proxy"
-              typed_config {
-                [type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig] {
-                  dns_cache_config {
-                    name: "base_dns_cache"
-                    dns_lookup_family: ALL
-                    dns_refresh_rate {
-                      seconds: 60
-                    }
-                    host_ttl {
-                      seconds: 86400
-                    }
-                    dns_failure_refresh_rate {
-                      base_interval {
-                        seconds: 2
-                      }
-                      max_interval {
-                        seconds: 10
-                      }
-                    }
-                    dns_query_timeout {
-                      seconds: 25
-                    }
-                    typed_dns_resolver_config {
-                      name: "envoy.network.dns_resolver.getaddrinfo"
-                      typed_config {
-                        [type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig] {
-                        }
-                      }
-                    }
-                    dns_min_refresh_rate {
-                      seconds: 20
-                    }
-                  }
-                }
-              }
-            }
-            http_filters {
-              name: "envoy.router"
-              typed_config {
-                [type.googleapis.com/envoy.extensions.filters.http.router.v3.Router] {
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  clusters {
-    name: "cluster_proxy"
-    connect_timeout {
-      seconds: 30
-    }
-    lb_policy: CLUSTER_PROVIDED
-    dns_lookup_family: ALL
-    cluster_type {
-      name: "envoy.clusters.dynamic_forward_proxy"
-      typed_config {
-        [type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig] {
-          dns_cache_config {
-            name: "base_dns_cache"
-            dns_lookup_family: ALL
-            dns_refresh_rate {
-              seconds: 60
-            }
-            host_ttl {
-              seconds: 86400
-            }
-            dns_failure_refresh_rate {
-              base_interval {
-                seconds: 2
-              }
-              max_interval {
-                seconds: 10
-              }
-            }
-            dns_query_timeout {
-              seconds: 25
-            }
-            typed_dns_resolver_config {
-              name: "envoy.network.dns_resolver.getaddrinfo"
-              typed_config {
-                [type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig] {
-                }
-              }
-            }
-            dns_min_refresh_rate {
-              seconds: 20
-            }
-          }
-        }
-      }
-    }
-  }
-}
-layered_runtime {
-  layers {
-    name: "static_layer_0"
-    static_layer {
-      fields {
-        key: "envoy"
-        value {
-          struct_value {
-            fields {
-              key: "disallow_global_stats"
-              value {
-                bool_value: true
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-)EOF";
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool http) {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
-inline constexpr absl::string_view HTTPS_PROXY_CONFIG = R"EOF(
-static_resources {
-  listeners {
-    name: "listener_proxy"
-    address {
-      socket_address {
-        address: "127.0.0.1"
-        port_value: 0
-      }
-    }
-    filter_chains {
-      filters {
-        name: "envoy.filters.network.http_connection_manager"
-        typed_config {
-          [type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager] {
-            stat_prefix: "remote_hcm"
-            route_config {
-              name: "remote_route"
-              virtual_hosts {
-                name: "remote_service"
-                domains: "*"
-                routes {
-                  match {
-                    connect_matcher {
-                    }
-                  }
-                  route {
-                    cluster: "cluster_proxy"
-                    upgrade_configs {
-                      upgrade_type: "CONNECT"
-                    }
-                  }
-                }
-              }
-              response_headers_to_add {
-                header {
-                  key: "x-response-header-that-should-be-stripped"
-                  value: "true"
-                }
-                append_action: OVERWRITE_IF_EXISTS_OR_ADD
-              }
-            }
-            http_filters {
-              name: "envoy.filters.http.local_error"
-              typed_config {
-                [type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError] {
-                }
-              }
-            }
-            http_filters {
-              name: "envoy.filters.http.dynamic_forward_proxy"
-              typed_config {
-                [type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig] {
-                  dns_cache_config {
-                    name: "base_dns_cache"
-                    dns_lookup_family: ALL
-                    dns_refresh_rate {
-                      seconds: 60
-                    }
-                    host_ttl {
-                      seconds: 86400
-                    }
-                    dns_failure_refresh_rate {
-                      base_interval {
-                        seconds: 2
-                      }
-                      max_interval {
-                        seconds: 10
-                      }
-                    }
-                    dns_query_timeout {
-                      seconds: 25
-                    }
-                    typed_dns_resolver_config {
-                      name: "envoy.network.dns_resolver.getaddrinfo"
-                      typed_config {
-                        [type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig] {
-                        }
-                      }
-                    }
-                    dns_min_refresh_rate {
-                      seconds: 20
-                    }
-                  }
-                }
-              }
-            }
-            http_filters {
-              name: "envoy.router"
-              typed_config {
-                [type.googleapis.com/envoy.extensions.filters.http.router.v3.Router] {
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+  auto* static_resources = bootstrap->mutable_static_resources();
+
+  auto* listener = static_resources->add_listeners();
+  listener->set_name("base_api_listener");
+  auto* base_address = listener->mutable_address();
+  base_address->mutable_socket_address()->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
+  base_address->mutable_socket_address()->set_address("127.0.0.1");
+  base_address->mutable_socket_address()->set_port_value(0);
+
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+  hcm.set_stat_prefix("remote hcm");
+  auto* route_config = hcm.mutable_route_config();
+  route_config->set_name("remote_route");
+  auto* remote_service = route_config->add_virtual_hosts();
+  remote_service->set_name("remote_service");
+  remote_service->add_domains("*");
+  auto* route = remote_service->add_routes();
+  route->mutable_route()->set_cluster("cluster_proxy");
+  if (http) {
+    route->mutable_match()->set_prefix("/");
+  } else {
+    route->mutable_match()->mutable_connect_matcher();
+    route->mutable_route()->add_upgrade_configs()->set_upgrade_type("CONNECT");
   }
-  clusters {
-    name: "cluster_proxy"
-    connect_timeout {
-      seconds: 30
-    }
-    lb_policy: CLUSTER_PROVIDED
-    dns_lookup_family: ALL
-    cluster_type {
-      name: "envoy.clusters.dynamic_forward_proxy"
-      typed_config {
-        [type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig] {
-          dns_cache_config {
-            name: "base_dns_cache"
-            dns_lookup_family: ALL
-            dns_refresh_rate {
-              seconds: 60
-            }
-            host_ttl {
-              seconds: 86400
-            }
-            dns_failure_refresh_rate {
-              base_interval {
-                seconds: 2
-              }
-              max_interval {
-                seconds: 10
-              }
-            }
-            dns_query_timeout {
-              seconds: 25
-            }
-            typed_dns_resolver_config {
-              name: "envoy.network.dns_resolver.getaddrinfo"
-              typed_config {
-                [type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig] {
-                }
-              }
-            }
-            dns_min_refresh_rate {
-              seconds: 20
-            }
-          }
-        }
-      }
-    }
+
+  auto* header_value_option = route->mutable_response_headers_to_add()->Add();
+  header_value_option->set_append_action(
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  header_value_option->mutable_header()->set_value("true");
+  if (http) {
+    header_value_option->mutable_header()->set_key("x-proxy-response");
+  } else {
+    header_value_option->mutable_header()->set_key("x-response-header-that-should-be-stripped");
   }
+
+  envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig dfp_config;
+  auto* dns_cache_config = dfp_config.mutable_dns_cache_config();
+  dns_cache_config->set_name("base_dns_cache");
+  dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+  dns_cache_config->mutable_host_ttl()->set_seconds(86400);
+  dns_cache_config->mutable_dns_min_refresh_rate()->set_seconds(20);
+  dns_cache_config->mutable_dns_refresh_rate()->set_seconds(60);
+  dns_cache_config->mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(2);
+  dns_cache_config->mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(10);
+  dns_cache_config->mutable_dns_query_timeout()->set_seconds(25);
+
+  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+      resolver_config;
+  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+      "envoy.network.dns_resolver.getaddrinfo");
+  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+      resolver_config);
+
+  auto* dfp_filter = hcm.add_http_filters();
+  dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
+  dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
+
+  auto* router_filter = hcm.add_http_filters();
+  envoy::extensions::filters::http::router::v3::Router router_config;
+  router_filter->set_name("envoy.router");
+  router_filter->mutable_typed_config()->PackFrom(router_config);
+
+  envoy::config::listener::v3::FilterChain* filter_chain = listener->add_filter_chains();
+  auto* filter = filter_chain->add_filters();
+  filter->set_name("envoy.filters.network.http_connection_manager");
+  filter->mutable_typed_config()->PackFrom(hcm);
+
+  // Base cluster config (DFP cluster config)
+  auto* base_cluster = static_resources->add_clusters();
+  base_cluster->set_name("cluster_proxy");
+  base_cluster->mutable_connect_timeout()->set_seconds(30);
+  base_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+  envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig base_cluster_config;
+  envoy::config::cluster::v3::Cluster::CustomClusterType base_cluster_type;
+  base_cluster_config.mutable_dns_cache_config()->CopyFrom(*dns_cache_config);
+  base_cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
+  base_cluster_type.mutable_typed_config()->PackFrom(base_cluster_config);
+  base_cluster->mutable_cluster_type()->CopyFrom(base_cluster_type);
+
+  return bootstrap;
 }
-layered_runtime {
-  layers {
-    name: "static_layer_0"
-    static_layer {
-      fields {
-        key: "envoy"
-        value {
-          struct_value {
-            fields {
-              key: "disallow_global_stats"
-              value {
-                bool_value: true
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-)EOF";
+
 } // namespace
 
 TestServer::TestServer()
@@ -415,10 +174,10 @@ void TestServer::start(TestServerType type) {
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
 
-    std::string config_path =
-        TestEnvironment::writeStringToFileForTest("config.pb_text", std::string(HTTP_PROXY_CONFIG));
-    test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,
-                                                 nullptr, nullptr, {}, time_system_, *api_);
+    test_server_ = IntegrationTestServer::create(
+        "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
+        absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
+        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(true));
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Http proxy is now running");
     return;
@@ -427,10 +186,10 @@ void TestServer::start(TestServerType type) {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
-    std::string config_path = TestEnvironment::writeStringToFileForTest(
-        "config.pb_text", std::string(HTTPS_PROXY_CONFIG));
-    test_server_ = IntegrationTestServer::create(config_path, Network::Address::IpVersion::v4,
-                                                 nullptr, nullptr, {}, time_system_, *api_);
+    test_server_ = IntegrationTestServer::create(
+        "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
+        absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
+        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(false));
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Https proxy is now running");
     return;
