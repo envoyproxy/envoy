@@ -500,6 +500,73 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstancePro
                                  "service_internal-ap-southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
+
+class CdsInteractionTest : public testing::Test, public HttpIntegrationTest {
+public:
+  CdsInteractionTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
+
+  void addStandardFilter(bool downstream = true) {
+    config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, downstream);
+  }
+};
+
+TEST_F(CdsInteractionTest, ClusterRemovalRecreatesCluster) {
+
+  // Web Identity Credentials only
+
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
+
+  CdsHelper cds_helper_;
+
+  // Add CDS cluster using cds helper
+  config_helper_.addConfigModifier(
+      [&cds_helper_](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+            envoy::config::core::v3::ApiVersion::V3);
+        bootstrap.mutable_dynamic_resources()
+            ->mutable_cds_config()
+            ->mutable_path_config_source()
+            ->set_path(cds_helper_.cdsPath());
+        bootstrap.mutable_static_resources()->clear_clusters();
+      });
+
+  // Don't validate clusters so we can use the CDS cluster as a route target
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+
+  addStandardFilter();
+
+  // Use CDS helper to add initial CDS cluster
+  envoy::config::cluster::v3::Cluster cluster_;
+  cluster_.mutable_connect_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+  cluster_.set_name("cluster_0");
+  cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+
+  cds_helper_.setCds({cluster_});
+
+  initialize();
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 2);
+
+  cluster_.set_name("testing");
+  cds_helper_.setCds({cluster_});
+
+  // Should delete our sts cluster and cluster_0
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
+                                 "service_internal-ap-southeast-2.clusters_removed_by_cds",
+                                 1, std::chrono::seconds(5));
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
+                                 "service_internal-ap-southeast-2.clusters_readded_after_cds",
+                                 1, std::chrono::seconds(5));
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common
