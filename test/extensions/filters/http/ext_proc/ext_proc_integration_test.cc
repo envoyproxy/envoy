@@ -1023,7 +1023,6 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
 }
 
 TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
-  // Allows route mutation.
   proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
   // Skip the header processing on response path.
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
