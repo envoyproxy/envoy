@@ -452,6 +452,10 @@ new_features:
   change: |
     Added support for flow control in Envoy gRPC side stream. This behavior can be disabled by setting the runtime flag
     ``envoy.reloadable_features.grpc_side_stream_flow_control`` to false.
+- area: oauth
+  change: |
+    Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_id_token_set_cookie>`
+    to disable setting the ID Token cookie.
 
 deprecated:
 - area: tracing
