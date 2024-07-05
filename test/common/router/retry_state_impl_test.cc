@@ -838,7 +838,6 @@ TEST_F(RouterRetryStateImplTest, PolicyResetRemoteReset) {
   EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
-
 TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();

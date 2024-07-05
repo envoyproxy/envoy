@@ -973,8 +973,76 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   EXPECT_EQ(512U, response->body().size());
 }
 
-void HttpIntegrationTest::testRetryOnResetBeforeRequest() {
+void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "reset-before-request"}});
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1024, true);
+  waitForNextUpstreamRequest();
+  // Reset the upstream connection after the headers have been sent
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  // We should get no new stream/retry
+  // waitForNextUpstreamRequest(); // Should fail
+  ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  cleanupUpstreamAndDownstream();
+}
+
+void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestBeforeHeaders() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "reset-before-request"}});
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Reset the upstream connection before the headers have been sent
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  // We should get a retry
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
 }
 
 void HttpIntegrationTest::testRetry() {

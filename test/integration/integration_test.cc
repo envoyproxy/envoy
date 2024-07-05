@@ -525,6 +525,14 @@ TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   testEnvoyProxying1xx(true);
 }
 
+TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestAfterHeaders) {
+  testRouterRetryOnResetBeforeRequestAfterHeaders();
+}
+
+TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
+  testRouterRetryOnResetBeforeRequestBeforeHeaders();
+}
+
 // Test the x-envoy-is-timeout-retry header is set to false for retries that are not
 // initiated by timeouts.
 TEST_P(IntegrationTest, RouterIsTimeoutRetryHeader) {

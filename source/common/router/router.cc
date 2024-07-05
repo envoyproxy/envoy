@@ -1185,9 +1185,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 }
 
-void Filter::onHeadersTransmittedToUpstream() {
-  upstream_request_started_ = true;
-}
+void Filter::onHeadersTransmittedToUpstream() { upstream_request_started_ = true; }
 
 void Filter::onPerTryIdleTimeout(UpstreamRequest& upstream_request) {
   onPerTryTimeoutCommon(upstream_request,
@@ -1339,6 +1337,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   // the request headers to the upstream, then don't retry
   if (route_entry_->retryPolicy().retryOn() & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST &&
       upstream_request_started_) {
+
     return false;
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
