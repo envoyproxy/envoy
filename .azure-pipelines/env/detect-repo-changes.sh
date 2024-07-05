@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 # Only exclude checks in pull requests.
-if [[ $(Build.Reason) != "PullRequest" ]]; then
+if [[ $BUILD_REASON != "PullRequest" ]]; then
     echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
     echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
     echo "##vso[task.setvariable variable=examplesOnly;isoutput=true]false"
@@ -9,7 +9,7 @@ if [[ $(Build.Reason) != "PullRequest" ]]; then
     exit 0
 fi
 
-CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
+CHANGE_TARGET="origin/${TARGET_BRANCH}"
 
 echo "Comparing changes ${CHANGE_TARGET}...HEAD"
 CHANGED_PATHS=$(git diff --name-only "${CHANGE_TARGET}"...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')

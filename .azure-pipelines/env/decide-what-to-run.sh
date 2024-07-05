@@ -6,21 +6,21 @@ RUN_DOCKER=true
 RUN_PACKAGING=true
 RUN_RELEASE_TESTS=true
 
-if [[ "$(changed.mobileOnly)" == true || "$(changed.docsOnly)" == true ]]; then
+if [[ $CHANGED_MOBILE_ONLY == true || $CHANGED_DOCS_ONLY == true ]]; then
     RUN_BUILD=false
     RUN_CHECKS=false
     RUN_DOCKER=false
     RUN_PACKAGING=false
 fi
-if [[ "$(changed.examplesOnly)" == true ]]; then
+if [[ $CHANGED_EXAMPLES_ONLY == true ]]; then
     RUN_CHECKS=false
 fi
-if [[ "$ISSTABLEBRANCH" == True && -n "$POSTSUBMIT" && "$(state.isDev)" == false ]]; then
+if [[ "$ISSTABLEBRANCH" == True && -n "$POSTSUBMIT" && $STATE_ISDEV == false ]]; then
     RUN_RELEASE_TESTS=false
 fi
 
 # Run ~everything in postsubmit
-if [[ "$(Build.Reason)" != "PullRequest" ]]; then
+if [[ $BUILD_REASON != "PullRequest" ]]; then
     echo "##vso[task.setvariable variable=build;isoutput=true]true"
     echo "##vso[task.setvariable variable=checks;isoutput=true]true"
     echo "##vso[task.setvariable variable=docker;isoutput=true]true"
