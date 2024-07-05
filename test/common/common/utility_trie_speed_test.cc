@@ -48,7 +48,7 @@ template <class TableType> static void typedBmTrieLookups(benchmark::State& stat
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   int num_keys = state.range(0);
   int key_length = state.range(1);
-  std::uniform_int_distribution<> char_distribution('a', 'z');
+  std::uniform_int_distribution<short> char_distribution('a', 'z');
   std::uniform_int_distribution<size_t> key_length_distribution(key_length == 0 ? 8 : key_length,
                                                                 key_length == 0 ? 128 : key_length);
   auto make_key = [&](size_t len) {
