@@ -166,6 +166,21 @@ public:
     return ret;
   }
 
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
+    last_local_address_ = local_address;
+    last_peer_address_ = peer_address;
+    EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
+                                             receive_time, tos);
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
+    return last_local_address_;
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastPeerAddress() const { return last_peer_address_; }
+
 private:
   Event::Dispatcher& dispatcher_;
   bool saw_path_response_{false};
@@ -175,6 +190,8 @@ private:
   bool waiting_for_handshake_done_{false};
   bool waiting_for_new_cid_{false};
   bool validation_failure_on_path_response_{false};
+  Network::Address::InstanceConstSharedPtr last_local_address_;
+  Network::Address::InstanceConstSharedPtr last_peer_address_;
 };
 
 // A test that sets up its own client connection with customized quic version and connection ID.
@@ -843,6 +860,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   EXPECT_EQ(4u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
                     &quic_connection_->sent_packet_manager()));
 
+  Network::Address::InstanceConstSharedPtr last_peer_addr = quic_connection_->getLastPeerAddress();
+  Network::Address::InstanceConstSharedPtr last_local_addr =
+      quic_connection_->getLastLocalAddress();
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
@@ -855,6 +875,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   while (!quic_connection_->IsHandshakeConfirmed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+
+  EXPECT_EQ(last_peer_addr.get(), quic_connection_->getLastPeerAddress().get());
+  EXPECT_EQ(last_local_addr.get(), quic_connection_->getLastLocalAddress().get());
 
   // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -872,6 +895,8 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_NE(last_peer_addr.get(), quic_connection_->getLastPeerAddress().get());
+  EXPECT_NE(last_local_addr.get(), quic_connection_->getLastLocalAddress().get());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());

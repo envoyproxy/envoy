@@ -17,6 +17,7 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -2480,9 +2481,9 @@ TEST_P(Http1ServerConnectionImplTest,
   EXPECT_TRUE(status.ok());
 
   // Dumps the header map without allocating memory
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
 
   // Check dump contents for completed headers and partial headers.
   EXPECT_THAT(
@@ -2520,9 +2521,9 @@ TEST_P(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_CALL(decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
-        Stats::TestUtil::MemoryTest memory_test;
+        Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-        EXPECT_EQ(memory_test.consumedBytes(), 0);
+        EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
       }))
       .WillOnce(Invoke([]() {}));
 
@@ -3874,9 +3875,9 @@ TEST_P(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_CALL(response_decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
-        Stats::TestUtil::MemoryTest memory_test;
+        Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-        EXPECT_EQ(memory_test.consumedBytes(), 0);
+        EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
       }))
       .WillOnce(Invoke([]() {}));
 
@@ -3917,9 +3918,9 @@ TEST_P(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
 
   EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce(InvokeWithoutArgs([&]() {
     // dumpState here before buffers are drained. No memory should be allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 1);
-    EXPECT_EQ(memory_test.consumedBytes(), 0);
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   }));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");
@@ -5283,14 +5284,8 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
       {"transfer-encoding", "chunked"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual("Hello World"), false));
-    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
-  } else {
-    EXPECT_CALL(decoder,
-                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-  }
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
 
   // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
@@ -5299,11 +5294,10 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
                            "0\r\n\r\n");
   // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0u, buffer.length());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_CHUNK_EXTENSION");
   } else {
-    EXPECT_TRUE(isCodecProtocolError(status));
 #ifdef ENVOY_ENABLE_UHV
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
 #else
@@ -5328,13 +5322,6 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
   };
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("Hello World"), false));
-    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
-  }
-
   // SPELLCHECKER(off)
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
                            "6;\ra\r\nHello \r\n"
@@ -5342,11 +5329,10 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
                            "0\r\n\r\n");
   // SPELLCHECKER(on)
   auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    EXPECT_TRUE(status.ok());
-    EXPECT_EQ(0u, buffer.length());
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_CHUNK_EXTENSION");
   } else {
-    EXPECT_TRUE(isCodecProtocolError(status));
 #ifdef ENVOY_ENABLE_UHV
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
 #else

@@ -47,7 +47,7 @@ Change directory to ``examples/websocket`` in the Envoy repository.
 Step 2: Build and start the sandbox
 ***********************************
 
-This starts three proxies listening on ``localhost`` ports ``10000-30000``.
+This starts four proxies listening on ``localhost`` ports ``10000``, ``15000``, ``20000``, ``30000``.
 
 It also starts two upstream services, one ``ws`` and one ``wss``.
 
@@ -65,6 +65,7 @@ The socket servers are very trivial implementations, that simply output ``[ws] H
               Name                             Command               State            Ports
   ---------------------------------------------------------------------------------------------------
   websocket_proxy-ws_1                /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
+  websocket_proxy-ws-route_1          /docker-entrypoint.sh /usr ... Up      0.0.0.0:15000->10000/tcp
   websocket_proxy-wss_1               /docker-entrypoint.sh /usr ... Up      0.0.0.0:20000->10000/tcp
   websocket_proxy-wss-passthrough_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:30000->10000/tcp
   websocket_service-ws_1              websocat -E ws-listen:0.0. ... Up
@@ -99,7 +100,43 @@ You can start an interactive session with the socket as follows:
 
 Type ``Ctrl-c`` to exit the socket session.
 
-Step 4: Test proxying ``wss`` -> ``wss``
+Step 4: Test proxying ``ws`` -> ``ws`` on specific route
+********************************************************
+
+The proxy listening on port ``15000`` terminates the WebSocket connection without ``TLS`` on specific route ``/ws`` and then proxies
+to an upstream socket, also without ``TLS``.
+
+In order for Envoy to terminate the WebSocket connection, the
+:ref:`upgrade_configs <envoy_v3_api_msg_config.route.v3.RouteAction.UpgradeConfig>`
+in :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>`
+must be set, as can be seen in the provided :download:`ws -> ws configuration <_include/websocket/envoy-ws-route.yaml>`:
+
+.. literalinclude:: _include/websocket/envoy-ws-route.yaml
+   :language: yaml
+   :lines: 19-25
+   :linenos:
+   :emphasize-lines: 6-7
+   :caption: :download:`envoy-ws-route.yaml <_include/websocket/envoy-ws-route.yaml>`
+
+You can start an interactive session with the socket as follows:
+
+.. code-block:: console
+
+   $ docker run -ti --network=host solsson/websocat ws://localhost:15000/ws
+   HELO
+   [ws] HELO
+   GOODBYE
+   [ws] HELO
+
+   $ curl http://localhost:15000
+   NotWebSocket
+
+   $ curl http://localhost:15000/ws
+   Only WebSocket connections are welcome here
+
+Type ``Ctrl-c`` to exit the socket session.
+
+Step 5: Test proxying ``wss`` -> ``wss``
 ****************************************
 
 The proxy listening on port ``20000`` terminates the WebSocket connection with ``TLS`` and then proxies
@@ -125,7 +162,7 @@ You can start an interactive session with the socket as follows:
 
 Type ``Ctrl-c`` to exit the socket session.
 
-Step 5: Test proxying ``wss`` passthrough
+Step 6: Test proxying ``wss`` passthrough
 *****************************************
 
 The proxy listening on port ``30000`` passes through all ``TCP`` traffic to an upstream ``TLS`` WebSocket.

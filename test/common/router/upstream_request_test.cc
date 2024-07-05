@@ -4,6 +4,7 @@
 #include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/test_common/test_runtime.h"
 
@@ -226,7 +227,7 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   // Dump State
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   upstream_request_->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 
