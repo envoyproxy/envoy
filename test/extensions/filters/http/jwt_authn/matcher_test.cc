@@ -253,6 +253,19 @@ TEST_F(MatcherTest, TestMatchPathSeparatedPrefixBaseCondition) {
   EXPECT_FALSE(matcher->matches(headers));
 }
 
+TEST_F(MatcherTest, TestMatchPathMatchPolicy) {
+  const char config[] = R"(match:
+  path_match_policy:
+    name: envoy.path.match.uri_template.uri_template_matcher
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+      path_template: "/bar/*/foo"
+  )";
+  MatcherConstPtr matcher = createMatcher(config);
+  auto headers = TestRequestHeaderMapImpl{{":path", "/bar/test/foo"}};
+  EXPECT_TRUE(matcher->matches(headers));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

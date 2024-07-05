@@ -7,6 +7,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/http/path_utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/config_impl.h"
 
 #include "absl/strings/match.h"
@@ -188,6 +189,33 @@ private:
 };
 } // namespace
 
+class PathMatchPolicyMatcherImpl : public BaseMatcherImpl {
+public:
+  PathMatchPolicyMatcherImpl(const RequirementRule& rule,
+                             Server::Configuration::CommonFactoryContext& context)
+      : BaseMatcherImpl(rule, context) {
+    auto& factory = Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(
+        rule.match().path_match_policy());
+    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        rule.match().path_match_policy().typed_config(),
+        ProtobufMessage::getStrictValidationVisitor(), factory);
+
+    uri_template_matcher_ = factory.createPathMatcher(*config).value();
+  }
+
+  bool matches(const Http::RequestHeaderMap& headers) const override {
+    if (BaseMatcherImpl::matchRoute(headers) &&
+        uri_template_matcher_->match(headers.getPathValue())) {
+      return true;
+    }
+
+    return false;
+  }
+
+private:
+  Router::PathMatcherSharedPtr uri_template_matcher_;
+};
+
 MatcherConstPtr Matcher::create(const RequirementRule& rule,
                                 Server::Configuration::CommonFactoryContext& context) {
   switch (rule.match().path_specifier_case()) {
@@ -201,10 +229,9 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule,
     return std::make_unique<ConnectMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule, context);
-  case RouteMatch::PathSpecifierCase::kPathMatchPolicy:
-    // TODO(silverstar194): Implement matcher for template based match
-    throw EnvoyException("RouteMatch: path_match_policy is not supported");
-    break;
+  case RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
+    return std::make_unique<PathMatchPolicyMatcherImpl>(rule, context);
+  }
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
