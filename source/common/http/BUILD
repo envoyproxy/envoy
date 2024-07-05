@@ -499,6 +499,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "http_option_limits_lib",
+    srcs = ["http_option_limits.cc"],
+    hdrs = ["http_option_limits.h"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -513,6 +519,7 @@ envoy_cc_library(
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
+        ":http_option_limits_lib",
         ":message_lib",
         "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",

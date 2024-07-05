@@ -11,9 +11,6 @@ def jvm_flags(lib_name):
     ] + select({
         "@envoy//bazel:disable_google_grpc": ["-Denvoy_jni_google_grpc_disabled=true"],
         "//conditions:default": [],
-    }) + select({
-        "@envoy//bazel:disable_envoy_mobile_xds": ["-Denvoy_jni_envoy_mobile_xds_disabled=true"],
-        "//conditions:default": [],
     })
 
 def _contains_all(srcs, extension):
