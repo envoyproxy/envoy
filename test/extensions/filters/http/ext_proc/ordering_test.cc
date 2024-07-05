@@ -867,7 +867,7 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 
-  // Now fire the timeout and expect a 500 error
+  // Now fire the timeout and expect a 504 error
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   request_timer->invokeCallback();
 }
