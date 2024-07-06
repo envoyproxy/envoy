@@ -24,6 +24,102 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 } // namespace Router
 namespace Http {
 
+class SidestreamWatermarkCallbacks {
+public:
+  virtual ~SidestreamWatermarkCallbacks() = default;
+
+  /**
+   * Called when the sidestream connection or stream goes over its high watermark. Note that this
+   * may be called separately for both the stream going over and the connection going over. It
+   * is the responsibility of the sidestreamWatermarkCallbacks implementation to handle unwinding
+   * multiple high and low watermark calls.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when the sidestream connection or stream goes from over its high watermark to under its
+   * low watermark. As with onAboveWriteBufferHighWatermark above, this may be called independently
+   * when both the stream and the connection go under the low watermark limit, and the callee must
+   * ensure that the flow of data does not resume until all callers which were above their high
+   * watermarks have gone below.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+class DecoderFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks {
+public:
+  DecoderFilterSidestreamWatermarkCallbacks() = default;
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* callback) {
+    callback_ = callback;
+  }
+  void onAboveWriteBufferHighWatermark() final {
+    if (callback_ != nullptr) {
+      // TODO(tyxia) Change to Envoy bug
+      callback_->onDecoderFilterAboveWriteBufferHighWatermark();
+    } else {
+    }
+  }
+
+  void onBelowWriteBufferLowWatermark() final {
+    if (callback_ != nullptr) {
+      callback_->onDecoderFilterBelowWriteBufferLowWatermark();
+    } else {
+      // TODO(tyxia) Change to Envoy bug
+    }
+  }
+
+  void resetFilterCallbacks() { callback_ = nullptr; }
+
+private:
+  Http::StreamDecoderFilterCallbacks* callback_ = nullptr;
+};
+
+class StreamFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks {
+public:
+  StreamFilterSidestreamWatermarkCallbacks() = default;
+
+  void onAboveWriteBufferHighWatermark() final {
+    if (decode_callback_ != nullptr) {
+      decode_callback_->onDecoderFilterAboveWriteBufferHighWatermark();
+    } else {
+    }
+
+    if (encode_callback_ != nullptr) {
+      encode_callback_->onEncoderFilterAboveWriteBufferHighWatermark();
+    } else {
+    }
+  }
+
+  void onBelowWriteBufferLowWatermark() final {
+    if (decode_callback_ != nullptr) {
+      decode_callback_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+
+    if (encode_callback_ != nullptr) {
+      encode_callback_->onEncoderFilterBelowWriteBufferLowWatermark();
+    } else {
+    }
+  }
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* decode_callback) {
+    decode_callback_ = decode_callback;
+  }
+
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks* encode_callback) {
+    encode_callback_ = encode_callback;
+  }
+
+  void resetFilterCallbacks() {
+    decode_callback_ = nullptr;
+    encode_callback_ = nullptr;
+  }
+
+private:
+  Http::StreamDecoderFilterCallbacks* decode_callback_ = nullptr;
+  Http::StreamEncoderFilterCallbacks* encode_callback_ = nullptr;
+};
+
 /**
  * Supports sending an HTTP request message and receiving a response asynchronously.
  */
@@ -191,7 +287,7 @@ public:
      * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
      * will trigger ENVOY_BUG.
      */
-    virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
+    virtual void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) PURE;
 
     /***
      * Remove previously set watermark callbacks. If there's no watermark callback registered, this

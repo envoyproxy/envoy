@@ -1255,5 +1255,6 @@ public:
    */
   virtual Event::Dispatcher& dispatcher() PURE;
 };
+
 } // namespace Http
 } // namespace Envoy
