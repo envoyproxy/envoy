@@ -32,6 +32,10 @@ public:
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->config_->getStatsScopeForTest();
   }
+  static Thread::ThreadSynchronizer& synchronizer(const DriverSharedPtr& driver) {
+    auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+    return provider->synchronizer_;
+  }
 };
 
 namespace {
@@ -517,6 +521,49 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
   const auto& geoip_header1_it = captured_lookup_response_.find(test_case.expected_header_name_);
   EXPECT_EQ(test_case.expected_reloaded_header_value_, geoip_header1_it->second);
+  // Clean up modifications to mmdb file names.
+  TestEnvironment::renameFile(source_db_file_path, reloaded_db_file_path);
+  TestEnvironment::renameFile(source_db_file_path + "1", source_db_file_path);
+}
+
+TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
+  MmdbReloadTestCase test_case = GetParam();
+  initializeProvider(test_case.yaml_config_);
+  GeoipProviderPeer::synchronizer(provider_).enable();
+  const auto lookup_sync_point_name = test_case.db_type_.append("_lookup_pre_complete");
+  // Start a thread that performs geoip lookup and wait in the worker thread right after reading the
+  // copy of mmdb instance.
+  GeoipProviderPeer::synchronizer(provider_).waitOn(lookup_sync_point_name);
+  std::thread t0([&] {
+    Network::Address::InstanceConstSharedPtr remote_address =
+        Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
+    Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+    testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+    auto lookup_cb_std = lookup_cb.AsStdFunction();
+    EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+    provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+    const auto& geoip_header_it = captured_lookup_response_.find(test_case.expected_header_name_);
+    EXPECT_EQ(test_case.expected_header_value_, geoip_header_it->second);
+    // Second lookup should read the updated value.
+    captured_lookup_response_.clear();
+    remote_address = Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
+    Geolocation::LookupRequest lookup_rq2{std::move(remote_address)};
+    testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb2;
+    auto lookup_cb_std2 = lookup_cb2.AsStdFunction();
+    EXPECT_CALL(lookup_cb2, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+    provider_->lookup(std::move(lookup_rq2), std::move(lookup_cb_std2));
+    const auto& geoip_header1_it = captured_lookup_response_.find(test_case.expected_header_name_);
+    EXPECT_EQ(test_case.expected_reloaded_header_value_, geoip_header1_it->second);
+  });
+  // Wait until the thread is actually waiting.
+  GeoipProviderPeer::synchronizer(provider_).barrierOn(lookup_sync_point_name);
+  std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
+  std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
+  TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
+  TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
+  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  GeoipProviderPeer::synchronizer(provider_).signal(lookup_sync_point_name);
+  t0.join();
   // Clean up modifications to mmdb file names.
   TestEnvironment::renameFile(source_db_file_path, reloaded_db_file_path);
   TestEnvironment::renameFile(source_db_file_path + "1", source_db_file_path);

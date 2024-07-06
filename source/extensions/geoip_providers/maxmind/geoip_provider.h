@@ -5,6 +5,7 @@
 #include "envoy/geoip/geoip_provider_driver.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/thread_synchronizer.h"
 
 #include "maxminddb.h"
 
@@ -145,6 +146,10 @@ private:
   void updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
+  // Used for testing only.
+  mutable Thread::ThreadSynchronizer synchronizer_;
+
+  friend class ActiveDownstreamConnectionsMonitorTest;
 };
 
 using GeoipProviderSharedPtr = std::shared_ptr<GeoipProvider>;
