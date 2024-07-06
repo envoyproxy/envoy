@@ -1013,11 +1013,12 @@ void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestBeforeHeaders() {
                                 fake_upstream_connection_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-
   // Reset the upstream connection before the headers have been sent
   ASSERT_TRUE(fake_upstream_connection_->close());
   // We should get a retry
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
