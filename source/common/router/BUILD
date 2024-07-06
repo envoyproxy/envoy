@@ -354,6 +354,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/http:async_client_utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:filter_chain_helper_lib",
         "//source/common/http:filter_manager_lib",

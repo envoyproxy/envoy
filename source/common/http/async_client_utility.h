@@ -39,5 +39,87 @@ private:
   absl::flat_hash_set<AsyncClient::Request*> active_requests_;
 };
 
+/**
+ * Sidestream watermark callback implementation for stream decoder filter that handles decoding.
+ */
+class StreamDecoderFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks {
+public:
+  StreamDecoderFilterSidestreamWatermarkCallbacks() = default;
+
+  void onAboveWriteBufferHighWatermark() final {
+    if (callback_ != nullptr) {
+      callback_->onDecoderFilterAboveWriteBufferHighWatermark();
+    } else {
+      // TODO(tyxia) Log
+    }
+  }
+
+  void onBelowWriteBufferLowWatermark() final {
+    if (callback_ != nullptr) {
+      callback_->onDecoderFilterBelowWriteBufferLowWatermark();
+    } else {
+      // TODO(tyxia) Log
+    }
+  }
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* callback) {
+    callback_ = callback;
+  }
+
+  void resetFilterCallbacks() { callback_ = nullptr; }
+
+private:
+  Http::StreamDecoderFilterCallbacks* callback_ = nullptr;
+};
+
+/**
+ * Sidestream watermark callback implementation for stream filter that handles both encoding and
+ * decoding.
+ */
+class StreamFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks {
+public:
+  StreamFilterSidestreamWatermarkCallbacks() = default;
+
+  void onAboveWriteBufferHighWatermark() final {
+    if (decode_callback_ != nullptr) {
+      decode_callback_->onDecoderFilterAboveWriteBufferHighWatermark();
+    } else {
+    }
+
+    if (encode_callback_ != nullptr) {
+      encode_callback_->onEncoderFilterAboveWriteBufferHighWatermark();
+    } else {
+    }
+  }
+
+  void onBelowWriteBufferLowWatermark() final {
+    if (decode_callback_ != nullptr) {
+      decode_callback_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+
+    if (encode_callback_ != nullptr) {
+      encode_callback_->onEncoderFilterBelowWriteBufferLowWatermark();
+    } else {
+    }
+  }
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* decode_callback) {
+    decode_callback_ = decode_callback;
+  }
+
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks* encode_callback) {
+    encode_callback_ = encode_callback;
+  }
+
+  void resetFilterCallbacks() {
+    decode_callback_ = nullptr;
+    encode_callback_ = nullptr;
+  }
+
+private:
+  Http::StreamDecoderFilterCallbacks* decode_callback_ = nullptr;
+  Http::StreamEncoderFilterCallbacks* encode_callback_ = nullptr;
+};
+
 } // namespace Http
 } // namespace Envoy
