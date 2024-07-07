@@ -9,7 +9,7 @@ if [[ $BUILD_REASON != "PullRequest" ]]; then
     exit 0
 fi
 
-CHANGE_TARGET="origin/${TARGET_BRANCH}"
+CHANGE_TARGET="origin/$TARGET_BRANCH"
 
 echo "Comparing changes ${CHANGE_TARGET}...HEAD"
 CHANGED_PATHS=$(git diff --name-only "${CHANGE_TARGET}"...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')
