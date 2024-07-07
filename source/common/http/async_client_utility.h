@@ -40,41 +40,8 @@ private:
 };
 
 /**
- * Sidestream watermark callback implementation for stream decoder filter that handles decoding.
- */
-class StreamDecoderFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks {
-public:
-  StreamDecoderFilterSidestreamWatermarkCallbacks() = default;
-
-  void onAboveWriteBufferHighWatermark() final {
-    if (callback_ != nullptr) {
-      callback_->onDecoderFilterAboveWriteBufferHighWatermark();
-    } else {
-      // TODO(tyxia) Log
-    }
-  }
-
-  void onBelowWriteBufferLowWatermark() final {
-    if (callback_ != nullptr) {
-      callback_->onDecoderFilterBelowWriteBufferLowWatermark();
-    } else {
-      // TODO(tyxia) Log
-    }
-  }
-
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* callback) {
-    callback_ = callback;
-  }
-
-  void resetFilterCallbacks() { callback_ = nullptr; }
-
-private:
-  Http::StreamDecoderFilterCallbacks* callback_ = nullptr;
-};
-
-/**
- * Sidestream watermark callback implementation for stream filter that handles both encoding and
- * decoding.
+ * Sidestream watermark callback implementation for stream filter that either handles decoding only
+ * or handles both encoding and decoding.
  */
 class StreamFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks {
 public:
@@ -84,11 +51,13 @@ public:
     if (decode_callback_ != nullptr) {
       decode_callback_->onDecoderFilterAboveWriteBufferHighWatermark();
     } else {
+      // TODO(tyxia) Log
     }
 
     if (encode_callback_ != nullptr) {
       encode_callback_->onEncoderFilterAboveWriteBufferHighWatermark();
     } else {
+      // TODO(tyxia) Log
     }
   }
 
@@ -120,6 +89,39 @@ private:
   Http::StreamDecoderFilterCallbacks* decode_callback_ = nullptr;
   Http::StreamEncoderFilterCallbacks* encode_callback_ = nullptr;
 };
+
+// TODO(tyxia) Remove, This class is merged into class above, which can be either decoder filter
+// only or dual filter.
+// /**
+//  * Sidestream watermark callback implementation for stream decoder filter that handles decoding.
+//  */
+// class StreamDecoderFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks
+// { public:
+//   StreamDecoderFilterSidestreamWatermarkCallbacks() = default;
+
+//   void onAboveWriteBufferHighWatermark() final {
+//     if (callback_ != nullptr) {
+//       callback_->onDecoderFilterAboveWriteBufferHighWatermark();
+//     } else {
+//     }
+//   }
+
+//   void onBelowWriteBufferLowWatermark() final {
+//     if (callback_ != nullptr) {
+//       callback_->onDecoderFilterBelowWriteBufferLowWatermark();
+//     } else {
+//     }
+//   }
+
+//   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* callback) {
+//     callback_ = callback;
+//   }
+
+//   void resetFilterCallbacks() { callback_ = nullptr; }
+
+// private:
+//   Http::StreamDecoderFilterCallbacks* callback_ = nullptr;
+// };
 
 } // namespace Http
 } // namespace Envoy

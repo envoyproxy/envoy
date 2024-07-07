@@ -7,8 +7,6 @@
 #include <optional>
 #include <string>
 
-// #include "source/common/http/async_client_impl.h"
-#include "source/common/http/async_client_utility.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/http/codec.h"
@@ -37,6 +35,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/async_client_utility.h"
 #include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
@@ -600,7 +599,7 @@ private:
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
-  Http::StreamDecoderFilterSidestreamWatermarkCallbacks watermark_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;
