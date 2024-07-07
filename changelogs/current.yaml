@@ -237,6 +237,9 @@ bug_fixes:
 - area: datadog
   change: |
     Bumped the version of datadog to resolve a crashing bug in earlier versions of the library.
+- area: lua
+  change: |
+    Fixed a bug where the user data will reference a dangling pointer to the Lua state and cause a crash.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
