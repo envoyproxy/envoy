@@ -4253,7 +4253,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   proto_config_.set_observability_mode(true);
   uint32_t deferred_close_timeout_ms = 1000;
-  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms/1000);
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
@@ -4276,6 +4276,8 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 1000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
@@ -4293,7 +4295,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(1000));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
@@ -4384,7 +4386,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);

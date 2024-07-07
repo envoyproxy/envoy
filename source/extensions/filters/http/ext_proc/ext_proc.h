@@ -175,7 +175,8 @@ public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
   ExternalProcessorStream* store(uint64_t stream_id, ExternalProcessorStreamPtr stream,
-                                 const ExtProcFilterStats& stat, const std::chrono::milliseconds& timeout) {
+                                 const ExtProcFilterStats& stat,
+                                 const std::chrono::milliseconds& timeout) {
     stream_manager_[stream_id] =
         std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat, timeout);
     return stream_manager_[stream_id]->stream_.get();
