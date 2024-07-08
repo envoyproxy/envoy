@@ -10,7 +10,7 @@
 #include "source/common/quic/server_codec_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_context_impl.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
@@ -24,6 +24,7 @@
 #include "test/test_common/network_utility.h"
 
 #include "extension_registry.h"
+#include "library/common/engine_common.h"
 
 namespace Envoy {
 namespace {
@@ -173,7 +174,9 @@ void TestServer::start(TestServerType type) {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
-
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+    registerMobileProtoDescriptors();
+#endif
     test_server_ = IntegrationTestServer::create(
         "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
         absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
@@ -186,6 +189,9 @@ void TestServer::start(TestServerType type) {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+    registerMobileProtoDescriptors();
+#endif
     test_server_ = IntegrationTestServer::create(
         "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
         absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
