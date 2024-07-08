@@ -184,7 +184,7 @@ FilterConfig::FilterConfig(
     Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
-      max_message_timeout_ms_(max_message_timeout_ms),
+      max_message_timeout_ms_(max_message_timeout_ms), max_more_chunks_(config.max_more_chunks()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),

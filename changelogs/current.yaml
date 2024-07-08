@@ -341,12 +341,11 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`.
     If set, the token buckets of the local rate limit will be shared across all the Envoy instances in the local
     cluster.
-- area: ext_authz
+- area: ext_proc
   change: |
-    implemented
+    implemented API
     :ref:`more_chunks <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.more_chunks>`
-    response API to support sending multiple response chunks for one received chunk from the external processing server
-    in STREAMED mode.
+    to support N receied chunks for one sent chunk case when Envoy processing messages from the external processor in the STREAMED mode.
 - area: ext_proc
   change: |
     added

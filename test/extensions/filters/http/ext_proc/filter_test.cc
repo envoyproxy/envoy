@@ -3938,6 +3938,7 @@ TEST_F(HttpFilterTest, SendMultipleChunkResponseForOnetreamingBody) {
   processing_mode:
     request_body_mode: "STREAMED"
     response_body_mode: "STREAMED"
+  max_more_chunks: 100
   )EOF");
 
   // Create synthetic HTTP request

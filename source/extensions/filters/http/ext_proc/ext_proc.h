@@ -175,6 +175,8 @@ public:
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
+  uint32_t maxMoreChunks() const { return max_more_chunks_; }
+
   const ExtProcFilterStats& stats() const { return stats_; }
 
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
@@ -235,6 +237,7 @@ private:
       route_cache_action_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
+  const uint32_t max_more_chunks_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;

@@ -264,29 +264,22 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       if (common_response.has_body_mutation() && common_response.body_mutation().more_chunks()) {
-        handleMutipleChunksInBodyResponse(common_response);
-      } else {
-        Buffer::OwnedImpl chunk_data;
-        auto chunk = dequeueStreamingChunk(chunk_data);
-        ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
-        if (common_response.has_body_mutation()) {
-          ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
-          MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
-        }
-        should_continue = chunk->end_stream;
-        if (chunk_data.length() > 0) {
-          ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
-          injectDataToFilterChain(chunk_data, chunk->end_stream);
+        more_chunk_count_++;
+
+        ENVOY_LOG(debug,
+                  "Streamed mode body response has more_chunks set to true. more_chunk_count_ {}, "
+                  "maxMoreChunks {}",
+                  more_chunk_count_, filter_.config().maxMoreChunks());
+        // MxN streaming will only be supported if the ext_proc filter has max_more_chunks
+        // configured to be none zero.
+        if (filter_.config().maxMoreChunks() == 0 ||
+            more_chunk_count_ > filter_.config().maxMoreChunks()) {
+          return absl::FailedPreconditionError("spurious message");
         }
 
-        if (queueBelowLowLimit()) {
-          clearWatermark();
-        }
-        if (chunk_queue_.empty()) {
-          onFinishProcessorCall(Grpc::Status::Ok);
-        } else {
-          onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
-        }
+        handleMultipleChunksInBodyResponse(common_response);
+      } else {
+        should_continue = handleSingleChunkInBodyResponse(common_response);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -399,7 +392,34 @@ void ProcessorState::continueIfNecessary() {
   }
 }
 
-void ProcessorState::handleMutipleChunksInBodyResponse(const CommonResponse& common_response) {
+bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& common_response) {
+  more_chunk_count_ = 0;
+  Buffer::OwnedImpl chunk_data;
+  auto chunk = dequeueStreamingChunk(chunk_data);
+  ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
+  if (common_response.has_body_mutation()) {
+    ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
+    MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+  }
+  bool should_continue = chunk->end_stream;
+  if (chunk_data.length() > 0) {
+    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
+    injectDataToFilterChain(chunk_data, chunk->end_stream);
+  }
+
+  if (queueBelowLowLimit()) {
+    clearWatermark();
+  }
+  if (chunk_queue_.empty()) {
+    onFinishProcessorCall(Grpc::Status::Ok);
+  } else {
+    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+  }
+
+  return should_continue;
+}
+
+void ProcessorState::handleMultipleChunksInBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl buffer;
   auto body = common_response.body_mutation().body();
   if (body.size() > 0) {
@@ -411,7 +431,7 @@ void ProcessorState::handleMutipleChunksInBodyResponse(const CommonResponse& com
   onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
   // Need to start a new gRPC call timer.
   onStartProcessorCall(std::bind(&Filter::onMessageTimeout, &(this->filter_)),
-		       filter_.config().messageTimeout(), callback_state_);
+                       filter_.config().messageTimeout(), callback_state_);
 }
 
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
