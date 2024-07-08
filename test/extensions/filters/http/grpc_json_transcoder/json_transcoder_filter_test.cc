@@ -339,8 +339,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
   proto_config.set_capture_unknown_query_parameters(true);
   JsonTranscoderConfig config(proto_config, *api_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
-                                         {":path", "/shelves?foo=bar+dsa&eep=baz&foo=asd"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/shelves?foo=bar+dsa&eep=baz&foo=asd&foo.bar=baz"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
@@ -353,8 +353,10 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
   EXPECT_TRUE(transcoder);
   ASSERT_TRUE(unknown_query_params.key().contains("foo"));
   ASSERT_TRUE(unknown_query_params.key().contains("eep"));
+  ASSERT_TRUE(unknown_query_params.key().contains("foo.bar"));
   EXPECT_THAT(unknown_query_params.key().at("foo").values(), ElementsAre("bar+dsa", "asd"));
   EXPECT_THAT(unknown_query_params.key().at("eep").values(), ElementsAre("baz"));
+  EXPECT_THAT(unknown_query_params.key().at("foo.bar").values(), ElementsAre("baz"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {

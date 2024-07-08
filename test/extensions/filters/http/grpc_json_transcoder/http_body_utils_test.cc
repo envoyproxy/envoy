@@ -6,8 +6,8 @@
 
 #include "test/proto/bookstore.pb.h"
 
-#include "google/api/httpbody.pb.h"
 #include "gmock/gmock.h"
+#include "google/api/httpbody.pb.h"
 #include "gtest/gtest.h"
 
 using testing::ElementsAre;
