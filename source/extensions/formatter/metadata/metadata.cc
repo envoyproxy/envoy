@@ -52,16 +52,21 @@ public:
   VirtualHostMetadataFormatter(const std::string& filter_namespace,
                                const std::vector<std::string>& path,
                                absl::optional<size_t> max_length)
-      : ::Envoy::Formatter::MetadataFormatter(
-            filter_namespace, path, max_length,
-            [](const StreamInfo::StreamInfo& stream_info)
-                -> const envoy::config::core::v3::Metadata* {
-              Router::RouteConstSharedPtr route = stream_info.route();
-              if (route == nullptr) {
-                return nullptr;
-              }
-              return &route->routeEntry()->virtualHost().metadata();
-            }) {}
+      : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
+                                              [](const StreamInfo::StreamInfo& stream_info)
+                                                  -> const envoy::config::core::v3::Metadata* {
+                                                Router::RouteConstSharedPtr route =
+                                                    stream_info.route();
+                                                if (route == nullptr) {
+                                                  return nullptr;
+                                                }
+                                                const Router::RouteEntry* route_entry =
+                                                    route->routeEntry();
+                                                if (route_entry == nullptr) {
+                                                  return nullptr;
+                                                }
+                                                return &route_entry->virtualHost().metadata();
+                                              }) {}
 };
 
 // Constructor registers all types of supported metadata along with the

@@ -168,6 +168,14 @@ TEST_F(MetadataFormatterTest, VirtualHostMetadataNoRoute) {
                      ->formatWithContext(formatter_context_, stream_info_));
 }
 
+TEST_F(MetadataFormatterTest, VirtualHostMetadataNoRouteEntry) {
+  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
+  EXPECT_CALL(*route, routeEntry()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_EQ("-", getTestMetadataFormatter("VIRTUAL_HOST")
+                     ->formatWithContext(formatter_context_, stream_info_));
+}
+
 } // namespace Formatter
 } // namespace Extensions
 } // namespace Envoy
