@@ -149,9 +149,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
 
 def envoy_stdlib_deps():
     return select({
-        "@envoy//bazel:asan_build": ["@envoy//bazel:dynamic_stdlib"],
-        "@envoy//bazel:msan_build": ["@envoy//bazel:dynamic_stdlib"],
-        "@envoy//bazel:tsan_build": ["@envoy//bazel:dynamic_stdlib"],
         "//conditions:default": ["@envoy//bazel:static_stdlib"],
     })
 

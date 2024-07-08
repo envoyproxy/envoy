@@ -24,8 +24,8 @@ protected:
 class NullValidationVisitorImpl : public ValidationVisitorBase {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view) override {}
-  void onDeprecatedField(absl::string_view, bool) override {}
+  absl::Status onUnknownField(absl::string_view) override { return absl::OkStatus(); }
+  absl::Status onDeprecatedField(absl::string_view, bool) override { return absl::OkStatus(); }
   bool skipValidation() override { return true; }
   void onWorkInProgress(absl::string_view) override {}
 };
@@ -50,8 +50,8 @@ public:
   void setCounters(Stats::Counter& unknown_counter, Stats::Counter& wip_counter);
 
   // Envoy::ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view description) override;
-  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+  absl::Status onUnknownField(absl::string_view description) override;
+  absl::Status onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
   bool skipValidation() override { return false; }
   void onWorkInProgress(absl::string_view description) override;
 
@@ -70,9 +70,9 @@ public:
   void setCounters(Stats::Counter& wip_counter) { setWipCounter(wip_counter); }
 
   // Envoy::ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view description) override;
+  absl::Status onUnknownField(absl::string_view description) override;
   bool skipValidation() override { return false; }
-  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+  absl::Status onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
   void onWorkInProgress(absl::string_view description) override;
 };
 

@@ -1,6 +1,6 @@
 #include "library/cc/string_accessor.h"
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 
 namespace Envoy {
 namespace Platform {
@@ -9,7 +9,7 @@ namespace {
 
 envoy_data c_string_accessor_read(const void* context) {
   auto accessor = *static_cast<const StringAccessorSharedPtr*>(context);
-  return Data::Utility::copyToBridgeData(accessor->get());
+  return Bridge::Utility::copyToBridgeData(accessor->get());
 }
 
 } // namespace

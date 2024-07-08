@@ -116,7 +116,6 @@ public final class CronvoyBidirectionalStream
   private static final String X_ENVOY = "x-envoy";
   private static final String X_ENVOY_SELECTED_TRANSPORT = "x-envoy-upstream-alpn";
   private static final String USER_AGENT = "User-Agent";
-  private static final Executor DIRECT_EXECUTOR = new DirectExecutor();
 
   private final CronvoyUrlRequestContext mRequestContext;
   private final Executor mExecutor;
@@ -647,7 +646,8 @@ public final class CronvoyBidirectionalStream
     });
   }
 
-  private void onErrorReceived(int errorCode, EnvoyFinalStreamIntel finalStreamIntel) {
+  private void onErrorReceived(int errorCode, String message,
+                               EnvoyFinalStreamIntel finalStreamIntel) {
     if (mResponseInfo != null) {
       mResponseInfo.setReceivedByteCount(finalStreamIntel.getReceivedByteCount());
     }
@@ -656,12 +656,17 @@ public final class CronvoyBidirectionalStream
     int javaError = mapNetErrorToCronetApiErrorCode(netError);
 
     if (isQuicException(javaError)) {
+      // `message` is populated from StreamInfo::responseCodeDetails(), so `message` is used to
+      // populate the error details in the exception.
       mException.set(new CronvoyQuicExceptionImpl("Exception in BidirectionalStream: " + netError,
                                                   javaError, netError.getErrorCode(),
-                                                  Errors.QUIC_INTERNAL_ERROR));
+                                                  Errors.QUIC_INTERNAL_ERROR, message));
     } else {
+      // `message` is populated from StreamInfo::responseCodeDetails(), so `message` is used to
+      // populate the error details in the exception.
       mException.set(new CronvoyBidirectionalStreamNetworkException(
-          "Exception in BidirectionalStream: " + netError, javaError, netError.getErrorCode()));
+          "Exception in BidirectionalStream: " + netError, javaError, netError.getErrorCode(),
+          message));
     }
 
     failWithException();
@@ -931,11 +936,6 @@ public final class CronvoyBidirectionalStream
   }
 
   @Override
-  public Executor getExecutor() {
-    return DIRECT_EXECUTOR;
-  }
-
-  @Override
   public void onSendWindowAvailable(EnvoyStreamIntel streamIntel) {
     switch (mState.nextAction(Event.ON_SEND_WINDOW_AVAILABLE)) {
     case NextAction.CHAIN_NEXT_WRITE:
@@ -1035,7 +1035,7 @@ public final class CronvoyBidirectionalStream
     mEnvoyFinalStreamIntel = finalStreamIntel;
     switch (mState.nextAction(Event.ON_ERROR)) {
     case NextAction.NOTIFY_USER_NETWORK_ERROR:
-      onErrorReceived(errorCode, finalStreamIntel);
+      onErrorReceived(errorCode, message, finalStreamIntel);
       break;
     case NextAction.NOTIFY_USER_FAILED:
       // There was already an error in-progress - the network error came too late and is ignored.
@@ -1104,13 +1104,6 @@ public final class CronvoyBidirectionalStream
       this.mByteBuffer = mByteBuffer;
       this.mInitialPosition = mByteBuffer.position();
       this.mInitialLimit = mByteBuffer.limit();
-    }
-  }
-
-  private static class DirectExecutor implements Executor {
-    @Override
-    public void execute(Runnable runnable) {
-      runnable.run();
     }
   }
 }

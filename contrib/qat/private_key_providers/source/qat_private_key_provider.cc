@@ -25,7 +25,7 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
 
   ssl_async_event_ = dispatcher_.createFileEvent(
       fd,
-      [this, ctx, fd](uint32_t) -> void {
+      [this, ctx, fd](uint32_t) {
         CpaStatus status = CPA_STATUS_FAIL;
         {
           Thread::LockGuard data_lock(ctx->data_lock_);
@@ -41,6 +41,7 @@ void QatPrivateKeyConnection::registerCallback(QatContext* ctx) {
           ctx->setOpStatus(status);
         }
         this->cb_.onPrivateKeyMethodComplete();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }

@@ -5,12 +5,18 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
+namespace {
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
+// Google DNS address used for IPv6 probes.
+constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
+} // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
@@ -40,25 +46,15 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, Thread::PosixThreadFactory::create()) {}
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread.
-  auto options = std::make_shared<Envoy::OptionsImplBase>();
-  options->setConfigYaml(config);
-  if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
-  }
-  options->setConcurrency(1);
-  return run(std::move(options));
-}
-
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
 envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
-                                           envoy_http_callbacks bridge_callbacks,
+                                           EnvoyStreamCallbacks&& stream_callbacks,
                                            bool explicit_flow_control) {
-  return dispatcher_->post([&, stream, bridge_callbacks, explicit_flow_control]() {
-    http_client_->startStream(stream, bridge_callbacks, explicit_flow_control);
-  });
+  return dispatcher_->post(
+      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
+        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+      });
 }
 
 envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
@@ -74,9 +70,11 @@ envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_r
       [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
 }
 
-envoy_status_t InternalEngine::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
-  return dispatcher_->post(
-      [&, stream, data, end_stream]() { http_client_->sendData(stream, data, end_stream); });
+envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
+                                        bool end_stream) {
+  return dispatcher_->post([&, stream, buffer = std::move(buffer), end_stream]() mutable {
+    http_client_->sendData(stream, std::move(buffer), end_stream);
+  });
 }
 
 envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
@@ -165,6 +163,13 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+            if (!hasIpV6Connectivity()) {
+              connectivity_manager_->dnsCache()->setIpVersionToRemove(
+                  {Network::Address::IpVersion::v6});
+            }
+          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -181,6 +186,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
+          engine_running_.Notify();
           callbacks_->on_engine_running_();
         });
   } // mutex_
@@ -219,6 +225,10 @@ envoy_status_t InternalEngine::terminate() {
   if (!main_thread_->joinable()) {
     return ENVOY_FAILURE;
   }
+
+  // Wait until the Engine is ready before calling terminate to avoid assertion failures.
+  // TODO(fredyw): Fix this without having to wait.
+  ASSERT(engine_running_.WaitForNotificationWithTimeout(ENGINE_RUNNING_TIMEOUT));
 
   // We need to be sure that MainCommon is finished being constructed so we can dispatch shutdown.
   {
@@ -268,10 +278,21 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
+envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration_key =
-        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+      // The IP version to remove flag must be set first before refreshing the DNS cache so that
+      // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
+      // removed.
+      if (!hasIpV6Connectivity()) {
+        connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
+      } else {
+        connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+      }
+    }
     connectivity_manager_->refreshDns(configuration_key, true);
   });
 }
@@ -375,6 +396,33 @@ void InternalEngine::logInterfaces(absl::string_view event,
     return all_names;
   };
   ENVOY_LOG_EVENT(debug, event, "{}", all_names_printer(interfaces));
+}
+
+bool InternalEngine::hasIpV6Connectivity() {
+  // This probing IPv6 logic is borrowed from Chromium.
+  // -
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=154-157;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
+  // -
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=1467-1488;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
+  ENVOY_LOG(trace, "Checking for IPv6 connectivity.");
+  int domain = AF_INET6;
+  const Api::SysCallSocketResult socket_result =
+      Api::OsSysCallsSingleton::get().socket(domain, SOCK_DGRAM, /* protocol= */ 0);
+  if (!SOCKET_VALID(socket_result.return_value_)) {
+    ENVOY_LOG(trace, "Unable to create a datagram socket with errno: {}.", socket_result.errno_);
+    return false;
+  }
+  Network::IoSocketHandleImpl socket_handle(socket_result.return_value_, /* socket_v6only= */ true,
+                                            {domain});
+  Api::SysCallIntResult connect_result = socket_handle.connect(
+      std::make_shared<Network::Address::Ipv6Instance>(std::string(IPV6_PROBE_ADDRESS)));
+  bool has_ipv6_connectivity = connect_result.return_value_ == 0;
+  if (has_ipv6_connectivity) {
+    ENVOY_LOG(trace, "Found IPv6 connectivity.");
+  } else {
+    ENVOY_LOG(trace, "No IPv6 connectivity found with errno: {}.", connect_result.errno_);
+  }
+  return has_ipv6_connectivity;
 }
 
 } // namespace Envoy

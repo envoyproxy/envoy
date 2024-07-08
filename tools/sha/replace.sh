@@ -1,5 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
 
+set -e
 set -o pipefail
 
 # This tool is for replacing shas in the repo, altho it could be

@@ -10,7 +10,8 @@ services:
     - ./protos:/protos
     - ./server/kv:/stubs
 
-  # $ docker run -ti -v $(pwd):/protos -v $(pwd)/stubs:/stubs grpc/python python -m grpc.tools.protoc --python_out=/stubs --grpc_python_out=/stubs -I/protos /protos/kv.proto
+  # $ docker run -ti -v $(pwd):/protos -v $(pwd)/stubs:/stubs grpc/python python -m grpc.tools.protoc \
+  #       --python_out=/stubs --grpc_python_out=/stubs -I/protos /protos/kv.proto
   stubs_python:
     build:
       context: .

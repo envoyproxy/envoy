@@ -144,11 +144,11 @@ public:
   std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
   void shutdownAll() override {}
   std::shared_ptr<Config::GrpcMux>
-  create(std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-         Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-         const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-         BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-         OptRef<Config::XdsResourcesDelegate>, bool) override {
+  create(std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
+         Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
+         const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+         std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+         OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>, bool) override {
     return std::make_shared<NiceMock<Config::MockGrpcMux>>();
   }
 };
@@ -279,7 +279,7 @@ public:
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, local_cluster_update_, local_hosts_removed_,
         http_context_, grpc_context_, router_context_, server_);
-    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
 
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
@@ -288,7 +288,7 @@ public:
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
         server_);
-    THROW_IF_NOT_OK(cluster_manager_->init(bootstrap));
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -421,7 +421,8 @@ TEST_F(ODCDTest, TestAllocateWithLocator) {
       "static_cluster");
 
   auto locator =
-      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar")
+          .value();
   auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
   EXPECT_NE(handle, nullptr);
 }
@@ -613,7 +614,7 @@ class AlpnTestConfigFactory
     : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
 public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
-  Network::UpstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
@@ -740,7 +741,6 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -773,7 +773,6 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   const std::string yaml = R"EOF(
   dynamic_resources:
     ads_config:
-      transport_api_version: V3
       api_type: GRPC
       set_node_on_first_message_only: true
       grpc_services:
@@ -1010,10 +1009,8 @@ static_resources:
     type: eds
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: static_cluster
@@ -1265,7 +1262,12 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
-  cluster1->info_->lb_type_ = LoadBalancerType::ClusterProvided;
+
+  ON_CALL(*cluster1->info_, loadBalancerFactory())
+      .WillByDefault(
+          ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
+              "envoy.load_balancing_policies.cluster_provided")));
+
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
@@ -1331,14 +1333,15 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
 public:
-  void doTest(LoadBalancerType lb_type) {
+  void doTest(const std::string& factory_name) {
     const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                           clustersJson({defaultStaticClusterJson("cluster_0")}));
 
     std::shared_ptr<MockClusterMockPrioritySet> cluster1(
         new NiceMock<MockClusterMockPrioritySet>());
     cluster1->info_->name_ = "cluster_0";
-    cluster1->info_->lb_type_ = lb_type;
+    cluster1->info_->lb_factory_ =
+        Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
 
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
@@ -1362,13 +1365,13 @@ public:
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplThreadAwareLbTest, RingHashLoadBalancerThreadAwareUpdate) {
-  doTest(LoadBalancerType::RingHash);
+  doTest("envoy.load_balancing_policies.ring_hash");
 }
 
 // Test that the cluster manager correctly re-creates the worker local LB when there is a host
 // set change.
 TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate) {
-  doTest(LoadBalancerType::Maglev);
+  doTest("envoy.load_balancing_policies.maglev");
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
@@ -1403,7 +1406,7 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
+                  PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
@@ -1438,7 +1441,7 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(factory_.dispatcher_,
               createClientConnection_(
-                  PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
+                  PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
   EXPECT_CALL(factory_.dispatcher_, deleteInDispatcherThread(_));
   create(parseBootstrapFromV3Yaml(yaml));
@@ -1597,7 +1600,9 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
   cluster2->info_->name_ = "fake_cluster2";
-  cluster2->info_->lb_type_ = LoadBalancerType::RingHash;
+  cluster2->info_->lb_factory_ =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.ring_hash");
 
   // This part tests static init.
   InSequence s;
@@ -1817,8 +1822,9 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
   auto priority_update_cb = foo->prioritySet().addPriorityUpdateCb(
-      [&membership_updated](uint32_t, const HostVector&, const HostVector&) -> void {
+      [&membership_updated](uint32_t, const HostVector&, const HostVector&) {
         membership_updated.ready();
+        return absl::OkStatus();
       });
 
   // Remove the new cluster.
@@ -2446,7 +2452,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*cp1,
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
@@ -2464,12 +2470,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_CALL(*cp2,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2523,7 +2529,7 @@ TEST_P(ClusterManagerLifecycleTest,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   EXPECT_CALL(*cp2, closeConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2567,7 +2573,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
       ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
   outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
   EXPECT_CALL(*cp1,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
@@ -2616,7 +2622,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
         ->tcpConnPool(ResourcePriority::Default, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*cp1,
                 drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
@@ -2634,12 +2640,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
   EXPECT_CALL(*cp2,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2692,7 +2698,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
     conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
     EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -2712,12 +2718,12 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
   EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Unhealthy);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed, HealthState::Healthy);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
@@ -2765,7 +2771,7 @@ TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   conn_info1 = cluster_manager_->getThreadLocalCluster("some_cluster")->tcpConn(nullptr);
 
   outlier_detector.runCallbacks(test_host);
-  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged, HealthState::Unhealthy);
 
   EXPECT_CALL(*connection1, close(_)).Times(0);
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -2818,7 +2824,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
@@ -2872,7 +2878,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
   cp1->idle_cb_();
   cp1->idle_cb_ = nullptr;
@@ -2906,7 +2912,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
@@ -2974,7 +2980,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
@@ -3070,7 +3076,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
   cp1->idle_cb_();
   cp1->idle_cb_ = nullptr;
@@ -3128,7 +3134,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
@@ -3918,7 +3924,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
@@ -3951,7 +3957,8 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   // crash.
   dns_timer_->invokeCallback();
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+               TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }
@@ -4011,7 +4018,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
@@ -4036,7 +4043,8 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   // Remove the first host, this should lead to the cp being drained.
   dns_timer_->invokeCallback();
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+               TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
   EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));

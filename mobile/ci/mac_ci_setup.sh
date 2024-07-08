@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -28,14 +28,10 @@ function retry () {
     return "$returns"
 }
 
-function is_installed {
-    brew ls --versions "$1" >/dev/null
-}
-
 function install {
-    echo "Installing $1"
+    echo "Installing brew package $1"
     if ! retry brew install --quiet "$1"; then
-        echo "Failed to install $1"
+        echo "Failed to install brew package $1"
         exit 1
     fi
 }
@@ -45,10 +41,17 @@ if ! retry brew update; then
   echo "Failed to update homebrew"
 fi
 
+# This is to save some disk space.
+# https://mac.install.guide/homebrew/8
+brew autoremove
+brew cleanup --prune=all
+# Remove broken symlinks.
+brew cleanup --prune-prefix
+
 DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
 do
-    is_installed "${DEP}" || install "${DEP}"
+    install "${DEP}"
 done
 
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode

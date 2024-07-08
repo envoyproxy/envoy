@@ -60,7 +60,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ssl_socket_lib",
+    name = "ssl_socket_base",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
@@ -96,6 +96,46 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "client_ssl_socket_lib",
+    srcs = ["client_ssl_socket.cc"],
+    hdrs = ["client_ssl_socket.h"],
+    external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
+        "abseil_optional",
+        "abseil_synchronization",
+        "ssl",
+    ],
+    deps = [
+        ":ssl_socket_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "server_ssl_socket_lib",
+    srcs = ["server_ssl_socket.cc"],
+    hdrs = ["server_ssl_socket.h"],
+    external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
+        "abseil_optional",
+        "abseil_synchronization",
+        "ssl",
+    ],
+    deps = [
+        ":ssl_socket_base",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_lib",
+    deps = [
+        ":client_ssl_socket_lib",
+        ":server_ssl_socket_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
@@ -126,10 +166,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_lib",
     srcs = [
+        "client_context_impl.cc",
         "context_impl.cc",
         "context_manager_impl.cc",
     ],
     hdrs = [
+        "client_context_impl.h",
         "context_impl.h",
         "context_manager_impl.h",
     ],
@@ -161,12 +203,28 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
-        "//source/common/tls/ocsp:ocsp_lib",
         "//source/common/tls/private_key:private_key_manager_lib",
         "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "server_context_lib",
+    srcs = [
+        "server_context_impl.cc",
+    ],
+    hdrs = [
+        "server_context_impl.h",
+    ],
+    deps = [
+        ":context_lib",
+        "//source/common/tls/ocsp:ocsp_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+    alwayslink = 1,  # has factory registration
 )
 
 envoy_cc_library(

@@ -1,6 +1,6 @@
 #include "source/server/backtrace.h"
 
-#include <iostream>
+#include <fstream>
 
 #include "absl/strings/str_split.h"
 

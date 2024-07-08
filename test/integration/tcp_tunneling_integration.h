@@ -16,7 +16,6 @@ struct TcpTunnelingTestParams {
   bool defer_processing_backedup_streams;
   bool use_universal_header_validator;
   bool tunneling_with_upstream_filters;
-  bool deprecate_callback_visitor;
 };
 
 absl::string_view http2ImplementationToString(Http2Impl impl);
@@ -83,8 +82,6 @@ public:
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_skip_callback_visitor",
-                                      GetParam().deprecate_callback_visitor ? "true" : "false");
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");
     config_helper_.addRuntimeOverride(Runtime::upstream_http_filters_with_tcp_proxy,

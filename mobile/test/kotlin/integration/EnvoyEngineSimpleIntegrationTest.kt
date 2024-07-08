@@ -7,7 +7,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class EnvoyEngineSimpleIntegrationTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -18,7 +21,7 @@ class EnvoyEngineSimpleIntegrationTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { countDownLatch.countDown() }
         .build()
@@ -31,7 +34,7 @@ class EnvoyEngineSimpleIntegrationTest {
     val countDownLatch = CountDownLatch(1)
     val engine =
       EngineBuilder()
-        .addLogLevel(LogLevel.DEBUG)
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setOnEngineRunning { countDownLatch.countDown() }
         .build()

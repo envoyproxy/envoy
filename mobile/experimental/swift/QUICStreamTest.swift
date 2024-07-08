@@ -157,7 +157,7 @@ final class QUICStreamTests: XCTestCase {
     let expectation = self.expectation(description: "Complete response received.")
 
     let client = EngineBuilder(yaml: config)
-      .addLogLevel(.trace)
+      .setLogLevel(.trace)
       .build()
       .streamClient()
 

@@ -73,18 +73,6 @@ You can install Envoy on Mac OSX using the official brew repositories.
       $ brew update
       $ brew install envoy
 
-.. _start_install_windows:
-
-Install Envoy on Windows
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can run Envoy using the official Windows Docker image.
-
-.. substitution-code-block:: console
-
-   $ docker pull envoyproxy/|envoy_windows_docker_image|
-   $ docker run --rm envoyproxy/|envoy_windows_docker_image| --version
-
 .. _start_install_docker:
 
 Install Envoy using Docker
@@ -214,25 +202,6 @@ The following table shows the available Docker tag variants for the latest
      - :dockerhub_envoy:`tools`
      - :dockerhub_envoy:`tools-dev`
 
-
-`envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows>`__, `envoyproxy/envoy-windows-dev <https://hub.docker.com/r/envoyproxy/envoy-windows-dev>`__
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Release binary with symbols stripped on top of a Windows Server 1809 base.
-
-The ``windows-dev`` image also contains build tools.
-
-.. list-table::
-   :widths: auto
-   :header-rows: 1
-   :stub-columns: 1
-
-   * - variant
-     - latest stable (amd64)
-     - main dev (amd64)
-   * - envoy-windows
-     - :dockerhub_envoy:`windows`
-     - :dockerhub_envoy:`windows-dev`
 
 .. _install_tools:
 

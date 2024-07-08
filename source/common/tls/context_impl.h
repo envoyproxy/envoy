@@ -21,7 +21,6 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -47,7 +46,7 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
-  Extensions::TransportSockets::Tls::Ocsp::OcspResponseWrapperPtr ocsp_response_;
+  std::unique_ptr<OcspResponseWrapper> ocsp_response_;
   bool is_ecdsa_{};
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
@@ -62,12 +61,12 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
-  void loadCertificateChain(const std::string& data, const std::string& data_path);
-  void loadPrivateKey(const std::string& data, const std::string& data_path,
-                      const std::string& password);
-  void loadPkcs12(const std::string& data, const std::string& data_path,
-                  const std::string& password);
-  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
+  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
+  absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
+                              const std::string& password);
+  absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
+                          const std::string& password);
+  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 } // namespace Ssl
 
@@ -78,7 +77,8 @@ namespace Tls {
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
+  virtual absl::StatusOr<bssl::UniquePtr<SSL>>
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -117,7 +117,7 @@ protected:
 
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               Server::Configuration::CommonFactoryContext& factory_context,
-              Ssl::ContextAdditionalInitFunc additional_init);
+              Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -128,8 +128,9 @@ protected:
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
 
-  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
-  std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
+  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl, absl::Status& parse_status);
+  std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
+                                          absl::Status& parse_status);
 
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
@@ -171,75 +172,14 @@ protected:
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 
-class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
+class ServerContextFactory : public Envoy::Config::UntypedFactory {
 public:
-  ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                    Server::Configuration::CommonFactoryContext& factory_context);
-
-  bssl::UniquePtr<SSL>
-  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
-
-private:
-  int newSessionKey(SSL_SESSION* session);
-
-  const std::string server_name_indication_;
-  const bool allow_renegotiation_;
-  const bool enforce_rsa_key_usage_;
-  const size_t max_session_keys_;
-  absl::Mutex session_keys_mu_;
-  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
-  bool session_keys_single_use_{false};
-};
-
-enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
-
-class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
-public:
-  ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names,
-                    Server::Configuration::CommonFactoryContext& factory_context,
-                    Ssl::ContextAdditionalInitFunc additional_init);
-
-  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
-  // ClientHello details. This is made public for use by custom TLS extensions who want to
-  // manually create and use this as a client hello callback.
-  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-
-  // Finds the best matching context. The returned context will have the same lifetime as
-  // this ``ServerContextImpl``.
-  std::pair<const Ssl::TlsContext&, OcspStapleAction> findTlsContext(absl::string_view sni,
-                                                                     bool client_ecdsa_capable,
-                                                                     bool client_ocsp_capable,
-                                                                     bool* cert_matched_sni);
-
-private:
-  // Currently, at most one certificate of a given key type may be specified for each exact
-  // server name or wildcard domain name.
-  using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<Ssl::TlsContext>>;
-  // Both exact server names and wildcard domains are part of the same map, in which wildcard
-  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
-  // between exact and wildcard entries.
-  using ServerNamesMap = absl::flat_hash_map<std::string, PkeyTypesMap>;
-
-  void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
-
-  using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
-
-  int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
-                         unsigned int inlen);
-  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
-                           HMAC_CTX* hmac_ctx, int encrypt);
-  bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
-  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
-  OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
-
-  SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
-
-  const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
-  const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
-  ServerNamesMap server_names_map_;
-  bool has_rsa_{false};
-  bool full_scan_certs_on_sni_mismatch_;
+  std::string category() const override { return "envoy.ssl.server_context_factory"; }
+  virtual Ssl::ServerContextSharedPtr
+  createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                      const std::vector<std::string>& server_names,
+                      Server::Configuration::CommonFactoryContext& factory_context,
+                      Ssl::ContextAdditionalInitFunc additional_init) PURE;
 };
 
 } // namespace Tls

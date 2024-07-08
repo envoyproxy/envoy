@@ -84,7 +84,8 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
           std::make_shared<QuicSslConnectionInfo>(*this),
           std::make_unique<StreamInfo::StreamInfoImpl>(
               dispatcher.timeSource(),
-              connection->connectionSocket()->connectionInfoProviderSharedPtr())),
+              connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+              StreamInfo::FilterState::LifeSpan::Connection)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
@@ -102,6 +103,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
         std::vector<std::string>(transport_socket_factory_->supportedAlpnProtocols().begin(),
                                  transport_socket_factory_->supportedAlpnProtocols().end());
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
+#endif
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {

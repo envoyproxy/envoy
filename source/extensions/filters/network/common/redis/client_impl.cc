@@ -61,7 +61,7 @@ ConfigImpl::ConfigImpl(
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config,
+                             const ConfigSharedPtr& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
                              Stats::Scope& scope, bool is_transaction_client) {
   auto client =
@@ -76,7 +76,8 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                       const ConfigSharedPtr& config,
                        const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                        bool is_transaction_client)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
@@ -115,7 +116,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   const bool empty_buffer = encoder_buffer_.length() == 0;
 
   Stats::StatName command;
-  if (config_.enableCommandStats()) {
+  if (config_->enableCommandStats()) {
     // Only lowercase command and get StatName if we enable command stats
     command = redis_command_stats_->getCommandFromRequest(request);
     redis_command_stats_->updateStatsTotal(scope_, command);
@@ -128,10 +129,10 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
+  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();
   } else if (empty_buffer) {
-    flush_timer_->enableTimer(std::chrono::milliseconds(config_.bufferFlushTimeoutInMs()));
+    flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
   }
 
   // Only boost the op timeout if:
@@ -141,7 +142,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   // - This is the first request on the pipeline. Otherwise the timeout would effectively start on
   //   the last operation.
   if (connected_ && pending_requests_.size() == 1) {
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
+    connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
   return &pending_requests_.back();
@@ -171,7 +172,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
 }
 
 void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
-  if (!config_.disableOutlierEvents()) {
+  if (!config_->disableOutlierEvents()) {
     host_->outlierDetector().putResult(result);
   }
 }
@@ -202,7 +203,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
     ASSERT(!pending_requests_.empty());
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
+    connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
   if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
@@ -216,7 +217,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
 
-  if (config_.enableCommandStats()) {
+  if (config_->enableCommandStats()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
     redis_command_stats_->updateStats(scope_, request.command_, success);
     request.command_request_timer_->complete();
@@ -230,7 +231,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   pending_requests_.pop_front();
   if (canceled) {
     host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
-  } else if (config_.enableRedirection() && !is_transaction_client_ &&
+  } else if (config_->enableRedirection() && !is_transaction_client_ &&
              (value->type() == Common::Redis::RespType::Error)) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     if (err.size() == 3 &&
@@ -256,7 +257,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
   } else {
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
+    connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
@@ -267,7 +268,7 @@ ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& 
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
           parent_.scope_, parent_.time_source_)) {
-  if (parent_.config_.enableCommandStats()) {
+  if (parent_.config_->enableCommandStats()) {
     command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
         parent_.scope_, command_, parent_.time_source_);
   }
@@ -302,7 +303,7 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
   // Any connection to replica requires the READONLY command in order to perform read.
   // Also the READONLY command is a no-opt for the primary.
   // We only need to send the READONLY command iff it's possible that the host is a replica.
-  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
+  if (config_->readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
     makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
   }
 }
@@ -310,7 +311,7 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config,
+                                    Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
                                     const std::string& auth_password, bool is_transaction_client) {

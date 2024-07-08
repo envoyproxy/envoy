@@ -74,7 +74,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         // Create a host we can use immediately.
         auto info = parent_->cluster_->info();
         HostSharedPtr host(std::make_shared<HostImpl>(
-            info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
+            info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
             envoy::config::core::v3::UNKNOWN, parent_->cluster_->time_source_));
@@ -189,24 +189,26 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
 }
 
 OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                                       ClusterFactoryContext& context)
-    : ClusterImplBase(config, context),
+                                       ClusterFactoryContext& context,
+                                       absl::Status& creation_status)
+    : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
       host_map_(std::make_shared<HostMultiMap>()) {
-  if (const auto& config_opt = info_->lbOriginalDstConfig(); config_opt.has_value()) {
-    if (config_opt->use_http_header()) {
-      http_header_name_ = config_opt->http_header_name().empty()
+  if (config.has_original_dst_lb_config()) {
+    const auto& lb_config = config.original_dst_lb_config();
+    if (lb_config.use_http_header()) {
+      http_header_name_ = lb_config.http_header_name().empty()
                               ? Http::Headers::get().EnvoyOriginalDstHost
-                              : Http::LowerCaseString(config_opt->http_header_name());
+                              : Http::LowerCaseString(lb_config.http_header_name());
     }
-    if (config_opt->has_metadata_key()) {
-      metadata_key_ = Config::MetadataKey(config_opt->metadata_key());
+    if (lb_config.has_metadata_key()) {
+      metadata_key_ = Config::MetadataKey(lb_config.metadata_key());
     }
-    if (config_opt->has_upstream_port_override()) {
-      port_override_ = config_opt->upstream_port_override().value();
+    if (lb_config.has_upstream_port_override()) {
+      port_override_ = lb_config.upstream_port_override().value();
     }
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
@@ -342,7 +344,10 @@ OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::C
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster = std::shared_ptr<OriginalDstCluster>(new OriginalDstCluster(cluster, context));
+  absl::Status creation_status = absl::OkStatus();
+  auto new_cluster = std::shared_ptr<OriginalDstCluster>(
+      new OriginalDstCluster(cluster, context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(
       std::make_shared<OriginalDstClusterHandle>(new_cluster));
   return std::make_pair(new_cluster, std::move(lb));

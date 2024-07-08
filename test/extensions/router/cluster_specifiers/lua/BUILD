@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/router/cluster_specifiers/lua:lua_cluster_specifier_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

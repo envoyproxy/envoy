@@ -2,7 +2,6 @@
 
 #include <functional>
 
-#include "library/cc/log_level.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
 
@@ -38,8 +37,6 @@ private:
   Envoy::InternalEngine* engine_;
   StreamClientSharedPtr stream_client_;
 };
-
-using InternalEngineSharedPtr = std::shared_ptr<Engine>;
 
 } // namespace Platform
 } // namespace Envoy

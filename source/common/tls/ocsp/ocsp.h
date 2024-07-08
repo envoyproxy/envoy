@@ -6,7 +6,9 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
+#include "envoy/ssl/context.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "openssl/bytestring.h"
@@ -178,15 +180,12 @@ struct OcspResponse {
 /**
  * A wrapper used to own and query an OCSP response in DER-encoded format.
  */
-class OcspResponseWrapper {
+class OcspResponseWrapperImpl : public Ssl::OcspResponseWrapper {
 public:
-  OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source);
-
-  /**
-   * @return std::vector<uint8_t>& a reference to the underlying bytestring representation
-   * of the OCSP response
-   */
-  const std::vector<uint8_t>& rawBytes() const { return raw_bytes_; }
+  OcspResponseWrapperImpl(std::vector<uint8_t> der_response, TimeSource& time_source,
+                          std::unique_ptr<OcspResponse>&& response);
+  static absl::StatusOr<std::unique_ptr<OcspResponseWrapperImpl>>
+  create(std::vector<uint8_t> der_response, TimeSource& time_source);
 
   /**
    * @return OcspResponseStatus whether the OCSP response was successfully created
@@ -200,42 +199,18 @@ public:
    */
   bool matchesCertificate(X509& cert) const;
 
-  /**
-   * Determines whether the OCSP response can no longer be considered valid.
-   * This can be true if the nextUpdate field of the response has passed
-   * or is not present, indicating that there is always more updated information
-   * available.
-   *
-   * @returns bool if the OCSP response is expired.
-   */
-  bool isExpired();
-
-  /**
-   * @returns the seconds until this OCSP response expires.
-   */
-  uint64_t secondsUntilExpiration() const;
-
-  /**
-   * @return The beginning of the validity window for this response.
-   */
-  Envoy::SystemTime getThisUpdate() const;
-
-  /**
-   * The time at which this response is considered to expire. If
-   * the underlying response does not have a value, then the current
-   * time is returned.
-   *
-   * @return The end of the validity window for this response.
-   */
-  Envoy::SystemTime getNextUpdate() const;
+  // OcspResponseWrapper
+  uint64_t secondsUntilExpiration() const override;
+  Envoy::SystemTime getThisUpdate() const override;
+  Envoy::SystemTime getNextUpdate() const override;
+  bool isExpired() override;
+  const std::vector<uint8_t>& rawBytes() const override { return raw_bytes_; }
 
 private:
   const std::vector<uint8_t> raw_bytes_;
   const std::unique_ptr<OcspResponse> response_;
   TimeSource& time_source_;
 };
-
-using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
 
 /**
  * `ASN.1` DER-encoded parsing functions similar to `Asn1Utility` but specifically
@@ -251,7 +226,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed OcspResponse
    * element.
    */
-  static std::unique_ptr<OcspResponse> parseOcspResponse(CBS& cbs);
+  static absl::StatusOr<std::unique_ptr<OcspResponse>> parseOcspResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` OcspResponseStatus element
@@ -259,7 +234,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * OcspResponseStatus element.
    */
-  static OcspResponseStatus parseResponseStatus(CBS& cbs);
+  static absl::StatusOr<OcspResponseStatus> parseResponseStatus(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` Response element
@@ -267,7 +242,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * structure that is a valid Response type.
    */
-  static ResponsePtr parseResponseBytes(CBS& cbs);
+  static absl::StatusOr<ResponsePtr> parseResponseBytes(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` BasicOcspResponse element
@@ -275,7 +250,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * BasicOcspResponse element.
    */
-  static std::unique_ptr<BasicOcspResponse> parseBasicOcspResponse(CBS& cbs);
+  static absl::StatusOr<std::unique_ptr<BasicOcspResponse>> parseBasicOcspResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` ResponseData element
@@ -284,7 +259,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * ResponseData element.
    */
-  static ResponseData parseResponseData(CBS& cbs);
+  static absl::StatusOr<ResponseData> parseResponseData(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` SingleResponse element
@@ -293,16 +268,15 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * SingleResponse element.
    */
-  static SingleResponse parseSingleResponse(CBS& cbs);
+  static absl::StatusOr<SingleResponse> parseSingleResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` CertId element
    * @returns CertId containing the information necessary to uniquely identify
-   * an SSL certificate.
-   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
-   * CertId element.
+   * an SSL certificate or an error status if
+   * `cbs` does not contain a well-formed CertId element.
    */
-  static CertId parseCertId(CBS& cbs);
+  static absl::StatusOr<CertId> parseCertId(CBS& cbs);
 };
 
 } // namespace Ocsp

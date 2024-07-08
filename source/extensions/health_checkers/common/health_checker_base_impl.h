@@ -139,7 +139,8 @@ private:
   std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
-  void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
+  void runCallbacks(HostSharedPtr host, HealthTransition changed_state,
+                    HealthState current_check_result);
   void setUnhealthyCrossThread(const HostSharedPtr& host,
                                HealthCheckHostMonitor::UnhealthyType type);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>

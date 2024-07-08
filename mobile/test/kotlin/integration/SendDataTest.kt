@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
@@ -16,11 +15,23 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-private const val ASSERTION_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
-private const val REQUEST_STRING_MATCH = "match_me"
+private const val ASSERTION_FILTER_TEXT_PROTO =
+  """
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+  match_config {
+    http_request_generic_body_match: {
+      patterns: {
+        string_match: 'request body'
+      }
+    }
+  }
+}
+"""
 
+@RunWith(RobolectricTestRunner::class)
 class SendDataTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -48,14 +59,11 @@ class SendDataTest {
   fun `successful sending data`() {
     val expectation = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter(
-          "envoy.filters.http.assertion",
-          "[$ASSERTION_FILTER_TYPE] { match_config { http_request_generic_body_match: { patterns: { string_match: '$REQUEST_STRING_MATCH'}}}}"
-        )
+        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
         .build()
 
     val client = engine.streamClient()
@@ -64,12 +72,10 @@ class SendDataTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
+          authority = httpTestServer.address,
           path = "/simple.txt"
         )
         .build()
-
-    val body = ByteBuffer.wrap(REQUEST_STRING_MATCH.toByteArray(Charsets.UTF_8))
 
     var responseStatus: Int? = null
     var responseEndStream = false
@@ -77,13 +83,18 @@ class SendDataTest {
       .newStreamPrototype()
       .setOnResponseHeaders { headers, _, _ -> responseStatus = headers.httpStatus }
       .setOnResponseData { _, endStream, _ ->
+        // Sometimes Envoy Mobile may send an empty data (0 byte) with `endStream` set to true
+        // to indicate an end of stream. So, we should only do `expectation.countDown()`
+        // when the `endStream` is true.
         responseEndStream = endStream
-        expectation.countDown()
+        if (endStream) {
+          expectation.countDown()
+        }
       }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, false)
-      .close(body)
+      .close(ByteBuffer.wrap("request body".toByteArray(Charsets.UTF_8)))
 
     expectation.await(10, TimeUnit.SECONDS)
 

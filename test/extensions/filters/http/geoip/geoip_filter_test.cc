@@ -8,7 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -58,9 +57,6 @@ public:
   }
 
   void initializeProviderFactory() {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(*dummy_factory_);
   }
 
@@ -93,7 +89,7 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
   Http::TestRequestHeaderMapImpl request_headers;
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -120,13 +116,15 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
       xff_num_trusted_hops: 1
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy("x-forwarded-for", "10.0.0.1,10.0.0.2");
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -150,6 +148,8 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -159,7 +159,7 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
                                                     {"x-geo-city", "dummy_city"}};
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -184,6 +184,8 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -198,7 +200,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                          {"x-geo-anon-proxy", "true"}};
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -239,12 +241,14 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
   const std::string external_request_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   expectStats();
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
@@ -268,11 +272,13 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
   const std::string external_request_yaml = R"EOF(
       provider:
           name: "envoy.geoip_providers.dummy"
+          typed_config:
+            "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
   )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))

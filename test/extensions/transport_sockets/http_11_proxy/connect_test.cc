@@ -11,6 +11,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,6 +23,7 @@ using testing::ByMove;
 using testing::Const;
 using testing::InSequence;
 using testing::NiceMock;
+using testing::Optional;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -38,7 +40,7 @@ public:
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
-        Network::Utility::parseInternetAddressAndPort(address_string);
+        Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
     auto info =
         std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>("www.foo.com", address);
     if (no_proxy_protocol) {
@@ -65,7 +67,7 @@ public:
   void setAddress() {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
-    auto address = Network::Utility::parseInternetAddressAndPort(address_string);
+    auto address = Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
     transport_callbacks_.connection_.stream_info_.filterState()->setData(
         "envoy.network.transport_socket.http_11_proxy.address",
         std::make_unique<Network::Http11ProxyInfoFilterState>("www.foo.com", address),
@@ -431,13 +433,81 @@ TEST(ParseTest, TestValidResponse) {
 
 // The SelfContainedParser is only intended for header parsing but for coverage,
 // test a request with a body.
-TEST(ParseTest, CoverResponseBody) {
+TEST(ParseTest, CoverResponseBodyHttp10) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
   std::string headers = "HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n";
   std::string body = "ab";
 
   SelfContainedParser parser;
   parser.parser().execute(headers.c_str(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
   parser.parser().execute(body.c_str(), body.length());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_FALSE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(2));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+TEST(ParseTest, CoverResponseBodyHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
+  std::string headers = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n";
+  std::string body = "ab";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.c_str(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+  parser.parser().execute(body.c_str(), body.length());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_TRUE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(2));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+// Regression tests for #34096.
+TEST(ParseTest, ContentLengthZeroHttp10) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
+  constexpr absl::string_view headers = "HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.data(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_FALSE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(0));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
+}
+
+TEST(ParseTest, ContentLengthZeroHttp11) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_balsa_delay_reset", "true"}});
+
+  constexpr absl::string_view headers = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.data(), headers.length());
+  EXPECT_TRUE(parser.headersComplete());
+
+  EXPECT_NE(parser.parser().getStatus(), Http::Http1::ParserStatus::Error);
+  EXPECT_EQ(parser.parser().statusCode(), Http::Code::OK);
+  EXPECT_TRUE(parser.parser().isHttp11());
+  EXPECT_THAT(parser.parser().contentLength(), Optional(0));
+  EXPECT_FALSE(parser.parser().isChunked());
+  EXPECT_FALSE(parser.parser().hasTransferEncoding());
 }
 
 } // namespace

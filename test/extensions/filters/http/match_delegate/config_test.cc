@@ -42,6 +42,8 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
         "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
     data_input_allow_list->add_type_url(
         "type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput");
+    data_input_allow_list->add_type_url(
+        "type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput");
 
     return requirements;
   }
@@ -215,6 +217,40 @@ xds_matcher:
   MatchDelegateConfig match_delegate_config;
   auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context).value();
   EXPECT_TRUE(cb);
+}
+
+TEST(MatchWrapper, FilterStateMatcherYaml) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
+extension_config:
+  name: test
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+xds_matcher:
+  matcher_tree:
+    input:
+      name: filter_state
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+        key: arg
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig match_delegate_config;
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
+  EXPECT_TRUE(cb.value());
 }
 
 TEST(MatchWrapper, WithMatcherInvalidDataInput) {

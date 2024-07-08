@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.extensions.network.dns_resolver.test_resolver.v3;
+
+option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.test_resolver.v3";
+option java_outer_classname = "GetaddrinfoDnsResolverProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/test_resolver/v3;test_resolverv3";
+
+// [#protodoc-title: test_resolver DNS resolver]
+// [#extension: envoy.network.dns_resolver.test_resolver]
+message TestResolverConfig {
+}

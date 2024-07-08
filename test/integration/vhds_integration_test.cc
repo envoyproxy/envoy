@@ -119,14 +119,14 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   vhds_stream_->startGrpcStream();
 
   EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_.get()));
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost,
       {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
           fmt::format(VhostTemplate, "my_route/vhost_0", "vhost.first"))},
-      {}, "1", vhds_stream_);
+      {}, "1", vhds_stream_.get());
   EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_.get()));
 
   // Confirm vhost.first that was configured via VHDS is reachable
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "vhost.first");

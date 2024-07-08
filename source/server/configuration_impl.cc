@@ -128,7 +128,11 @@ absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap&
   }
 
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
+
+  // clusterManagerFromProto() and init() have to be called consecutively.
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+  status = cluster_manager_->initialize(bootstrap);
+  RETURN_IF_NOT_OK(status);
 
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());

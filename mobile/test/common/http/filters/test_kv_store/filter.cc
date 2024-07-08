@@ -4,7 +4,7 @@
 
 #include "source/common/common/assert.h"
 
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,24 +18,24 @@ TestKeyValueStoreFilterConfig::TestKeyValueStoreFilterConfig(
 
 Http::FilterHeadersStatus TestKeyValueStoreFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto store = config_->keyValueStore();
-  auto key = Data::Utility::copyToBridgeData(config_->testKey());
-  RELEASE_ASSERT(Data::Utility::copyToString(store->read(key, store->context)).empty(),
+  auto key = Bridge::Utility::copyToBridgeData(config_->testKey());
+  RELEASE_ASSERT(Bridge::Utility::copyToString(store->read(key, store->context)).empty(),
                  "store should be empty");
 
-  envoy_data value = Data::Utility::copyToBridgeData(config_->testValue());
+  envoy_data value = Bridge::Utility::copyToBridgeData(config_->testValue());
   store->save(key, value, store->context);
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus TestKeyValueStoreFilter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
   const auto store = config_->keyValueStore();
-  auto key = Data::Utility::copyToBridgeData(config_->testKey());
-  RELEASE_ASSERT(Data::Utility::copyToString(store->read(key, store->context)) ==
+  auto key = Bridge::Utility::copyToBridgeData(config_->testKey());
+  RELEASE_ASSERT(Bridge::Utility::copyToString(store->read(key, store->context)) ==
                      config_->testValue(),
                  "store did not contain expected value");
 
   store->remove(key, store->context);
-  RELEASE_ASSERT(Data::Utility::copyToString(store->read(key, store->context)).empty(),
+  RELEASE_ASSERT(Bridge::Utility::copyToString(store->read(key, store->context)).empty(),
                  "store should be empty");
 
   return Http::FilterHeadersStatus::Continue;

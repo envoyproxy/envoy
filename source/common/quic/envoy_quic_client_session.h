@@ -65,14 +65,7 @@ public:
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
-  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support")) {
-      return quic::HttpDatagramSupport::kRfc;
-    }
-#endif
-    return quic::HttpDatagramSupport::kNone;
-  }
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
   std::vector<std::string> GetAlpnsToOffer() const override;
 
   // quic::QuicSpdyClientSessionBase
@@ -132,6 +125,7 @@ private:
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   OptRef<QuicTransportSocketFactoryBase> transport_socket_factory_;
   std::vector<std::string> configured_alpns_;
+  quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
 };
 
 } // namespace Quic

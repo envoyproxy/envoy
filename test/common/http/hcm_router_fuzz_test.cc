@@ -40,8 +40,8 @@ using ActionCase = test::common::http::FuzzAction::ActionCase;
 class RouterFuzzFilter : public Router::Filter {
 public:
   using Router::Filter::Filter;
-  static StreamDecoderFilterSharedPtr create(Router::FilterConfig& config) {
-    auto fuzz_filter = new RouterFuzzFilter(config, config.default_stats_);
+  static StreamDecoderFilterSharedPtr create(const Router::FilterConfigSharedPtr config) {
+    auto fuzz_filter = new RouterFuzzFilter(config, config->default_stats_);
     return StreamDecoderFilterSharedPtr{fuzz_filter};
   }
   // Filter
@@ -439,14 +439,14 @@ public:
       : pool_(fake_stats_.symbolTable()), fuzz_conn_pool_factory_(cluster_manager_),
         reg_(fuzz_conn_pool_factory_), router_context_(fake_stats_.symbolTable()),
         shadow_writer_(new NiceMock<Router::MockShadowWriter>()),
-        filter_config_(
+        filter_config_(std::make_shared<Router::FilterConfig>(
             factory_context_, pool_.add("fuzz_filter"), local_info_, *fake_stats_.rootScope(), cm_,
             runtime_, random_, Router::ShadowWriterPtr{shadow_writer_}, true /*emit_dynamic_stats*/,
             false /*start_child_span*/, true /*suppress_envoy_headers*/,
             false /*respect_expected_rq_timeout*/,
             true /*suppress_grpc_request_failure_code_stats*/,
             false /*flush_upstream_log_on_upstream_stream*/, std::move(strict_headers_to_check),
-            time_system_.timeSystem(), http_context_, router_context_) {
+            time_system_.timeSystem(), http_context_, router_context_)) {
     cluster_manager_.createDefaultClusters(*this);
     // Install the `RouterFuzzFilter` here
     ON_CALL(filter_factory_, createFilterChain(_))
@@ -493,12 +493,12 @@ private:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockLoader> runtime_;
   Router::MockShadowWriter* shadow_writer_;
-  Router::FilterConfig filter_config_;
+  std::shared_ptr<Router::FilterConfig> filter_config_;
 };
 
 class Harness {
 public:
-  Harness() : hcm_config_(Protobuf::RepeatedPtrField<std::string>{}) {
+  Harness() : hcm_config_(std::make_shared<FuzzConfig>(Protobuf::RepeatedPtrField<std::string>{})) {
     ON_CALL(filter_callbacks_.connection_, close(_, _)).WillByDefault(InvokeWithoutArgs([this]() {
       closed_ = true;
     }));
@@ -506,12 +506,12 @@ public:
 
   void fuzz(const FuzzCase& input) {
     hcm_ = std::make_unique<ConnectionManagerImpl>(
-        hcm_config_, drain_close_, random_, hcm_config_.http_context_, runtime_, local_info_,
-        hcm_config_.cm_, overload_manager_, hcm_config_.time_system_);
+        hcm_config_, drain_close_, random_, hcm_config_->http_context_, runtime_, local_info_,
+        hcm_config_->cm_, overload_manager_, hcm_config_->time_system_);
     hcm_->initializeReadFilterCallbacks(filter_callbacks_);
     Buffer::OwnedImpl data;
     hcm_->onData(data, false);
-    FuzzClusterManager& cluster_manager = hcm_config_.getFuzzClusterManager();
+    FuzzClusterManager& cluster_manager = hcm_config_->getFuzzClusterManager();
 
     for (const auto& action : input.actions()) {
       if (closed_) {
@@ -520,7 +520,7 @@ public:
       switch (action.action_case()) {
       case ActionCase::kAdvanceTime: {
         const auto& a = action.advance_time();
-        hcm_config_.time_system_.timeSystem().advanceTimeWait(
+        hcm_config_->time_system_.timeSystem().advanceTimeWait(
             std::chrono::milliseconds(a.milliseconds()));
         break;
       }
@@ -582,7 +582,7 @@ public:
   }
 
 private:
-  FuzzConfig hcm_config_;
+  std::shared_ptr<FuzzConfig> hcm_config_;
   NiceMock<Network::MockDrainDecision> drain_close_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;

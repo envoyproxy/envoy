@@ -32,7 +32,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: Checkout repository
-      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633  # v4.1.2
+      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
       with:
         fetch-depth: 2
 
@@ -61,14 +61,14 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.29
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.30
       with:
         to_remove: |
           /usr/local/lib/android
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4
+      uses: github/codeql-action/init@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # codeql-bundle-v3.25.8
       with:
         languages: cpp
 
@@ -77,7 +77,9 @@ jobs:
       shell: bash
       run: |
        sudo apt-get update --error-on=any
-       sudo apt-get install --yes libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
+       sudo apt-get install --yes \
+           libtool cmake automake autoconf make ninja-build curl \
+           unzip virtualenv openjdk-11-jdk build-essential libc++1
        # Note: the llvm/clang version should match the version specifed in:
        #  - bazel/repository_locations.bzl
        #  - .github/workflows/codeql-daily.yml
@@ -110,4 +112,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@cdcdbb579706841c47f7063dda365e292e5cad7a  # codeql-bundle-v2.13.4
+      uses: github/codeql-action/analyze@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # codeql-bundle-v3.25.8

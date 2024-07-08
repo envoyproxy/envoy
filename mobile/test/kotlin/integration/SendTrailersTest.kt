@@ -6,7 +6,6 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.RequestTrailersBuilder
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
@@ -17,12 +16,23 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-private const val ASSERTION_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 private const val MATCHER_TRAILER_NAME = "test-trailer"
 private const val MATCHER_TRAILER_VALUE = "test.code"
+private const val ASSERTION_FILTER_TEXT_PROTO =
+  """
+  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
+    match_config: {
+      http_request_trailers_match: {
+        headers: { name: 'test-trailer', exact_match: 'test.code' }
+      }
+    }
+  }
+"""
 
+@RunWith(RobolectricTestRunner::class)
 class SendTrailersTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -44,14 +54,11 @@ class SendTrailersTest {
   fun `successful sending of trailers`() {
     val expectation = CountDownLatch(1)
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter(
-          "envoy.filters.http.assertion",
-          "[$ASSERTION_FILTER_TYPE] {match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
-        )
+        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
         .addNativeFilter(
           "envoy.filters.http.buffer",
           "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 65000 } }"
@@ -64,7 +71,7 @@ class SendTrailersTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
+          authority = httpTestServer.address,
           path = "/simple.txt"
         )
         .build()

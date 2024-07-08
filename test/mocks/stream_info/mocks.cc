@@ -43,6 +43,11 @@ MockUpstreamInfo::MockUpstreamInfo()
           Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_local_address) {
             upstream_local_address_ = upstream_local_address;
           }));
+  ON_CALL(*this, setUpstreamRemoteAddress(_))
+      .WillByDefault(
+          Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_remote_address) {
+            upstream_remote_address_ = upstream_remote_address;
+          }));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, setUpstreamTransportFailureReason(_))
       .WillByDefault(Invoke([this](absl::string_view failure_reason) {

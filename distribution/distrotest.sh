@@ -1,4 +1,6 @@
-#!/bin/bash -E
+#!/usr/bin/env bash
+
+set -E
 
 FAILED=()
 TESTNAME=

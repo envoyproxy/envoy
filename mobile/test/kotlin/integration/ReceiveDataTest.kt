@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
@@ -16,7 +15,10 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class ReceiveDataTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -43,8 +45,8 @@ class ReceiveDataTest {
   @Test
   fun `response headers and response data call onResponseHeaders and onResponseData`() {
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
@@ -54,7 +56,7 @@ class ReceiveDataTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "localhost:${httpTestServer.port}",
+          authority = httpTestServer.address,
           path = "/simple.txt"
         )
         .build()

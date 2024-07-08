@@ -34,7 +34,8 @@
 
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
-#include "source/common/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
@@ -241,7 +242,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   }
 #ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
-  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+  Network::Address::InstanceConstSharedPtr server_addr = *Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
@@ -322,7 +323,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
-            return Network::Utility::parseInternetAddress(
+            return Network::Utility::parseInternetAddressNoThrow(
                 Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
@@ -837,12 +838,16 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_terminated; "
-            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
-            "termination",
-            response->body());
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(response->headers().getProxyStatusValue(),
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
+              "ERROR|Closed_by_application}; UC\"");
+  } else {
+    EXPECT_EQ(response->headers().getProxyStatusValue(),
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
+  }
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(

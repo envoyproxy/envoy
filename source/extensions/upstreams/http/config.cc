@@ -82,19 +82,19 @@ bool useHttp3(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&
   return false;
 }
 
-absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
+absl::StatusOr<absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>>
 getAlternateProtocolsCacheOptions(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     Server::Configuration::ServerFactoryContext& server_context) {
   if (options.has_auto_config() && options.auto_config().has_http3_protocol_options()) {
     if (!options.auto_config().has_alternate_protocols_cache_options()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("alternate protocols cache must be configured when HTTP/3 "
                       "is enabled with auto_config"));
     }
     auto cache_options = options.auto_config().alternate_protocols_cache_options();
     if (cache_options.has_key_value_store_config() && server_context.options().concurrency() != 1) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("options has key value store but Envoy has concurrency = {} : {}",
                       server_context.options().concurrency(), cache_options.DebugString()));
     }
@@ -104,7 +104,7 @@ getAlternateProtocolsCacheOptions(
   return absl::nullopt;
 }
 
-Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
+absl::StatusOr<Envoy::Http::HeaderValidatorFactoryPtr> createHeaderValidatorFactory(
     [[maybe_unused]] const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     [[maybe_unused]] Server::Configuration::ServerFactoryContext& server_context) {
 
@@ -134,26 +134,26 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   auto* factory = Envoy::Config::Utility::getFactory<Envoy::Http::HeaderValidatorFactoryConfig>(
       header_validator_config);
   if (!factory) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
   }
 
   header_validator_factory =
       factory->createFromProto(header_validator_config.typed_config(), server_context);
   if (!header_validator_factory) {
-    throwEnvoyExceptionOrPanic(fmt::format("Header validator extension could not be created: '{}'",
-                                           header_validator_config.name()));
+    return absl::InvalidArgumentError(fmt::format(
+        "Header validator extension could not be created: '{}'", header_validator_config.name()));
   }
 #else
   if (options.has_header_validation_config()) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("This Envoy binary does not support header validator extensions: '{}'",
                     options.header_validation_config().name()));
   }
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_universal_header_validator")) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         "Header validator can not be enabled since this Envoy binary does not support it.");
   }
 #endif
@@ -190,8 +190,13 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     Server::Configuration::ServerFactoryContext& server_context) {
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(getHttp2Options(options));
   RETURN_IF_STATUS_NOT_OK(options_or_error);
-  return std::shared_ptr<ProtocolOptionsConfigImpl>(
-      new ProtocolOptionsConfigImpl(options, options_or_error.value(), server_context));
+  auto cache_options_or_error = getAlternateProtocolsCacheOptions(options, server_context);
+  RETURN_IF_STATUS_NOT_OK(cache_options_or_error);
+  auto validator_factory_or_error = createHeaderValidatorFactory(options, server_context);
+  RETURN_IF_STATUS_NOT_OK(validator_factory_or_error);
+  return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
+      options, options_or_error.value(), std::move(validator_factory_or_error.value()),
+      cache_options_or_error.value(), server_context));
 }
 
 absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
@@ -212,6 +217,8 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     envoy::config::core::v3::Http2ProtocolOptions http2_options,
+    Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
+    absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
     Server::Configuration::ServerFactoryContext& server_context)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
           getHttpOptions(options), server_context.messageValidationVisitor())),
@@ -223,8 +230,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
                     options.upstream_http_protocol_options())
               : absl::nullopt),
       http_filters_(options.http_filters()),
-      alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options, server_context)),
-      header_validator_factory_(createHeaderValidatorFactory(options, server_context)),
+      alternate_protocol_cache_options_(std::move(cache_options)),
+      header_validator_factory_(std::move(header_validator_factory)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {

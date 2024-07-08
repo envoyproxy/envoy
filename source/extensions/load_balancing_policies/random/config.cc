@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/random/random_lb.h"
 
 namespace Envoy {
 namespace Extensions {

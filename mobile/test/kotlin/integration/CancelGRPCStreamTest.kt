@@ -13,7 +13,6 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -21,11 +20,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val FILTER_NAME = "cancel_validation_filter"
 private const val LOCAL_ERROR_FILTER_CONFIG =
   "[type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError] {}"
 
+@RunWith(RobolectricTestRunner::class)
 class CancelGRPCStreamTest {
 
   init {
@@ -71,8 +73,8 @@ class CancelGRPCStreamTest {
   @Test
   fun `cancel grpc stream calls onCancel callback`() {
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,

@@ -89,11 +89,11 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 
 class HttpFilterTest : public testing::Test {
 protected:
-  void initialize(std::string&& yaml) {
+  void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -133,7 +133,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_ = std::make_shared<FilterConfig>(
-        proto_config, 200ms, 10000, *stats_store_.rootScope(), "",
+        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         factory_context_);
@@ -179,7 +179,8 @@ protected:
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                     testing::Unused) {
+                                     const Envoy::Http::AsyncClient::StreamOptions&,
+                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) {
     if (final_expected_grpc_service_.has_value()) {
       EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
                                           config_with_hash_key.config()));
@@ -187,7 +188,7 @@ protected:
 
     stream_callbacks_ = &callbacks;
 
-    auto stream = std::make_unique<MockStream>();
+    auto stream = std::make_unique<NiceMock<MockStream>>();
     // We never send with the "close" flag set
     EXPECT_CALL(*stream, send(_, false)).WillRepeatedly(Invoke(this, &HttpFilterTest::doSend));
 
@@ -195,6 +196,7 @@ protected:
 
     // close is idempotent and only called once per filter
     EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
+
     return stream;
   }
 
@@ -261,14 +263,21 @@ protected:
       bool buffering_data,
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb) {
-    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_request_headers());
     const auto& headers = last_request_.request_headers();
+
     auto response = std::make_unique<ProcessingResponse>();
     auto* headers_response = response->mutable_request_headers();
     if (cb) {
       (*cb)(headers, *response, *headers_response);
     }
+
+    if (observability_mode_) {
+      EXPECT_TRUE(last_request_.observability_mode());
+      return;
+    }
+
+    EXPECT_FALSE(last_request_.observability_mode());
     if (!buffering_data) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
@@ -281,7 +290,6 @@ protected:
       bool buffering_data,
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb) {
-    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_response_headers());
     const auto& headers = last_request_.response_headers();
     auto response = std::make_unique<ProcessingResponse>();
@@ -289,6 +297,13 @@ protected:
     if (cb) {
       (*cb)(headers, *response, *headers_response);
     }
+
+    if (observability_mode_) {
+      EXPECT_TRUE(last_request_.observability_mode());
+      return;
+    }
+
+    EXPECT_FALSE(last_request_.observability_mode());
     if (!buffering_data) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
@@ -301,8 +316,14 @@ protected:
       absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
       bool should_continue = true,
       const std::chrono::microseconds latency = std::chrono::microseconds(10)) {
-    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_request_body());
+
+    if (observability_mode_) {
+      EXPECT_TRUE(last_request_.observability_mode());
+      return;
+    }
+
+    EXPECT_FALSE(last_request_.observability_mode());
     const auto& body = last_request_.request_body();
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_response = response->mutable_request_body();
@@ -320,8 +341,14 @@ protected:
   void processResponseBody(
       absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
       bool should_continue = true) {
-    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_response_body());
+
+    if (observability_mode_) {
+      EXPECT_TRUE(last_request_.observability_mode());
+      return;
+    }
+
+    EXPECT_FALSE(last_request_.observability_mode());
     const auto& body = last_request_.response_body();
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_response = response->mutable_response_body();
@@ -340,8 +367,14 @@ protected:
           std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
           cb,
       bool should_continue = true) {
-    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_request_trailers());
+
+    if (observability_mode_) {
+      EXPECT_TRUE(last_request_.observability_mode());
+      return;
+    }
+
+    EXPECT_FALSE(last_request_.observability_mode());
     const auto& trailers = last_request_.request_trailers();
     auto response = std::make_unique<ProcessingResponse>();
     auto* trailers_response = response->mutable_request_trailers();
@@ -360,8 +393,13 @@ protected:
           std::function<void(const HttpTrailers&, ProcessingResponse&, TrailersResponse&)>>
           cb,
       bool should_continue = true) {
-    EXPECT_FALSE(last_request_.observability_mode());
     ASSERT_TRUE(last_request_.has_response_trailers());
+    if (observability_mode_) {
+      EXPECT_TRUE(last_request_.observability_mode());
+      return;
+    }
+    EXPECT_FALSE(last_request_.observability_mode());
+
     const auto& trailers = last_request_.response_trailers();
     auto response = std::make_unique<ProcessingResponse>();
     auto* trailers_response = response->mutable_response_trailers();
@@ -561,6 +599,7 @@ protected:
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
   bool server_closed_stream_ = false;
+  bool observability_mode_ = false;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::shared_ptr<Filter> filter_;
@@ -575,6 +614,7 @@ protected:
   TestRequestTrailerMapImpl request_trailers_;
   TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
+  Event::MockTimer* deferred_close_timer_;
   TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
@@ -867,6 +907,55 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
   auto* immediate_response = resp2->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
   immediate_response->set_body("Bad request");
+  immediate_response->set_details("Got a bad request");
+  stream_callbacks_->onReceiveMessage(std::move(resp2));
+  EXPECT_TRUE(immediate_response_headers.empty());
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, RespondImmediatelyWithBinaryBody) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  processRequestHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_FALSE(last_request_.observability_mode());
+  ASSERT_TRUE(last_request_.has_response_headers());
+
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::BadRequest, "non-utf-8 compliant field\x80\x81",
+                             _, Eq(absl::nullopt), "Got_a_bad_request"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp2 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp2->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+  immediate_response->set_body("non-utf-8 compliant field\x80\x81");
   immediate_response->set_details("Got a bad request");
   stream_callbacks_->onReceiveMessage(std::move(resp2));
   EXPECT_TRUE(immediate_response_headers.empty());
@@ -2665,6 +2754,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
 
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
@@ -2754,10 +2844,209 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchanged) {
 
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 1);
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 3);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 3);
   EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
+// Using the default configuration, "clear_route_cache" flag not set. No header mutation.
+TEST_F(HttpFilterTest, ClearRouteCacheUnchangedNoClearFlag) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF");
+
+  // Do not call ClearRouteCache() for inbound traffic without header mutation.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("foo");
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data);
+
+  // There is no ClearRouteCache() call for outbound traffic regardless.
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+  processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
+}
+
+// Verify that the "disable_route_cache_clearing" and "route_cache_action"  setting
+// can not be set at the same time.
+TEST_F(HttpFilterTest, ClearRouteCacheDisableRouteCacheActionBothSet) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  disable_clear_route_cache: true
+  route_cache_action: CLEAR
+  )EOF";
+
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto config = std::make_shared<FilterConfig>(
+            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
+            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+            factory_context_);
+      },
+      EnvoyException,
+      "disable_clear_route_cache and route_cache_action can not be set to none-default at the same "
+      "time.");
+}
+
+// Verify that with header mutation in response, setting route_cache_action to CLEAR
+// will clear route cache even the response does not set clear_route_cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: CLEAR
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 2);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 2);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
+// Verify that without header mutation in response, setting route_cache_action to CLEAR
+// and set the clear_route_cache flag to true in the response will not clear route cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearNoHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: CLEAR
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 1);
+}
+
+// Verify that without header mutation in response, setting route_cache_action to CLEAR and not
+// set the clear_route_cache flag to true in the response will not clear route cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearResponseNotSetNoHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: CLEAR
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  // There is no clear_route_cache set in the response. clear_route_cache_ignored_ is zero in this
+  // case.
+  processRequestHeaders(false, absl::nullopt);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+}
+
+// Verify that setting route_cache_action to RETAIN will not clear route cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainWithHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: RETAIN
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 1);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+}
+
+// Verify that setting route_cache_action to RETAIN, response clear_route_cache flag not set,
+// will not clear route cache.
+TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainResponseNotWithHeaderMutation) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  route_cache_action: RETAIN
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  filter_->onDestroy();
+
+  // This counter will not increase as clear_route_cache flag in the response is not set.
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
 }
 
 // Using the default configuration, turn a GET into a POST.
@@ -3678,6 +3967,289 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
                        .string_value());
 
   filter_->onDestroy();
+}
+
+// Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
+// sends back response with clear_route_cache set to true, it is ignored.
+TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_header_mode: "SKIP"
+  )EOF",
+             true);
+
+  // When ext_proc filter is in upstream, clear_route_cache response is ignored.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_header()->set_key("x-new-header");
+    resp_add->mutable_header()->set_value("new");
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  // The clear_router_cache from response is ignored.
+  EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 1);
+  EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
+  EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
+// When ext_proc filter is in upstream filter chain, do not sending local
+// reply to downstream in case immediate response is received.
+TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF",
+             true);
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  TestResponseHeaderMapImpl immediate_response_headers;
+  ON_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
+                                             Eq(absl::nullopt), "Got_a_bad_request"))
+      .WillByDefault(Invoke([&immediate_response_headers](
+                                Unused, Unused,
+                                std::function<void(ResponseHeaderMap & headers)> modify_headers,
+                                Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp1->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+  immediate_response->set_body("Bad request");
+  immediate_response->set_details("Got a bad request");
+  auto* immediate_headers = immediate_response->mutable_headers();
+  auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_header()->set_key("content-type");
+  hdr1->mutable_header()->set_value("text/plain");
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  TestResponseHeaderMapImpl expected_response_headers{};
+  // Send local reply never happened.
+  EXPECT_THAT(&immediate_response_headers, HeaderMapEqualIgnoreOrder(&expected_response_headers));
+  // The send immediate response counter is increased.
+  EXPECT_EQ(config_->stats().send_immediate_resp_upstream_ignored_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_started_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
+  EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
+  EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+}
+
+TEST_F(HttpFilterTest, HeaderProcessingInObservabilityMode) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  observability_mode: true
+  )EOF");
+
+  EXPECT_TRUE(config_->observabilityMode());
+  observability_mode_ = true;
+
+  // Create synthetic HTTP request
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 10);
+  request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
+
+  // In the observability mode, the filter returns `Continue` in all events of http request
+  // lifecycle.
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false,
+                        [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
+                          EXPECT_FALSE(header_req.end_of_stream());
+                          TestRequestHeaderMapImpl expected{{":path", "/"},
+                                                            {":method", "POST"},
+                                                            {":scheme", "http"},
+                                                            {"host", "host"},
+                                                            {"content-type", "text/plain"},
+                                                            {"content-length", "10"},
+                                                            {"x-some-other-header", "yes"}};
+                          EXPECT_THAT(header_req.headers(), HeaderProtosEqual(expected));
+                        });
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+
+  // In the observability mode, the filter returns `Continue` in all events of http response
+  // lifecycle.
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(
+      false, [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
+        EXPECT_FALSE(header_resp.end_of_stream());
+        TestRequestHeaderMapImpl expected_response{
+            {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+        EXPECT_THAT(header_resp.headers(), HeaderProtosEqual(expected_response));
+      });
+
+  Buffer::OwnedImpl resp_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  deferred_close_timer_ = new Event::MockTimer(&dispatcher_);
+  // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
+  // which is triggered by filter onDestroy() function below.
+  EXPECT_CALL(*deferred_close_timer_,
+              enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS), _));
+  filter_->onDestroy();
+  deferred_close_timer_->invokeCallback();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  // Two messages (request and response header message) are sent.
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  // No response is received in observability mode.
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
+  // Deferred stream is closed.
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  observability_mode: true
+  processing_mode:
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+  )EOF");
+
+  uint32_t content_length = 100;
+  observability_mode_ = true;
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), content_length);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+  // In observability mode, content length is not removed as there is no mutation from ext_proc
+  // server.
+  EXPECT_EQ(request_headers_.getContentLengthValue(), absl::StrCat(content_length));
+
+  Buffer::OwnedImpl want_request_body;
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+      .WillRepeatedly(Invoke(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
+
+  Buffer::OwnedImpl req_chunk_1;
+  TestUtility::feedBufferWithRandomCharacters(req_chunk_1, 100);
+  want_request_body.add(req_chunk_1.toString());
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_chunk_1, true));
+  got_request_body.move(req_chunk_1);
+  EXPECT_EQ(want_request_body.toString(), got_request_body.toString());
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), content_length);
+
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(response_headers_.getContentLengthValue(), absl::StrCat(content_length));
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    got_response_body.move(resp_chunk);
+  }
+
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(last_resp_chunk, true));
+
+  // At this point, since we injected the data from each chunk after the "encodeData"
+  // callback, and since we also injected any chunks inserted using "injectEncodedData,"
+  // the two buffers should match!
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+
+  deferred_close_timer_ = new Event::MockTimer(&dispatcher_);
+  // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
+  // which is triggered by filter onDestroy() function.
+  EXPECT_CALL(*deferred_close_timer_,
+              enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS), _));
+  filter_->onDestroy();
+  deferred_close_timer_->invokeCallback();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, StreamingAllDataInObservabilityMode) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  observability_mode: true
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  observability_mode_ = true;
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  const uint32_t chunk_number = 20;
+  sendChunkRequestData(chunk_number, true);
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  processRequestTrailers(absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+  sendChunkResponseData(chunk_number * 2, true);
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  processResponseTrailers(absl::nullopt, false);
+  deferred_close_timer_ = new Event::MockTimer(&dispatcher_);
+  // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
+  // which is triggered by filter onDestroy() function.
+  EXPECT_CALL(*deferred_close_timer_,
+              enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS), _));
+  filter_->onDestroy();
+  deferred_close_timer_->invokeCallback();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  // Total gRPC messages include two headers and two trailers on top of the req/resp chunk data.
+  uint32_t total_msg = 3 * chunk_number + 4;
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 class HttpFilter2Test : public HttpFilterTest,

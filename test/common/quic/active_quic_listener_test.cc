@@ -18,12 +18,14 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -45,6 +47,15 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+constexpr int kECT1 = 1; // This is an Explicit Congestion Notification
+                         // code point defined in RFC3168.
+} // namespace
+
+namespace {
+class TestProcessObject : public ProcessObject {};
+} // namespace
 
 // A test quic listener that exits after processing one round of packets.
 class TestActiveQuicListener : public ActiveQuicListener {
@@ -78,8 +89,9 @@ protected:
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-        packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-        proof_source_factory, std::move(cid_generator), testWorkerSelector);
+        packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
+        crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
+        testWorkerSelector, std::nullopt);
   }
 };
 
@@ -94,6 +106,8 @@ public:
   }
 
   static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
+
+  static Network::Socket& socket(ActiveQuicListener& listener) { return listener.listen_socket_; }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -101,6 +115,10 @@ public:
   static envoy::config::core::v3::RuntimeFeatureFlag&
   runtimeEnabled(ActiveQuicListenerFactory* factory) {
     return factory->enabled_;
+  }
+  static EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
+  debugVisitorFactory(ActiveQuicListenerFactory* factory) {
+    return factory->connection_debug_visitor_factory_;
   }
 };
 
@@ -111,9 +129,9 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
         connection_handler_(*dispatcher_, absl::nullopt),
-        transport_socket_factory_(true, *store_.rootScope(),
-                                  std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-                                  ssl_context_manager_, {}),
+        transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
+            true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
+            ssl_context_manager_, {})),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -123,6 +141,7 @@ protected:
   }
 
   void SetUp() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     listen_socket_ =
@@ -186,7 +205,7 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
     return std::make_unique<TestActiveQuicListenerFactory>(
-        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, absl::nullopt);
+        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, context_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -236,7 +255,7 @@ protected:
           .WillOnce(ReturnRef(filter_factories_.back()));
       EXPECT_CALL(*filter_chain_, transportSocketFactory())
           .InSequence(seq)
-          .WillRepeatedly(ReturnRef(transport_socket_factory_));
+          .WillRepeatedly(ReturnRef(*transport_socket_factory_));
     }
   }
 
@@ -244,6 +263,15 @@ protected:
     client_sockets_.push_back(
         std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
                                               nullptr, Network::SocketCreationOptions{}));
+    // Set outgoing ECN marks on client packets.
+    int level = IPPROTO_IP;
+    int optname = IP_TOS;
+    if (local_address_->ip()->version() == Network::Address::IpVersion::v6) {
+      level = IPPROTO_IPV6;
+      optname = IPV6_TCLASS;
+    }
+    int value = kECT1;
+    client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
@@ -315,6 +343,7 @@ protected:
                        handshake_timeout_);
   }
 
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   TestScopedRuntime scoped_runtime_;
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
@@ -352,7 +381,7 @@ protected:
   // of elements are saved in expectations before new elements are added.
   std::list<Filter::NetworkFilterFactoriesList> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
-  QuicServerTransportSocketFactory transport_socket_factory_;
+  std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
@@ -498,14 +527,21 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   for (size_t i = 1; i <= count; ++i) {
     sendCHLO(quic::test::TestConnectionId(i));
   }
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // Wait for 1ms so that as many packets as possible can arrive at the listener.
+  absl::SleepFor(absl::Milliseconds(1));
+  size_t read_ready = 0;
+  // Read all the packets and count how many Read events it took. If all packets
+  // arrive within 3 event loops, QUIC stack will defer processing some of them.
+  for (; quic_dispatcher_->NumSessions() < count + 1; ++read_ready) {
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
 
-  // The first kNumSessionsToCreatePerLoop were processed immediately, the next
-  // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last one
-  // was buffered to the subsequent event loop.
-  EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlosForTest());
+  if (read_ready == 3) {
+    // The first kNumSessionsToCreatePerLoop were processed immediately, the next
+    // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last
+    // one was buffered to the subsequent event loop.
+    EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlosForTest());
+  }
 
   for (size_t i = 1; i <= count; ++i) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
@@ -562,6 +598,38 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 
+TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
+  initialize();
+  Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
+  absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
+  EXPECT_TRUE(version.has_value());
+  int optval;
+  socklen_t optlen = sizeof(optval);
+  Api::SysCallIntResult rv;
+  if (*version == Network::Address::IpVersion::v6) {
+    rv = socket.getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
+  } else {
+    rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+  }
+  EXPECT_EQ(rv.return_value_, 0);
+  EXPECT_EQ(optval, 1);
+}
+
+TEST_P(ActiveQuicListenerTest, EcnReporting) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 1);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  quic::QuicConnection* connection =
+      quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
+  EXPECT_EQ(connection->connection_id(), quic::test::TestConnectionId(1));
+  ASSERT(connection != nullptr);
+  const quic::QuicConnectionStats& stats = connection->GetStats();
+  EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
+}
+
 class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
 protected:
   std::string yamlForQuicConfig() override {
@@ -603,6 +671,46 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
                 ->config()
                 ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   readFromClientSockets();
+}
+
+class ActiveQuicListenerFactoryTest : public testing::Test {
+protected:
+  std::unique_ptr<ActiveQuicListenerFactory>
+  createQuicListenerFactory(envoy::config::listener::v3::QuicProtocolOptions options) {
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
+                                                       validation_visitor_, server_context_);
+  }
+
+  Stats::SymbolTable symbol_table_;
+  QuicStatNames quic_stat_names_ = QuicStatNames(symbol_table_);
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+};
+
+TEST_F(ActiveQuicListenerFactoryTest, NoDebugVisitorConfigured) {
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  auto factory = createQuicListenerFactory(options);
+  EXPECT_EQ(ActiveQuicListenerFactoryPeer::debugVisitorFactory(factory.get()), std::nullopt);
+}
+
+TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
+  TestProcessObject test_process_object;
+  ProcessContextImpl context(test_process_object);
+  EXPECT_CALL(server_context_, processContext())
+      .WillRepeatedly(Return(ProcessContextOptRef(context)));
+  envoy::config::listener::v3::QuicProtocolOptions quic_config;
+  quic_config.mutable_connection_debug_visitor_config()->set_name(
+      "envoy.quic.connection_debug_visitor.mock");
+  quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
+      test::common::config::DummyConfig());
+  auto listener_factory = createQuicListenerFactory(quic_config);
+  auto debug_visitor_factory =
+      ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
+  EXPECT_TRUE(debug_visitor_factory.has_value());
+  auto test_debug_visitor_factory =
+      dynamic_cast<TestEnvoyQuicConnectionDebugVisitorFactory*>(debug_visitor_factory.ptr());
+  EXPECT_TRUE(test_debug_visitor_factory->processContext().has_value());
+  EXPECT_EQ(&test_debug_visitor_factory->processContext().value().get(), &context);
 }
 
 } // namespace Quic

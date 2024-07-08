@@ -62,8 +62,9 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
       random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")),
-      request_headers_parser_(
-          Router::HeaderParser::configure(config.grpc_health_check().initial_metadata())) {
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(config.grpc_health_check().initial_metadata()),
+          Router::HeaderParserPtr)) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }
@@ -211,7 +212,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, parent_.dispatcher_.timeSource(),
-                                         local_connection_info_provider_);
+                                         local_connection_info_provider_,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(headers_message->headers(), stream_info);
@@ -222,7 +224,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       headers_message->headers(),
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport());
+      false, host_->transportSocketFactory().implementsSecureTransport(), true);
 
   auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);
   // Encoding will only fail if required headers are missing.

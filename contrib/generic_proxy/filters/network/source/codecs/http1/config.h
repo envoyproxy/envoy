@@ -21,7 +21,7 @@ using ProtoConfig =
 template <class Interface> class HttpHeaderFrame : public Interface {
 public:
   absl::string_view protocol() const override { return "http1"; }
-  void forEach(StreamBase::IterateCallback callback) const override {
+  void forEach(HeaderFrame::IterateCallback callback) const override {
     headerMap().iterate([cb = std::move(callback)](const Http::HeaderEntry& entry) {
       if (cb(entry.key().getStringView(), entry.value().getStringView())) {
         return Http::HeaderMap::Iterate::Continue;
@@ -60,7 +60,7 @@ public:
   HttpRequestFrame(Http::RequestHeaderMapPtr request, bool end_stream)
       : request_(std::move(request)) {
     ASSERT(request_ != nullptr);
-    frame_flags_ = {StreamFlags{}, end_stream};
+    frame_flags_ = {0, end_stream ? FrameFlags::FLAG_END_STREAM : FrameFlags::FLAG_EMPTY};
   }
 
   absl::string_view host() const override { return request_->getHostValue(); }
@@ -80,7 +80,15 @@ public:
     const bool drain_close = Envoy::StringUtil::caseFindToken(
         response_->getConnectionValue(), ",", Http::Headers::get().ConnectionValues.Close);
 
-    frame_flags_ = {StreamFlags{0, false, drain_close, false}, end_stream};
+    uint32_t flags = 0;
+    if (end_stream) {
+      flags |= FrameFlags::FLAG_END_STREAM;
+    }
+    if (drain_close) {
+      flags |= FrameFlags::FLAG_DRAIN_CLOSE;
+    }
+
+    frame_flags_ = {0, flags};
   }
 
   StreamStatus status() const override {
@@ -98,10 +106,10 @@ public:
   Http::ResponseHeaderMapPtr response_;
 };
 
-class HttpRawBodyFrame : public StreamFrame {
+class HttpRawBodyFrame : public CommonFrame {
 public:
   HttpRawBodyFrame(Envoy::Buffer::Instance& buffer, bool end_stream)
-      : frame_flags_({StreamFlags{}, end_stream}) {
+      : frame_flags_(0, end_stream ? FrameFlags::FLAG_END_STREAM : FrameFlags::FLAG_EMPTY) {
     buffer_.move(buffer);
   }
   FrameFlags frameFlags() const override { return frame_flags_; }
@@ -242,7 +250,11 @@ public:
 
   virtual Http::HeaderMap& headerMap() PURE;
 
-  virtual void onDecodingSuccess(StreamFramePtr&& frame) PURE;
+  virtual void onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
+                                 absl::optional<StartTime> start_time) PURE;
+  virtual void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                                 absl::optional<StartTime> start_time) PURE;
+  virtual void onDecodingSuccess(CommonFramePtr frame) PURE;
   virtual void onDecodingFailure() PURE;
 
 protected:
@@ -287,7 +299,7 @@ public:
       callbacks_->onDecodingFailure();
     }
   }
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
+  EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
   ResponsePtr respond(absl::Status status, absl::string_view data, const Request&) override {
     auto response = Http::ResponseHeaderMapImpl::create();
     response->setStatus(std::to_string(Utility::statusToHttpStatus(status.code())));
@@ -298,7 +310,20 @@ public:
     return response_frame;
   }
 
-  void onDecodingSuccess(StreamFramePtr&& frame) override {
+  void onDecodingSuccess(ResponseHeaderFramePtr, absl::optional<StartTime>) override {}
+  void onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
+                         absl::optional<StartTime> start_time) override {
+    if (callbacks_->connection().has_value()) {
+      callbacks_->onDecodingSuccess(std::move(request_header_frame), std::move(start_time));
+    }
+
+    // Connection may have been closed by the callback.
+    if (!callbacks_->connection().has_value() ||
+        callbacks_->connection()->state() != Network::Connection::State::Open) {
+      parser_->pause();
+    }
+  }
+  void onDecodingSuccess(CommonFramePtr frame) override {
     if (callbacks_->connection().has_value()) {
       callbacks_->onDecodingSuccess(std::move(frame));
     }
@@ -309,7 +334,6 @@ public:
       parser_->pause();
     }
   }
-
   // TODO(wbpcode): send 400 bad request to client as response and then call the callback.
   void onDecodingFailure() override { callbacks_->onDecodingFailure(); }
 
@@ -336,9 +360,22 @@ public:
       callbacks_->onDecodingFailure();
     }
   }
-  void encode(const StreamFrame& frame, EncodingCallbacks& callbacks) override;
+  EncodingResult encode(const StreamFrame& frame, EncodingContext& ctx) override;
 
-  void onDecodingSuccess(StreamFramePtr&& frame) override {
+  void onDecodingSuccess(RequestHeaderFramePtr, absl::optional<StartTime>) override {}
+  void onDecodingSuccess(ResponseHeaderFramePtr response_header_frame,
+                         absl::optional<StartTime> start_time) override {
+    if (callbacks_->connection().has_value()) {
+      callbacks_->onDecodingSuccess(std::move(response_header_frame), std::move(start_time));
+    }
+
+    // Connection may have been closed by the callback.
+    if (!callbacks_->connection().has_value() ||
+        callbacks_->connection()->state() != Network::Connection::State::Open) {
+      parser_->pause();
+    }
+  }
+  void onDecodingSuccess(CommonFramePtr frame) override {
     if (callbacks_->connection().has_value()) {
       callbacks_->onDecodingSuccess(std::move(frame));
     }

@@ -259,6 +259,17 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedClientAndUpstreamHeaders) {
       config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 }
 
+TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
+  auto empty_config = createConfig(EMPTY_STRING, 250, "");
+  EXPECT_TRUE(empty_config->pathPrefix().empty());
+
+  auto slash_prefix_config = createConfig(EMPTY_STRING, 250, "/the_prefix");
+  EXPECT_EQ(slash_prefix_config->pathPrefix(), "/the_prefix");
+
+  EXPECT_THROW_WITH_MESSAGE(createConfig(EMPTY_STRING, 250, "the_prefix"), EnvoyException,
+                            "path_prefix should start with \"/\".");
+}
+
 // Verify client response when the authorization server returns a 200 OK and path_prefix is
 // configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
@@ -466,9 +477,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
   // and inserted into the authz Response just below.
   Response authz_response;
   authz_response.status = CheckStatus::OK;
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me"});
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-too"});
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-also"});
+  authz_response.headers_to_remove.emplace_back("remove-me");
+  authz_response.headers_to_remove.emplace_back("remove-me-too");
+  authz_response.headers_to_remove.emplace_back("remove-me-also");
+  authz_response.headers_to_remove.emplace_back("this is a valid header value but invalid name");
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
@@ -476,6 +488,9 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
       {":status", "200", false},
       {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ", false},
       {"x-envoy-auth-headers-to-remove", " remove-me-also ", false},
+      // This should not cause an error in the HTTP client. It should transparently pass it through
+      // to the filter (which will then SKIP the header later).
+      {"x-envoy-auth-headers-to-remove", "this is a valid header value but invalid name", false},
   });
   Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
   client_->onSuccess(async_request_, std::move(http_response));

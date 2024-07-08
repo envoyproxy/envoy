@@ -1544,7 +1544,12 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
-      fd, [&](uint32_t) -> void { watcher.ready(); }, trigger, FileReadyType::Read);
+      fd,
+      [&](uint32_t) {
+        watcher.ready();
+        return absl::OkStatus();
+      },
+      trigger, FileReadyType::Read);
   file_event->activate(FileReadyType::Read);
 
   InSequence s;
@@ -1565,7 +1570,7 @@ protected:
 TEST_F(DispatcherConnectionTest, CreateTcpConnection) {
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     SCOPED_TRACE(Network::Test::addressVersionAsString(ip_version));
-    auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
+    auto client_addr_port = Network::Utility::parseInternetAddressAndPortNoThrow(
         fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), 10911));
     auto client_conn = dispatcher_->createClientConnection(
         client_addr_port, Network::Address::InstanceConstSharedPtr(),

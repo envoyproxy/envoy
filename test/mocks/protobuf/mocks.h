@@ -12,8 +12,8 @@ public:
   MockValidationVisitor();
   ~MockValidationVisitor() override;
 
-  MOCK_METHOD(void, onUnknownField, (absl::string_view));
-  MOCK_METHOD(void, onDeprecatedField, (absl::string_view, bool));
+  MOCK_METHOD(absl::Status, onUnknownField, (absl::string_view));
+  MOCK_METHOD(absl::Status, onDeprecatedField, (absl::string_view, bool));
   MOCK_METHOD(void, onWorkInProgress, (absl::string_view));
   MOCK_METHOD(OptRef<Runtime::Loader>, runtime, ());
 

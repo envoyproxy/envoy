@@ -34,8 +34,6 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/cidr_range.h"
-#include "source/common/router/rds_impl.h"
-#include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
@@ -135,7 +133,7 @@ public:
           config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status);
 
@@ -204,6 +202,7 @@ public:
     return server_transformation_;
   }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_to_set_; }
+  bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -306,8 +305,7 @@ private:
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  Router::RouteConfigProviderManager& route_config_provider_manager_;
-  Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
+  Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
   FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
@@ -317,6 +315,7 @@ private:
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   absl::optional<std::string> scheme_to_set_;
+  bool should_scheme_match_upstream_;
   Tracing::TracerSharedPtr tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
@@ -388,7 +387,7 @@ public:
   struct Singletons {
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
     Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
-    Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
+    std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager_;
     Tracing::TracerManagerSharedPtr tracer_manager_;
     std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
   };
@@ -416,7 +415,7 @@ public:
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 };

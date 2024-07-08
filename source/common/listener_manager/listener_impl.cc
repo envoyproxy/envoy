@@ -266,6 +266,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       listener_init_target_(fmt::format("Listener-init-target {}", name),
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
@@ -400,6 +401,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       // listener_init_target_ is not used during in place update because we expect server started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
@@ -581,7 +583,7 @@ void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Li
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, listener_factory_context_->serverFactoryContext().processContext());
+        validation_visitor_, listener_factory_context_->serverFactoryContext());
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -1124,13 +1126,13 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
-  bool is_equal = std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
-                             rhs.socket_options().begin(), rhs.socket_options().end(),
-                             [](const ::envoy::config::core::v3::SocketOption& option,
-                                const ::envoy::config::core::v3::SocketOption& other_option) {
-                               Protobuf::util::MessageDifferencer differencer;
-                               return differencer.Compare(option, other_option);
-                             });
+  bool is_equal =
+      std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
+                 rhs.socket_options().begin(), rhs.socket_options().end(),
+                 [](const ::envoy::config::core::v3::SocketOption& option,
+                    const ::envoy::config::core::v3::SocketOption& other_option) {
+                   return Protobuf::util::MessageDifferencer::Equals(option, other_option);
+                 });
   if (!is_equal) {
     return false;
   }
@@ -1145,15 +1147,15 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
       return false;
     }
     if (lhs.additional_addresses(i).has_socket_options()) {
-      is_equal = std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
-                            lhs.additional_addresses(i).socket_options().socket_options().end(),
-                            rhs.additional_addresses(i).socket_options().socket_options().begin(),
-                            rhs.additional_addresses(i).socket_options().socket_options().end(),
-                            [](const ::envoy::config::core::v3::SocketOption& option,
-                               const ::envoy::config::core::v3::SocketOption& other_option) {
-                              Protobuf::util::MessageDifferencer differencer;
-                              return differencer.Compare(option, other_option);
-                            });
+      is_equal =
+          std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
+                     lhs.additional_addresses(i).socket_options().socket_options().end(),
+                     rhs.additional_addresses(i).socket_options().socket_options().begin(),
+                     rhs.additional_addresses(i).socket_options().socket_options().end(),
+                     [](const ::envoy::config::core::v3::SocketOption& option,
+                        const ::envoy::config::core::v3::SocketOption& other_option) {
+                       return Protobuf::util::MessageDifferencer::Equals(option, other_option);
+                     });
       if (!is_equal) {
         return false;
       }
@@ -1165,6 +1167,7 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                                 const envoy::config::listener::v3::Listener& rhs) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
@@ -1175,6 +1178,12 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "filter_chain_matcher"));
   return differencer.Compare(lhs, rhs);
+#else
+  UNREFERENCED_PARAMETER(lhs);
+  UNREFERENCED_PARAMETER(rhs);
+  // Without message reflection, err on the side of reloads.
+  return false;
+#endif
 }
 
 } // namespace Server

@@ -1,5 +1,7 @@
 #include <jni.h>
 
+#include <iostream>
+
 #include "library/jni/jni_helper.h"
 
 // NOLINT(namespace-envoy)
@@ -7,12 +9,31 @@
 // This file contains JNI implementation used by
 // `test/java/io/envoyproxy/envoymobile/jni/JniHelperTest.java` unit tests.
 
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
+  Envoy::JNI::JniHelper::initialize(vm);
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/Exception");
+  Envoy::JNI::JniHelper::addClassToCache("java/lang/RuntimeException");
+  return Envoy::JNI::JniHelper::getVersion();
+}
+
+extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
+  Envoy::JNI::JniHelper::finalize();
+}
+
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getFieldId(
     JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
   Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
   jni_helper.getFieldId(clazz, name_ptr.get(), sig_ptr.get());
+}
+
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticFieldId(
+    JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  jni_helper.getStaticFieldId(clazz, name_ptr.get(), sig_ptr.get());
 }
 
 #define DEFINE_JNI_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                  \
@@ -68,8 +89,7 @@ extern "C" JNIEXPORT jclass JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelper
     JNIEnv* env, jclass, jstring class_name) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
-  Envoy::JNI::LocalRefUniquePtr<jclass> clazz = jni_helper.findClass(class_name_ptr.get());
-  return clazz.release();
+  return jni_helper.findClass(class_name_ptr.get());
 }
 
 extern "C" JNIEXPORT jclass JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getObjectClass(
@@ -84,6 +104,33 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTe
   Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
   Envoy::JNI::StringUtfUniquePtr message_ptr = jni_helper.getStringUtfChars(message, nullptr);
   jni_helper.throwNew(class_name_ptr.get(), message_ptr.get());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_exceptionOccurred(JNIEnv* env, jclass,
+                                                                   jclass clazz, jstring name,
+                                                                   jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  jmethodID method_id = jni_helper.getStaticMethodId(clazz, name_ptr.get(), sig_ptr.get());
+  jni_helper.callStaticVoidMethod(clazz, method_id);
+  return jni_helper.exceptionOccurred() != nullptr;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_exceptionClear(JNIEnv* env, jclass, jclass clazz,
+                                                                jstring name, jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  jmethodID method_id = jni_helper.getStaticMethodId(clazz, name_ptr.get(), sig_ptr.get());
+  jni_helper.callStaticVoidMethod(clazz, method_id);
+  if (jni_helper.exceptionOccurred() != nullptr) {
+    jni_helper.exceptionCleared();
+    return true;
+  }
+  return false;
 }
 
 extern "C" JNIEXPORT jobject JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_newObject(

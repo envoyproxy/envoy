@@ -42,7 +42,7 @@
 #include "source/common/router/upstream_request.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
 namespace Envoy {
@@ -119,11 +119,13 @@ public:
 
   /**
    * Set the :scheme header using the best information available. In order this is
+   * - whether the upstream connection is using TLS if use_upstream is true
    * - existing scheme header if valid
    * - x-forwarded-proto header if valid
-   * - security of downstream connection
+   * - whether the downstream connection is using TLS
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
+                                bool upstream_ssl, bool use_upstream);
 
   /**
    * Determine whether a request should be shadowed.
@@ -300,7 +302,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
-  Filter(FilterConfig& config, FilterStats& stats)
+  Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
@@ -463,7 +465,7 @@ public:
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
-  FilterConfig& config() override { return config_; }
+  FilterConfig& config() override { return *config_; }
   TimeoutData timeout() override { return timeout_; }
   absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
     return dynamic_max_stream_duration_;
@@ -475,7 +477,7 @@ public:
   uint32_t attemptCount() const override { return attempt_count_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const { return upstream_requests_; }
 
-  TimeSource& timeSource() { return config_.timeSource(); }
+  TimeSource& timeSource() { return config_->timeSource(); }
   const Route* route() const { return route_.get(); }
   const FilterStats& stats() { return stats_; }
 
@@ -552,12 +554,12 @@ private:
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    UpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
-  Http::Context& httpContext() { return config_.http_context_; }
+  Http::Context& httpContext() { return config_->http_context_; }
   bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                          std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
 
   RetryStatePtr retry_state_;
-  FilterConfig& config_;
+  const FilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};

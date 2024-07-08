@@ -7,6 +7,7 @@
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
+#include "absl/synchronization/notification.h"
 #include "absl/types/optional.h"
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
@@ -37,11 +38,9 @@ public:
   ~InternalEngine();
 
   /**
-   * Run the engine with the provided configuration.
-   * @param config, the Envoy bootstrap configuration to use.
-   * @param log_level, the log level.
+   * Run the engine with the provided options.
+   * @param options, the Envoy options, including the Bootstrap configuration and log level.
    */
-  envoy_status_t run(const std::string& config, const std::string& log_level);
   envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
 
   /**
@@ -64,7 +63,7 @@ public:
   // These functions are wrappers around http client functions, which hand off
   // to http client functions of the same name after doing a dispatcher post
   // (thread context switch)
-  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+  envoy_status_t startStream(envoy_stream_t stream, EnvoyStreamCallbacks&& stream_callbacks,
                              bool explicit_flow_control);
 
   /**
@@ -80,7 +79,14 @@ public:
 
   envoy_status_t readData(envoy_stream_t stream, size_t bytes_to_read);
 
-  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
+  /**
+   * Send data over an open HTTP stream. This method can be invoked multiple times.
+   *
+   * @param stream the stream to send data over.
+   * @param buffer the data to send.
+   * @param end_stream indicates whether to close the stream locally after sending this frame.
+   */
+  envoy_status_t sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool end_stream);
 
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
@@ -97,7 +103,17 @@ public:
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
   envoy_status_t setProxySettings(const char* host, const uint16_t port);
   envoy_status_t resetConnectivityState();
-  envoy_status_t setPreferredNetwork(envoy_network_t network);
+  /**
+   * This function does the following on a network change event (such as switching from WiFI to
+   * cellular, WIFi A to WiFI B, etc.).
+   *
+   * - Sets the preferred network.
+   * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
+   *   `setIpVersionToRemove` in the DNS cache implementation to remove the IPv6 addresses from
+   *   the DNS response in the subsequent DNS resolutions.
+   * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
+   */
+  envoy_status_t setPreferredNetwork(NetworkType network);
 
   /**
    * Increment a counter with a given string of elements and by the given count.
@@ -133,6 +149,8 @@ private:
   envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
+  /** Returns true if there is IPv6 connectivity. */
+  static bool hasIpV6Connectivity();
 
   Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
@@ -158,9 +176,7 @@ private:
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
+  absl::Notification engine_running_;
 };
-
-using InternalEngineSharedPtr = std::shared_ptr<InternalEngine>;
-using InternalEngineWeakPtr = std::weak_ptr<InternalEngine>;
 
 } // namespace Envoy

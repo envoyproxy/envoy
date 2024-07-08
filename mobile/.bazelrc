@@ -13,7 +13,6 @@ build --define=static_extension_registration=disabled
 build --define=admin_functionality=disabled
 build --define envoy_mobile_listener=disabled
 build --define=library_autolink=disabled
-build --define=envoy_mobile_swift_cxx_interop=enabled
 build --define=envoy_enable_http_datagrams=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
@@ -30,7 +29,6 @@ build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
-build --define=envoy_mobile_xds=disabled
 build --define=envoy_yaml=disabled
 
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
@@ -39,7 +37,8 @@ build --swiftcopt=-wmo
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
-build --define cxxopts=-std=c++17
+# Temporarily set to C++17 because Android NDK does not fully support C++20 yet.
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
@@ -79,41 +78,18 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
-# enabled for //test/kotlin/integration:xds_test and
-# //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
-build:mobile-test-android --define=envoy_mobile_xds=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
 
-# Locally-runnable ASAN config for MacOS & Linux with standard dev environment
-# See also:
-# https://github.com/bazelbuild/bazel/issues/6932
-build:mobile-asan-dev --strip=never
-build:mobile-asan-dev --copt -Wno-macro-redefined # ASAN sets _FORTIFY_SOURCE=0
-build:mobile-asan-dev --copt -DADDRESS_SANITIZER
-build:mobile-asan-dev --copt -D_LIBCPP_HAS_NO_ASAN
-build:mobile-asan-dev --copt -g
-build:mobile-asan-dev --copt -fno-omit-frame-pointer
-build:mobile-asan-dev --copt -fno-optimize-sibling-calls
-build:mobile-asan-dev --copt -fsanitize=address
-build:mobile-asan-dev --linkopt -fsanitize=address
-build:mobile-asan-dev --platform_suffix=-asan
+# Clang ASAN.
+build:mobile-clang-asan --config=clang-asan-common
 
-build:clang-asan --linkopt --rtlib=compiler-rt
-build:clang-asan --linkopt --unwindlib=libgcc
+# Clang TSAN.
+build:mobile-clang-tsan --config=clang-tsan
 
-# Locally-runnable TSAN config
-build:mobile-tsan-dev --features=tsan
-build:mobile-tsan-dev --copt -fsanitize=thread
-build:mobile-tsan-dev --linkopt -fsanitize=thread
-build:mobile-tsan-dev --test_env=ENVOY_IP_TEST_VERSIONS=v4only
-build:mobile-tsan-dev --platform_suffix=-tsan
-# Needed due to https://github.com/libevent/libevent/issues/777
-build:mobile-tsan-dev --copt -DEVENT__DISABLE_DEBUG_MODE
-# https://github.com/abseil/abseil-cpp/issues/760
-# https://github.com/google/sanitizers/issues/953
-build:mobile-tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
+# Clang MSAN.
+build:mobile-clang-msan --config=clang-msan
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
@@ -134,12 +110,6 @@ build:mobile-remote-release-clang-android-publish --config=mobile-remote-release
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
 build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
-
-build:mobile-remote-release-clang-android-publish-xds --config=mobile-remote-release-clang-android-publish
-build:mobile-remote-release-clang-android-publish-xds --define=envoy_mobile_xds=enabled
-
-# Temporary revert to C++17 for mobile NDK builds.
-build:mobile-release-common --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
@@ -198,13 +168,11 @@ build:mobile-remote-ci-linux --config=mobile-remote-ci-common
 build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
 build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
 build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
-# Temporary revert to C++17 for mobile NDK builds.
-build:mobile-remote-ci-linux-clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
 #############################################################################
 # mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
 #############################################################################
-build:mobile-remote-ci-linux-asan --config=clang-asan
+build:mobile-remote-ci-linux-asan --config=mobile-clang-asan
 build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-asan --config=remote-ci
 build:mobile-remote-ci-linux-asan --define=envoy_full_protos=disabled
@@ -264,6 +232,7 @@ build:mobile-remote-ci-macos --config=remote
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
+build:mobile-remote-ci --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
@@ -271,38 +240,26 @@ test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --config=mobile-test-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
-# Temporary revert to C++17 for mobile NDK builds.
-build:mobile-remote-ci-cc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:mobile-remote-ci-cc --define=envoy_full_protos=disabled
-build:mobile-remote-ci-cc --build_tests_only
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 
-build:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-test --test_output=all
-test:mobile-remote-ci-cc-test --config=mobile-remote-ci-cc
+build:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
+test:mobile-remote-ci-cc-full-protos-enabled --define=envoy_full_protos=enabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
 
-build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-swift --config=mobile-test-ios
-build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
-
 build:mobile-remote-ci-core --config=mobile-remote-ci
 build:mobile-remote-ci-core --define=envoy_full_protos=disabled
-build:mobile-remote-ci-core --build_tests_only
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
-test:mobile-remote-ci-core --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
-
-#TODO(alyssar) remove this build
-build:mobile-remote-ci-macos-ios-admin --config=mobile-remote-ci-macos-ios
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
 test:mobile-remote-ci-macos-ios-swift --build_tests_only

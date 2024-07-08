@@ -27,6 +27,10 @@ main commit at which the binary was compiled, and `latest` corresponds to a bina
 
 ## Windows 2019 Envoy image
 
+On August 31, 2023 the Envoy project ended official Windows support due to a lack of resources.
+We will continue to accept patches related to the Windows build. Until further notice, Windows
+builds are excluded from Envoy CI, as well as the Envoy release and security processes.
+
 The Windows 2019 based Envoy Docker image at [`envoyproxy/envoy-build-windows2019:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build-windows2019/)
 is used for CI checks, where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh).
 Developers may work with the most recent `envoyproxy/envoy-build-windows2019` image to provide a self-contained environment for building Envoy binaries and
@@ -168,6 +172,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
+* `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 

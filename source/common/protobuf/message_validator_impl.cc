@@ -16,13 +16,13 @@ const char deprecation_error[] = " If continued use of this field is absolutely 
                                  "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
                                  "how to apply a temporary and highly discouraged override.";
 
-void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecation) {
+absl::Status onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecation) {
   if (soft_deprecation) {
     ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
   } else {
-    throwExceptionOrPanic(DeprecatedProtoFieldException,
-                          absl::StrCat(description, deprecation_error));
+    return absl::InvalidArgumentError(absl::StrCat(description, deprecation_error));
   }
+  return absl::OkStatus();
 }
 } // namespace
 
@@ -49,12 +49,12 @@ void WarningValidationVisitorImpl::setCounters(Stats::Counter& unknown_counter,
   unknown_counter.add(prestats_unknown_count_);
 }
 
-void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
+absl::Status WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
   const uint64_t hash = HashUtil::xxHash64(description);
   auto it = descriptions_.insert(hash);
   // If we've seen this before, skip.
   if (!it.second) {
-    return;
+    return absl::OkStatus();
   }
 
   // It's a new field, log and bump stat.
@@ -64,25 +64,26 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
   } else {
     unknown_counter_->inc();
   }
+  return absl::OkStatus();
 }
 
-void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
-                                                     bool soft_deprecation) {
-  onDeprecatedFieldCommon(description, soft_deprecation);
+absl::Status WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
+                                                             bool soft_deprecation) {
+  return onDeprecatedFieldCommon(description, soft_deprecation);
 }
 
 void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
   onWorkInProgressCommon(description);
 }
 
-void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
-  throwExceptionOrPanic(UnknownProtoFieldException,
-                        absl::StrCat("Protobuf message (", description, ") has unknown fields"));
+absl::Status StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
+  return absl::InvalidArgumentError(
+      absl::StrCat("Protobuf message (", description, ") has unknown fields"));
 }
 
-void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
-                                                    bool soft_deprecation) {
-  onDeprecatedFieldCommon(description, soft_deprecation);
+absl::Status StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
+                                                            bool soft_deprecation) {
+  return onDeprecatedFieldCommon(description, soft_deprecation);
 }
 
 void StrictValidationVisitorImpl::onWorkInProgress(absl::string_view description) {

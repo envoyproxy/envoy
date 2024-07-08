@@ -34,11 +34,13 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
-                                            Http::HeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
                                             {{}},
                                             Http::Utility::QueryParamsVector{},
                                             {},
@@ -60,9 +62,8 @@ struct SuccessResponse {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
-        response_->headers_to_set.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
+        response_->headers_to_set.emplace_back(header.key().getStringView(),
+                                               header.value().getStringView());
       }
       if (append_matchers_->matches(header.key().getStringView())) {
         // If there is an existing matching key in the current headers, the new entry will be
@@ -70,16 +71,14 @@ struct SuccessResponse {
         // a matching "key" from the authorization response headers {"key": "value2"}, the
         // request to upstream server will have two entries for "key": {"key": "value1", "key":
         // "value2"}.
-        response_->headers_to_add.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
+        response_->headers_to_add.emplace_back(header.key().getStringView(),
+                                               header.value().getStringView());
       }
       if (response_matchers_->matches(header.key().getStringView())) {
         // For HTTP implementation, the response headers from the auth server will, by default, be
         // appended (using addCopy) to the encoded response headers.
-        response_->response_headers_to_add.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
+        response_->response_headers_to_add.emplace_back(header.key().getStringView(),
+                                                        header.value().getStringView());
       }
       if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
         const std::string key{header.key().getStringView()};
@@ -98,6 +97,13 @@ struct SuccessResponse {
   const MatcherSharedPtr& to_dynamic_metadata_matchers_;
   ResponsePtr response_;
 };
+
+absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
+  if (!path_prefix.empty() && path_prefix[0] != '/') {
+    return absl::InvalidArgumentError("path_prefix should start with \"/\".");
+  }
+  return std::string(path_prefix);
+}
 
 } // namespace
 
@@ -118,11 +124,13 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_upstream_headers_to_append(),
           context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
-      path_prefix_(path_prefix),
+      path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
-      request_headers_parser_(Router::HeaderParser::configure(
-          config.http_service().authorization_request().headers_to_add(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.http_service().authorization_request().headers_to_add(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)),
       encode_raw_headers_(config.encode_raw_headers()) {}
 
 MatcherSharedPtr
@@ -274,10 +282,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setChildSpanName(config_->tracingName())
                        .setSampled(absl::nullopt);
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_authz_http_send_original_xff")) {
-      options.setSendXff(false);
-    }
+    options.setSendXff(false);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
@@ -291,7 +296,9 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  // TODO(botengyao): handle different failure reasons.
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }
@@ -323,7 +330,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
-  std::vector<Http::LowerCaseString> headers_to_remove;
+  std::vector<std::string> headers_to_remove;
   if (status_code == enumToInt(Http::Code::OK)) {
     const auto& get_result = message->headers().get(storage_header_name);
     for (size_t i = 0; i < get_result.size(); ++i) {
@@ -334,7 +341,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
             storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
         headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
         for (const auto& header_name : header_names) {
-          headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
+          headers_to_remove.emplace_back(header_name);
         }
       }
     }
@@ -351,11 +358,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK,
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
                                 {},
@@ -372,11 +381,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->clientHeaderOnSuccessMatchers(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
                                   {{}},
                                   Http::Utility::QueryParamsVector{},
                                   {},

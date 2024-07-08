@@ -185,6 +185,7 @@ public:
     return server_transformation_;
   }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
+  bool shouldSchemeMatchUpstream() const override { return scheme_match_upstream_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -265,6 +266,7 @@ public:
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   absl::optional<std::string> scheme_;
+  bool scheme_match_upstream_{};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
@@ -605,7 +607,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     return;
   }
 
-  FuzzConfig config(input.forward_client_cert());
+  std::shared_ptr<FuzzConfig> config = std::make_shared<FuzzConfig>(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Random::MockRandomGenerator> random;
   Stats::SymbolTableImpl symbol_table;
@@ -630,7 +632,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, overload_manager, config.time_system_);
+                                     cluster_manager, overload_manager, config->time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;
@@ -645,7 +647,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(
-          conn_manager, config,
+          conn_manager, *config,
           Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers(),
                                                       /* ignore_headers =*/{}, {":authority"}),
           action.new_stream().status(), action.new_stream().end_stream()));

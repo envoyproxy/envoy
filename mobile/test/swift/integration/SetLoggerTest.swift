@@ -21,7 +21,10 @@ final class LoggerTests: XCTestCase {
     let port = String(EnvoyTestServer.getEnvoyPort())
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addNativeFilter(
         name: "test_logger",
         // swiftlint:disable:next line_length

@@ -32,6 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL forceIPv6;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
+@property (nonatomic, strong, nullable) NSString *upstreamTlsSni;
 @property (nonatomic, assign) BOOL respectSystemProxySettings;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
@@ -45,19 +46,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
-@property (nonatomic, strong, nullable) NSString *nodeId;
-@property (nonatomic, strong, nullable) NSString *nodeRegion;
-@property (nonatomic, strong, nullable) NSString *nodeZone;
-@property (nonatomic, strong, nullable) NSString *nodeSubZone;
-@property (nonatomic, strong, nullable) NSString *xdsServerAddress;
-@property (nonatomic, assign) UInt32 xdsServerPort;
-@property (nonatomic, strong) NSDictionary<NSString *, NSString *> *xdsGrpcInitialMetadata;
-@property (nonatomic, strong, nullable) NSString *xdsSslRootCerts;
-@property (nonatomic, strong, nullable) NSString *rtdsResourceName;
-@property (nonatomic, assign) UInt32 rtdsTimeoutSeconds;
-@property (nonatomic, assign) BOOL enableCds;
-@property (nonatomic, strong, nullable) NSString *cdsResourcesLocator;
-@property (nonatomic, assign) UInt32 cdsTimeoutSeconds;
 @property (nonatomic, assign) intptr_t bootstrapPointer;
 
 /**
@@ -82,6 +70,7 @@ NS_ASSUME_NONNULL_BEGIN
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
                                         forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
+                                   upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
@@ -102,21 +91,7 @@ NS_ASSUME_NONNULL_BEGIN
                                           stringAccessors
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
-                                           keyValueStores
-                                           nodeId:(nullable NSString *)nodeId
-                                       nodeRegion:(nullable NSString *)nodeRegion
-                                         nodeZone:(nullable NSString *)nodeZone
-                                      nodeSubZone:(nullable NSString *)nodeSubZone
-                                 xdsServerAddress:(nullable NSString *)xdsServerAddress
-                                    xdsServerPort:(UInt32)xdsServerPort
-                           xdsGrpcInitialMetadata:
-                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
-                                  xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                 rtdsResourceName:(nullable NSString *)rtdsResourceName
-                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                        enableCds:(BOOL)enableCds
-                              cdsResourcesLocator:(nullable NSString *)cdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds;
+                                           keyValueStores;
 
 /**
  Generate a string description of the C++ Envoy bootstrap from this configuration.

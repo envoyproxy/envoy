@@ -55,7 +55,10 @@ final class ReceiveErrorTests: XCTestCase {
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setLogger { _, msg in
           print(msg, terminator: "")
       }

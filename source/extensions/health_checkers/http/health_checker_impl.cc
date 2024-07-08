@@ -64,9 +64,10 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
       method_(getMethod(config.http_health_check().method())),
       response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.http_health_check(), response_buffer_size, kDefaultMaxBytesInBuffer)),
-      request_headers_parser_(
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
-                                          config.http_health_check().request_headers_to_remove())),
+                                          config.http_health_check().request_headers_to_remove()),
+          Router::HeaderParserPtr)),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
@@ -267,9 +268,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       *request_headers,
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport());
+      false, host_->transportSocketFactory().implementsSecureTransport(), true);
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
-                                         local_connection_info_provider_);
+                                         local_connection_info_provider_,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);

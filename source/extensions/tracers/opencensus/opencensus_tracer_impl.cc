@@ -71,7 +71,7 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -80,7 +80,8 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override{};
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; };
 
-  std::string getTraceIdAsHex() const override;
+  std::string getTraceId() const override;
+  std::string getSpanId() const override;
 
 private:
   ::opencensus::trace::Span span_;
@@ -203,8 +204,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
@@ -237,7 +237,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   }
 }
 
-std::string Span::getTraceIdAsHex() const {
+std::string Span::getSpanId() const { return EMPTY_STRING; }
+
+std::string Span::getTraceId() const {
   const auto& ctx = span_.context();
   return ctx.trace_id().ToHex();
 }

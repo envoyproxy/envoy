@@ -32,6 +32,7 @@ envoy_cc_test(
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//test/common/http:common_lib",
         "//test/common/http/http2:http2_frame",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/init:init_mocks",
@@ -168,6 +169,7 @@ envoy_cc_test(
     srcs = ["protocol_constraints_test.cc"],
     deps = [
         "//source/common/http/http2:protocol_constraints_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],

@@ -25,12 +25,14 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
+#include "absl/flags/declare.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/common/platform/api/quiche_flags.h"
 #endif
+ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_reject_invalid_yaml);
 
 using testing::_;
 using testing::Invoke;
@@ -95,10 +97,11 @@ public:
 
     envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
     Config::translateRuntime(runtime, layered_runtime);
-    absl::Status creation_status;
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                           generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
 
   void write(const std::string& path, const std::string& value) {
@@ -519,11 +522,10 @@ TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
     layer->set_name("admin_1");
     layer->mutable_admin_layer();
   }
-  absl::Status creation_status;
-  auto loader =
-      std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                   generator_, validation_visitor_, *api_, creation_status);
-  EXPECT_EQ(creation_status.message(),
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+      Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                  generator_, validation_visitor_, *api_);
+  EXPECT_EQ(loader.status().message(),
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
 }
 
@@ -542,11 +544,13 @@ protected:
       layer->set_name("admin");
       layer->mutable_admin_layer();
     }
-    absl::Status creation_status;
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_, store_,
-                                           generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                    generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
   }
+  void testAllTheThings(bool allow_invalid_yaml);
 
   ProtobufWkt::Struct base_;
 };
@@ -603,8 +607,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsingInvalidField) {
   EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException, "Invalid runtime entry value for file0");
 }
 
-// Validate proto parsing sanity.
-TEST_F(StaticLoaderImplTest, ProtoParsing) {
+void StaticLoaderImplTest::testAllTheThings(bool allow_invalid_yaml) {
+  // Validate proto parsing sanity.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     file1: hello override
     file2: world
@@ -757,48 +761,57 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   ProtobufWkt::Value empty_value;
   const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
       .createEntry(empty_value, "", error);
+  if (allow_invalid_yaml) {
+    // Make sure the hacky fractional percent function works.
+    ProtobufWkt::Value fractional_value;
+    fractional_value.set_string_value(" numerator:  11 ");
+    auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                     .createEntry(fractional_value, "", error);
+    ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+    EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+              envoy::type::v3::FractionalPercent::HUNDRED);
+    EXPECT_EQ(entry.fractional_percent_value_->numerator(), 11);
 
-  // Make sure the hacky fractional percent function works.
-  ProtobufWkt::Value fractional_value;
-  fractional_value.set_string_value(" numerator:  11 ");
-  auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                   .createEntry(fractional_value, "", error);
-  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
-  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
-            envoy::type::v3::FractionalPercent::HUNDRED);
-  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 11);
+    // Make sure the hacky percent function works with numerator and denominator
+    fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}");
+    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                .createEntry(fractional_value, "", error);
+    ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+    EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+              envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+    EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
 
-  // Make sure the hacky percent function works with numerator and denominator
-  fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}");
-  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(fractional_value, "", error);
-  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
-  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
-            envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
+    // Make sure the hacky fractional percent function works with million
+    fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
+    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                .createEntry(fractional_value, "", error);
+    ASSERT_TRUE(entry.fractional_percent_value_.has_value());
+    EXPECT_EQ(entry.fractional_percent_value_->denominator(),
+              envoy::type::v3::FractionalPercent::MILLION);
+    EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
 
-  // Make sure the hacky fractional percent function works with million
-  fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
-  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(fractional_value, "", error);
-  ASSERT_TRUE(entry.fractional_percent_value_.has_value());
-  EXPECT_EQ(entry.fractional_percent_value_->denominator(),
-            envoy::type::v3::FractionalPercent::MILLION);
-  EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
+    // Test atoi failure for the hacky fractional percent value function.
+    fractional_value.set_string_value(" numerator:  1.1 ");
+    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                .createEntry(fractional_value, "", error);
+    ASSERT_FALSE(entry.fractional_percent_value_.has_value());
 
-  // Test atoi failure for the hacky fractional percent value function.
-  fractional_value.set_string_value(" numerator:  1.1 ");
-  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(fractional_value, "", error);
-  ASSERT_FALSE(entry.fractional_percent_value_.has_value());
+    // Test legacy malformed boolean support
+    ProtobufWkt::Value boolean_value;
+    boolean_value.set_string_value("FaLsE");
+    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
+                .createEntry(boolean_value, "", error);
+    ASSERT_TRUE(entry.bool_value_.has_value());
+    ASSERT_FALSE(entry.bool_value_.value());
+  }
+}
 
-  // Test legacy malformed boolean support
-  ProtobufWkt::Value boolean_value;
-  boolean_value.set_string_value("FaLsE");
-  entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-              .createEntry(boolean_value, "", error);
-  ASSERT_TRUE(entry.bool_value_.has_value());
-  ASSERT_FALSE(entry.bool_value_.value());
+TEST_F(StaticLoaderImplTest, ProtoParsing) { testAllTheThings(false); }
+
+TEST_F(StaticLoaderImplTest, ProtoParsingLegacy) {
+  absl::SetFlag(&FLAGS_envoy_reloadable_features_reject_invalid_yaml, false);
+
+  testAllTheThings(true);
 }
 
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {
@@ -957,11 +970,11 @@ public:
               rtds_callbacks_.push_back(&callbacks);
               return ret;
             }));
-    absl::Status creation_status;
-    loader_ = std::make_unique<LoaderImpl>(dispatcher_, tls_, config, local_info_, store_,
-                                           generator_, validation_visitor_, *api_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
-    loader_->initialize(cm_);
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+        dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
+    loader_ = std::move(loader.value());
+    THROW_IF_NOT_OK(loader_->initialize(cm_));
     for (auto* sub : rtds_subscriptions_) {
       EXPECT_CALL(*sub, start(_));
     }
@@ -1294,11 +1307,11 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->mutable_rtds_config();
 
   EXPECT_CALL(cm_, subscriptionFactory());
-  absl::Status creation_status;
-  LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
-                    *api_, creation_status);
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+      dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
 
-  EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
+  EXPECT_THROW_WITH_MESSAGE(loader.value()->initialize(cm_).IgnoreError(), EnvoyException,
+                            "bad config");
 }
 
 } // namespace

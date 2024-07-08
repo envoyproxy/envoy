@@ -192,22 +192,20 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type, bool 
 
 std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
   std::string san;
+  ASN1_STRING* str = nullptr;
   switch (general_name->type) {
-  case GEN_DNS: {
-    ASN1_STRING* str = general_name->d.dNSName;
+  case GEN_DNS:
+    str = general_name->d.dNSName;
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
-  }
-  case GEN_URI: {
-    ASN1_STRING* str = general_name->d.uniformResourceIdentifier;
+  case GEN_URI:
+    str = general_name->d.uniformResourceIdentifier;
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
-  }
-  case GEN_EMAIL: {
-    ASN1_STRING* str = general_name->d.rfc822Name;
+  case GEN_EMAIL:
+    str = general_name->d.rfc822Name;
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
-  }
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
       sockaddr_in sin;
@@ -227,6 +225,136 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       san = addr.ip()->addressAsString();
     }
     break;
+  }
+  case GEN_OTHERNAME: {
+    ASN1_TYPE* value = general_name->d.otherName->value;
+    if (value == nullptr) {
+      break;
+    }
+    switch (value->type) {
+    case V_ASN1_NULL:
+      break;
+    case V_ASN1_BOOLEAN:
+      san = value->value.boolean ? "true" : "false";
+      break;
+    case V_ASN1_ENUMERATED:
+    case V_ASN1_INTEGER: {
+      BIGNUM san_bn;
+      BN_init(&san_bn);
+      value->type == V_ASN1_ENUMERATED ? ASN1_ENUMERATED_to_BN(value->value.enumerated, &san_bn)
+                                       : ASN1_INTEGER_to_BN(value->value.integer, &san_bn);
+      char* san_char = BN_bn2dec(&san_bn);
+      BN_free(&san_bn);
+      if (san_char != nullptr) {
+        san.assign(san_char);
+        OPENSSL_free(san_char);
+      }
+      break;
+    }
+    case V_ASN1_OBJECT: {
+      char tmp_obj[256]; // OID Max length
+      int obj_len = OBJ_obj2txt(tmp_obj, 256, value->value.object, 1);
+      if (obj_len > 256 || obj_len < 0) {
+        break;
+      }
+      san.assign(tmp_obj);
+      break;
+    }
+    case V_ASN1_BIT_STRING: {
+      ASN1_BIT_STRING* tmp_str = value->value.bit_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_OCTET_STRING: {
+      ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_PRINTABLESTRING: {
+      ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_T61STRING: {
+      ASN1_T61STRING* tmp_str = value->value.t61string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_IA5STRING: {
+      ASN1_IA5STRING* tmp_str = value->value.ia5string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_GENERALSTRING: {
+      ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_BMPSTRING: {
+      // `ASN1_BMPSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
+      unsigned char* tmp = nullptr;
+      if (ASN1_STRING_to_UTF8(&tmp, value->value.bmpstring) < 0) {
+        break;
+      }
+      san.assign(reinterpret_cast<const char*>(tmp));
+      OPENSSL_free(tmp);
+      break;
+    }
+    case V_ASN1_UNIVERSALSTRING: {
+      // `ASN1_UNIVERSALSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
+      unsigned char* tmp = nullptr;
+      if (ASN1_STRING_to_UTF8(&tmp, value->value.universalstring) < 0) {
+        break;
+      }
+      san.assign(reinterpret_cast<const char*>(tmp));
+      OPENSSL_free(tmp);
+      break;
+    }
+    case V_ASN1_UTCTIME: {
+      ASN1_UTCTIME* tmp_str = value->value.utctime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_GENERALIZEDTIME: {
+      ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_VISIBLESTRING: {
+      ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_UTF8STRING: {
+      ASN1_UTF8STRING* tmp_str = value->value.utf8string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_SET: {
+      ASN1_STRING* tmp_str = value->value.set;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_SEQUENCE: {
+      ASN1_STRING* tmp_str = value->value.sequence;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    default:
+      break;
+    }
   }
   }
   return san;

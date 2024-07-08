@@ -12,7 +12,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-Network::UpstreamTransportSocketFactoryPtr
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
@@ -23,9 +23,10 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
       Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory =
+  auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  return std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(inner_transport_factory));
+  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  return std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(factory_or_error.value()));
 }
 
 ProtobufTypes::MessagePtr UpstreamHttp11ConnectSocketConfigFactory::createEmptyConfigProto() {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ENVOY_BIN=${TEST_SRCDIR}/envoy/source/exe/envoy-static
 

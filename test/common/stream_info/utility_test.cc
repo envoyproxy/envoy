@@ -116,8 +116,8 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
 TEST(UtilityTest, formatDownstreamAddressNoPort) {
   EXPECT_EQ("1.2.3.4",
             Utility::formatDownstreamAddressNoPort(Network::Address::Ipv4Instance("1.2.3.4")));
-  EXPECT_EQ("/hello",
-            Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
+  EXPECT_EQ("/hello", Utility::formatDownstreamAddressNoPort(
+                          **Network::Address::PipeInstance::create("/hello")));
 }
 
 TEST(UtilityTest, formatDownstreamAddressJustPort) {
@@ -367,8 +367,6 @@ TEST(ProxyStatusErrorToString, TestAll) {
 TEST(ProxyStatusFromStreamInfo, TestAll) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
-  scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "false"}});
   for (const auto& [response_flag, proxy_status_error] :
        std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
@@ -402,8 +400,6 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
 
 TEST(ProxyStatusFromStreamInfo, TestNewAll) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "true"}});
   for (const auto& [response_flag, proxy_status_error] :
@@ -442,16 +438,6 @@ TEST(ProxyStatusFromStreamInfo, TestNewAll) {
     ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
     EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
   }
-}
-
-TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
-  NiceMock<MockStreamInfo> stream_info;
-  ON_CALL(stream_info, hasResponseFlag(ResponseFlag(CoreResponseFlag::UpstreamRequestTimeout)))
-      .WillByDefault(Return(true));
-  EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
 }
 
 } // namespace

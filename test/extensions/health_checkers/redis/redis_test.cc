@@ -211,7 +211,7 @@ public:
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string& username, const std::string& password, bool) override {
     EXPECT_EQ(auth_username_, username);
@@ -250,15 +250,15 @@ public:
     RedisHealthChecker::RedisActiveHealthCheckSessionPtr session =
         std::make_unique<RedisHealthChecker::RedisActiveHealthCheckSession>(*health_checker_, host);
 
-    EXPECT_TRUE(session->disableOutlierEvents());
-    EXPECT_EQ(session->opTimeout(),
+    EXPECT_TRUE(session->redis_config_->disableOutlierEvents());
+    EXPECT_EQ(session->redis_config_->opTimeout(),
               std::chrono::milliseconds(2000)); // Timeout is 1s is test configurations.
-    EXPECT_FALSE(session->enableHashtagging());
-    EXPECT_TRUE(session->enableRedirection());
-    EXPECT_EQ(session->maxBufferSizeBeforeFlush(), 0);
-    EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
-    EXPECT_EQ(session->maxUpstreamUnknownConnections(), 0);
-    EXPECT_FALSE(session->enableCommandStats());
+    EXPECT_FALSE(session->redis_config_->enableHashtagging());
+    EXPECT_TRUE(session->redis_config_->enableRedirection());
+    EXPECT_EQ(session->redis_config_->maxBufferSizeBeforeFlush(), 0);
+    EXPECT_EQ(session->redis_config_->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
+    EXPECT_EQ(session->redis_config_->maxUpstreamUnknownConnections(), 0);
+    EXPECT_FALSE(session->redis_config_->enableCommandStats());
     session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
   }
 

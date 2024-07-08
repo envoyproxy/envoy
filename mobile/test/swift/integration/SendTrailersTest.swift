@@ -23,7 +23,10 @@ final class SendTrailersTests: XCTestCase {
     EnvoyTestServer.startHttp1PlaintextServer()
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addNativeFilter(
         name: "envoy.filters.http.assertion",
         // swiftlint:disable:next line_length

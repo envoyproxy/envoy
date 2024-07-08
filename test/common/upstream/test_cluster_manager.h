@@ -151,7 +151,7 @@ public:
   NiceMock<Server::MockAdmin>& admin_ = server_context_.admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager>& log_manager_ = server_context_.access_log_manager_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
@@ -174,7 +174,7 @@ public:
         new TestClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
                                    log_manager, main_thread_dispatcher, admin, validation_context,
                                    api, http_context, grpc_context, router_context, server)};
-    THROW_IF_NOT_OK(cluster_manager->init(bootstrap));
+    THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
   }
 

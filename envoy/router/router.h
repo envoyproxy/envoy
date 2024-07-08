@@ -534,6 +534,11 @@ public:
    * @return true if the trace span should be sampled.
    */
   virtual bool traceSampled() const PURE;
+
+  /**
+   * @return true if host name should be suffixed with "-shadow".
+   */
+  virtual bool disableShadowHostSuffixAppend() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;

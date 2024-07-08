@@ -13,7 +13,6 @@ import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
-import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
@@ -21,9 +20,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val FILTER_NAME = "error_validation_filter"
 
+@RunWith(RobolectricTestRunner::class)
 class GRPCReceiveErrorTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -82,8 +84,8 @@ class GRPCReceiveErrorTest {
         .build()
 
     val engine =
-      EngineBuilder(Standard())
-        .addLogLevel(LogLevel.DEBUG)
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
           name = FILTER_NAME,

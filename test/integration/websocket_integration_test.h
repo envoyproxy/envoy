@@ -20,7 +20,8 @@ public:
 
 protected:
   void performUpgrade(const Http::TestRequestHeaderMapImpl& upgrade_request_headers,
-                      const Http::TestResponseHeaderMapImpl& upgrade_response_headers);
+                      const Http::TestResponseHeaderMapImpl& upgrade_response_headers,
+                      bool upgrade_should_fail = false);
   void sendBidirectionalData();
 
   void validateUpgradeRequestHeaders(const Http::RequestHeaderMap& proxied_request_headers,

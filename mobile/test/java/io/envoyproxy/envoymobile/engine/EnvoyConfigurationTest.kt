@@ -12,6 +12,8 @@ import io.envoyproxy.envoymobile.engine.testing.TestJni
 import java.nio.ByteBuffer
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.util.regex.Pattern
 
 class TestFilter : EnvoyHTTPFilter {
@@ -63,6 +65,7 @@ class TestEnvoyHTTPFilterFactory(name : String) : EnvoyHTTPFilterFactory {
  }
 }
 
+@RunWith(RobolectricTestRunner::class)
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
@@ -77,6 +80,8 @@ class EnvoyConfigurationTest {
     dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
+    enableCares: Boolean = false,
+    enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
@@ -98,20 +103,7 @@ class EnvoyConfigurationTest {
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enablePlatformCertificatesValidation: Boolean = false,
-    rtdsResourceName: String = "",
-    rtdsTimeoutSeconds: Int = 0,
-    xdsAddress: String = "",
-    xdsPort: Int = 0,
-    xdsGrpcInitialMetadata: Map<String, String> = emptyMap(),
-    xdsSslRootCerts: String = "",
-    nodeId: String = "",
-    nodeRegion: String = "",
-    nodeZone: String = "",
-    nodeSubZone: String = "",
-    nodeMetadata: Struct = Struct.getDefaultInstance(),
-    cdsResourcesLocator: String = "",
-    cdsTimeoutSeconds: Int = 0,
-    enableCds: Boolean = false,
+    upstreamTlsSni: String = "",
 
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -126,6 +118,8 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      enableCares,
+      enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
@@ -149,25 +143,8 @@ class EnvoyConfigurationTest {
       emptyMap(),
       runtimeGuards,
       enablePlatformCertificatesValidation,
-      rtdsResourceName,
-      rtdsTimeoutSeconds,
-      xdsAddress,
-      xdsPort,
-      xdsGrpcInitialMetadata,
-      xdsSslRootCerts,
-      nodeId,
-      nodeRegion,
-      nodeZone,
-      nodeSubZone,
-      nodeMetadata,
-      cdsResourcesLocator,
-      cdsTimeoutSeconds,
-      enableCds
+      upstreamTlsSni,
     )
-  }
-
-  fun isEnvoyMobileXdsDisabled(): Boolean {
-    return System.getProperty("envoy_jni_envoy_mobile_xds_disabled") != null
   }
 
   @Test
@@ -175,7 +152,7 @@ class EnvoyConfigurationTest {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate).contains("connect_timeout { seconds: 123 }")
 
     // DNS
@@ -229,13 +206,13 @@ class EnvoyConfigurationTest {
 
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
-    // Validate that createYaml doesn't change filter order.
-    val resolvedTemplate2 = TestJni.createYaml(envoyConfiguration)
+    // Validate that createProtoString doesn't change filter order.
+    val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createBootstrap also doesn't change filter order.
     // This may leak memory as the boostrap isn't used.
     envoyConfiguration.createBootstrap()
-    val resolvedTemplate3 = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate3 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
   }
 
@@ -247,6 +224,8 @@ class EnvoyConfigurationTest {
       enableDNSCache = true,
       dnsCacheSaveIntervalSeconds = 101,
       enableHttp3 = false,
+      enableCares = true,
+      enableGro = true,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
       enableSocketTagging = true,
@@ -258,13 +237,19 @@ class EnvoyConfigurationTest {
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     // TlS Verification
     assertThat(resolvedTemplate).contains("trust_chain_verification: ACCEPT_UNTRUSTED")
 
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("enable_drain_post_dns_refresh: true")
+
+    // enableCares = true
+    assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
+
+    // enableGro = true
+    assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: \"dns_persistent_cache\"")
@@ -285,11 +270,6 @@ class EnvoyConfigurationTest {
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca")
-
-    // ADS and RTDS not included by default
-    assertThat(resolvedTemplate).doesNotContain("rtds_layer");
-    assertThat(resolvedTemplate).doesNotContain("ads_config");
-    assertThat(resolvedTemplate).doesNotContain("cds_config");
   }
 
   @Test
@@ -299,105 +279,9 @@ class EnvoyConfigurationTest {
       runtimeGuards = mapOf("test_feature_false" to true, "test_feature_true" to false),
     )
 
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
 
     assertThat(resolvedTemplate).contains("test_feature_false")
     assertThat(resolvedTemplate).contains("test_feature_true")
-  }
-
-  @Test
-  fun `test adding RTDS`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsResourceName = "fake_rtds_layer", rtdsTimeoutSeconds = 5432, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-    assertThat(resolvedTemplate).contains("fake_rtds_layer");
-    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5432 }")
-  }
-
-  @Test
-  fun `test adding RTDS and CDS`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 356, xdsAddress = "FAKE_ADDRESS", xdsPort = 0, enableCds = true
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("FAKE_CDS_LOCATOR");
-    assertThat(resolvedTemplate).contains("FAKE_ADDRESS");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 356 }")
-  }
-
-  @Test
-  fun `test not using enableCds`() {
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      cdsResourcesLocator = "FAKE_CDS_LOCATOR", cdsTimeoutSeconds = 123456, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
-    assertThat(resolvedTemplate).doesNotContain("FAKE_CDS_LOCATOR");
-    assertThat(resolvedTemplate).doesNotContain("1234356");
-  }
-
-  @Test
-  fun `test enableCds with default string`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      enableCds = true, xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("cds_config");
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5 }")
-  }
-
-  @Test
-  fun `test RTDS default timeout`() {
-    if (isEnvoyMobileXdsDisabled()) {
-      return
-    }
-
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      rtdsResourceName = "fake_rtds_layer", xdsAddress = "FAKE_ADDRESS", xdsPort = 0
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("initial_fetch_timeout { seconds: 5 }")
-  }
-
-  @Test
-  fun `test node metadata`() {
-    JniLibrary.loadTestLibrary()
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      nodeMetadata = Struct.newBuilder()
-        .putFields("metadata_field", Value.newBuilder().setStringValue("metadata_value").build())
-        .build()
-    )
-
-    val resolvedTemplate = TestJni.createYaml(envoyConfiguration)
-
-    assertThat(resolvedTemplate).contains("metadata_field")
-    assertThat(resolvedTemplate).contains("metadata_value")
   }
 }

@@ -48,7 +48,7 @@ TEST_P(AdminInstanceTest, ClustersJsonAndText) {
 
   host_set->hosts_.emplace_back(host);
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://1.2.3.4:80");
+      *Network::Utility::resolveUrl("tcp://1.2.3.4:80");
   ON_CALL(*host, address()).WillByDefault(Return(address));
   const std::string hostname = "foo.com";
   ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));

@@ -300,9 +300,9 @@ TEST(TcpStatsTest, ConfigErrorOnUnsupportedPlatform) {
   transport_socket_config.mutable_typed_config()->PackFrom(proto_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket_config);
-  EXPECT_THROW_WITH_MESSAGE(config_factory.createTransportSocketFactory(proto_config, context, {}),
-                            EnvoyException,
-                            "envoy.transport_sockets.tcp_stats is not supported on this platform.");
+  EXPECT_THROW_WITH_MESSAGE(
+      config_factory.createTransportSocketFactory(proto_config, context, {}).value(),
+      EnvoyException, "envoy.transport_sockets.tcp_stats is not supported on this platform.");
 }
 
 } // namespace TcpStats

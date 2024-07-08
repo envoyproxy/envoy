@@ -15,9 +15,10 @@ public:
   MOCK_METHOD(void, addHostCheckCompleteCb, (HostStatusCb callback));
   MOCK_METHOD(void, start, ());
 
-  void runCallbacks(Upstream::HostSharedPtr host, HealthTransition changed_state) {
+  void runCallbacks(Upstream::HostSharedPtr host, HealthTransition changed_state,
+                    HealthState current_check_result) {
     for (const auto& callback : callbacks_) {
-      callback(host, changed_state);
+      callback(host, changed_state, current_check_result);
     }
   }
 

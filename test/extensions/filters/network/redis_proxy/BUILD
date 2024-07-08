@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/extensions/clusters/redis:redis_cluster_mocks",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/extensions/common/redis:mocks_lib",

@@ -21,7 +21,10 @@ final class SendDataTests: XCTestCase {
 
     let expectation = self.expectation(description: "Run called with expected http status")
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addNativeFilter(
         name: "test_logger",
         // swiftlint:disable:next line_length
@@ -49,9 +52,6 @@ final class SendDataTests: XCTestCase {
       }
       .setOnError { _, _ in
         XCTFail("Unexpected error")
-      }
-      .setOnCancel { _ in
-        XCTFail("Unexpected cancel")
       }
       .start()
       .sendHeaders(requestHeaders, endStream: false)

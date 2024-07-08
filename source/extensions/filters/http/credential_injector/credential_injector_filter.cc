@@ -12,7 +12,7 @@ FilterConfig::FilterConfig(CredentialInjectorSharedPtr credential_injector, bool
                            Stats::Scope& scope)
     : injector_(credential_injector), overwrite_(overwrite),
       allow_request_without_credential_(allow_request_without_credential),
-      stats_(generateStats(stats_prefix + "credential_injector.", scope)) {}
+      stats_(generateStats(stats_prefix, scope)) {}
 
 // Inject configured credential to the HTTP request header.
 // return true if successful

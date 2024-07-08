@@ -106,14 +106,14 @@ public:
   Router::ContextImpl router_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
-  FilterConfig config_;
+  FilterConfigSharedPtr config_;
   std::unique_ptr<RouterTestFilter> router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
   Event::MockTimer* per_try_idle_timeout_{};
   Event::MockTimer* max_stream_duration_timer_{};
   Network::Address::InstanceConstSharedPtr host_address_{
-      Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+      *Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   NiceMock<Http::MockRequestEncoder> original_encoder_;
   NiceMock<Http::MockRequestEncoder> second_encoder_;
   NiceMock<Network::MockConnection> connection_;

@@ -55,7 +55,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       // Creating the IP address will throw an exception if the address string is malformed
       for (auto index = 0; index < address_list.size(); index++) {
         const auto address_iter = std::next(address_list.begin(), (i++ % address_list.size()));
-        auto ipaddr = Network::Utility::parseInternetAddress(*address_iter, 0 /* port */);
+        auto ipaddr = Network::Utility::parseInternetAddressNoThrow(*address_iter, 0 /* port */);
+        if (!ipaddr) {
+          throw EnvoyException(absl::StrCat("malformed IP address: ", *address_iter));
+        }
         addrs.push_back(std::move(ipaddr));
       }
 
@@ -208,10 +211,7 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
                               ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
   }
-  END_TRY catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  }
-  catch (const EnvoyException& e) {
+  END_TRY catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;

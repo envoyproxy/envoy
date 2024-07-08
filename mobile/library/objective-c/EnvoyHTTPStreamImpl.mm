@@ -1,6 +1,10 @@
 #import "library/objective-c/EnvoyEngine.h"
 #import "library/objective-c/EnvoyBridgeUtility.h"
 
+#include "source/common/buffer/buffer_impl.h"
+
+#include "library/common/bridge/utility.h"
+
 #import "library/common/types/c_types.h"
 #import "library/common/internal_engine.h"
 #include "library/common/http/header_utility.h"
@@ -22,38 +26,62 @@ typedef struct {
 
 #pragma mark - C callbacks
 
-static void ios_on_headers(envoy_headers headers, bool end_stream, envoy_stream_intel stream_intel,
-                           void *context) {
+static EnvoyHeaders *toEnvoyHeaders(const Envoy::Http::HeaderMap &headers) {
+  NSMutableDictionary *headerDict = [NSMutableDictionary new];
+  headers.iterate([&](const Envoy::Http::HeaderEntry &header) -> Envoy::Http::HeaderMap::Iterate {
+    std::string key = std::string(header.key().getStringView());
+    if (headers.formatter().has_value()) {
+      const Envoy::Http::StatefulHeaderKeyFormatter &formatter = headers.formatter().value();
+      key = formatter.format(key);
+    }
+    NSString *headerKey = @(key.c_str());
+    NSString *headerValue = @(std::string(header.value().getStringView()).c_str());
+    NSMutableArray *headerValueList = headerDict[headerKey];
+    if (headerValueList == nil) {
+      headerValueList = [NSMutableArray new];
+      headerDict[headerKey] = headerValueList;
+    }
+    [headerValueList addObject:headerValue];
+    return Envoy::Http::HeaderMap::Iterate::Continue;
+  });
+  return headerDict;
+}
+
+static void ios_on_headers(const Envoy::Http::ResponseHeaderMap &headers, bool end_stream,
+                           envoy_stream_intel stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
+  EnvoyHeaders *envoyHeaders = toEnvoyHeaders(headers);
   dispatch_async(callbacks.dispatchQueue, ^{
     if (callbacks.onHeaders) {
-      callbacks.onHeaders(to_ios_headers(headers), end_stream, stream_intel);
+      callbacks.onHeaders(envoyHeaders, end_stream, stream_intel);
     }
   });
 }
 
-static void ios_on_data(envoy_data data, bool end_stream, envoy_stream_intel stream_intel,
-                        void *context) {
+static void ios_on_data(const Envoy::Buffer::Instance &buffer, uint64_t length, bool end_stream,
+                        envoy_stream_intel stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
+  NSData *data =
+      [NSData dataWithBytes:(void *)const_cast<Envoy::Buffer::Instance &>(buffer).linearize(
+                                static_cast<uint32_t>(length))
+                     length:length];
   dispatch_async(callbacks.dispatchQueue, ^{
     if (callbacks.onData) {
-      callbacks.onData(to_ios_data(data), end_stream, stream_intel);
+      callbacks.onData(data, end_stream, stream_intel);
     }
   });
 }
 
-static void ios_on_metadata(envoy_headers metadata, envoy_stream_intel stream_intel,
-                            void *context) {}
-
-static void ios_on_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
-                            void *context) {
+static void ios_on_trailers(const Envoy::Http::ResponseTrailerMap &trailers,
+                            envoy_stream_intel stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
+  EnvoyHeaders *envoyTrailers = toEnvoyHeaders(trailers);
   dispatch_async(callbacks.dispatchQueue, ^{
     if (callbacks.onTrailers) {
-      callbacks.onTrailers(to_ios_headers(trailers), stream_intel);
+      callbacks.onTrailers(envoyTrailers, stream_intel);
     }
   });
 }
@@ -102,19 +130,17 @@ static void ios_on_cancel(envoy_stream_intel stream_intel,
   });
 }
 
-static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
+static void ios_on_error(const Envoy::EnvoyError &error, envoy_stream_intel stream_intel,
                          envoy_final_stream_intel final_stream_intel, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
+  uint64_t errorCode = error.error_code_;
+  NSString *errorMessage = @(error.message_.c_str());
+  int32_t attemptCount = error.attempt_count_.value_or(-1);
   dispatch_async(callbacks.dispatchQueue, ^{
     if (callbacks.onError) {
-      NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
-                                                        length:error.message.length
-                                                      encoding:NSUTF8StringEncoding];
-      release_envoy_error(error);
-      callbacks.onError(error.error_code, errorMessage, error.attempt_count, stream_intel,
-                        final_stream_intel);
+      callbacks.onError(errorCode, errorMessage, attemptCount, stream_intel, final_stream_intel);
     }
 
     // TODO: If the callback queue is not serial, clean up is not currently thread-safe.
@@ -128,7 +154,7 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 @implementation EnvoyHTTPStreamImpl {
   EnvoyHTTPStreamImpl *_strongSelf;
   EnvoyHTTPCallbacks *_platformCallbacks;
-  envoy_http_callbacks _nativeCallbacks;
+  ios_context *_context;
   envoy_stream_t _streamHandle;
   Envoy::InternalEngine *_engine;
 }
@@ -152,13 +178,7 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   context->stream = self;
   context->closed = (atomic_bool *)safe_malloc(sizeof(atomic_bool));
   atomic_store(context->closed, NO);
-
-  // Create native callbacks
-  envoy_http_callbacks native_callbacks = {
-      ios_on_headers, ios_on_data,     ios_on_metadata, ios_on_trailers,
-      ios_on_error,   ios_on_complete, ios_on_cancel,   ios_on_send_window_available,
-      context};
-  _nativeCallbacks = native_callbacks;
+  _context = context;
 
   _engine = reinterpret_cast<Envoy::InternalEngine *>(engine);
 
@@ -166,15 +186,46 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
   // start_stream could result in a reset that would release the native ref.
   _strongSelf = self;
   _streamHandle = _engine->initStream();
-  _engine->startStream(_streamHandle, native_callbacks, explicitFlowControl);
+
+  // Create native callbacks
+  Envoy::EnvoyStreamCallbacks streamCallbacks;
+  streamCallbacks.on_headers_ = [context](const Envoy::Http::ResponseHeaderMap &headers,
+                                          bool end_stream, envoy_stream_intel stream_intel) {
+    ios_on_headers(headers, end_stream, stream_intel, context);
+  };
+  streamCallbacks.on_data_ = [context](const Envoy::Buffer::Instance &buffer, uint64_t length,
+                                       bool end_stream, envoy_stream_intel stream_intel) {
+    ios_on_data(buffer, length, end_stream, stream_intel, context);
+  };
+  streamCallbacks.on_trailers_ = [context](const Envoy::Http::ResponseTrailerMap &trailers,
+                                           envoy_stream_intel stream_intel) {
+    ios_on_trailers(trailers, stream_intel, context);
+  };
+  streamCallbacks.on_complete_ = [context](envoy_stream_intel stream_intel,
+                                           envoy_final_stream_intel final_stream_intel) {
+    ios_on_complete(stream_intel, final_stream_intel, context);
+  };
+  streamCallbacks.on_error_ = [context](const Envoy::EnvoyError &error,
+                                        envoy_stream_intel stream_intel,
+                                        envoy_final_stream_intel final_stream_intel) {
+    ios_on_error(error, stream_intel, final_stream_intel, context);
+  };
+  streamCallbacks.on_cancel_ = [context](envoy_stream_intel stream_intel,
+                                         envoy_final_stream_intel final_stream_intel) {
+    ios_on_cancel(stream_intel, final_stream_intel, context);
+  };
+  streamCallbacks.on_send_window_available_ = [context](envoy_stream_intel stream_intel) {
+    ios_on_send_window_available(stream_intel, context);
+  };
+
+  _engine->startStream(_streamHandle, std::move(streamCallbacks), explicitFlowControl);
 
   return self;
 }
 
 - (void)dealloc {
-  ios_context *context = (ios_context *)_nativeCallbacks.context;
-  free(context->closed);
-  free(context);
+  free(_context->closed);
+  free(_context);
 }
 
 - (void)sendHeaders:(EnvoyHeaders *)headers close:(BOOL)close {
@@ -196,7 +247,9 @@ static void ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
 }
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
-  _engine->sendData(_streamHandle, toNativeData(data), close);
+  Envoy::Buffer::InstancePtr buffer = std::make_unique<Envoy::Buffer::OwnedImpl>();
+  buffer->add([data bytes], data.length);
+  _engine->sendData(_streamHandle, std::move(buffer), close);
 }
 
 - (void)readData:(size_t)byteCount {

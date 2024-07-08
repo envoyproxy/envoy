@@ -241,6 +241,11 @@ public:
   virtual bool pausedForConnect() const PURE;
   virtual void setPausedForConnect(bool value) PURE;
 
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a WebSocket upgrade. These should only be used by the upstream codec filter.
+  virtual bool pausedForWebsocketUpgrade() const PURE;
+  virtual void setPausedForWebsocketUpgrade(bool value) PURE;
+
   // Return the upstreamStreamOptions for this stream.
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 
@@ -812,6 +817,11 @@ public:
    */
   virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const PURE;
+
+  /**
+   * @return true if the filter should shed load based on the system pressure, typically memory.
+   */
+  virtual bool shouldLoadShed() const PURE;
 };
 
 /**
@@ -1193,6 +1203,8 @@ public:
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
 
   const Network::Address::Instance& localAddress() const {
     return *connectionInfoProvider().localAddress();

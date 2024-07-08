@@ -118,17 +118,17 @@ void jsonConvertInternal(const Protobuf::Message& source,
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   bool has_unknown_field;
-  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
-  if (status.ok()) {
+  auto load_status = loadFromJsonNoThrow(json, message, has_unknown_field);
+  if (load_status.ok()) {
     return;
   }
   if (has_unknown_field) {
     // If the parsing failure is caused by the unknown fields.
-    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                      status.ToString());
+    THROW_IF_NOT_OK(validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                                      load_status.ToString()));
   } else {
     // If the error has nothing to do with unknown field.
-    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+    throw EnvoyException("Unable to parse JSON as proto (" + load_status.ToString() + "): " + json);
   }
 }
 
@@ -223,7 +223,7 @@ MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bo
   // Primitive types such as int32s and enums will not be serialized if they have the default value.
   // This flag disables that behavior.
   if (always_print_primitive_fields) {
-    json_options.always_print_primitive_fields = true;
+    json_options.always_print_fields_with_no_presence = true;
   }
   std::string json;
   if (auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);

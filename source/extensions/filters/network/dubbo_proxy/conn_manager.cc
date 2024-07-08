@@ -17,10 +17,11 @@ namespace DubboProxy {
 
 constexpr uint32_t BufferLimit = UINT32_MAX;
 
-ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+ConnectionManager::ConnectionManager(ConfigSharedPtr config,
+                                     Random::RandomGenerator& random_generator,
                                      TimeSource& time_system)
-    : config_(config), time_system_(time_system), stats_(config_.stats()),
-      random_generator_(random_generator), protocol_(config.createProtocol()),
+    : config_(config), time_system_(time_system), stats_(config_->stats()),
+      random_generator_(random_generator), protocol_(config_->createProtocol()),
       decoder_(std::make_unique<RequestDecoder>(*protocol_, *this)) {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
