@@ -189,31 +189,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying xDS works`() {
-    var xdsBuilder = XdsBuilder("fake_test_address", 0)
-    xdsBuilder
-      .addInitialStreamHeader("x-goog-api-key", "A1B2C3")
-      .addInitialStreamHeader("x-android-package", "com.google.myapp")
-    xdsBuilder.setSslRootCerts("my_root_certs")
-    xdsBuilder.addRuntimeDiscoveryService("some_rtds_resource")
-    xdsBuilder.addClusterDiscoveryService(
-      "xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz"
-    )
-    engineBuilder = EngineBuilder()
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.setXds(xdsBuilder)
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.xdsAddress).isEqualTo("fake_test_address")
-    assertThat(engine.envoyConfiguration.xdsGrpcInitialMetadata)
-      .isEqualTo(mapOf("x-goog-api-key" to "A1B2C3", "x-android-package" to "com.google.myapp"))
-    assertThat(engine.envoyConfiguration.xdsRootCerts).isEqualTo("my_root_certs")
-    assertThat(engine.envoyConfiguration.rtdsResourceName).isEqualTo("some_rtds_resource")
-    assertThat(engine.envoyConfiguration.cdsResourcesLocator)
-      .isEqualTo("xdstp://fake_test_address/envoy.config.cluster.v3.Cluster/xyz")
-  }
-
-  @Test
   fun `specifying runtime guards work`() {
     engineBuilder = EngineBuilder()
     engineBuilder

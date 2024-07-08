@@ -55,16 +55,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
   private int mStreamIdleTimeoutSeconds = 15;
-  private final int mPerTryIdleTimeoutSeconds = 15;
+  private int mPerTryIdleTimeoutSeconds = 15;
   private final String mAppVersion = "unspecified";
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
-  private final String mNodeId = "";
-  private final String mNodeRegion = "";
-  private final String mNodeZone = "";
-  private final String mNodeSubZone = "";
+
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
   /**
@@ -158,6 +155,22 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Set the per-try stream idle timeout, in seconds, which is defined as the period in which
+   * there are no active requests. When the idle timeout is reached, the connection is closed.
+   * This setting is the same as the stream idle timeout, except it's applied per-retry attempt.
+   * See
+   * https://github.com/envoyproxy/envoy/blob/f15ec821d6a70a1d132f53f50970595efd1b84ee/api/envoy/config/route/v3/route_components.proto#L1570.
+   *
+   * The default is 15s.
+   *
+   * @param timeout The per-try idle timeout, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setPerTryIdleTimeoutSeconds(int timeout) {
+    mPerTryIdleTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
    * Adds the boolean value for the reloadable runtime feature flag value. For example, to set the
    * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
    * call `addRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
@@ -237,11 +250,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
-        /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
-        /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,
-        Struct.getDefaultInstance(), /*cdsResourcesLocator=*/"", /*cdsTimeoutSeconds=*/0,
-        /*enableCds=*/false);
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni);
   }
 }
