@@ -27,12 +27,13 @@
 namespace Envoy {
 namespace Server {
 
-OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                                  Network::Address::IpVersion ip_version,
-                                  FieldValidationConfig validation_config, uint32_t concurrency,
-                                  std::chrono::seconds drain_time,
-                                  Server::DrainStrategy drain_strategy,
-                                  bool use_bootstrap_node_metadata) {
+OptionsImpl
+createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                      Network::Address::IpVersion ip_version,
+                      FieldValidationConfig validation_config, uint32_t concurrency,
+                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+                      bool use_bootstrap_node_metadata,
+                      std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto) {
   // Empty string values mean the Bootstrap node metadata won't be overridden.
   const std::string service_cluster = use_bootstrap_node_metadata ? "" : "cluster_name";
   const std::string service_node = use_bootstrap_node_metadata ? "" : "node_name";
@@ -51,6 +52,9 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);
   test_options.setHotRestartDisabled(true);
+  if (config_proto) {
+    test_options.setConfigProto(std::move(config_proto));
+  }
 
   return test_options;
 }
@@ -65,9 +69,10 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats,
-    bool use_bootstrap_node_metadata) {
-  IntegrationTestServerPtr server{
-      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
+    bool use_bootstrap_node_metadata,
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto) {
+  IntegrationTestServerPtr server{std::make_unique<IntegrationTestServerImpl>(
+      time_system, api, config_path, use_real_stats, std::move(config_proto))};
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
@@ -191,9 +196,9 @@ void IntegrationTestServer::threadRoutine(
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata) {
-  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version, validation_config,
-                                                    concurrency, drain_time, drain_strategy,
-                                                    use_bootstrap_node_metadata));
+  OptionsImpl options(Server::createTestOptionsImpl(
+      config_path_, "", version, validation_config, concurrency, drain_time, drain_strategy,
+      use_bootstrap_node_metadata, std::move(config_proto_)));
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;
@@ -209,10 +214,10 @@ void IntegrationTestServer::threadRoutine(
                           watermark_factory);
 }
 
-IntegrationTestServerImpl::IntegrationTestServerImpl(Event::TestTimeSystem& time_system,
-                                                     Api::Api& api, const std::string& config_path,
-                                                     bool use_real_stats)
-    : IntegrationTestServer(time_system, api, config_path) {
+IntegrationTestServerImpl::IntegrationTestServerImpl(
+    Event::TestTimeSystem& time_system, Api::Api& api, const std::string& config_path,
+    bool use_real_stats, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto)
+    : IntegrationTestServer(time_system, api, config_path, std::move(config_proto)) {
   stats_allocator_ =
       (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(symbol_table_)
                       : std::make_unique<Stats::NotifyingAllocatorImpl>(symbol_table_));
