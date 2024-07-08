@@ -323,6 +323,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for `xack`, `xadd`, `xautoclaim`, `xclaim`, `xdel`, `xlen`, `xpending`, `xrange`, `xrevrange`, `xtrim`.
 - area: hot_restart
   change: |
     Added new command-line flag :option:`--skip-hot-restart-parent-stats`.
