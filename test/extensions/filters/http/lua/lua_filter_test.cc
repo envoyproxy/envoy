@@ -898,6 +898,90 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
+// Test verifies that request body is not buffered during Http_call
+// when buffer_body API is set to false;
+TEST_F(LuaHttpFilterTest, HttpCallWithWatermarking) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
+        "hello world",
+        5000)
+      for key, value in pairs(headers) do
+        request_handle:logTrace(key .. " " .. value)
+      end
+      request_handle:logTrace(string.len(body))
+      request_handle:logTrace(body)
+      request_handle:logTrace(string.byte(body, 5))
+      request_handle:logTrace(string.sub(body, 6, 8))
+    end
+  )EOF"};
+
+  InSequence s;
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  // Indicate that buffering body should not happen.
+  proto_config.mutable_buffer_body()->set_value(false);
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            const Http::TestRequestHeaderMapImpl expected_headers{
+                {":method", "POST"},
+                {":path", "/"},
+                {":authority", "foo"},
+
+                {"set-cookie", "flavor=chocolate; Path=/"},
+                {"set-cookie", "variant=chewy; Path=/"},
+                {"content-length", "11"}};
+            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+            // The parent span always be set for lua http call.
+            EXPECT_NE(options.parent_span_, nullptr);
+
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
+
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
+  response_message->body().add(response, 8);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(std::string("resp\0nse", 8))));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("nse")));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
+  callbacks->onSuccess(request, std::move(response_message));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+//==
 // HTTP request flow with multiple header values for same header name.
 TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
   const std::string SCRIPT{R"EOF(
