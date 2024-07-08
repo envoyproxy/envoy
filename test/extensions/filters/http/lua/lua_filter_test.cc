@@ -981,7 +981,6 @@ TEST_F(LuaHttpFilterTest, HttpCallWithWatermarking) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-//==
 // HTTP request flow with multiple header values for same header name.
 TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
   const std::string SCRIPT{R"EOF(
