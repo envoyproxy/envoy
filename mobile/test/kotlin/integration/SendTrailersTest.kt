@@ -1,6 +1,12 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
+import io.envoyproxy.envoy.config.route.v3.HeaderMatcher
+import io.envoyproxy.envoy.type.matcher.v3.StringMatcher
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -43,28 +49,16 @@ class SendTrailersTest {
   @Test
   fun `successful sending of trailers`() {
     val expectation = CountDownLatch(1)
-    val match = io.envoyproxy.envoy.type.matcher.v3.StringMatcher.newBuilder().setExact("test.code")
-    val trailers =
-      io.envoyproxy.envoy.config.route.v3.HeaderMatcher.newBuilder()
-        .setName("test-trailer")
-        .setStringMatch(match)
-        .build()
-    val headers_match =
-      io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch.newBuilder()
-        .addHeaders(trailers)
-        .build()
-    val match_config =
-      io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate.newBuilder()
-        .setHttpRequestTrailersMatch(headers_match)
-        .build()
-    val config_proto =
-      envoymobile.extensions.filters.http.assertion.Filter.Assertion.newBuilder()
-        .setMatchConfig(match_config)
-        .build()
-    var any_proto =
-      com.google.protobuf.Any.newBuilder()
+    StringMatcher.newBuilder().setExact("test.code")
+    val match = StringMatcher.newBuilder().setExact("test.code")
+    val trailers = HeaderMatcher.newBuilder().setName("test-trailer").setStringMatch(match).build()
+    val headersMatch = HttpHeadersMatch.newBuilder().addHeaders(trailers).build()
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestTrailersMatch(headersMatch).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
         .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
-        .setValue(config_proto.toByteString())
+        .setValue(configProto.toByteString())
         .build()
 
     val engine =
@@ -72,7 +66,10 @@ class SendTrailersTest {
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", String(any_proto.toByteArray()))
+        .addNativeFilter(
+          "envoy.filters.http.assertion",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     val client = engine.streamClient()

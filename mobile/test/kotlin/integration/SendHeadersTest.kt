@@ -1,6 +1,12 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
+import io.envoyproxy.envoy.config.route.v3.HeaderMatcher
+import io.envoyproxy.envoy.type.matcher.v3.StringMatcher
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -41,43 +47,28 @@ class SendHeadersTest {
     val headersExpectation = CountDownLatch(1)
 
     val match1 =
-      io.envoyproxy.envoy.config.route.v3.HeaderMatcher.newBuilder()
+      HeaderMatcher.newBuilder()
         .setName(":method")
-        .setStringMatch(
-          io.envoyproxy.envoy.type.matcher.v3.StringMatcher.newBuilder().setExact("GET")
-        )
+        .setStringMatch(StringMatcher.newBuilder().setExact("GET"))
         .build()
     val match2 =
-      io.envoyproxy.envoy.config.route.v3.HeaderMatcher.newBuilder()
+      HeaderMatcher.newBuilder()
         .setName(":scheme")
-        .setStringMatch(
-          io.envoyproxy.envoy.type.matcher.v3.StringMatcher.newBuilder().setExact("https")
-        )
+        .setStringMatch(StringMatcher.newBuilder().setExact("https"))
         .build()
     val match3 =
-      io.envoyproxy.envoy.config.route.v3.HeaderMatcher.newBuilder()
+      HeaderMatcher.newBuilder()
         .setName(":path")
-        .setStringMatch(
-          io.envoyproxy.envoy.type.matcher.v3.StringMatcher.newBuilder().setExact("/simple.txt")
-        )
+        .setStringMatch(StringMatcher.newBuilder().setExact("/simple.txt"))
         .build()
-    val headers_match =
-      io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch.newBuilder()
-        .addHeaders(match1)
-        .addHeaders(match2)
-        .addHeaders(match3)
-    val match_config =
-      io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate.newBuilder()
-        .setHttpRequestHeadersMatch(headers_match)
-        .build()
-    val config_proto =
-      envoymobile.extensions.filters.http.assertion.Filter.Assertion.newBuilder()
-        .setMatchConfig(match_config)
-        .build()
-    var any_proto =
-      com.google.protobuf.Any.newBuilder()
+    val headersMatch =
+      HttpHeadersMatch.newBuilder().addHeaders(match1).addHeaders(match2).addHeaders(match3)
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestHeadersMatch(headersMatch).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
         .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
-        .setValue(config_proto.toByteString())
+        .setValue(configProto.toByteString())
         .build()
 
     val engine =
@@ -85,7 +76,10 @@ class SendHeadersTest {
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", String(any_proto.toByteArray()))
+        .addNativeFilter(
+          "envoy.filters.http.assertion",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
     val client = engine.streamClient()
 

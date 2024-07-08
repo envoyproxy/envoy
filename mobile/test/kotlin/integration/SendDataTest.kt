@@ -1,6 +1,11 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch.GenericTextMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -46,27 +51,14 @@ class SendDataTest {
   fun `successful sending data`() {
     val expectation = CountDownLatch(1)
 
-    val string_match =
-      io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch.GenericTextMatch
-        .newBuilder()
-        .setStringMatch("request body")
-        .build()
-    val match =
-      io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch.newBuilder()
-        .addPatterns(string_match)
-        .build()
-    val match_config =
-      io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate.newBuilder()
-        .setHttpRequestGenericBodyMatch(match)
-        .build()
-    val config_proto =
-      envoymobile.extensions.filters.http.assertion.Filter.Assertion.newBuilder()
-        .setMatchConfig(match_config)
-        .build()
-    var any_proto =
-      com.google.protobuf.Any.newBuilder()
+    val stringMatch = GenericTextMatch.newBuilder().setStringMatch("request body").build()
+    val match = HttpGenericBodyMatch.newBuilder().addPatterns(stringMatch).build()
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestGenericBodyMatch(match).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
         .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
-        .setValue(config_proto.toByteString())
+        .setValue(configProto.toByteString())
         .build()
 
     val engine =
@@ -74,7 +66,10 @@ class SendDataTest {
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", String(any_proto.toByteArray()))
+        .addNativeFilter(
+          "envoy.filters.http.assertion",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     val client = engine.streamClient()

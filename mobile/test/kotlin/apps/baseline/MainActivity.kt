@@ -8,6 +8,8 @@ import android.util.Log
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
@@ -46,13 +48,12 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
     val config =
-      String(
-        com.google.protobuf.Any.newBuilder()
-          .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
-          .setValue(com.google.protobuf.ByteString.empty())
-          .build()
-          .toByteArray()
-      )
+      Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+        .setValue(ByteString.empty())
+        .build()
+        .toByteArray()
+        .toString(Charsets.UTF_8)
 
     engine =
       AndroidEngineBuilder(application)

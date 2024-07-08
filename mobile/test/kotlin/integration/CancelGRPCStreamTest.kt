@@ -1,6 +1,8 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -69,12 +71,12 @@ class CancelGRPCStreamTest {
   @Test
   fun `cancel grpc stream calls onCancel callback`() {
 
-    var any_proto =
-      com.google.protobuf.Any.newBuilder()
+    var anyProto =
+      Any.newBuilder()
         .setTypeUrl(
           "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
         )
-        .setValue(com.google.protobuf.ByteString.empty())
+        .setValue(ByteString.empty())
         .build()
 
     val engine =
@@ -85,7 +87,10 @@ class CancelGRPCStreamTest {
           name = "cancel_validation_filter",
           factory = { CancelValidationFilter(filterExpectation) }
         )
-        .addNativeFilter("envoy.filters.http.local_error", String(any_proto.toByteArray()))
+        .addNativeFilter(
+          "envoy.filters.http.local_error",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     val client = GRPCClient(engine.streamClient())

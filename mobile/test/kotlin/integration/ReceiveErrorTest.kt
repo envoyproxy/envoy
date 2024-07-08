@@ -2,6 +2,8 @@ package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -85,11 +87,8 @@ class ReceiveErrorTest {
         )
         .build()
 
-    var any_proto =
-      com.google.protobuf.Any.newBuilder()
-        .setTypeUrl(LOCAL_ERROR_FILTER_TYPE)
-        .setValue(com.google.protobuf.ByteString.empty())
-        .build()
+    var anyProto =
+      Any.newBuilder().setTypeUrl(LOCAL_ERROR_FILTER_TYPE).setValue(ByteString.empty()).build()
 
     val engine =
       EngineBuilder()
@@ -99,7 +98,10 @@ class ReceiveErrorTest {
           name = FILTER_NAME,
           factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
         )
-        .addNativeFilter("envoy.filters.http.local_error", String(any_proto.toByteArray()))
+        .addNativeFilter(
+          "envoy.filters.http.local_error",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     var errorCode: Int? = null
