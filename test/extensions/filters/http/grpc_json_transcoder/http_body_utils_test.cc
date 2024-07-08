@@ -7,7 +7,10 @@
 #include "test/proto/bookstore.pb.h"
 
 #include "google/api/httpbody.pb.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::ElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +18,7 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 namespace {
 
-using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
 
 class HttpBodyUtilsTest : public testing::Test {
 public:
@@ -42,7 +45,7 @@ public:
     {
       Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
       HttpBodyUtils::appendHttpBodyEnvelope(*message_buffer, body_field_path_, content_type,
-                                            content.length(), UnknownVariableBindings{});
+                                            content.length(), UnknownQueryParams{});
       message_buffer->add(content);
 
       Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
@@ -59,7 +62,7 @@ public:
     {
       Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
       HttpBodyUtils::appendHttpBodyEnvelope(*message_buffer, body_field_path_, content_type,
-                                            content.length(), UnknownVariableBindings{});
+                                            content.length(), UnknownQueryParams{});
       message_buffer->add(content);
 
       google::api::HttpBody http_body;
@@ -83,14 +86,16 @@ public:
   std::vector<const ProtobufWkt::Field*> body_field_path_;
 };
 
-TEST_F(HttpBodyUtilsTest, UnknownVariableBindingsAppearInExtension) {
+TEST_F(HttpBodyUtilsTest, UnknownQueryParamsAppearInExtension) {
   Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
-  UnknownVariableBindings unknown_variables;
-  (*unknown_variables.mutable_bindings())["foo"] = "bar";
+  UnknownQueryParams unknown_params;
+  auto& foo_key = (*unknown_params.mutable_key())["foo"];
+  foo_key.add_values("bar");
+  foo_key.add_values("baz");
   const std::string content = "abcd";
   const std::string content_type = "text/plain";
   HttpBodyUtils::appendHttpBodyEnvelope(*message_buffer, {}, content_type, content.length(),
-                                        unknown_variables);
+                                        unknown_params);
   message_buffer->add(content);
 
   Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
@@ -103,11 +108,11 @@ TEST_F(HttpBodyUtilsTest, UnknownVariableBindingsAppearInExtension) {
   ASSERT_EQ(http_body.extensions_size(), 1);
   ASSERT_EQ(http_body.extensions(0).type_url(),
             "type.googleapis.com/"
-            "envoy.extensions.filters.http.grpc_json_transcoder.v3.UnknownVariableBindings");
-  UnknownVariableBindings unknown_vars_out;
+            "envoy.extensions.filters.http.grpc_json_transcoder.v3.UnknownQueryParams");
+  UnknownQueryParams unknown_vars_out;
   http_body.extensions(0).UnpackTo(&unknown_vars_out);
-  ASSERT_TRUE(unknown_vars_out.bindings().contains("foo"));
-  EXPECT_EQ(unknown_vars_out.bindings().at("foo"), "bar");
+  ASSERT_TRUE(unknown_vars_out.key().contains("foo"));
+  EXPECT_THAT(unknown_vars_out.key().at("foo").values(), ElementsAre("bar", "baz"));
 }
 
 TEST_F(HttpBodyUtilsTest, EmptyFieldsList) {

@@ -20,8 +20,8 @@ public:
   static void appendHttpBodyEnvelope(
       Buffer::Instance& output, const std::vector<const Protobuf::Field*>& request_body_field_path,
       std::string content_type, uint64_t content_length,
-      const envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings&
-          unknown_bindings);
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams&
+          unknown_params);
 };
 
 } // namespace GrpcJsonTranscoder

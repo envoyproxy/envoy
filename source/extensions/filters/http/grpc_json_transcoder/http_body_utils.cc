@@ -4,7 +4,7 @@
 
 #include "google/api/httpbody.pb.h"
 
-using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
 using Envoy::Protobuf::io::CodedInputStream;
 using Envoy::Protobuf::io::CodedOutputStream;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
@@ -64,8 +64,7 @@ bool HttpBodyUtils::parseMessageByFieldPath(
 
 void HttpBodyUtils::appendHttpBodyEnvelope(
     Buffer::Instance& output, const std::vector<const Protobuf::Field*>& request_body_field_path,
-    std::string content_type, uint64_t content_length,
-    const UnknownVariableBindings& unknown_bindings) {
+    std::string content_type, uint64_t content_length, const UnknownQueryParams& unknown_params) {
   // Manually encode the protobuf envelope for the body.
   // See https://developers.google.com/protocol-buffers/docs/encoding#embedded for wire format.
 
@@ -79,8 +78,8 @@ void HttpBodyUtils::appendHttpBodyEnvelope(
 
     ::google::api::HttpBody body;
     body.set_content_type(std::move(content_type));
-    if (!unknown_bindings.bindings().empty()) {
-      body.add_extensions()->PackFrom(unknown_bindings);
+    if (!unknown_params.key().empty()) {
+      body.add_extensions()->PackFrom(unknown_params);
     }
 
     uint64_t envelope_size = body.ByteSizeLong() +

@@ -44,7 +44,7 @@ using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
 using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
-using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
 
 namespace Envoy {
 namespace Extensions {
@@ -331,7 +331,7 @@ absl::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info,
-    UnknownVariableBindings& unknown_bindings) const {
+    UnknownQueryParams& unknown_params) const {
 
   ASSERT(!disabled_);
   const std::string method(headers.getMethodValue());
@@ -367,7 +367,7 @@ absl::Status JsonTranscoderConfig::createTranscoder(
     if (!status.ok()) {
       if (capture_unknown_query_parameters_) {
         auto binding_key = absl::StrJoin(binding.field_path, ".");
-        (*unknown_bindings.mutable_bindings())[binding_key] = binding.value;
+        (*unknown_params.mutable_key())[binding_key].add_values(binding.value);
         continue;
       } else if (ignore_unknown_query_parameters_) {
         continue;
@@ -473,7 +473,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   }
 
   const auto status = per_route_config_->createTranscoder(headers, request_in_, response_in_,
-                                                          transcoder_, method_, unknown_bindings_);
+                                                          transcoder_, method_, unknown_params_);
 
   if (!status.ok()) {
     ENVOY_STREAM_LOG(debug, "Failed to transcode request headers: {}", *decoder_callbacks_,
@@ -914,7 +914,7 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage(Buffer::Instance* dat
   message_payload.move(initial_request_data_);
   HttpBodyUtils::appendHttpBodyEnvelope(message_payload, method_->request_body_field_path,
                                         std::move(content_type_), request_data_.length(),
-                                        unknown_bindings_);
+                                        unknown_params_);
   content_type_.clear();
   stats_->transcoder_request_buffer_bytes_.sub(request_data_.length());
   message_payload.move(request_data_);
