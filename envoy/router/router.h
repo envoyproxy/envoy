@@ -449,6 +449,12 @@ public:
                                        DoRetryResetCallback callback) PURE;
 
   /**
+   * Determine whether a failed request on connection failure should be retried.
+   * @return whether a connection failure should be reattempted.
+   */
+  virtual bool shouldRetryOnConnectionFailure() const PURE;
+
+  /**
    * Determine whether a "hedged" retry should be sent after the per try
    * timeout expires. This means the original request is not canceled, but a
    * new one is sent to hedge against the original request taking even longer.

@@ -299,12 +299,16 @@ using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
+               public Http::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
+        ensure_connection_retry_(
+            Runtime::runtimeFeatureEnabled("envoy.restart_features.ensure_connection_retry")),
+        increased_retry_shadow_buffer_limit_until_got_connection_(false),
         request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
                                                "envoy.reloadable_features.streaming_shadow")) {}
 
@@ -476,6 +480,8 @@ public:
   bool downstreamEndStream() const override { return downstream_end_stream_; }
   uint32_t attemptCount() const override { return attempt_count_; }
   const std::list<UpstreamRequestPtr>& upstreamRequests() const { return upstream_requests_; }
+  // Http::UpstreamCallbacks
+  void onUpstreamConnectionEstablished() override;
 
   TimeSource& timeSource() { return config_->timeSource(); }
   const Route* route() const { return route_.get(); }
@@ -518,6 +524,7 @@ private:
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
+  void giveUpRetryAndShadow();
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
   void onRequestComplete();
@@ -593,7 +600,12 @@ private:
   absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+
+  // The amount of byte we are willing to buffer before giving up on retrying and shadow.
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  // Similar retry_shadow_buffer_limit_ above, expect number of byte we are willing to buffer until
+  // we get a connection with an upstream.
+  uint32_t retry_connection_failure_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
@@ -603,6 +615,17 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
+  // mapped to the runtime guard "envoy.restart_features.ensure_connection_retry"
+  // on router creation.
+  bool ensure_connection_retry_ : 1;
+  // Set to true when ensure_connection_retry_ above is true, retry on connection-failure is
+  // enabled, and the router is waiting to get an upcoming connection from an upstream.
+  // This will potentially increase the limit to which we are willing to buffer in order to ensure
+  // we retry the connection failure.
+  // increased_retry_shadow_buffer_limit_until_got_connection_
+  bool increased_retry_shadow_buffer_limit_until_got_connection_ : 1;
+  // Set to true when retrying on connection error, buffer limit has been exceeded and
+  // the router hasn't got any connection with upstream.
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;

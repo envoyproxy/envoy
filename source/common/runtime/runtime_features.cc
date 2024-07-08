@@ -152,6 +152,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_if_no_connections);
 // TODO(adisuissa): flip to true after this is out of alpha mode.
 FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
+// TODO(fl0Lec): flip this to true after some test time.
+FALSE_RUNTIME_GUARD(envoy_restart_features_ensure_connection_retry);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

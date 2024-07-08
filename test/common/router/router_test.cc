@@ -2950,6 +2950,88 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+class RouterConnectFailureTest : public RouterTest {
+public:
+  RouterConnectFailureTest() {
+    scoped_runtime_.mergeValues({{"envoy.restart_features.ensure_connection_retry", "true"}});
+    // Recreate router filter.
+    router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+    router_->setDecoderFilterCallbacks(callbacks_);
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(host_address_);
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
+  }
+
+protected:
+  TestScopedRuntime scoped_runtime_;
+};
+
+// Test retrying a request on connect failure, when the first attempt fails while the client
+// is sending the body, with the rest of the request arriving in between upstream
+// request attempts, and wait to get a new connection.
+TEST_F(RouterConnectFailureTest, RetryRequestConnectFailureBodyBufferLimitExceeded) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillRepeatedly(Return(64));
+
+  std::function<void()> conn_pool_callback;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
+        conn_pool_callback = [&]() {
+          callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                  absl::string_view(), cm_.thread_local_cluster_.conn_pool_.host_);
+        };
+        return &cancellable_;
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "connect-failure"},
+                                         {"x-envoy-internal", "true"},
+                                         {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->retry_connection_failure = true;
+  router_->decodeHeaders(headers, false);
+  // Reduce the retry_shadow_buffer_limit
+  router_->setRetryShadowBufferLimit(20);
+
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  const std::string body1(50, 'a');
+  Buffer::OwnedImpl buf1(body1);
+  router_->decodeData(buf1, false);
+
+  // Trigger retry.
+  router_->retry_state_->expectResetRetry();
+  conn_pool_callback();
+  ASSERT(router_->retry_state_->callback_ != nullptr);
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  router_->retry_state_->callback_();
+
+  // Simulate router got connection with upstream.
+  router_->onUpstreamConnectionEstablished();
+
+  const std::string body2("body");
+  Buffer::OwnedImpl buf2(body2);
+  router_->decodeData(buf2, false);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  // Verify number of retries and retry_or_shadow_abandoned metrics.
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+  EXPECT_EQ(router_->attemptCount(), 2);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+}
+
 // Two requests are sent (slow request + hedged retry) and then global timeout
 // is hit. Verify everything gets cleaned up.
 TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
