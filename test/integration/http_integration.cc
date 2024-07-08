@@ -994,7 +994,6 @@ void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   // We should get no new stream/retry
-  // waitForNextUpstreamRequest(); // Should fail
   ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   cleanupUpstreamAndDownstream();
 }
