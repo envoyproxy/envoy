@@ -62,6 +62,9 @@ minor_behavior_changes:
 - area: http
   change: |
     Fixed host header changes for shadow requests to properly handle ipv6 addresses.
+  change: |
+    Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
 - area: tracers
   change: |
     Set status code for OpenTelemetry tracers (previously unset).

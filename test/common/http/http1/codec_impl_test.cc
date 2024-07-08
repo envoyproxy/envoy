@@ -3511,8 +3511,6 @@ TEST_P(Http1ServerConnectionImplTest, ManyLargeRequestHeadersAccepted) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
-  TestScopedRuntime scoped_runtime;
-
   // No readDisable for normal non-piped HTTP request.
   {
     initialize();
@@ -3549,8 +3547,6 @@ TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
 // Tests the scenario where the client sends pipelined requests and the requests reach Envoy at the
 // same time.
 TEST_P(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
-  TestScopedRuntime scoped_runtime;
-
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -3585,8 +3581,6 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
 // Tests the scenario where the client sends pipelined requests. The second request reaches Envoy
 // before the end of the first request.
 TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
-  TestScopedRuntime scoped_runtime;
-
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -5306,6 +5300,10 @@ TEST_P(Http1ClientConnectionImplTest, HeaderNameInvalidCR) {
 // https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
 // https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
 TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "true"}});
+
   initialize();
 
   InSequence sequence;
@@ -5345,7 +5343,54 @@ TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
 // or TAB, but CR is forbidden:
 // https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
 // https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
+TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCRAccept) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+
+  // With the runtime flag false, BalsaParser accepts the message. However,
+  // since chunk extensions are ignored and the body is reframed, the offending
+  // CR is not proxied.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "false"}});
+
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_CALL(decoder, decodeData(BufferStringEqual("Hello World"), false));
+  EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6;\ra\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0u, buffer.length());
+}
+
+// The ';' between chunk length and chunk extension may be surrounded by space
+// or TAB, but CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
 TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "true"}});
+
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -5374,6 +5419,49 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
     EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
 #endif
   }
+}
+
+// The ';' between chunk length and chunk extension may be surrounded by space
+// or TAB, but CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
+TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCRAccept) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+
+  // With the runtime flag false, BalsaParser accepts the message. However,
+  // since chunk extensions are ignored and the body is reframed, the offending
+  // CR is not proxied.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "false"}});
+
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":authority", "host"},
+  };
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("Hello World"), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6;\ra\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0u, buffer.length());
 }
 
 } // namespace Http
