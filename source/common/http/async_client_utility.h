@@ -48,12 +48,14 @@ public:
   StreamFilterSidestreamWatermarkCallbacks() = default;
 
   void onAboveWriteBufferHighWatermark() final {
+    // Sidestream push back downstream, if callback is configured.
     if (decode_callback_ != nullptr) {
       decode_callback_->onDecoderFilterAboveWriteBufferHighWatermark();
     } else {
       // TODO(tyxia) Log
     }
 
+    // Sidestream push back upstream, if callback is configured.
     if (encode_callback_ != nullptr) {
       encode_callback_->onEncoderFilterAboveWriteBufferHighWatermark();
     } else {
@@ -89,39 +91,6 @@ private:
   Http::StreamDecoderFilterCallbacks* decode_callback_ = nullptr;
   Http::StreamEncoderFilterCallbacks* encode_callback_ = nullptr;
 };
-
-// TODO(tyxia) Remove, This class is merged into class above, which can be either decoder filter
-// only or dual filter.
-// /**
-//  * Sidestream watermark callback implementation for stream decoder filter that handles decoding.
-//  */
-// class StreamDecoderFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermarkCallbacks
-// { public:
-//   StreamDecoderFilterSidestreamWatermarkCallbacks() = default;
-
-//   void onAboveWriteBufferHighWatermark() final {
-//     if (callback_ != nullptr) {
-//       callback_->onDecoderFilterAboveWriteBufferHighWatermark();
-//     } else {
-//     }
-//   }
-
-//   void onBelowWriteBufferLowWatermark() final {
-//     if (callback_ != nullptr) {
-//       callback_->onDecoderFilterBelowWriteBufferLowWatermark();
-//     } else {
-//     }
-//   }
-
-//   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* callback) {
-//     callback_ = callback;
-//   }
-
-//   void resetFilterCallbacks() { callback_ = nullptr; }
-
-// private:
-//   Http::StreamDecoderFilterCallbacks* callback_ = nullptr;
-// };
 
 } // namespace Http
 } // namespace Envoy
