@@ -495,8 +495,8 @@ TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
 
   auto inner_factory = std::make_unique<Network::MockTransportSocketFactory>();
   EXPECT_CALL(*inner_factory, createTransportSocket(_, _))
-      .WillOnce(Invoke([&](Network::TransportSocketOptionsConstSharedPtr,
-                           std::shared_ptr<const Upstream::HostDescription>) {
+      .WillRepeatedly(Invoke([&](Network::TransportSocketOptionsConstSharedPtr,
+                                 std::shared_ptr<const Upstream::HostDescription>) {
         auto mts = std::make_unique<Network::MockTransportSocket>();
         testing::Mock::AllowLeak(mts.get());
         return mts;
@@ -508,7 +508,6 @@ TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
   auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
 
   EXPECT_THAT(factory->createTransportSocket(tso, hd).release(), testing::NotNull());
-  return;
   UpstreamHttp11ConnectSocket* ts =
       static_cast<UpstreamHttp11ConnectSocket*>(factory->createTransportSocket(tso, hd).release());
   EXPECT_THAT(ts, testing::NotNull());
