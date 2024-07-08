@@ -187,7 +187,7 @@ private:
   // Actual config used for the current request. Is config_ by default, but can be overridden by
   // per-route config.
   const FilterConfig* used_config_{};
-  OptRef<Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
+  OptRef<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
 
   VhRateLimitOptions vh_rate_limits_;
 };

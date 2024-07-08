@@ -63,7 +63,7 @@ public:
 
   virtual uint32_t maxTokens() const PURE;
   virtual uint32_t remainingTokens() const PURE;
-  virtual absl::optional<double> remainingFillInterval() const PURE;
+  virtual absl::optional<int64_t> remainingFillInterval() const PURE;
 };
 
 class RateLimitTokenBucket : public TokenBucketContext {
@@ -91,7 +91,7 @@ public:
   double fillRate() const override { return fill_rate_; }
   uint32_t maxTokens() const override { return max_tokens_; }
   uint32_t remainingTokens() const override { return tokens_.load(); }
-  absl::optional<double> remainingFillInterval() const override;
+  absl::optional<int64_t> remainingFillInterval() const override;
 
   // Descriptor refill interval is a multiple of the timer refill interval.
   // For example, if the descriptor refill interval is 150ms and the global

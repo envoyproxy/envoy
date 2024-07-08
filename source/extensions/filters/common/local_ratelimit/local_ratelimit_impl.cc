@@ -5,7 +5,6 @@
 
 #include "envoy/runtime/runtime.h"
 
-#include "local_ratelimit_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -88,7 +87,9 @@ TimerTokenBucket::TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill
   fill_time_ = parent_.time_source_.monotonicTime();
 }
 
-absl::optional<double> TimerTokenBucket::remainingFillInterval() const {
+absl::optional<int64_t> TimerTokenBucket::remainingFillInterval() const {
+  using namespace std::literals;
+
   const auto time_after_last_fill = std::chrono::duration_cast<std::chrono::milliseconds>(
       parent_.time_source_.monotonicTime() - fill_time_.load());
 
@@ -98,9 +99,8 @@ absl::optional<double> TimerTokenBucket::remainingFillInterval() const {
     return {};
   }
 
-  return std::chrono::duration_cast<std::chrono::duration<double>>(fill_interval_ -
-                                                                   time_after_last_fill)
-      .count();
+  return absl::ToInt64Seconds(absl::FromChrono(fill_interval_) -
+                              absl::Seconds((time_after_last_fill) / 1s));
 }
 
 bool TimerTokenBucket::consume(double) {
@@ -263,18 +263,29 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
   // See if the request is forbidden by any of the matched descriptors.
   for (auto descriptor : matched_descriptors) {
     if (!descriptor->consume(share_factor)) {
+      // If the request is forbidden by a descriptor, return the result and the descriptor
+      // token bucket.
       return {false, makeOptRefFromPtr<TokenBucketContext>(descriptor)};
     }
   }
 
   // See if the request is forbidden by the default token bucket.
   if (matched_descriptors.empty() || always_consume_default_token_bucket_) {
-    return {default_token_bucket_->consume(share_factor),
-            makeOptRefFromPtr<TokenBucketContext>(default_token_bucket_.get())};
+    if (const bool result = default_token_bucket_->consume(share_factor); !result) {
+      // If the request is forbidden by the default token bucket, return the result and the
+      // default token bucket.
+      return {false, makeOptRefFromPtr<TokenBucketContext>(default_token_bucket_.get())};
+    }
+
+    // If the request is allowed then return the result the token bucket. The descriptor
+    // token bucket will be selected as priority if it exists.
+    return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors.empty()
+                                                            ? default_token_bucket_.get()
+                                                            : matched_descriptors[0])};
   };
 
-  return {true, makeOptRefFromPtr<TokenBucketContext>(
-                    matched_descriptors.empty() ? nullptr : matched_descriptors[0])};
+  ASSERT(!matched_descriptors.empty());
+  return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors[0])};
 }
 
 } // namespace LocalRateLimit

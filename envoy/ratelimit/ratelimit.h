@@ -73,7 +73,7 @@ struct LocalDescriptor {
 
   std::string toString() const {
     return absl::StrJoin(entries_, ", ", [](std::string* out, const auto& e) {
-      absl::StrAppend(out, e.key_, '=', e.value_);
+      absl::StrAppend(out, e.key_, "=", e.value_);
     });
   }
 
