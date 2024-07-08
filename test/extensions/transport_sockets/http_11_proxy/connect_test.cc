@@ -507,9 +507,9 @@ TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
   auto hd = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
 
-  EXPECT_THAT(factory->createTransportSocket(tso, hd).release(), testing::NotNull());
-  UpstreamHttp11ConnectSocket* ts =
-      static_cast<UpstreamHttp11ConnectSocket*>(factory->createTransportSocket(tso, hd).release());
+  auto tsptr = factory->createTransportSocket(tso, hd);
+  EXPECT_THAT(tsptr.get(), testing::NotNull());
+  UpstreamHttp11ConnectSocket* ts = static_cast<UpstreamHttp11ConnectSocket*>(tsptr.get());
   EXPECT_THAT(ts, testing::NotNull());
 
   // We never set any filter state metadata, so check if the factory gets the proxy address and that
@@ -687,8 +687,8 @@ TEST_F(SocketConfigFactoryTest, VerifyConfigPropagatesProxyAddr) {
   using MockHost = NiceMock<Upstream::MockHostDescription>;
   auto host = std::make_shared<MockHost>();
   auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
-  auto sock = static_cast<UpstreamHttp11ConnectSocket*>(
-      factory->createTransportSocket(tso, host).release());
+  auto ts = factory->createTransportSocket(tso, host);
+  auto sock = static_cast<UpstreamHttp11ConnectSocket*>(ts.get());
 
   EXPECT_FALSE(sock->legacyBehavior());
 }
