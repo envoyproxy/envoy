@@ -13,8 +13,8 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/tls/client_ssl_socket.h"
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/test_common/network_utility.h"

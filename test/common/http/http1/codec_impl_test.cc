@@ -2914,6 +2914,40 @@ TEST_P(Http1ClientConnectionImplTest, EarlyHintHeaders) {
   EXPECT_TRUE(status.ok());
 }
 
+// 104 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
+TEST_P(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // As per Resumable Uploads for HTTP draft, the upload-draft-interop-version header
+  // must be passed through with 104 responses.
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_))
+      .WillOnce(Invoke([&](ResponseHeaderMapPtr& headers) {
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version")).size(), 1);
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]
+                      ->value()
+                      .getStringView(),
+                  "4");
+      }));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl initial_response(
+      "HTTP/1.1 104 Upload Resumption Supported\r\nUpload-Draft-Interop-Version: 4\r\n\r\n");
+  auto status = codec_->dispatch(initial_response);
+  EXPECT_TRUE(status.ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
+  status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
+}
+
 // Multiple 100 responses are passed to the response encoder (who is responsible for coalescing).
 TEST_P(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
   initialize();
@@ -4839,10 +4873,11 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
-// When receiving header value with obsolete line folding, `obs-fold` should be replaced by SP.
-// This is http-parser's behavior. BalsaParser does not support obsolete line folding and rejects
-// such messages (also permitted by the specification). See RFC9110 Section 5.5:
-// https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
+// When receiving a message with obsolete line folding, `obs-fold` should be replaced by one or more
+// SP characters, see RFC9110 Section 5.5:
+// https://www.rfc-editor.org/rfc/rfc9112.html#name-obsolete-line-folding.
+// However, both http-parser and BalsaParser simply strip the `\r\n`, and keep the SP or TAB at the
+// beginning of the next line.
 TEST_P(Http1ServerConnectionImplTest, ObsFold) {
   // SPELLCHECKER(off)
   initialize();

@@ -31,7 +31,6 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_abort_filter_chain_on_stream_reset);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_zombie_streams);
-RUNTIME_GUARD(envoy_reloadable_features_check_mep_on_first_eject);
 RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshake);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
@@ -72,6 +71,7 @@ RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_host_for_preresolve_dfp_dns);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
+RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
 RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
@@ -153,6 +153,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_if_no_connections);
 // TODO(adisuissa): flip to true after this is out of alpha mode.
 FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
+// TODO(fredyw): evaluate and either make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

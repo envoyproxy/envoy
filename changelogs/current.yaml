@@ -46,15 +46,6 @@ behavior_changes:
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
-- area: ext_proc
-  change: |
-    Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
-    is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode that can be used by external
-    processor to observe Envoy data and status.
-- area: grpc
-  change: |
-    Added support for flow control in Envoy gRPC side stream. This behavior can be disabled by setting the runtime flag
-    ``envoy.reloadable_features.grpc_side_stream_flow_control`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -139,6 +130,12 @@ minor_behavior_changes:
   change: |
     Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
     guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
+- area: http
+  change: |
+    http: envoy will now proxy 104 headers from upstream, though as with 100s only the first 1xx response
+    headers will be sent.104 headers are designated by ietf's draft-ietf-httpbis-resumable-upload rfc.
+    This behavioral can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.proxy_104`` to ``false``.
 - area: jwt_authn
   change: |
     Changes the behavior of the
@@ -246,6 +243,9 @@ bug_fixes:
 - area: datadog
   change: |
     Bumped the version of datadog to resolve a crashing bug in earlier versions of the library.
+- area: lua
+  change: |
+    Fixed a bug where the user data will reference a dangling pointer to the Lua state and cause a crash.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -312,6 +312,9 @@ removed_config_or_runtime:
 - area: jwt
   change: |
     Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
+- area: outlier detection
+  change: |
+    Removed ``envoy.reloadable_features.check_mep_on_first_eject`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` runtime flag and legacy code paths.
@@ -421,6 +424,10 @@ new_features:
     to listen to file changes and dynamically update the response when :ref:`watched_directory
     <envoy_v3_api_field_config.core.v3.datasource.watched_directory>`
     is configured in :ref:`DataSource <envoy_v3_api_msg_config.core.v3.datasource>`.
+- area: outlier detection
+  change: |
+    Added :ref:`always_eject_one_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.always_eject_one_host>`
+    to optionally override the :ref:`max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`.
 - area: listener
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
@@ -452,6 +459,19 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
     An additional field ``oid`` is added to :ref:`SubjectAltNameMatcher
     <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>` to support this change.
+- area: ext_proc
+  change: |
+    Added support for observability mode which deprecates ``async_mode``. If enabled, each part of the HTTP request or response
+    specified by ProcessingMode is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode
+    that can be used by external processor to observe Envoy data and status.
+- area: grpc
+  change: |
+    Added support for flow control in Envoy gRPC side stream. This behavior can be disabled by setting the runtime flag
+    ``envoy.reloadable_features.grpc_side_stream_flow_control`` to false.
+- area: oauth
+  change: |
+    Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_id_token_set_cookie>`
+    to disable setting the ID Token cookie.
 
 deprecated:
 - area: tracing
