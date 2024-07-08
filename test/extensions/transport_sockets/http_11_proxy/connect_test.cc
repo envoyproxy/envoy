@@ -603,6 +603,8 @@ TEST(ParseTest, CoverResponseBodyHttp10) {
   EXPECT_THAT(parser.parser().contentLength(), Optional(2));
   EXPECT_FALSE(parser.parser().isChunked());
   EXPECT_FALSE(parser.parser().hasTransferEncoding());
+  EXPECT_EQ(Http::Http1::CallbackResult::Success, parser.onUrl(nullptr, 0));
+  parser.onChunkHeader(false);
 }
 
 TEST(ParseTest, CoverResponseBodyHttp11) {
