@@ -134,9 +134,9 @@ public:
     bool shouldAttemptSecondHttp3Connection();
     // This kicks off an HTTP/3 happy eyeballs attempt, connecting to the second
     // address in the host's address list.
-    void attemptSecondHttp3Connection();
-  private:
+    ConnectivityGrid::StreamCreationResult attemptSecondHttp3Connection();
 
+  private:
     // Removes this from the owning list, deleting it.
     void deleteThis();
 

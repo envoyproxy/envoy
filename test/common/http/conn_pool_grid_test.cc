@@ -308,6 +308,71 @@ TEST_F(ConnectivityGridTest, DoubleFailureThenSuccessSerial) {
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
+// Test HTTP/3 attempting to use the alternate pool immediately if it's connected and TCP not
+// delayed.
+TEST_F(ConnectivityGridTest, ThreeParallelConnections) {
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // Force HTTP3 to have recently failed. Theoretically this shouldn't happen if
+  // the alternate pool is in use (Http3 should not have failed recently if it's
+  // working) but test all 3 in parallel just in case some bug allows this to happen.
+  grid_->onZeroRttHandshakeFailed();
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+
+  grid_->getOrCreateHttp3Pool();
+  grid_->getOrCreateHttp2Pool();
+  grid_->createHttp3AlternatePool();
+
+  // Set things up so the H3 pool is unused and the alternate pool is in use.
+  // This will force H3 to attempt the alternate pool immediately.
+  EXPECT_CALL(*grid_->http3Pool(), hasActiveConnections).WillOnce(Return(false));
+  EXPECT_CALL(*grid_->alternate(), hasActiveConnections).WillOnce(Return(true));
+
+  // Expect both pools to get a new stream attempt.
+  EXPECT_CALL(*grid_->http3Pool(), newStream).WillOnce(Return(&cancel_));
+  EXPECT_CALL(*grid_->alternate(), newStream).WillOnce(Return(&cancel_));
+  EXPECT_CALL(*grid_->http2Pool(), newStream).WillOnce(Return(&cancel_));
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data=*/false,
+                    /*can_use_http3_=*/true});
+}
+
+// Same test as above but with the H3 alternate pool succeeding inline no TCP is attempted.
+TEST_F(ConnectivityGridTest, ParallelH3NoTcp) {
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // Force HTTP3 to have recently failed. Theoretically this shouldn't happen if
+  // the alternate pool is in use (Http3 should not have failed recently if it's
+  // working) but test all 3 in parallel just in case some bug allows this to happen.
+  grid_->onZeroRttHandshakeFailed();
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+
+  grid_->getOrCreateHttp3Pool();
+  grid_->getOrCreateHttp2Pool();
+  grid_->createHttp3AlternatePool();
+
+  // Set things up so the H3 pool is unused and the alternate pool is in use.
+  // This will force H3 to attempt the alternate pool immediately.
+  EXPECT_CALL(*grid_->http3Pool(), hasActiveConnections).WillOnce(Return(false));
+  EXPECT_CALL(*grid_->alternate(), hasActiveConnections).WillOnce(Return(true));
+
+  // Expect both pools to get a new stream attempt.
+  EXPECT_CALL(*grid_->http3Pool(), newStream).WillOnce(Return(&cancel_));
+  EXPECT_CALL(*grid_->alternate(), newStream).WillOnce(Return(nullptr));
+  EXPECT_CALL(*grid_->http2Pool(), newStream).Times(0);
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data=*/false,
+                    /*can_use_http3_=*/true});
+}
+
 // Test all three connections in parallel, H3 failing and TCP connecting.
 TEST_F(ConnectivityGridTest, ParallelConnectionsTcpConnects) {
   initialize();

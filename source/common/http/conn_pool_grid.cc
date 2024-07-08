@@ -79,13 +79,14 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
   parent_.onConnectionAttemptFailed(this, reason, transport_failure_reason, host);
 }
 
-void ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
+ConnectivityGrid::StreamCreationResult
+ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
   has_tried_http3_alternate_address_ = true;
   auto attempt =
       std::make_unique<ConnectionAttemptCallbacks>(*this, *grid_.getOrCreateHttp3AlternativePool());
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   // Kick off a new stream attempt.
-  connection_attempts_.front()->newStream();
+  return connection_attempts_.front()->newStream();
 }
 
 bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
@@ -402,8 +403,8 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       overriding_options.can_send_early_data_ = false;
       delay_tcp_attempt = false;
     }
-    if (http3_pool_ && http3_alternate_pool_ &&
-        !http3_pool_->hasActiveConnections() && http3_alternate_pool_->hasActiveConnections()) {
+    if (http3_pool_ && http3_alternate_pool_ && !http3_pool_->hasActiveConnections() &&
+        http3_alternate_pool_->hasActiveConnections()) {
       // If it looks like the main HTTP/3 pool is not functional and the
       // alternate works, don't wait 300ms before attempting to use the
       // alternate pool.
@@ -422,12 +423,14 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // WrappedCallbacks object is queued to be deleted.
     return nullptr;
   }
+  if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
+    if (ret->attemptSecondHttp3Connection() == StreamCreationResult::ImmediateResult) {
+      return nullptr;
+    }
+  }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
     ret->tryAnotherConnection();
-  }
-  if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
-    ret->attemptSecondHttp3Connection();
   }
 
   // Return a handle if the caller hasn't yet been notified of success/failure.
