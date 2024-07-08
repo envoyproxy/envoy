@@ -177,7 +177,7 @@ on_no_match:
   }
 
   void setDestinationPort(uint16_t port) {
-    address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
+    address_ = Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", port, false);
 
     stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
     ON_CALL(callbacks_.connection_.stream_info_, downstreamAddressProvider())

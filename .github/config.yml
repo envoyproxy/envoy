@@ -53,11 +53,6 @@ checks:
     on-run:
     - mobile-compile-time-cc
     - mobile-compile-time-options
-  mobile-core:
-    name: Mobile/Core
-    required: true
-    on-run:
-    - mobile-core
   mobile-coverage:
     name: Mobile/Coverage
     required: true
@@ -258,22 +253,6 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
-  mobile-core:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - api/**/*
-    - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
-    - envoy/**/*
-    - mobile/.bazelrc
-    - mobile/**/*
-    - source/**/*
-    - test/config/**/*
-    - test/integration/*
-    - test/mocks/**/*
-    - test/test_common/**/*
   mobile-format:
     paths:
     - .bazelrc

@@ -789,7 +789,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setBufferAccount(callbacks_->account())
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
+              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
+              .setDiscardResponseBody(true);
       options.setFilterConfig(config_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
@@ -835,8 +836,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
+    if (Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
       upstream_protocol = UpstreamProtocol::UDP;
     } else if (method == Http::Headers::get().MethodValues.Connect ||
                (route_entry_->connectConfig()->allow_post() &&
@@ -1414,7 +1414,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
   const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
+      transport_failure_reason.empty() ? "" : absl::StrCat("|", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 

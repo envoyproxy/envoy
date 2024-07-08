@@ -43,7 +43,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -97,7 +96,6 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       dispatcher_(api_->allocateDispatcher("main_thread")),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -768,7 +766,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
-  runtime().initialize(clusterManager());
+  RETURN_IF_NOT_OK(runtime().initialize(clusterManager()));
 
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
@@ -820,8 +818,9 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),

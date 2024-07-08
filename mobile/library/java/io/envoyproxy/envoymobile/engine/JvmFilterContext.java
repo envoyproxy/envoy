@@ -68,11 +68,8 @@ class JvmFilterContext {
    * @return Object[],   pair of HTTP filter status and optional modified data.
    */
   public Object onRequestData(ByteBuffer data, boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
     return toJniFilterDataStatus(
-        filter.onRequestData(copiedData, endStream, new EnvoyStreamIntel(streamIntel)));
+        filter.onRequestData(data, endStream, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**
@@ -113,11 +110,8 @@ class JvmFilterContext {
    * @return Object[],   pair of HTTP filter status and optional modified data.
    */
   public Object onResponseData(ByteBuffer data, boolean endStream, long[] streamIntel) {
-    // Create a copy of the `data` because the `data` uses direct `ByteBuffer` and the `data` will
-    // be destroyed after calling this callback.
-    ByteBuffer copiedData = ByteBuffers.copy(data);
     return toJniFilterDataStatus(
-        filter.onResponseData(copiedData, endStream, new EnvoyStreamIntel(streamIntel)));
+        filter.onResponseData(data, endStream, new EnvoyStreamIntel(streamIntel)));
   }
 
   /**

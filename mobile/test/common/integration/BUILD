@@ -3,7 +3,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_mobile_package",
-    "envoy_select_envoy_mobile_xds",
     "envoy_select_signal_trace",
 )
 
@@ -14,10 +13,6 @@ envoy_mobile_package()
 envoy_cc_test(
     name = "client_integration_test",
     srcs = ["client_integration_test.cc"],
-    exec_properties = {
-        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
     linkopts = select({
         "@envoy//bazel:apple": [
             # For the TestProxyResolutionApi test.
@@ -43,88 +38,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "rtds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["rtds_integration_test.cc"],
-        "@envoy",
-    ),
-    data = [
-        "@envoy//test/config/integration/certs",
-    ],
-    exec_properties = {
-        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
-    external_deps = [
-        "abseil_strings",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":xds_integration_test_lib",
-        "@envoy//test/test_common:environment_lib",
-        "@envoy//test/test_common:test_runtime_lib",
-        "@envoy//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "cds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["cds_integration_test.cc"],
-        "@envoy",
-    ),
-    data = [
-        "@envoy//test/config/integration/certs",
-    ],
-    exec_properties = {
-        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
-    external_deps = [
-        "abseil_strings",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":xds_integration_test_lib",
-        "@envoy//test/test_common:environment_lib",
-        "@envoy//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "sds_integration_test",
-    srcs = envoy_select_envoy_mobile_xds(
-        ["sds_integration_test.cc"],
-        "@envoy",
-    ),
-    data = [
-        "@envoy//test/config/integration/certs",
-    ],
-    exec_properties = {
-        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
-    repository = "@envoy",
-    deps = [
-        ":xds_integration_test_lib",
-        "@envoy//source/common/config:protobuf_link_hacks",
-        "@envoy//source/common/tls:context_config_lib",
-        "@envoy//source/common/tls:context_lib",
-        "@envoy//source/extensions/transport_sockets/tls:config",
-        "@envoy//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_cc_test_library(
     name = "base_client_integration_test_lib",
     srcs = [
@@ -145,27 +58,6 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "xds_integration_test_lib",
-    srcs = [
-        "xds_integration_test.cc",
-    ],
-    hdrs = [
-        "xds_integration_test.h",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":base_client_integration_test_lib",
-        "@envoy//source/common/config:api_version_lib",
-        "@envoy//source/common/http:rds_lib",
-        "@envoy//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_build_config//:extension_registry",
-        "@envoy_build_config//:test_extensions",
-    ],
-)
-
 # interface libs for test servers` jni implementations
 envoy_cc_test_library(
     name = "test_server_lib",
@@ -180,6 +72,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "//library/common:engine_common_lib",
         "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
@@ -206,35 +99,6 @@ envoy_cc_test_library(
     deps = [
         ":test_server_lib",
     ],
-)
-
-envoy_cc_test_library(
-    name = "xds_test_server_lib",
-    srcs = [
-        "xds_test_server.cc",
-    ],
-    hdrs = [
-        "xds_test_server.h",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":base_client_integration_test_lib",
-        "@envoy//source/common/event:libevent_lib",
-        "@envoy//source/common/tls:context_config_lib",
-        "@envoy//source/common/tls:context_lib",
-        "@envoy//source/common/tls:ssl_socket_lib",
-        "@envoy//source/exe:process_wide_lib",
-        "@envoy//test/integration:autonomous_upstream_lib",
-        "@envoy//test/integration:utility_lib",
-        "@envoy//test/mocks/server:server_factory_context_mocks",
-        "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
-        "@envoy//test/test_common:environment_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-        "@envoy_build_config//:extension_registry",
-    ] + envoy_select_signal_trace(
-        ["@envoy//source/common/signal:sigaction_lib"],
-        "@envoy",
-    ),
 )
 
 envoy_cc_test_library(

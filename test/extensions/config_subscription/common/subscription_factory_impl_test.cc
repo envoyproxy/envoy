@@ -53,18 +53,21 @@ public:
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
-    return subscription_factory_.subscriptionFromConfigSource(
-        config, Config::TypeUrl::get().ClusterLoadAssignment, *stats_store_.rootScope(), callbacks_,
-        resource_decoder_, {});
+    return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
+                                     config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                     *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
+                                 SubscriptionPtr);
   }
 
   SubscriptionPtr
   collectionSubscriptionFromUrl(const std::string& xds_url,
                                 const envoy::config::core::v3::ConfigSource& config) {
     const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url).value();
-    return subscription_factory_.collectionSubscriptionFromUrl(
-        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
-        *stats_store_.rootScope(), callbacks_, resource_decoder_);
+    return THROW_OR_RETURN_VALUE(subscription_factory_.collectionSubscriptionFromUrl(
+                                     resource_locator, config,
+                                     "envoy.config.endpoint.v3.ClusterLoadAssignment",
+                                     *stats_store_.rootScope(), callbacks_, resource_decoder_),
+                                 SubscriptionPtr);
   }
 
   Upstream::MockClusterManager cm_;
@@ -114,7 +117,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
 
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
                           "API configs must have either a gRPC service or a cluster name defined:");
 }
@@ -125,7 +128,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterEmpty) {
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
                           "API configs must have either a gRPC service or a cluster name defined:");
 }
@@ -187,7 +190,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
   config.mutable_api_config_source()->add_cluster_names("static_cluster_bar");
   primary_clusters.insert("static_cluster_bar");
 
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
                           fmt::format("{} must have a singleton cluster name specified:",
                                       config.mutable_api_config_source()->GetTypeName()));
@@ -207,12 +210,93 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultiton) {
   primary_clusters.insert("static_cluster_bar");
 
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                          fmt::format("{}::.DELTA_.GRPC must have a "
-                                      "single gRPC service specified:",
+                          fmt::format("{}::.DELTA_.GRPC must have no "
+                                      "more than 1 gRPC services specified:",
                                       config.mutable_api_config_source()->GetTypeName()));
+}
+
+// Validate that failover is accepted.
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
+  // Once "envoy.restart_features.xds_failover_support" is deprecated, the
+  // "GrpcClusterMultiton" test above will be removed and this one kept.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+  envoy::config::core::v3::ConfigSource config;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+
+  config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+
+  // A single entry is accepted.
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster_foo");
+  primary_clusters.insert("static_cluster_foo");
+
+  {
+    envoy::config::core::v3::GrpcService expected_grpc_service;
+    expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster_foo");
+
+    EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+            return std::make_unique<Grpc::MockAsyncClient>();
+          }));
+          return async_client_factory;
+        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+
+    subscriptionFromConfigSource(config);
+  }
+
+  // 2 entries (primary and failover) are accepted.
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster_bar");
+  primary_clusters.insert("static_cluster_bar");
+
+  {
+    envoy::config::core::v3::GrpcService expected_grpc_service;
+    expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster_foo");
+
+    EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+    // A factory will only be created for the primary source, because the
+    // failover source is only supported for ADS.
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+            return std::make_unique<Grpc::MockAsyncClient>();
+          }));
+          return async_client_factory;
+        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+
+    subscriptionFromConfigSource(config);
+  }
+
+  // 3 entries are rejected.
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster_baz");
+  primary_clusters.insert("static_cluster_baz");
+
+  {
+    EXPECT_CALL(cm_, primaryClusters()).Times(2).WillRepeatedly(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
+
+    EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
+                            fmt::format("{}::.DELTA_.GRPC must have no "
+                                        "more than 2 gRPC services specified:",
+                                        config.mutable_api_config_source()->GetTypeName()));
+  }
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
@@ -486,10 +570,13 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
-  EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment,
-                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
-                          EnvoyException, "V2 xDS transport protocol version is deprecated in");
+  EXPECT_THAT(subscription_factory_
+                  .subscriptionFromConfigSource(
+                      config, Config::TypeUrl::get().ClusterLoadAssignment,
+                      *stats_store_.rootScope(), callbacks_, resource_decoder_, {})
+                  .status()
+                  .message(),
+              testing::HasSubstr("V2 xDS transport protocol version is deprecated in"));
 }
 
 // Use of AUTO transport fails by default. This will encourage folks to upgrade to explicit V3.
@@ -506,6 +593,7 @@ TEST_F(SubscriptionFactoryTest, AutoTransportIsAllowed) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
@@ -539,7 +627,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
     api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterSet primary_clusters;
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}),
                             EnvoyException,
                             fmt::format("{} must have a statically defined "

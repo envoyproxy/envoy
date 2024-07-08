@@ -554,8 +554,10 @@ envoy.filters.http.thrift_to_metadata:
 envoy.filters.http.wasm:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.wasm.v3.Wasm
 envoy.filters.http.stateful_session:
@@ -1012,6 +1014,13 @@ envoy.quic.server_preferred_address.fixed:
   status: alpha
   type_urls:
   - envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
+envoy.quic.server_preferred_address.datasource:
+  categories:
+  - envoy.quic.server_preferred_address
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig
 envoy.udp_packet_writer.default:
   categories:
   - envoy.udp_packet_writer

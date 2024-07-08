@@ -841,7 +841,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
   };
   stream_callbacks.on_error_ = [java_stream_callbacks_global_ref](
-                                   Envoy::EnvoyError error, envoy_stream_intel stream_intel,
+                                   const Envoy::EnvoyError& error, envoy_stream_intel stream_intel,
                                    envoy_final_stream_intel final_stream_intel) {
     Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
     auto java_stream_intel = Envoy::JNI::cppStreamIntelToJavaStreamIntel(jni_helper, stream_intel);
@@ -852,10 +852,10 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
         java_stream_callbacks_class.get(), "onError",
         "(ILjava/lang/String;ILio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;"
         "Lio/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V");
-    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message);
+    auto java_error_message = Envoy::JNI::cppStringToJavaString(jni_helper, error.message_);
     jni_helper.callVoidMethod(java_stream_callbacks_global_ref, java_on_error_method_id,
-                              static_cast<jint>(error.error_code), java_error_message.get(),
-                              error.attempt_count.value_or(-1), java_stream_intel.get(),
+                              static_cast<jint>(error.error_code_), java_error_message.get(),
+                              error.attempt_count_.value_or(-1), java_stream_intel.get(),
                               java_final_stream_intel.get());
     // on_error_ is a terminal callback, delete the java_stream_callbacks_global_ref.
     jni_helper.getEnv()->DeleteGlobalRef(java_stream_callbacks_global_ref);
@@ -1151,9 +1151,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
                       jstring app_version, jstring app_id, jboolean trust_chain_verification,
                       jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
-                      jstring upstream_tls_sni, jobjectArray runtime_guards, jstring node_id,
-                      jstring node_region, jstring node_zone, jstring node_sub_zone,
-                      jbyteArray serialized_node_metadata,
+                      jstring upstream_tls_sni, jobjectArray runtime_guards,
                       Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1205,7 +1203,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
-    builder.setRuntimeGuard(entry.first, entry.second == "true");
+    builder.addRuntimeGuard(entry.first, entry.second == "true");
   }
 
   auto filters = javaObjectArrayToStringPairVector(jni_helper, filter_chain);
@@ -1216,19 +1214,6 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   std::vector<std::string> hostnames =
       javaObjectArrayToStringVector(jni_helper, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
-  std::string native_node_id = Envoy::JNI::javaStringToCppString(jni_helper, node_id);
-  if (!native_node_id.empty()) {
-    builder.setNodeId(native_node_id);
-  }
-  std::string native_node_region = Envoy::JNI::javaStringToCppString(jni_helper, node_region);
-  if (!native_node_region.empty()) {
-    builder.setNodeLocality(native_node_region,
-                            Envoy::JNI::javaStringToCppString(jni_helper, node_zone),
-                            Envoy::JNI::javaStringToCppString(jni_helper, node_sub_zone));
-  }
-  Envoy::ProtobufWkt::Struct node_metadata;
-  Envoy::JNI::javaByteArrayToProto(jni_helper, serialized_node_metadata, &node_metadata);
-  builder.setNodeMetadata(node_metadata);
 }
 
 #if defined(__GNUC__)
@@ -1262,11 +1247,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards, jstring rtds_resource_name, jlong rtds_timeout_seconds,
-    jstring xds_address, jlong xds_port, jobjectArray xds_grpc_initial_metadata,
-    jstring xds_root_certs, jstring node_id, jstring node_region, jstring node_zone,
-    jstring node_sub_zone, jbyteArray serialized_node_metadata, jstring cds_resources_locator,
-    jlong cds_timeout_seconds, jboolean enable_cds) {
+    jobjectArray runtime_guards) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
@@ -1281,40 +1262,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
-      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards, node_id,
-      node_region, node_zone, node_sub_zone, serialized_node_metadata, builder);
-
-  std::string native_xds_address = Envoy::JNI::javaStringToCppString(jni_helper, xds_address);
-  if (!native_xds_address.empty()) {
-#ifdef ENVOY_MOBILE_XDS
-    Envoy::Platform::XdsBuilder xds_builder(std::move(native_xds_address), xds_port);
-    auto initial_metadata =
-        javaObjectArrayToStringPairVector(jni_helper, xds_grpc_initial_metadata);
-    for (const std::pair<std::string, std::string>& entry : initial_metadata) {
-      xds_builder.addInitialStreamHeader(entry.first, entry.second);
-    }
-    std::string native_root_certs = Envoy::JNI::javaStringToCppString(jni_helper, xds_root_certs);
-    if (!native_root_certs.empty()) {
-      xds_builder.setSslRootCerts(std::move(native_root_certs));
-    }
-    std::string native_rtds_resource_name =
-        Envoy::JNI::javaStringToCppString(jni_helper, rtds_resource_name);
-    if (!native_rtds_resource_name.empty()) {
-      xds_builder.addRuntimeDiscoveryService(std::move(native_rtds_resource_name),
-                                             rtds_timeout_seconds);
-    }
-    if (enable_cds == JNI_TRUE) {
-      xds_builder.addClusterDiscoveryService(
-          Envoy::JNI::javaStringToCppString(jni_helper, cds_resources_locator),
-          cds_timeout_seconds);
-    }
-    builder.setXds(std::move(xds_builder));
-#else
-    jni_helper.throwNew("java/lang/UnsupportedOperationException",
-                        "This library does not support xDS. Please use "
-                        "io.envoyproxy.envoymobile:envoy-xds instead.");
-#endif
-  }
+      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

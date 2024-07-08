@@ -474,12 +474,19 @@ EncodingResult Http1ServerCodec::encode(const StreamFrame& frame, EncodingContex
   ASSERT(encoding_buffer_.length() == 0);
 
   if (response_end_stream) {
-    if (active_request_->request_complete_) {
-      active_request_.reset();
-      return encoded_size;
+    if (!active_request_.has_value()) {
+      ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete without request");
+      return absl::InvalidArgumentError("response complete without request");
     }
-    ENVOY_LOG(debug, "Generic proxy HTTP1 server codec: response complete before request complete");
-    return absl::InvalidArgumentError("response complete before request complete");
+
+    if (!active_request_->request_complete_) {
+      ENVOY_LOG(debug,
+                "Generic proxy HTTP1 server codec: response complete before request complete");
+      return absl::InvalidArgumentError("response complete before request complete");
+    }
+
+    active_request_.reset();
+    return encoded_size;
   }
 
   return encoded_size;
@@ -597,6 +604,7 @@ Http::Http1::CallbackResult Http1ClientCodec::onMessageCompleteImpl() {
     // 101 Switching Protocols response. Ignore it because we don't support upgrade for now.
     // 102 Processing response. Ignore it.
     // 103 Early Hints response. Ignore it.
+    // 104 Upload Resumption Supported response. Ignore it.
 
     // Return success to continue parsing the actual response.
     return Http::Http1::CallbackResult::Success;

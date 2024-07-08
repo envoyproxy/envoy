@@ -11,7 +11,6 @@
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -60,7 +59,6 @@ ValidationInstance::ValidationInstance(
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
@@ -144,7 +142,7 @@ void ValidationInstance::initialize(const Options& options,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
       sslContextManager(), *secret_manager_, quic_stat_names_, *this);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
-  runtime().initialize(clusterManager());
+  THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 

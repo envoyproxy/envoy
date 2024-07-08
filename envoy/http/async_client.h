@@ -47,7 +47,9 @@ public:
    */
   enum class FailureReason {
     // The stream has been reset.
-    Reset
+    Reset,
+    // The stream exceeds the response buffer limit.
+    ExceedResponseBufferLimit
   };
 
   /**
@@ -187,12 +189,13 @@ public:
      * Register a callback to be called when high/low write buffer watermark events occur on the
      * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
      * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
-     * will ASSERT-fail.
+     * will trigger ENVOY_BUG.
      */
     virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
 
     /***
-     * Remove previously set watermark callbacks.
+     * Remove previously set watermark callbacks. If there's no watermark callback registered, this
+     * method will trigger ENVOY_BUG.
      */
     virtual void removeWatermarkCallbacks() PURE;
 
@@ -316,6 +319,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setDiscardResponseBody(bool discard) {
+      discard_response_body = discard;
+      return *this;
+    }
+
     StreamOptions& setIsShadowSuffixDisabled(bool d) {
       is_shadow_suffixed_disabled = d;
       return *this;
@@ -380,6 +388,7 @@ public:
     bool is_shadow{false};
 
     bool is_shadow_suffixed_disabled{false};
+    bool discard_response_body{false};
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.

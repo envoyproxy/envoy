@@ -1206,6 +1206,7 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
+        "//source/common/tls:server_context_config_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -1291,7 +1292,6 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/access_loggers/stream:config",
         "//source/extensions/health_checkers/grpc:health_checker_lib",
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
@@ -1407,6 +1407,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -1437,7 +1438,7 @@ envoy_cc_test(
         "//source/common/memory:stats_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//test/common/stats:stat_test_utility_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/config/integration/certs:certs_info",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
@@ -2482,6 +2483,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )
 
