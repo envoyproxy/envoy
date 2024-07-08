@@ -206,6 +206,8 @@ public:
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
         uri_template_matcher_->match(headers.getPathValue())) {
+      ENVOY_LOG(debug, "Path match policy requirement '{}' matched.",
+                uri_template_matcher_->uriTemplate());
       return true;
     }
 
