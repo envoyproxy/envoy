@@ -1024,6 +1024,9 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
 
 TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
   proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
+  // Skip the header processing on response path.
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
   initializeConfig();
   // Set up the route config.
   std::string vhost_domain = "new_host";
@@ -1060,9 +1063,9 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
         return true;
       });
 
-  // The routing to upstream is expected to fail and 500 is returned to downstream client, since no
+  // The routing to upstream is expected to fail and 404 is returned to downstream client, since no
   // route is found for mismatched vhost.
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 404);
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
