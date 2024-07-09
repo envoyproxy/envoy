@@ -472,6 +472,7 @@ public:
    * @param packet the received packet.
    * @return status used by the filter manager to manage further filter iteration.
    */
+  // TODO(pksohn): make this interface PURE when all known implementations are updated.
   virtual FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket&) {
     return FilterStatus::Continue;
   };
