@@ -263,8 +263,6 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, bool client
   return {*selected_ctx, ocsp_staple_action};
 }
 
-REGISTER_FACTORY(TlsCertificateSelectorConfigFactoryImpl, Ssl::TlsCertificateSelectorConfigFactory);
-
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

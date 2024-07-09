@@ -168,6 +168,7 @@ envoy_cc_library(
     hdrs = ["server_context_config_impl.h"],
     deps = [
         ":context_config_lib",
+        ":server_context_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
