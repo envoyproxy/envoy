@@ -73,7 +73,6 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
-        ":context_config_lib",
         ":context_lib",
         ":io_handle_bio_lib",
         ":ssl_handshaker_lib",
@@ -159,6 +158,16 @@ envoy_cc_library(
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "server_context_config_lib",
+    srcs = ["server_context_config_impl.cc"],
+    hdrs = ["server_context_config_impl.h"],
+    deps = [
+        ":context_config_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

@@ -46,6 +46,16 @@ length of time after which this URL becomes invalid, starting from the time the 
 The default expiration time is 5 seconds, with a maximum of 3600 seconds. It is recommended to keep this value as small as practicable,
 as the generated URL is replayable before this time expires.
 
+Header Modification
+-------------------
+
+Unless the  :ref:`query_string <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string>` signing method is used,
+the following HTTP header modifications will be made by this extension:
+- The HTTP ``authorization`` header will be replaced with the calculated SigV4/SigV4A Authorization value
+- The ``x-amz-security-token`` header will be removed, or replaced if a session token is present via credentials
+- The ``x-amz-date`` header will be replaced with the current date
+- The ``x-amz-region-set`` header will replaced if the ``AWS_SIGV4A`` signing algorithm is used
+
 Example configuration
 ---------------------
 

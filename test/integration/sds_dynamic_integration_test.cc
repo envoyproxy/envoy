@@ -19,8 +19,8 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"

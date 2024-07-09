@@ -6,7 +6,7 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {

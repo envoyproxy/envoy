@@ -79,7 +79,6 @@ jobs:
     needs:
     - load
     - cc
-    - build
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

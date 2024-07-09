@@ -320,6 +320,38 @@ TEST(UtilityTest, EncodeS3PathSegment) {
   EXPECT_EQ("/test/%5E%21%40%3D/-_~.", encoded_path);
 }
 
+// We assume that by the time our path has reached encodePathSegment, it has already been uriEncoded
+// These tests validate that we do not doubly encode these
+TEST(UtilityTest, CheckDoubleEncodingS3) {
+  const absl::string_view path = "/test%20file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3withSpace) {
+  const absl::string_view path = "/test file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3Outposts) {
+  const absl::string_view path = "/test%20file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3-outposts");
+  EXPECT_EQ("/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3Folder) {
+  const absl::string_view path = "/test%20folder/test%20file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20folder/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3FolderPercentFile) {
+  const absl::string_view path = "/test%20folder/%25";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20folder/%25", encoded_path);
+}
+
 TEST(UtilityTest, CanonicalizeQueryString) {
   const absl::string_view query = "a=1&b=2";
   const auto canonical_query = Utility::canonicalizeQueryString(query);
