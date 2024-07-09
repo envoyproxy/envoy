@@ -97,11 +97,11 @@ const char* codec_strerror(int) { return "unknown_error"; }
 int reasonToReset(StreamResetReason reason) {
   switch (reason) {
   case StreamResetReason::LocalRefusedStreamReset:
-    return REFUSED_STREAM;
+    return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
-    return CONNECT_ERROR;
+    return OGHTTP2_CONNECT_ERROR;
   default:
-    return NO_ERROR;
+    return OGHTTP2_NO_ERROR;
   }
 }
 
@@ -1117,7 +1117,7 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = stream_id;
-  if (type == PING && (flags & FLAG_ACK)) {
+  if (type == OGHTTP2_PING_FRAME_TYPE && (flags & FLAG_ACK)) {
     return okStatus();
   }
 
@@ -1134,7 +1134,7 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // DATA frame is tracked in onFrameReceived().
   auto status = okStatus();
-  if (type != DATA) {
+  if (type != OGHTTP2_DATA_FRAME_TYPE) {
     status = trackInboundFrames(stream_id, length, type, flags, 0);
   }
 
@@ -1144,7 +1144,7 @@ Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, u
 ABSL_MUST_USE_RESULT
 enum GoAwayErrorCode ngHttp2ErrorCodeToErrorCode(uint32_t code) noexcept {
   switch (code) {
-  case NO_ERROR:
+  case OGHTTP2_NO_ERROR:
     return GoAwayErrorCode::NoError;
   default:
     return GoAwayErrorCode::Other;
@@ -1166,7 +1166,7 @@ Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
 Status ConnectionImpl::onBeginData(int32_t stream_id, size_t length, uint8_t flags,
                                    size_t padding) {
   ENVOY_CONN_LOG(trace, "recv frame type=DATA stream_id={}", connection_, stream_id);
-  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, DATA, flags, padding));
+  RETURN_IF_ERROR(trackInboundFrames(stream_id, length, OGHTTP2_DATA_FRAME_TYPE, flags, padding));
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream) {
@@ -1267,14 +1267,14 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
     if (type != METADATA_FRAME_TYPE) {
       stream->bytes_meter_->addWireBytesSent(length + H2_FRAME_HEADER_SIZE);
     }
-    if (type == HEADERS || type == CONTINUATION) {
+    if (type == OGHTTP2_HEADERS_FRAME_TYPE || type == OGHTTP2_CONTINUATION_FRAME_TYPE) {
       stream->bytes_meter_->addHeaderBytesSent(length + H2_FRAME_HEADER_SIZE);
     }
   }
   switch (type) {
-  case GOAWAY: {
+  case OGHTTP2_GOAWAY_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, error_code);
-    if (error_code != NO_ERROR) {
+    if (error_code != OGHTTP2_NO_ERROR) {
       // TODO(mattklein123): Returning this error code abandons standard nghttp2 frame accounting.
       // As such, it is not reliable to call sendPendingFrames() again after this and we assume
       // that the connection is going to get torn down immediately. One byproduct of this is that
@@ -1289,14 +1289,14 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
     break;
   }
 
-  case RST_STREAM: {
+  case OGHTTP2_RST_STREAM_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
     break;
   }
 
-  case HEADERS:
-  case DATA: {
+  case OGHTTP2_HEADERS_FRAME_TYPE:
+  case OGHTTP2_DATA_FRAME_TYPE: {
     // This should be the case since we're sending these frames. It's possible
     // that codec fuzzers would incorrectly send frames for non-existent streams
     // which is why this is not an assert.
@@ -1372,7 +1372,9 @@ int ConnectionImpl::onBeforeFrameSend(int32_t /*stream_id*/, size_t /*length*/, 
   ASSERT(!is_outbound_flood_monitored_control_frame_);
   // Flag flood monitored outbound control frames.
   is_outbound_flood_monitored_control_frame_ =
-      ((type == PING || type == SETTINGS) && flags & FLAG_ACK) || type == RST_STREAM;
+      ((type == OGHTTP2_PING_FRAME_TYPE || type == OGHTTP2_SETTINGS_FRAME_TYPE) &&
+       flags & FLAG_ACK) ||
+      type == OGHTTP2_RST_STREAM_FRAME_TYPE;
   return 0;
 }
 
@@ -1395,7 +1397,8 @@ Status ConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint
                  connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
                  static_cast<uint64_t>(length), padding_length);
 
-  const bool end_stream = (type == DATA || type == HEADERS) && (flags & FLAG_END_STREAM);
+  const bool end_stream = (type == OGHTTP2_DATA_FRAME_TYPE || type == OGHTTP2_HEADERS_FRAME_TYPE) &&
+                          (flags & FLAG_END_STREAM);
   const bool is_empty = (length - padding_length) == 0;
   result = protocol_constraints_.trackInboundFrame(type, end_stream, is_empty);
   if (!result.ok()) {
@@ -1467,11 +1470,11 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         // depending whether the connection is upstream or downstream.
         reason = getMessagingErrorResetReason();
       } else {
-        if (error_code == REFUSED_STREAM) {
+        if (error_code == OGHTTP2_REFUSED_STREAM) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
         } else {
-          if (error_code == CONNECT_ERROR) {
+          if (error_code == OGHTTP2_CONNECT_ERROR) {
             reason = StreamResetReason::ConnectError;
           } else {
             reason = StreamResetReason::RemoteReset;
@@ -1799,7 +1802,7 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
   ENVOY_CONN_LOG(debug, "Http2Visitor::OnFrameHeader({}, {}, {}, {})", connection_->connection_,
                  stream_id, length, int(type), int(flags));
 
-  if (type == CONTINUATION) {
+  if (type == OGHTTP2_CONTINUATION_FRAME_TYPE) {
     if (current_frame_.stream_id != stream_id) {
       return false;
     }
@@ -1903,7 +1906,7 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
 
 bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
   ENVOY_CONN_LOG(debug, "Http2Visitor::OnEndStream({})", connection_->connection_, stream_id);
-  if (current_frame_.type == DATA) {
+  if (current_frame_.type == OGHTTP2_DATA_FRAME_TYPE) {
     // `onBeginData` is invoked here to ensure that the connection has successfully validated and
     // processed the entire DATA frame.
     ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,

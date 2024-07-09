@@ -17,17 +17,18 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+// Frame types as inherited from nghttp2 and preserved for oghttp2
 enum FrameType {
-  DATA,
-  HEADERS,
-  PRIORITY,
-  RST_STREAM,
-  SETTINGS,
-  PUSH_PROMISE,
-  PING,
-  GOAWAY,
-  WINDOW_UPDATE,
-  CONTINUATION,
+  OGHTTP2_DATA_FRAME_TYPE,
+  OGHTTP2_HEADERS_FRAME_TYPE,
+  OGHTTP2_PRIORITY_FRAME_TYPE,
+  OGHTTP2_RST_STREAM_FRAME_TYPE,
+  OGHTTP2_SETTINGS_FRAME_TYPE,
+  OGHTTP2_PUSH_PROMISE_FRAME_TYPE,
+  OGHTTP2_PING_FRAME_TYPE,
+  OGHTTP2_GOAWAY_FRAME_TYPE,
+  OGHTTP2_WINDOW_UPDATE_FRAME_TYPE,
+  OGHTTP2_CONTINUATION_FRAME_TYPE,
 };
 
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
