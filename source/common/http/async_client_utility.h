@@ -74,6 +74,15 @@ public:
     }
   }
 
+  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
+    // Sidestream subscribes to downstream watermark events.
+    decoder_callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+  }
+
+  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
+  }
+
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* decode_callback) {
     decode_callback_ = decode_callback;
   }
