@@ -16,6 +16,11 @@ behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to true. This changes the codec used for HTTP/2
     requests and responses. This behavior can be reverted by setting the feature to false.
+- area: http3
+  change: |
+    Added a "happy eyeballs" feature to HTTP/3 upstream, where it assuming happy eyeballs sorting results in alternating address
+    families will attempt the first v4 and v6 address before giving up on HTTP/3.  This change can be reverted by setting
+    ``envoy.reloadable_features.http3_happy_eyeballs`` to false.
 - area: http2
   change: |
     Passes HTTP/2 DATA frames through a different codec API. This behavior can be temporarily disabled by setting the runtime
@@ -41,14 +46,13 @@ behavior_changes:
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
-- area: ext_proc
-  change: |
-    Added support for observability mode. If enabled, each part of the HTTP request or response specified by ProcessingMode
-    is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode that can be used by external
-    processor to observe Envoy data and status.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_proc
+  change: |
+    Timeout errors in external processor now returns 504 Gateway Timeout to downstream clients.
+    The previous behavior was returning 500 Internal Server Error.
 - area: dfp
   change: |
     Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
@@ -130,6 +134,23 @@ minor_behavior_changes:
   change: |
     Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
     guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
+- area: http
+  change: |
+    http: envoy will now proxy 104 headers from upstream, though as with 100s only the first 1xx response
+    headers will be sent.104 headers are designated by ietf's draft-ietf-httpbis-resumable-upload rfc.
+    This behavioral can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.proxy_104`` to ``false``.
+- area: jwt_authn
+  change: |
+    Changes the behavior of the
+    :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
+    config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
+    used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
+- area: http
+  change: |
+    Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -227,6 +248,12 @@ bug_fixes:
   change: |
     Fixed a bug where additional :ref:`cookie attributes <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy.cookie>`
     are not sent properly to clients.
+- area: datadog
+  change: |
+    Bumped the version of datadog to resolve a crashing bug in earlier versions of the library.
+- area: lua
+  change: |
+    Fixed a bug where the user data will reference a dangling pointer to the Lua state and cause a crash.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -293,11 +320,20 @@ removed_config_or_runtime:
 - area: jwt
   change: |
     Removed ``envoy.reloadable_features.token_passed_entirely`` runtime flag and legacy code paths.
+- area: outlier detection
+  change: |
+    Removed ``envoy.reloadable_features.check_mep_on_first_eject`` runtime flag and legacy code paths.
 - area: http
   change: |
     Removed ``envoy.reloadable_features.stop_decode_metadata_on_local_reply`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
 - area: hot_restart
   change: |
     Added new command-line flag :option:`--skip-hot-restart-parent-stats`.
@@ -399,6 +435,10 @@ new_features:
     to listen to file changes and dynamically update the response when :ref:`watched_directory
     <envoy_v3_api_field_config.core.v3.datasource.watched_directory>`
     is configured in :ref:`DataSource <envoy_v3_api_msg_config.core.v3.datasource>`.
+- area: outlier detection
+  change: |
+    Added :ref:`always_eject_one_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.always_eject_one_host>`
+    to optionally override the :ref:`max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`.
 - area: listener
   change: |
     Added :ref:`bypass_overload_manager <envoy_v3_api_field_config.listener.v3.Listener.bypass_overload_manager>`
@@ -419,6 +459,11 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: quic
+  change: |
+    Added :ref:`DataSourceServerPreferredAddressConfig
+    <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig>` for cases when
+    the control plane does not know the correct configuration for the server preferred address.
 - area: tls
   change: |
     added support to match against ``OtherName`` SAN Type under :ref:`match_typed_subject_alt_names
@@ -428,6 +473,24 @@ new_features:
 - area: retry
   change: |
     Added :ref:`reset-before-request retry policy <config_http_filters_router_x-envoy-retry-on>`.
+- area: ext_proc
+  change: |
+    Added support for observability mode which deprecates ``async_mode``. If enabled, each part of the HTTP request or response
+    specified by ProcessingMode is sent without waiting for the response from the ext_proc service. It is "Send and Go" mode
+    that can be used by external processor to observe Envoy data and status.
+- area: grpc
+  change: |
+    Added support for flow control in Envoy gRPC side stream. This behavior can be disabled by setting the runtime flag
+    ``envoy.reloadable_features.grpc_side_stream_flow_control`` to false.
+- area: oauth
+  change: |
+    Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_id_token_set_cookie>`
+    to disable setting the ID Token cookie.
+- area: dns_filter
+  change: |
+    Added support for wildcard resolution in :ref:`inline_dns_table
+    <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ServerContextConfig.inline_dns_table>`
+    when DNS filter is working in server mode.
 
 deprecated:
 - area: tracing

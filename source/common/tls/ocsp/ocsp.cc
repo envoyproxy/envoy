@@ -109,17 +109,18 @@ absl::Status validateResponse(std::unique_ptr<OcspResponse>& response) {
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::unique_ptr<OcspResponseWrapper>>
-OcspResponseWrapper::create(std::vector<uint8_t> der_response, TimeSource& time_source) {
+absl::StatusOr<std::unique_ptr<OcspResponseWrapperImpl>>
+OcspResponseWrapperImpl::create(std::vector<uint8_t> der_response, TimeSource& time_source) {
   auto response_or_error = readDerEncodedOcspResponse(der_response);
   RETURN_IF_NOT_OK(response_or_error.status());
   RETURN_IF_NOT_OK(validateResponse(response_or_error.value()));
-  return std::unique_ptr<OcspResponseWrapper>{
-      new OcspResponseWrapper(der_response, time_source, std::move(response_or_error.value()))};
+  return std::unique_ptr<OcspResponseWrapperImpl>{
+      new OcspResponseWrapperImpl(der_response, time_source, std::move(response_or_error.value()))};
 }
 
-OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source,
-                                         std::unique_ptr<OcspResponse>&& response)
+OcspResponseWrapperImpl::OcspResponseWrapperImpl(std::vector<uint8_t> der_response,
+                                                 TimeSource& time_source,
+                                                 std::unique_ptr<OcspResponse>&& response)
     : raw_bytes_(std::move(der_response)), response_(std::move(response)),
       time_source_(time_source) {
   auto& this_update = response_->response_->getThisUpdate();
@@ -135,18 +136,18 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
 // Though different issuers could produce certificates with the same serial
 // number, this is check is to prevent operator error and a collision in this
 // case is unlikely.
-bool OcspResponseWrapper::matchesCertificate(X509& cert) const {
+bool OcspResponseWrapperImpl::matchesCertificate(X509& cert) const {
   std::string cert_serial_number = CertUtility::getSerialNumberFromCertificate(cert);
   std::string resp_cert_serial_number = response_->response_->getCertSerialNumber();
   return resp_cert_serial_number == cert_serial_number;
 }
 
-bool OcspResponseWrapper::isExpired() {
+bool OcspResponseWrapperImpl::isExpired() {
   auto& next_update = response_->response_->getNextUpdate();
   return next_update == absl::nullopt || next_update < time_source_.systemTime();
 }
 
-uint64_t OcspResponseWrapper::secondsUntilExpiration() const {
+uint64_t OcspResponseWrapperImpl::secondsUntilExpiration() const {
   auto& next_update = response_->response_->getNextUpdate();
   auto now = time_source_.systemTime();
   if (!next_update || next_update.value() <= now) {
@@ -155,11 +156,11 @@ uint64_t OcspResponseWrapper::secondsUntilExpiration() const {
   return std::chrono::duration_cast<std::chrono::seconds>(next_update.value() - now).count();
 }
 
-Envoy::SystemTime OcspResponseWrapper::getThisUpdate() const {
+Envoy::SystemTime OcspResponseWrapperImpl::getThisUpdate() const {
   return response_->response_->getThisUpdate();
 }
 
-Envoy::SystemTime OcspResponseWrapper::getNextUpdate() const {
+Envoy::SystemTime OcspResponseWrapperImpl::getNextUpdate() const {
   auto& next_update = response_->response_->getNextUpdate();
   if (next_update) {
     return *next_update;

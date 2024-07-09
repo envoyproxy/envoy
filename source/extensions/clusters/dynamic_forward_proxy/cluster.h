@@ -54,15 +54,18 @@ public:
   bool touch(const std::string& cluster_name) override;
   void checkIdleSubCluster();
 
-private:
-  friend class ClusterFactory;
-  friend class ClusterTest;
-
+protected:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager);
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+          absl::Status& creation_status);
+
+private:
+  friend class ClusterFactory;
+  friend class ClusterTest;
+
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();

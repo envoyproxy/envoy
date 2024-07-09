@@ -5,6 +5,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_enable_exceptions",
     "envoy_select_signal_trace",
 )
 
@@ -31,8 +32,10 @@ envoy_cc_test_library(
         "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
+        "//source/server:options_base",
+    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]) + envoy_select_enable_exceptions([
         "//source/server:options_lib",
-    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
+    ]),
 )
 
 envoy_cc_test_library(

@@ -53,22 +53,6 @@ android_library(
     ],
 )
 
-android_library(
-    name = "xds_test_server_factory_lib",
-    testonly = True,
-    srcs = [
-        "XdsTestServerFactory.java",
-    ],
-    data = [
-        "//test/jni:libenvoy_jni_xds_test_server_factory.so",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-    ],
-)
-
 envoy_mobile_android_test(
     name = "quic_test_server_test",
     srcs = [
