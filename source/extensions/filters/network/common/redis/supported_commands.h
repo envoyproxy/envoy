@@ -37,15 +37,10 @@ struct SupportedCommands {
         "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
   }
 
-  BF.ADD, Bloom BF.CARD, Bloom BF.EXISTS, Bloom BF.INFO, Bloom BF.INSERT, Bloom BF.LOADCHUNK,
-      Bloom BF.MADD, Bloom BF.MEXISTS, Bloom BF.RESERVE, Bloom BF.SCANDUMP,
-      Bloom
-
-      /**
-       * @return commands which hash on the fourth argument
-       */
-      static const absl::flat_hash_set<std::string>&
-      evalCommands() {
+  /**
+   * @return commands which hash on the fourth argument
+   */
+  static const absl::flat_hash_set<std::string>& evalCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "eval", "evalsha");
   }
 
