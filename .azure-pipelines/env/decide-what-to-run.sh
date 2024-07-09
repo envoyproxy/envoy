@@ -6,13 +6,13 @@ RUN_DOCKER=true
 RUN_PACKAGING=true
 RUN_RELEASE_TESTS=true
 
-if [[ $CHANGED_MOBILE_ONLY == true || $CHANGED_DOCS_ONLY == true ]]; then
+if [[ $CHANGED_MOBILEONLY == true || $CHANGED_DOCSONLY == true ]]; then
     RUN_BUILD=false
     RUN_CHECKS=false
     RUN_DOCKER=false
     RUN_PACKAGING=false
 fi
-if [[ $CHANGED_EXAMPLES_ONLY == true ]]; then
+if [[ $CHANGED_EXAMPLESONLY == true ]]; then
     RUN_CHECKS=false
 fi
 if [[ "$ISSTABLEBRANCH" == True && -n "$POSTSUBMIT" && $STATE_ISDEV == false ]]; then
