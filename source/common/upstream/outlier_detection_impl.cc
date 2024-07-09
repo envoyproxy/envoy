@@ -218,6 +218,8 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
           config, consecutive_gateway_failure, DEFAULT_CONSECUTIVE_GATEWAY_FAILURE))),
       max_ejection_percent_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_ejection_percent, DEFAULT_MAX_EJECTION_PERCENT))),
+      always_eject_one_host_(
+          static_cast<bool>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, always_eject_one_host, false))),
       success_rate_minimum_hosts_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, success_rate_minimum_hosts, DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS))),
       success_rate_request_volume_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -480,7 +482,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   bool should_eject = (ejected_percent <= max_ejection_percent);
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_mep_on_first_eject")) {
+  if (config_.alwaysEjectOneHost()) {
     should_eject = (ejections_active_helper_.value() == 0) || should_eject;
   }
   if (should_eject) {

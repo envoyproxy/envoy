@@ -282,6 +282,9 @@ envoy_cc_library(
         "envoy_quic_server_session.h",
         "envoy_quic_server_stream.h",
     ],
+    external_deps = [
+        "abseil_optional",
+    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_debug_visitor_factory_interface",
@@ -506,7 +509,7 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
-        "//source/common/tls:context_config_lib",
+        "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
         "//source/common/tls:server_ssl_socket_lib",
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
@@ -662,6 +665,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",
+        "//envoy/server:factory_context_interface",
         "@com_github_google_quiche//:quic_platform_socket_address",
     ],
 )

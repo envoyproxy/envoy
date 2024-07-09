@@ -46,6 +46,13 @@ getAddressRecordType(const Network::Address::InstanceConstSharedPtr& ipaddr);
  */
 absl::string_view getDomainSuffix(const absl::string_view name);
 
+/**
+ * @brief For given domain name return virtual domain name that will be used for internal
+ * resolution. Valid wildcard names are sanitized and converted to format to store in
+ * virtual domain config.
+ */
+absl::string_view getVirtualDomainName(const absl::string_view domain_name);
+
 } // namespace Utils
 } // namespace DnsFilter
 } // namespace UdpFilters
