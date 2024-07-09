@@ -76,7 +76,6 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
                                absl::nullopt, details);
     return Http::FilterHeadersStatus::StopIteration;
   }
-
   upstreamTiming().onFirstUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
 
   if (end_stream) {

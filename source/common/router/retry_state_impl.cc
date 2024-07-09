@@ -358,11 +358,13 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
-                                             Http3Used http3_used, DoRetryResetCallback callback) {
+                                             Http3Used http3_used, DoRetryResetCallback callback,
+                                             bool upstream_request_started) {
 
   // Following wouldRetryFromReset() may override the value.
   bool disable_http3 = false;
-  const RetryDecision retry_decision = wouldRetryFromReset(reset_reason, http3_used, disable_http3);
+  const RetryDecision retry_decision =
+      wouldRetryFromReset(reset_reason, http3_used, disable_http3, upstream_request_started);
   return shouldRetry(retry_decision, [disable_http3, callback]() { callback(disable_http3); });
 }
 
@@ -460,7 +462,8 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    Http3Used http3_used, bool& disable_http3) {
+                                    Http3Used http3_used, bool& disable_http3,
+                                    bool upstream_request_started) {
   ASSERT(!disable_http3);
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
@@ -491,11 +494,15 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     return RetryDecision::RetryImmediately;
   }
 
-  if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
+  // Technically, this doesn't *have* to go before the RETRY_ON_RESET check,
+  // but it's safer for the user if they have them both set
+  // for some reason.
+  if (retry_on_ & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST && !upstream_request_started) {
+    // Only return a positive retry decision if we haven't sent any bytes upstream.
     return RetryDecision::RetryWithBackoff;
   }
 
-  if (retry_on_ & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST) {
+  if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
     return RetryDecision::RetryWithBackoff;
   }
 

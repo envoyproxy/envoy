@@ -86,7 +86,6 @@ public:
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
                                       bool pool_success) PURE;
-
   /*
    * This will be called if a per-try timeout fails.
    * @param upstream_request inicates which UpstreamRequest which timed out
