@@ -129,7 +129,6 @@ protected:
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
-  void onFirstPacketReceived(const quic::QuicReceivedPacket& packet);
 
   std::unique_ptr<EnvoyQuicServerConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
@@ -147,7 +146,6 @@ private:
   QuicConnectionStats& connection_stats_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
   std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
-  bool first_packet_received_ = false;
 };
 
 } // namespace Quic

@@ -147,15 +147,18 @@ public:
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
   void OnCanWrite() override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
 
   bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
-  void OnFirstPacketReceived(const quic::QuicReceivedPacket& packet);
 
 protected:
   void OnEffectivePeerMigrationValidated(bool is_migration_linkable) override;
 
 private:
   std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager_;
+  bool first_packet_received_ = false;
 };
 
 // An implementation that issues connection IDs with stable first 4 types.

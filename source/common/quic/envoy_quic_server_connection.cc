@@ -52,17 +52,22 @@ void EnvoyQuicServerConnection::OnCanWrite() {
   onWriteEventDone();
 }
 
+void EnvoyQuicServerConnection::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                                                 const quic::QuicSocketAddress& peer_address,
+                                                 const quic::QuicReceivedPacket& packet) {
+  if (!first_packet_received_) {
+    listener_filter_manager_->onFirstPacketReceived(packet);
+  }
+  first_packet_received_ = true;
+
+  quic::QuicConnection::ProcessUdpPacket(self_address, peer_address, packet);
+};
+
 void EnvoyQuicServerConnection::OnEffectivePeerMigrationValidated(bool is_migration_linkable) {
   quic::QuicConnection::OnEffectivePeerMigrationValidated(is_migration_linkable);
   if (listener_filter_manager_ != nullptr && networkConnection() != nullptr) {
     // This connection might become closed after this call.
     listener_filter_manager_->onPeerAddressChanged(effective_peer_address(), *networkConnection());
-  }
-}
-
-void EnvoyQuicServerConnection::OnFirstPacketReceived(const quic::QuicReceivedPacket& packet) {
-  if (listener_filter_manager_ != nullptr) {
-    listener_filter_manager_->onFirstPacketReceived(packet);
   }
 }
 
