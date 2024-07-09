@@ -88,7 +88,8 @@ message GrpcJsonTranscoder {
     // When set to true, the request will be rejected with a ``HTTP 400 Bad Request``.
     //
     // The fields
-    // :ref:`ignore_unknown_query_parameters <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignore_unknown_query_parameters>`
+    // :ref:`ignore_unknown_query_parameters <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignore_unknown_query_parameters>`,
+    // :ref:`capture_unknown_query_parameters <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.capture_unknown_query_parameters>`,
     // and
     // :ref:`ignored_query_parameters <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignored_query_parameters>`
     // have priority over this strict validation behavior.
@@ -291,7 +292,6 @@ message GrpcJsonTranscoder {
 
   // If true, query parameters that cannot be mapped to a corresponding
   // protobuf field are captured in an HttpBody extension of UnknownQueryParams.
-  // This overrides ``ignore_unknown_query_parameters`` and ``reject_unknown_query_parameters``.
   bool capture_unknown_query_parameters = 17;
 }
 
