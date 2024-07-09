@@ -706,7 +706,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   quic_stream_->OnWindowUpdateFrame(window_update1);
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   spdy::Http2HeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "POST";
@@ -730,7 +730,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   quic_stream_->OnWindowUpdateFrame(window_update1);
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   spdy::Http2HeaderBlock spdy_trailers;
   // This header exceeds max header size limit and should cause stream reset.
   spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');

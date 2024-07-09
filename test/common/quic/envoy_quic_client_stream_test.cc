@@ -639,7 +639,7 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
   // Receive more response headers than allowed. Such response headers shouldn't be delivered to
   // stream decoder.
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _)).Times(0u);
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   for (size_t i = 0; i < 101; ++i) {
     spdy_response_headers_[absl::StrCat("key", i)] = absl::StrCat("value", i);
   }
