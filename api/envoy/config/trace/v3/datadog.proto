@@ -18,13 +18,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Datadog tracer]
 
-// Remote Configuration
+// Configuration for the Remote Configuration feature.
 message DatadogRemoteConfig {
-  // Allows to configure and change the tracer behaviour from Datadog's UI.
-  // Default value is `false`, which disable the feature.
+  // Allows to configure and change the tracer behaviour from Datadog's user interface.
+  // Default value is ``false``, which disable the feature.
   // [#comment: This feature can drastically increase the number of connections to the Datadog Agent.
-  // This is the consequence of each tracer regularly polling for configuration updates, and the number
-  // of tracer is the product of the number of listeners and worker threads.]
+  // Each tracer regularly polls for configuration updates, and the number of tracers is the product
+  // of the number of listeners and worker threads.]
   bool enabled = 1;
 
   // Frequency at which new configuration updates are queried.
