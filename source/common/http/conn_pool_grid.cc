@@ -103,11 +103,6 @@ bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
     return false;
   }
-  // Make sure the original caller hasn't been called. This shouldn't be
-  // possible but is a helpful sanity check.
-  if (!inner_callbacks_) {
-    return false;
-  }
   // QUIC "happy eyeballs" currently only handles one v4 and one v6 address. If
   // there's not multiple families don't bother.
   return hasBothAddressFamilies(grid_.host_);
@@ -408,6 +403,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
       // If it looks like the main HTTP/3 pool is not functional and the
       // alternate works, don't wait 300ms before attempting to use the
       // alternate pool.
+      // TODO(alyssawilk) look into skipping the original pool if this is the case.
       delay_alternate_http3_attempt = false;
     }
   } else {

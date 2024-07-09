@@ -1142,6 +1142,59 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
   // Getting onPoolReady() from TCP pool alone doesn't change H3 status.
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
   // Getting onPoolFailure() from Http3 pool later should mark H3 broken.
+
+  grid_->createHttp3AlternatePool();
+  EXPECT_CALL(*grid_->alternate(), newStream)
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            grid_->callbacks_.push_back(&callbacks);
+            return grid_->cancel_;
+          }));
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "reason", host_);
+  // Because the alternate pool is outstanding H3 is not broken.
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // When H3 alternate connects, there should not be a second up call.
+  EXPECT_CALL(callbacks_.pool_ready_, ready()).Times(0);
+  grid_->callbacks(2)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+}
+
+// Same as above only the alternate pool connects after TCP.
+TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenTCPThenAlternate) {
+  initialize();
+  addHttp3AlternateProtocol();
+  grid_->onZeroRttHandshakeFailed();
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/true,
+                              /*can_use_http3_=*/true}),
+            nullptr);
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_->callbacks(0), nullptr);
+  ASSERT_NE(grid_->callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  // Getting onPoolReady() from TCP pool alone doesn't change H3 status.
+  EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
+  // Getting onPoolFailure() from Http3 pool later should mark H3 broken.
+
+  grid_->createHttp3AlternatePool();
+  EXPECT_CALL(*grid_->alternate(), newStream)
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+            return nullptr;
+          }));
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
   EXPECT_TRUE(grid_->isHttp3Broken());
