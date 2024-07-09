@@ -283,7 +283,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
     if (is_proxying) {
-      ENVOY_BUG(host.has_value(), "Proxying request but not host entry in DNS cache.");
+      ENVOY_BUG(host.has_value(), "Proxying request but no host entry in DNS cache.");
       return Http::FilterHeadersStatus::Continue;
     }
     if (!host.has_value() || !host.value()->address()) {
