@@ -10,8 +10,6 @@
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 
-#include "quiche/quic/core/quic_packets.h"
-
 namespace Envoy {
 namespace Quic {
 

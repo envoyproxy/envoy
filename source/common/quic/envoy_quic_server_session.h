@@ -13,7 +13,6 @@
 
 #include "quiche/quic/core/http/quic_server_session_base.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
-#include "quiche/quic/core/quic_packets.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
 
 namespace Envoy {
