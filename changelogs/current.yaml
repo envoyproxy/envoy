@@ -149,8 +149,12 @@ minor_behavior_changes:
     ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
 - area: custom response filter
   change: |
-    Prevent the redirect response filter from sending 100 as the response code as this does not make sense
+    Prevent the redirect  policy from sending 100 as the overridden response code as this does not make sense
     for custom responses.
+- area: http
+  change: |
+    Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -331,6 +335,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
 - area: hot_restart
   change: |
     Added new command-line flag :option:`--skip-hot-restart-parent-stats`.
