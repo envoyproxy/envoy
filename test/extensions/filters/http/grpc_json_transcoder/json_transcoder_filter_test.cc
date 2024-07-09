@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -33,6 +34,7 @@ using Envoy::Protobuf::util::MessageDifferencer;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
 
 namespace Envoy {
 namespace Extensions {
@@ -233,8 +235,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -254,8 +257,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -273,8 +277,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"foo\" in the type \"google.protobuf.Empty\".",
@@ -298,8 +303,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"search[encoded]\" in the type \"bookstore.Shelf\".",
@@ -318,11 +324,39 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
+  EXPECT_TRUE(unknown_variable_bindings.key().empty());
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
+  auto proto_config = getProtoConfig(
+      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
+  proto_config.set_capture_unknown_query_parameters(true);
+  JsonTranscoderConfig config(proto_config, *api_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/shelves?foo=bar+dsa&eep=baz&foo=asd&foo.bar=baz"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  UnknownQueryParams unknown_query_params;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_query_params);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+  ASSERT_TRUE(unknown_query_params.key().contains("foo"));
+  ASSERT_TRUE(unknown_query_params.key().contains("eep"));
+  ASSERT_TRUE(unknown_query_params.key().contains("foo.bar"));
+  EXPECT_THAT(unknown_query_params.key().at("foo").values(), ElementsAre("bar+dsa", "asd"));
+  EXPECT_THAT(unknown_query_params.key().at("eep").values(), ElementsAre("baz"));
+  EXPECT_THAT(unknown_query_params.key().at("foo.bar").values(), ElementsAre("baz"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
@@ -337,8 +371,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -359,8 +394,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
@@ -385,8 +421,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -408,8 +445,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(status.code(), StatusCode::kNotFound);
   EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:verb to a method.");
@@ -433,8 +471,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(status.code(), StatusCode::kNotFound);
   EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unknown to a method.");
