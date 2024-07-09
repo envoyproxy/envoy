@@ -158,7 +158,7 @@ message TlsParameters {
   //   ecdsa_sha1
   repeated string signature_algorithms = 5;
 
-  // By default, Envoy uses server's prefered cipher during the handshake. Setting this
+  // By default, Envoy uses server's preferred cipher during the handshake. Setting this
   // to true would allow the client's preference instead. Has no effect when using TLSv1_3.
   bool enable_client_cipher_preference = 6;
 }
