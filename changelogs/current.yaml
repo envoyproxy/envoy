@@ -466,6 +466,11 @@ new_features:
   change: |
     Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_id_token_set_cookie>`
     to disable setting the ID Token cookie.
+- area: tls
+  change: |
+    Added :ref:`enable_client_cipher_preference
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.enable_client_cipher_preference>`
+    to support enabling client cipher preference instead of server's for TLS handshakes.
 
 deprecated:
 - area: tracing
