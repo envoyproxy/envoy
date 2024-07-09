@@ -143,6 +143,11 @@ bug_fixes:
     Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to "1"/"0"
     instead of "true"/"false". The correct string representation ("true"/"false") will now be used. This change can be
     reverted by setting the runtime guard ``envoy.reloadable_features.boolean_to_string_fix`` to false.
+- area: jwt
+  change: |
+    Fixed a bug where using ``clear_route_cache`` with remote JWKs works
+    incorrectly and may cause a crash when the modified request does not match
+    any route.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
