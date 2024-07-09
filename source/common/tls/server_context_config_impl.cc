@@ -9,6 +9,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -155,6 +156,29 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     session_timeout_ =
         std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
+
+  if (config.common_tls_context().has_custom_tls_certificate_selector()) {
+    // If a custom tls context provider is configured, derive the factory from the config.
+    const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
+    Ssl::TlsCertificateSelectorConfigFactory* provider_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
+            provider_config);
+    tls_certificate_selector_factory_ = provider_factory->createTlsCertificateSelectorFactory(
+        provider_config.typed_config(), factory_context.serverFactoryContext(),
+        factory_context.messageValidationVisitor());
+    return;
+  }
+
+  auto factory = Envoy::Config::Utility::getFactoryByName<Ssl::TlsCertificateSelectorConfigFactory>(
+      "envoy.tls.certificate_selectors.default");
+  if (!factory) {
+    IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
+    return;
+  }
+
+  const ProtobufWkt::Any any;
+  tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
+      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
@@ -227,6 +251,13 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+Ssl::TlsCertificateSelectorFactory ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
+  if (!tls_certificate_selector_factory_) {
+    IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
+  }
+  return tls_certificate_selector_factory_;
 }
 
 } // namespace Tls
