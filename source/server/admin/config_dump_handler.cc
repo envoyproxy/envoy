@@ -383,6 +383,13 @@ void ConfigDumpHandler::addLbEndpoint(
   auto& endpoint = *lb_endpoint.mutable_endpoint();
   endpoint.set_hostname(host->hostname());
   Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
+  if (host->addressListOrNull() != nullptr) {
+    for (auto& additional_address : *host->addressListOrNull()) {
+      auto& new_address = *endpoint.mutable_additional_addresses()->Add();
+      Network::Utility::addressToProtobufAddress(*additional_address,
+                                                 *new_address.mutable_address());
+    }
+  }
   auto& health_check_config = *endpoint.mutable_health_check_config();
   health_check_config.set_hostname(host->hostnameForHealthChecks());
   if (host->healthCheckAddress()->asString() != host->address()->asString()) {

@@ -1118,47 +1118,6 @@ typed_config:
                           ProtoValidationException, "Proto constraint validation failed");
 }
 
-TEST_F(AccessLogImplTest, Stdout) {
-  const std::string yaml = R"EOF(
-name: accesslog
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
-  )EOF";
-
-  ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(context_.server_factory_context_, accessLogManager())
-      .WillByDefault(ReturnRef(log_manager_));
-  EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info)
-                           -> absl::StatusOr<AccessLogFileSharedPtr> {
-        EXPECT_EQ(file_info.path_, "");
-        EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
-
-        return file_;
-      }));
-  EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
-}
-
-TEST_F(AccessLogImplTest, Stderr) {
-  const std::string yaml = R"EOF(
-name: accesslog
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog
-  )EOF";
-
-  ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(context_.server_factory_context_, accessLogManager())
-      .WillByDefault(ReturnRef(log_manager_));
-  EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info)
-                           -> absl::StatusOr<AccessLogFileSharedPtr> {
-        EXPECT_EQ(file_info.path_, "");
-        EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
-        return file_;
-      }));
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-}
-
 TEST_F(AccessLogImplTest, GrpcStatusFormatterUnsupportedFormat) {
   const std::string yaml = R"EOF(
 name: accesslog

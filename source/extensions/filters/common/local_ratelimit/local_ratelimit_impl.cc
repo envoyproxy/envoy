@@ -13,16 +13,78 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
+SINGLETON_MANAGER_REGISTRATION(local_ratelimit_share_provider_manager);
+
+class DefaultEvenShareMonitor : public ShareProviderManager::ShareMonitor {
+public:
+  uint32_t tokensPerFill(uint32_t origin_tokens_per_fill) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    return std::ceil(origin_tokens_per_fill * share_);
+  }
+  void onLocalClusterUpdate(const Upstream::Cluster& cluster) override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    const auto number = cluster.info()->endpointStats().membership_total_.value();
+    share_ = number == 0 ? 1.0 : 1.0 / number;
+  }
+
+private:
+  double share_{1.0};
+};
+
+ShareProviderManager::ShareProviderManager(Event::Dispatcher& main_dispatcher,
+                                           const Upstream::Cluster& cluster)
+    : main_dispatcher_(main_dispatcher), cluster_(cluster) {
+  // It's safe to capture the local cluster reference here because the local cluster is
+  // guaranteed to be static cluster and should never be removed.
+  handle_ = cluster_.prioritySet().addMemberUpdateCb([this](const auto&, const auto&) {
+    share_monitor_->onLocalClusterUpdate(cluster_);
+    return absl::OkStatus();
+  });
+  share_monitor_ = std::make_shared<DefaultEvenShareMonitor>();
+  share_monitor_->onLocalClusterUpdate(cluster_);
+}
+
+ShareProviderManager::~ShareProviderManager() {
+  // Ensure the callback is unregistered on the main dispatcher thread.
+  main_dispatcher_.post([h = std::move(handle_)]() {});
+}
+
+ShareProviderSharedPtr
+ShareProviderManager::getShareProvider(const ProtoLocalClusterRateLimit&) const {
+  // TODO(wbpcode): we may want to support custom share provider in the future based on the
+  // configuration.
+  return share_monitor_;
+}
+
+ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher& dispatcher,
+                                                              Upstream::ClusterManager& cm,
+                                                              Singleton::Manager& manager) {
+  return manager.getTyped<ShareProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_share_provider_manager),
+      [&dispatcher, &cm]() -> Singleton::InstanceSharedPtr {
+        const auto& local_cluster_name = cm.localClusterName();
+        if (!local_cluster_name.has_value()) {
+          return nullptr;
+        }
+        auto cluster = cm.clusters().getCluster(local_cluster_name.value());
+        if (!cluster.has_value()) {
+          return nullptr;
+        }
+        return ShareProviderManagerSharedPtr{
+            new ShareProviderManager(dispatcher, cluster.value().get())};
+      });
+}
+
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-    bool always_consume_default_token_bucket)
+    bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider)
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
-      time_source_(dispatcher.timeSource()),
+      time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket) {
   if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
@@ -105,13 +167,20 @@ void LocalRateLimiterImpl::onFillTimer() {
 
 void LocalRateLimiterImpl::onFillTimerHelper(TokenState& tokens,
                                              const RateLimit::TokenBucket& bucket) {
+
+  uint32_t tokens_per_fill = bucket.tokens_per_fill_;
+  if (share_provider_ != nullptr) {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    tokens_per_fill = share_provider_->tokensPerFill(tokens_per_fill);
+  }
+
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
   uint32_t expected_tokens = tokens.tokens_.load(std::memory_order_relaxed);
   uint32_t new_tokens_value;
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
-    new_tokens_value = std::min(bucket.max_tokens_, expected_tokens + bucket.tokens_per_fill_);
+    new_tokens_value = std::min(bucket.max_tokens_, expected_tokens + tokens_per_fill);
 
     // Testing hook.
     synchronizer_.syncPoint("on_fill_timer_pre_cas");

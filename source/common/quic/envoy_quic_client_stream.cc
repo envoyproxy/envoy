@@ -91,9 +91,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      (Http::HeaderUtility::isCapsuleProtocol(headers) ||
-       Http::HeaderUtility::isConnectUdpRequest(headers))) {
+  if (Http::HeaderUtility::isCapsuleProtocol(headers) ||
+      Http::HeaderUtility::isConnectUdpRequest(headers)) {
     useCapsuleProtocol();
     if (Http::HeaderUtility::isConnectUdpRequest(headers)) {
       // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
@@ -256,7 +255,8 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   if (read_side_closed() && !end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()));
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
+                      absl::string_view());
   }
   return true;
 }
@@ -354,7 +354,7 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   quic::QuicSpdyClientStream::OnStreamReset(frame);
   ASSERT(read_side_closed());
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code), absl::string_view());
   }
 }
 
@@ -362,21 +362,24 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
   stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()));
+  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
+                    absl::string_view());
   if (session()->connection()->connected()) {
     quic::QuicSpdyClientStream::ResetWithError(error);
   }
 }
 
-void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
+void EnvoyQuicClientStream::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
     runResetCallbacks(
         source == quic::ConnectionCloseSource::FROM_SELF
-            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
-            : quicErrorCodeToEnvoyRemoteResetReason(error));
+            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                   session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+        absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|", frame.error_details));
   }
-  quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
+  quic::QuicSpdyClientStream::OnConnectionClosed(frame, source);
 }
 
 void EnvoyQuicClientStream::OnClose() {
