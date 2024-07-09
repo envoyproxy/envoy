@@ -86,7 +86,8 @@ private:
   bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
   OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
 
-  absl::StatusOr<SessionContextID> generateHashForSessionContextId(const std::vector<std::string>& server_names);
+  absl::StatusOr<SessionContextID>
+  generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;

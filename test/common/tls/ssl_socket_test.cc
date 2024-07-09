@@ -371,13 +371,16 @@ void testUtil(const TestUtilOptions& options) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
-  auto server_cfg =
-      *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context);
+  auto server_cfg = THROW_OR_RETURN_VALUE(
+      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context),
+      std::unique_ptr<ServerContextConfigImpl>);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = THROW_OR_RETURN_VALUE(
+      ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                     *server_stats_store.rootScope(), std::vector<std::string>{}),
+      std::unique_ptr<ServerSslSocketFactory>);
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(options.version()));

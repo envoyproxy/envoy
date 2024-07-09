@@ -102,7 +102,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     return;
   }
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
-    creation_status = absl::InvalidArgumentError("Server TlsCertificates must have a certificate specified");
+    creation_status =
+        absl::InvalidArgumentError("Server TlsCertificates must have a certificate specified");
     return;
   }
 
@@ -144,7 +145,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     auto& ctx = tls_contexts_[i];
     if (!config.capabilities().verifies_peer_certificates) {
       SET_AND_RETURN_IF_NOT_OK(cert_validator_->addClientValidationContext(
-          ctx.ssl_ctx_.get(), config.requireClientCertificate()), creation_status);
+                                   ctx.ssl_ctx_.get(), config.requireClientCertificate()),
+                               creation_status);
     }
 
     if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
@@ -191,19 +193,22 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
     if (ocsp_resp_bytes.empty()) {
       if (ctx.is_must_staple_) {
-        creation_status = absl::InvalidArgumentError("OCSP response is required for must-staple certificate");
+        creation_status =
+            absl::InvalidArgumentError("OCSP response is required for must-staple certificate");
         return;
       }
       if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
-        creation_status = absl::InvalidArgumentError("Required OCSP response is missing from TLS context");
+        creation_status =
+            absl::InvalidArgumentError("Required OCSP response is missing from TLS context");
         return;
       }
     } else {
       auto response_or_error =
           Ocsp::OcspResponseWrapperImpl::create(ocsp_resp_bytes, factory_context_.timeSource());
-      SET_AND_RETURN_IF_STATUS_NOT_OK(response_or_error.status(), creation_status);
+      SET_AND_RETURN_IF_NOT_OK(response_or_error.status(), creation_status);
       if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
-        creation_status = absl::InvalidArgumentError("OCSP response does not match its TLS certificate");
+        creation_status =
+            absl::InvalidArgumentError("OCSP response does not match its TLS certificate");
         return;
       }
       ctx.ocsp_response_ = std::move(response_or_error.value());
@@ -335,7 +340,8 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
       // It's possible that the certificate doesn't have a subject, but
       // does have SANs. Make sure that we have one or the other.
       if (cn_index < 0 && san_count == 0) {
-        return absl::InvalidArgumentError("Invalid TLS context has neither subject CN nor SAN names");
+        return absl::InvalidArgumentError(
+            "Invalid TLS context has neither subject CN nor SAN names");
       }
 
       rc = X509_NAME_digest(X509_get_issuer_name(cert), EVP_sha256(), hash_buffer, &hash_length);
@@ -705,7 +711,7 @@ absl::StatusOr<Ssl::ServerContextSharedPtr> ServerContextFactoryImpl::createServ
     Server::Configuration::CommonFactoryContext& factory_context,
     Ssl::ContextAdditionalInitFunc additional_init) {
   return ServerContextImpl::create(scope, config, server_names, factory_context,
-                                                    std::move(additional_init));
+                                   std::move(additional_init));
 }
 
 REGISTER_FACTORY(ServerContextFactoryImpl, ServerContextFactory);
