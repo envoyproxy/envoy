@@ -93,7 +93,7 @@ protected:
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -179,7 +179,8 @@ protected:
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                     const Envoy::Http::AsyncClient::StreamOptions&) {
+                                     const Envoy::Http::AsyncClient::StreamOptions&,
+                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) {
     if (final_expected_grpc_service_.has_value()) {
       EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
                                           config_with_hash_key.config()));
@@ -195,6 +196,7 @@ protected:
 
     // close is idempotent and only called once per filter
     EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
+
     return stream;
   }
 

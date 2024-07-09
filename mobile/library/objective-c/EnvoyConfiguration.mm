@@ -107,21 +107,7 @@
                                           stringAccessors
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
-                                           keyValueStores
-                                           nodeId:(nullable NSString *)nodeId
-                                       nodeRegion:(nullable NSString *)nodeRegion
-                                         nodeZone:(nullable NSString *)nodeZone
-                                      nodeSubZone:(nullable NSString *)nodeSubZone
-                                 xdsServerAddress:(nullable NSString *)xdsServerAddress
-                                    xdsServerPort:(UInt32)xdsServerPort
-                           xdsGrpcInitialMetadata:
-                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
-                                  xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                 rtdsResourceName:(nullable NSString *)rtdsResourceName
-                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                        enableCds:(BOOL)enableCds
-                              cdsResourcesLocator:(nullable NSString *)cdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds {
+                                           keyValueStores {
   self = [super init];
   if (!self) {
     return nil;
@@ -161,19 +147,6 @@
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
-  self.nodeId = nodeId;
-  self.nodeRegion = nodeRegion;
-  self.nodeZone = nodeZone;
-  self.nodeSubZone = nodeSubZone;
-  self.xdsServerAddress = xdsServerAddress;
-  self.xdsServerPort = xdsServerPort;
-  self.xdsGrpcInitialMetadata = xdsGrpcInitialMetadata;
-  self.xdsSslRootCerts = xdsSslRootCerts;
-  self.rtdsResourceName = rtdsResourceName;
-  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-  self.cdsResourcesLocator = cdsResourcesLocator;
-  self.cdsTimeoutSeconds = cdsTimeoutSeconds;
-  self.enableCds = enableCds;
   self.bootstrapPointer = 0;
 
   return self;
@@ -247,36 +220,6 @@
   if (self.upstreamTlsSni != nil) {
     builder.setUpstreamTlsSni([self.upstreamTlsSni toCXXString]);
   }
-  if (self.nodeRegion != nil) {
-    builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
-                            [self.nodeSubZone toCXXString]);
-  }
-  if (self.nodeId != nil) {
-    builder.setNodeId([self.nodeId toCXXString]);
-  }
-
-#ifdef ENVOY_MOBILE_XDS
-  if (self.xdsServerAddress != nil) {
-    Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
-    for (NSString *header in self.xdsGrpcInitialMetadata) {
-      xdsBuilder.addInitialStreamHeader(
-          [header toCXXString], [[self.xdsGrpcInitialMetadata objectForKey:header] toCXXString]);
-    }
-    if (self.xdsSslRootCerts != nil) {
-      xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
-    }
-    if (self.rtdsResourceName != nil) {
-      xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],
-                                            self.rtdsTimeoutSeconds);
-    }
-    if (self.enableCds) {
-      xdsBuilder.addClusterDiscoveryService(
-          self.cdsResourcesLocator != nil ? [self.cdsResourcesLocator toCXXString] : "",
-          self.cdsTimeoutSeconds);
-    }
-    builder.setXds(xdsBuilder);
-  }
-#endif
 
   return builder;
 }

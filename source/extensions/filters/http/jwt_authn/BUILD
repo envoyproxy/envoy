@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["extractor.cc"],
     hdrs = ["extractor.h"],
     deps = [
+        "//envoy/runtime:runtime_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "@com_google_absl//absl/container:btree",
