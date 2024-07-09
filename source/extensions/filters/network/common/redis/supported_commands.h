@@ -29,10 +29,11 @@ struct SupportedCommands {
         "ltrim", "persist", "pexpire", "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "restore",
         "rpop", "rpush", "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange",
         "sismember", "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type",
-        "watch", "zadd", "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange",
-        "zrangebylex", "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank",
-        "zremrangebyscore", "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan",
-        "zscore");
+        "watch", "xack", "xadd", "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange",
+        "xrevrange", "xtrim", "zadd", "zcard", "zcount", "zincrby", "zlexcount", "zpopmin",
+        "zpopmax", "zrange", "zrangebylex", "zrangebyscore", "zrank", "zrem", "zremrangebylex",
+        "zremrangebyrank", "zremrangebyscore", "zrevrange", "zrevrangebylex", "zrevrangebyscore",
+        "zrevrank", "zscan", "zscore");
   }
 
   /**

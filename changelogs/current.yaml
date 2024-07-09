@@ -49,6 +49,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_proc
+  change: |
+    Timeout errors in external processor now returns 504 Gateway Timeout to downstream clients.
+    The previous behavior was returning 500 Internal Server Error.
 - area: dfp
   change: |
     Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
@@ -143,6 +147,10 @@ minor_behavior_changes:
     config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
     used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
+- area: http
+  change: |
+    Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -323,6 +331,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
 - area: hot_restart
   change: |
     Added new command-line flag :option:`--skip-hot-restart-parent-stats`.
