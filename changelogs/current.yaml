@@ -147,6 +147,10 @@ minor_behavior_changes:
     config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
     used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
+- area: custom response filter
+  change: |
+    Prevent the redirect response filter from sending 100 as the response code as this does not make sense
+    for custom responses.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
