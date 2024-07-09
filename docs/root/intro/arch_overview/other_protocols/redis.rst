@@ -255,6 +255,16 @@ For details on each command's usage see the official
   SETNX, String
   SETRANGE, String
   STRLEN, String
+  XACK, Stream
+  XADD, Stream
+  XAUTOCLAIM, Stream
+  XCLAIM, Stream
+  XDEL, Stream
+  XLEN, Stream
+  XPENDING, Stream
+  XRANGE, Stream
+  XREVRANGE, Stream
+  XTRIM, Stream
 
 Failure modes
 -------------
