@@ -391,7 +391,7 @@ new_features:
     to allow stripping the failure response details from the JWT authentication filter.
 - area: quic
   change: |
-    Added function to QuicListenerFilter interface that is called on receiving the first packet.
+    Added new interface to QuicListenerFilter that is called on receiving the first packet.
 
 deprecated:
 - area: tracing
