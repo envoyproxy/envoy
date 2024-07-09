@@ -460,6 +460,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   // Unless allowing failed or missing, all tokens must be verified successfully.
   if ((Status::Ok != status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
     tokens_.clear();
+    if (clear_route_cache_ && clear_route_cb_) {
+      clear_route_cb_();
+    }
+    clear_route_cb_ = nullptr;
+
     if (is_allow_failed_) {
       callback_(Status::Ok);
     } else if (is_allow_missing_ && status == Status::JwtMissed) {
@@ -468,11 +473,6 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
       callback_(status);
     }
     callback_ = nullptr;
-
-    if (clear_route_cache_ && clear_route_cb_) {
-      clear_route_cb_();
-    }
-    clear_route_cb_ = nullptr;
 
     return;
   }
