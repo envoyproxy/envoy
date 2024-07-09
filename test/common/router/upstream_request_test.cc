@@ -183,7 +183,6 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false));
-  EXPECT_CALL(router_filter_interface_, onHeadersTransmittedToUpstream());
   upstream_request_->acceptHeadersFromRouter(false);
 
   EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _));

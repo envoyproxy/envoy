@@ -304,7 +304,6 @@ public:
                               bool pool_success) override {
     parent_.onUpstreamHostSelected(host, pool_success);
   }
-  void onHeadersTransmittedToUpstream() override {}
   void onPerTryTimeout(UpstreamRequest&) override {}
   void onPerTryIdleTimeout(UpstreamRequest&) override {}
   void onStreamMaxDurationReached(UpstreamRequest&) override {}

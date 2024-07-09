@@ -87,10 +87,6 @@ public:
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host,
                                       bool pool_success) PURE;
 
-  /**
-   * This will be called when the downstream headers are transmitted to the upstream.
-   */
-  virtual void onHeadersTransmittedToUpstream() PURE;
   /*
    * This will be called if a per-try timeout fails.
    * @param upstream_request inicates which UpstreamRequest which timed out
