@@ -151,7 +151,6 @@ paths:
     - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
-    - source/common/tls/server_context_impl.cc
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
