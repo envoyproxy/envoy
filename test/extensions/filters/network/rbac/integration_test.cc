@@ -133,7 +133,19 @@ typed_config:
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
 }
 
-TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDenied) {
+class RoleBasedAccessControlNetworkFilterIntegrationTestWithSimTime
+    : public Event::TestUsingSimulatedTime,
+      public RoleBasedAccessControlNetworkFilterIntegrationTest {
+public:
+  RoleBasedAccessControlNetworkFilterIntegrationTestWithSimTime()
+      : RoleBasedAccessControlNetworkFilterIntegrationTest() {}
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrationTestWithSimTime,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTestWithSimTime, DelayDenied) {
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
@@ -147,12 +159,17 @@ typed_config:
         principals:
           - not_id:
               any: true
-  delay_deny: 1s
+  delay_deny: 5s
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  std::string buff(16 * 1024 * 1024, 'a');
-  // Write 16MB of data in 500ms. This should complete if the RBAC filter does not pause the read.
-  ASSERT_TRUE(tcp_client->partialWrite(buff, false, std::chrono::milliseconds(500)));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
+
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
