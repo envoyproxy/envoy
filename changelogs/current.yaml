@@ -49,6 +49,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_proc
+  change: |
+    Timeout errors in external processor now returns 504 Gateway Timeout to downstream clients.
+    The previous behavior was returning 500 Internal Server Error.
 - area: dfp
   change: |
     Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
@@ -130,6 +134,12 @@ minor_behavior_changes:
   change: |
     Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
     guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
+- area: http
+  change: |
+    http: envoy will now proxy 104 headers from upstream, though as with 100s only the first 1xx response
+    headers will be sent.104 headers are designated by ietf's draft-ietf-httpbis-resumable-upload rfc.
+    This behavioral can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.proxy_104`` to ``false``.
 - area: jwt_authn
   change: |
     Changes the behavior of the

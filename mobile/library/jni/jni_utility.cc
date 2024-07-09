@@ -305,8 +305,7 @@ MatcherData::Type StringToType(std::string type_as_string) {
   return MatcherData::EXACT;
 }
 
-void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
-                          Envoy::Protobuf::MessageLite* dest) {
+void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source, Protobuf::Message* dest) {
   ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
       jni_helper.getByteArrayElements(source, /* is_copy= */ nullptr);
   jsize size = jni_helper.getArrayLength(source);
@@ -315,7 +314,7 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
 }
 
 LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
-                                                   const Envoy::Protobuf::MessageLite& source) {
+                                                   const Envoy::Protobuf::Message& source) {
   size_t size = source.ByteSizeLong();
   LocalRefUniquePtr<jbyteArray> byte_array = jni_helper.newByteArray(size);
   auto bytes = jni_helper.getByteArrayElements(byte_array.get(), nullptr);
