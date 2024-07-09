@@ -63,16 +63,35 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
       continue;
     }
 
+    // Possible types from source/extensions/filters/common/expr/context.cc:
+    // - String
+    // - StringView
+    // - Map
+    // - Timestamp
+    // - Int64
+    // - Duration
+    // - Bool
+    // - Uint64
+    // - Bytes
+    //
+    // Of these, we need to handle
+    // - bool as bool
+    // - int64, uint64 as number
+    // - everything else as string via print
+    //
+    // Handling all value types here would be graceful but is not currently
+    // testable and drives down coverage %. This is not a _great_ reason to
+    // not do it; will get feedback from reviewers.
     ProtobufWkt::Value value;
     switch (result.value().type()) {
     case google::api::expr::runtime::CelValue::Type::kBool:
       value.set_bool_value(result.value().BoolOrDie());
       break;
-    case google::api::expr::runtime::CelValue::Type::kNullType:
-      value.set_null_value(ProtobufWkt::NullValue{});
+    case google::api::expr::runtime::CelValue::Type::kInt64:
+      value.set_number_value(result.value().Int64OrDie());
       break;
-    case google::api::expr::runtime::CelValue::Type::kDouble:
-      value.set_number_value(result.value().DoubleOrDie());
+    case google::api::expr::runtime::CelValue::Type::kUint64:
+      value.set_number_value(result.value().Uint64OrDie());
       break;
     default:
       value.set_string_value(Filters::Common::Expr::print(result.value()));

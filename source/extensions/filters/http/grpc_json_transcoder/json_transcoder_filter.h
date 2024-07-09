@@ -10,6 +10,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/stats.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"
@@ -148,7 +149,8 @@ using JsonTranscoderConfigConstSharedPtr = std::shared_ptr<const JsonTranscoderC
  */
 class JsonTranscoderFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
 public:
-  JsonTranscoderFilter(const JsonTranscoderConfigConstSharedPtr& config);
+  JsonTranscoderFilter(const JsonTranscoderConfigConstSharedPtr& config,
+                       const GrpcJsonTranscoderFilterStatsSharedPtr& stats);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -171,7 +173,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // Http::StreamFilterBase
-  void onDestroy() override {}
+  void onDestroy() override;
 
   // shouldTranscodeResponse returns whether to transcode response based on
   // the config and the request transcoding status.
@@ -207,6 +209,7 @@ private:
   void maybeExpandBufferLimits();
 
   const JsonTranscoderConfigConstSharedPtr config_;
+  const GrpcJsonTranscoderFilterStatsSharedPtr stats_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;
@@ -228,7 +231,7 @@ private:
   bool http_body_response_headers_set_{false};
 
   // Don't buffer unary response data in the `FilterManager` buffer.
-  Buffer::OwnedImpl response_out_;
+  Buffer::OwnedImpl response_data_;
 };
 
 } // namespace GrpcJsonTranscoder

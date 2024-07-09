@@ -9,7 +9,7 @@
 
 #include "source/common/common/utility.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -227,7 +227,7 @@ TEST(OutputBufferStream, CannotOverwriteBuffer) {
 TEST(OutputBufferStream, DoesNotAllocateMemoryEvenIfWeTryToOverflowBuffer) {
   constexpr char data[] = "123";
   std::array<char, 2> buffer;
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
 
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ostream << data << std::endl;

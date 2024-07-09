@@ -133,18 +133,17 @@ inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
 /**
  * Composite formatter implementation.
  */
-template <class FormatterContext>
-class CommonFormatterBaseImpl : public FormatterBase<FormatterContext> {
+template <class FormatterContext> class FormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
   using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
-  CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values = false)
+  FormatterBaseImpl(const std::string& format, bool omit_empty_values = false)
       : empty_value_string_(omit_empty_values ? absl::string_view{}
                                               : DefaultUnspecifiedValueStringView) {
     providers_ = SubstitutionFormatParser::parse<FormatterContext>(format);
   }
-  CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values,
-                          const CommandParsers& command_parsers)
+  FormatterBaseImpl(const std::string& format, bool omit_empty_values,
+                    const CommandParsers& command_parsers)
       : empty_value_string_(omit_empty_values ? absl::string_view{}
                                               : DefaultUnspecifiedValueStringView) {
     providers_ = SubstitutionFormatParser::parse<FormatterContext>(format, command_parsers);
@@ -167,12 +166,6 @@ public:
 private:
   const std::string empty_value_string_;
   std::vector<FormatterProviderBasePtr<FormatterContext>> providers_;
-};
-
-template <class FormatterContext>
-class FormatterBaseImpl : public CommonFormatterBaseImpl<FormatterContext> {
-public:
-  using CommonFormatterBaseImpl<FormatterContext>::CommonFormatterBaseImpl;
 };
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
@@ -382,13 +375,13 @@ template <class FormatterContext>
 using StructFormatterBasePtr = std::unique_ptr<StructFormatterBase<FormatterContext>>;
 
 template <class FormatterContext>
-class CommonJsonFormatterBaseImpl : public FormatterBase<FormatterContext> {
+class JsonFormatterBaseImpl : public FormatterBase<FormatterContext> {
 public:
   using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
-  CommonJsonFormatterBaseImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                              bool omit_empty_values, bool sort_properties,
-                              const CommandParsers& commands = {})
+  JsonFormatterBaseImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                        bool omit_empty_values, bool sort_properties,
+                        const CommandParsers& commands = {})
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands),
         sort_properties_(sort_properties) {}
 
@@ -414,12 +407,6 @@ public:
 private:
   const StructFormatterBase<FormatterContext> struct_formatter_;
   const bool sort_properties_;
-};
-
-template <class FormatterContext>
-class JsonFormatterBaseImpl : public CommonJsonFormatterBaseImpl<FormatterContext> {
-public:
-  using CommonJsonFormatterBaseImpl<FormatterContext>::CommonJsonFormatterBaseImpl;
 };
 
 using StructFormatter = StructFormatterBase<HttpFormatterContext>;
