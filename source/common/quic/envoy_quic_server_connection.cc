@@ -57,8 +57,8 @@ void EnvoyQuicServerConnection::ProcessUdpPacket(const quic::QuicSocketAddress& 
                                                  const quic::QuicReceivedPacket& packet) {
   if (!first_packet_received_) {
     listener_filter_manager_->onFirstPacketReceived(packet);
+    first_packet_received_ = true;
   }
-  first_packet_received_ = true;
 
   quic::QuicConnection::ProcessUdpPacket(self_address, peer_address, packet);
 };
