@@ -309,7 +309,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   // use the server's cipher list preferences
   for (auto& ctx : tls_contexts_) {
-    SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
+    if (!config.enableClientCipherPreference()) {
+      SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
+    }
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);

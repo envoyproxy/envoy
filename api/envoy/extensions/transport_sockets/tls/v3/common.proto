@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common TLS configuration]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message TlsParameters {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsParameters";
 
@@ -157,6 +157,10 @@ message TlsParameters {
   //   rsa_pkcs1_sha1
   //   ecdsa_sha1
   repeated string signature_algorithms = 5;
+
+  // By default, Envoy uses server's prefered cipher during the handshake. Setting this
+  // to true would allow the client's preference instead. Has no effect when using TLSv1_3.
+  bool enable_client_cipher_preference = 6;
 }
 
 // BoringSSL private key method configuration. The private key methods are used for external

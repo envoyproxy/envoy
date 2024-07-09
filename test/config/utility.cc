@@ -1524,6 +1524,8 @@ void ConfigHelper::initializeTls(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
   }
+  common_tls_context.mutable_tls_params()->set_enable_client_cipher_preference(
+      options.enable_client_cipher_preference_);
   if (!options.san_matchers_.empty()) {
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};

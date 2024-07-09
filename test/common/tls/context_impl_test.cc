@@ -139,6 +139,40 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
             "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
             "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
 }
+// Envoy's default cipher preference is server's.
+TEST_F(SslContextImplTest, TestServerCipherPreference) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(cfg.get()->enableClientCipherPreference(), false);
+}
+
+TEST_F(SslContextImplTest, TestEnableClientCipherPreference) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    tls_params:
+      enable_client_cipher_preference: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(cfg.get()->enableClientCipherPreference(), true);
+}
 
 TEST_F(SslContextImplTest, TestExpiringCert) {
   const std::string yaml = R"EOF(

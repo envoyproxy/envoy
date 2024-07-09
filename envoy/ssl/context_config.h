@@ -49,6 +49,11 @@ public:
   virtual const std::string& signatureAlgorithms() const PURE;
 
   /**
+   * @return true if the client cipher preference is enabled, false otherwise.
+   */
+  virtual bool enableClientCipherPreference() const PURE;
+
+  /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
    * certificate configs.
    */

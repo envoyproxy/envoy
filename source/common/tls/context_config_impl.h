@@ -27,6 +27,7 @@ public:
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
+  bool enableClientCipherPreference() const override { return enable_client_cipher_preference_; }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -89,6 +90,7 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
   const std::string signature_algorithms_;
+  const bool enable_client_cipher_preference_;
 
   std::vector<std::unique_ptr<Ssl::TlsCertificateConfigImpl>> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;

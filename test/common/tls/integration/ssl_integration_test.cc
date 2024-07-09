@@ -275,6 +275,40 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   checkStats();
 }
 
+// Test server preference of cipher suites. Default server order is ECDHE-RSA-AES128-GCM-SHA256
+// followed by ECDHE-RSA-AES256-GCM-SHA384. "ECDHE-RSA-AES128-GCM-SHA256" should be used based on
+// server preference.
+TEST_P(SslIntegrationTest, TestServerCipherPreference) {
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"})));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  const std::string counter_name = listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  EXPECT_EQ(1, test_server_->counter(counter_name)->value());
+}
+
+// Test client preference of cipher suites. Same server preference is followed as in the previous.
+// "ECDHE-RSA-AES256-GCM-SHA384" should be used based on client preference.
+TEST_P(SslIntegrationTest, ClientCipherPreference) {
+  enable_client_cipher_preference_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"})));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  const std::string counter_name = listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  EXPECT_EQ(1, test_server_->counter(counter_name)->value());
+}
+
 // This test must be here vs integration_admin_test so that it tests a server with loaded certs.
 TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   DISABLE_IF_ADMIN_DISABLED; // Admin functionality.

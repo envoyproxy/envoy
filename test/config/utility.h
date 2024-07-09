@@ -70,6 +70,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setEnableClientCipherPreference(bool enable_client_cipher_preference) {
+      enable_client_cipher_preference_ = enable_client_cipher_preference;
+      return *this;
+    }
+
     ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
       curves_ = curves;
       return *this;
@@ -127,6 +132,7 @@ public:
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
     bool ecdsa_cert_ocsp_staple_{false};
+    bool enable_client_cipher_preference_{false};
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     std::vector<std::string> curves_;

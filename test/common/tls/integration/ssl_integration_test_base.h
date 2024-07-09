@@ -36,6 +36,7 @@ protected:
   bool server_ecdsa_cert_{false};
   bool server_ecdsa_cert_ocsp_staple_{false};
   bool ocsp_staple_required_{false};
+  bool enable_client_cipher_preference_{false};
   bool client_ecdsa_cert_{false};
   // Set this true to debug SSL handshake issues with openssl s_client. The
   // verbose trace will be in the logs, openssl must be installed separately.
