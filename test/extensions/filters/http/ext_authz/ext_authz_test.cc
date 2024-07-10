@@ -53,7 +53,7 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-constexpr char filter_config_name[] = "ext_authz_filter";
+constexpr char FilterConfigName[] = "ext_authz_filter";
 
 template <class T> class HttpFilterTestBase : public T {
 public:
@@ -72,8 +72,7 @@ public:
                                              "ext_authz_prefix", factory_context_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
-    ON_CALL(decoder_filter_callbacks_, filterConfigName())
-        .WillByDefault(Return(filter_config_name));
+    ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
@@ -2958,9 +2957,9 @@ TEST_F(HttpFilterTest, LoggingInfoOK) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 
-  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
   EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
 }
@@ -2991,9 +2990,9 @@ TEST_F(HttpFilterTest, LoggingInfoEmpty) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(filter_config_name));
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 
-  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(filter_config_name);
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   EXPECT_TRUE(logging_info->filterMetadata().fields().empty());
 }
 
