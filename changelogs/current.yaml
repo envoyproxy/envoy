@@ -488,6 +488,11 @@ new_features:
     Added support for wildcard resolution in :ref:`inline_dns_table
     <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ServerContextConfig.inline_dns_table>`
     when DNS filter is working in server mode.
+- area: quic
+  change: |
+    QUIC stream reset error code will be added to transport failure reason.
+    This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.report_stream_reset_error_code``
+    to false.
 
 deprecated:
 - area: tracing
