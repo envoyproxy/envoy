@@ -65,7 +65,7 @@ public:
         filter_.deferred_reset_ = true;
         return;
       }
-      std::string failure_reason = transport_failure_reason;
+      std::string failure_reason(transport_failure_reason);
       if (reason == Http::StreamResetReason::LocalReset) {
         if (!Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.report_stream_reset_error_code")) {
