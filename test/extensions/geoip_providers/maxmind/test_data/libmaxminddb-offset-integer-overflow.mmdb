@@ -7,7 +7,7 @@
 <!DOCTYPE html>
 <html
   lang="en"
-  
+
   data-color-mode="auto" data-light-theme="light" data-dark-theme="dark"
   data-a11y-animated-images="system" data-a11y-link-underlines="true"
   >
@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://github.githubassets.com" crossorigin>
   <link rel="preconnect" href="https://avatars.githubusercontent.com">
 
-  
+
 
 
   <link crossorigin="anonymous" media="all" rel="stylesheet" href="https://github.githubassets.com/assets/light-efd2f2257c96.css" /><link crossorigin="anonymous" media="all" rel="stylesheet" href="https://github.githubassets.com/assets/dark-6b1e37da2254.css" /><link data-color-theme="dark_dimmed" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/dark_dimmed-aa16bfa90fb8.css" /><link data-color-theme="dark_high_contrast" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/dark_high_contrast-f4daad25d8cf.css" /><link data-color-theme="dark_colorblind" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/dark_colorblind-a4629b2e906b.css" /><link data-color-theme="light_colorblind" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/light_colorblind-afcc3a6a38dd.css" /><link data-color-theme="light_high_contrast" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/light_high_contrast-79bca7145393.css" /><link data-color-theme="light_tritanopia" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/light_tritanopia-fe4137b54b26.css" /><link data-color-theme="dark_tritanopia" crossorigin="anonymous" media="all" rel="stylesheet" data-href="https://github.githubassets.com/assets/dark_tritanopia-1911f0cf0db4.css" />
@@ -34,7 +34,7 @@
   <link crossorigin="anonymous" media="all" rel="stylesheet" href="https://github.githubassets.com/assets/repository-7247b57543b3.css" />
 <link crossorigin="anonymous" media="all" rel="stylesheet" href="https://github.githubassets.com/assets/code-68246ade0881.css" />
 
-  
+
 
 
   <script type="application/json" id="client-env">{"locale":"en","featureFlags":["code_vulnerability_scanning","copilot_chat_static_thread_suggestions","copilot_chat_dotcom_user_server_tokens","copilot_conversational_ux_history_refs","copilot_followup_to_agent","copilot_smell_icebreaker_ux","copilot_implicit_context","copilot_stop_response","failbot_handle_non_errors","geojson_azure_maps","marketing_forms_api_integration_contact_request","marketing_pages_search_explore_provider","turbo_experiment_risky","sample_network_conn_type","no_character_key_shortcuts_in_inputs","react_start_transition_for_navigations","custom_inp","remove_child_patch","kb_source_repos"]}</script>
@@ -78,7 +78,7 @@
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/vendors-node_modules_github_mini-throttle_dist_index_js-node_modules_github_catalyst_lib_inde-dbbea9-bac2d7b04358.js"></script>
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/app_assets_modules_github_repositories_get-repo-element_ts-d813e49daba2.js"></script>
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/code-menu-14f80622cb85.js"></script>
-  
+
   <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/react-lib-dc88c1a68b28.js"></script>
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/vendors-node_modules_github_mini-throttle_dist_index_js-node_modules_primer_octicons-react_di-b40d97-7312ee04163d.js"></script>
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/vendors-node_modules_primer_react_lib-esm_Box_Box_js-5a335cbe71ad.js"></script>
@@ -133,7 +133,7 @@
   <meta name="route-controller" content="blob" data-turbo-transient>
   <meta name="route-action" content="show" data-turbo-transient>
 
-    
+
   <meta name="current-catalog-service-hash" content="82c569b93da5c18ed649ebd4c2c79437db4611a6a1373e805a3cb001c64130b7">
 
 
@@ -144,7 +144,7 @@
 
 
   <meta name="github-keyboard-shortcuts" content="repository,source-code,file-tree,copilot" data-turbo-transient="true" />
-  
+
 
   <meta name="selected-link" value="repo_source" data-turbo-transient>
   <link rel="assets" href="https://github.githubassets.com/">
@@ -155,18 +155,18 @@
 
   <meta name="analytics-location" content="/&lt;user-name&gt;/&lt;repo-name&gt;/blob/show" data-turbo-transient="true" />
 
-  
+
 
 
 
 
     <meta name="user-login" content="">
 
-  
+
 
     <meta name="viewport" content="width=device-width">
 
-    
+
 
       <meta name="description" content="Spec and test data for the MaxMind DB file format. Contribute to maxmind/MaxMind-DB development by creating an account on GitHub.">
 
@@ -178,7 +178,7 @@
 
       <meta name="twitter:image:src" content="https://opengraph.githubassets.com/8c274aa1754f7cbdabd6de3141fe255c7ab4c29902bbb2a808f017a6f5dc172b/maxmind/MaxMind-DB" /><meta name="twitter:site" content="@github" /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="MaxMind-DB/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb at main · maxmind/MaxMind-DB" /><meta name="twitter:description" content="Spec and test data for the MaxMind DB file format. Contribute to maxmind/MaxMind-DB development by creating an account on GitHub." />
   <meta property="og:image" content="https://opengraph.githubassets.com/8c274aa1754f7cbdabd6de3141fe255c7ab4c29902bbb2a808f017a6f5dc172b/maxmind/MaxMind-DB" /><meta property="og:image:alt" content="Spec and test data for the MaxMind DB file format. Contribute to maxmind/MaxMind-DB development by creating an account on GitHub." /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="600" /><meta property="og:site_name" content="GitHub" /><meta property="og:type" content="object" /><meta property="og:title" content="MaxMind-DB/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb at main · maxmind/MaxMind-DB" /><meta property="og:url" content="https://github.com/maxmind/MaxMind-DB/blob/main/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb" /><meta property="og:description" content="Spec and test data for the MaxMind DB file format. Contribute to maxmind/MaxMind-DB development by creating an account on GitHub." />
-  
+
 
 
 
@@ -205,7 +205,7 @@
 
 
 
-    
+
 
     <meta name="turbo-body-classes" content="logged-out env-production page-responsive">
 
@@ -228,7 +228,7 @@
 
   <body class="logged-out env-production page-responsive" style="word-wrap: break-word;">
     <div data-turbo-body class="logged-out env-production page-responsive" style="word-wrap: break-word;">
-      
+
 
 
     <div class="position-relative js-header-wrapper ">
@@ -236,9 +236,9 @@
 
       <span data-view-component="true" class="progress-pjax-loader Progress position-fixed width-full">
     <span style="width: 0%;" data-view-component="true" class="Progress-item progress-pjax-loader-bar left-0 top-0 color-bg-accent-emphasis"></span>
-</span>      
-      
-      
+</span>
+
+
 
 
 
@@ -253,7 +253,7 @@
   partial-name="keyboard-shortcuts-dialog"
   data-ssr="false"
 >
-  
+
   <script type="application/json" data-target="react-partial.embeddedData">{"props":{"docsUrl":"https://docs.github.com/get-started/accessibility/keyboard-shortcuts"}}</script>
   <div data-target="react-partial.reactRoot"></div>
 </react-partial>
@@ -261,11 +261,11 @@
 
 
 
-      
 
-        
 
-            
+
+
+
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/vendors-node_modules_github_remote-form_dist_index_js-node_modules_delegated-events_dist_inde-94fd67-f094580c6608.js"></script>
 <script crossorigin="anonymous" defer="defer" type="application/javascript" src="https://github.githubassets.com/assets/sessions-d29ab5b270a5.js"></script>
 <header class="Header-old header-logged-out js-details-container Details position-relative f4 py-3" role="banner" data-color-mode=light data-light-theme=light data-dark-theme=dark>
@@ -327,7 +327,7 @@
         Automate any workflow
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -340,7 +340,7 @@
         Host and manage packages
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -353,7 +353,7 @@
         Find and fix vulnerabilities
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -366,7 +366,7 @@
         Instant dev environments
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -379,7 +379,7 @@
         Write better code with AI
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -392,7 +392,7 @@
         Manage code changes
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -405,7 +405,7 @@
         Plan and track work
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -418,7 +418,7 @@
         Collaborate outside of code
       </div>
 
-    
+
 </a></li>
 
             </ul>
@@ -430,7 +430,7 @@
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Product&quot;,&quot;action&quot;:&quot;click to go to All features&quot;,&quot;label&quot;:&quot;ref_cta:All features;&quot;}" href="https://github.com/features">
       All features
 
-    
+
 </a></li>
 
                 <li>
@@ -481,21 +481,21 @@
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to Enterprise&quot;,&quot;label&quot;:&quot;ref_cta:Enterprise;&quot;}" href="https://github.com/enterprise">
       Enterprise
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to Teams&quot;,&quot;label&quot;:&quot;ref_cta:Teams;&quot;}" href="https://github.com/team">
       Teams
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to Startups&quot;,&quot;label&quot;:&quot;ref_cta:Startups;&quot;}" href="https://github.com/enterprise/startups">
       Startups
 
-    
+
 </a></li>
 
             </ul>
@@ -507,21 +507,21 @@
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to Healthcare&quot;,&quot;label&quot;:&quot;ref_cta:Healthcare;&quot;}" href="https://github.com/solutions/industries/healthcare">
       Healthcare
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to Financial services&quot;,&quot;label&quot;:&quot;ref_cta:Financial services;&quot;}" href="https://github.com/solutions/industries/financial-services">
       Financial services
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to Manufacturing&quot;,&quot;label&quot;:&quot;ref_cta:Manufacturing;&quot;}" href="https://github.com/solutions/industries/manufacturing">
       Manufacturing
 
-    
+
 </a></li>
 
             </ul>
@@ -533,21 +533,21 @@
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to CI/CD &amp;amp; Automation&quot;,&quot;label&quot;:&quot;ref_cta:CI/CD &amp;amp; Automation;&quot;}" href="https://github.com/solutions/ci-cd">
       CI/CD &amp; Automation
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to DevOps&quot;,&quot;label&quot;:&quot;ref_cta:DevOps;&quot;}" href="https://github.com/solutions/devops">
       DevOps
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Solutions&quot;,&quot;action&quot;:&quot;click to go to DevSecOps&quot;,&quot;label&quot;:&quot;ref_cta:DevSecOps;&quot;}" href="https://github.com/solutions/devsecops">
       DevSecOps
 
-    
+
 </a></li>
 
             </ul>
@@ -589,7 +589,7 @@
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Resources&quot;,&quot;action&quot;:&quot;click to go to Customer Stories&quot;,&quot;label&quot;:&quot;ref_cta:Customer Stories;&quot;}" href="https://github.com/customer-stories">
       Customer Stories
 
-    
+
 </a></li>
 
                 <li>
@@ -619,13 +619,13 @@
             <ul class="list-style-none f5" >
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary d-flex flex-items-center" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Open Source&quot;,&quot;action&quot;:&quot;click to go to GitHub Sponsors&quot;,&quot;label&quot;:&quot;ref_cta:GitHub Sponsors;&quot;}" href="/sponsors">
-      
+
       <div>
         <div class="color-fg-default h4">GitHub Sponsors</div>
         Fund open source developers
       </div>
 
-    
+
 </a></li>
 
             </ul>
@@ -634,13 +634,13 @@
             <ul class="list-style-none f5" >
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary d-flex flex-items-center" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Open Source&quot;,&quot;action&quot;:&quot;click to go to The ReadME Project&quot;,&quot;label&quot;:&quot;ref_cta:The ReadME Project;&quot;}" href="https://github.com/readme">
-      
+
       <div>
         <div class="color-fg-default h4">The ReadME Project</div>
         GitHub community articles
       </div>
 
-    
+
 </a></li>
 
             </ul>
@@ -652,21 +652,21 @@
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Open Source&quot;,&quot;action&quot;:&quot;click to go to Topics&quot;,&quot;label&quot;:&quot;ref_cta:Topics;&quot;}" href="https://github.com/topics">
       Topics
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Open Source&quot;,&quot;action&quot;:&quot;click to go to Trending&quot;,&quot;label&quot;:&quot;ref_cta:Trending;&quot;}" href="https://github.com/trending">
       Trending
 
-    
+
 </a></li>
 
                 <li>
   <a class="HeaderMenu-dropdown-link lh-condensed d-block no-underline position-relative py-2 Link--secondary" data-analytics-event="{&quot;category&quot;:&quot;Header dropdown (logged out), Open Source&quot;,&quot;action&quot;:&quot;click to go to Collections&quot;,&quot;label&quot;:&quot;ref_cta:Collections;&quot;}" href="https://github.com/collections">
       Collections
 
-    
+
 </a></li>
 
             </ul>
@@ -695,7 +695,7 @@
         AI-powered developer platform
       </div>
 
-    
+
 </a></li>
 
             </ul>
@@ -713,7 +713,7 @@
         Enterprise-grade security features
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -726,7 +726,7 @@
         Enterprise-grade AI features
       </div>
 
-    
+
 </a></li>
 
                 <li>
@@ -739,7 +739,7 @@
         Enterprise-grade 24/7 support
       </div>
 
-    
+
 </a></li>
 
             </ul>
@@ -756,7 +756,7 @@
           </nav>
 
         <div class="d-lg-flex flex-items-center mb-3 mb-lg-0 text-center text-lg-left ml-3" style="">
-                
+
 
 
 <qbsearch-input class="search-input" data-scope="repo:maxmind/MaxMind-DB" data-custom-scopes-path="/search/custom_scopes" data-delete-custom-scopes-csrf="1iYG2h2OLnX7DJjxMQfDrk1Oi3YwoQkqDcMVotQpXFsekt-_I9D5f7vUAkhWLHQE1DUZByHJteTAQ_f-Q88skg" data-max-custom-scopes="10" data-header-redesign-enabled="false" data-initial-value="" data-blackbird-suggestions-path="/search/suggestions" data-jump-to-suggestions-path="/_graphql/GetSuggestedNavigationDestinations" data-current-repository="maxmind/MaxMind-DB" data-current-org="maxmind" data-current-owner="" data-logged-in="false" data-copilot-chat-enabled="false" data-blackbird-indexed-repo-csrf="<esi:include src=&quot;/_esi/rails_csrf_token_form_hidden?r=lgB%2FPP5UAj9lzy4AineNDo7j55bYlov593Zo95%2FkO2raG1RUoAUf2uiYHCcqR09PMd1sQRSJ%2BpikL39AkU98zY4kDlFqEa5jLbNpO%2BXxW0ABm3y%2FfLs%2B3KPPOlxfAKzZ1Gn7S978SXXCGwjsJqw8ZXfG0cWyWz5NR1CEuTdKbZtpIvlbBxKoRhwZgJhHDbW0LcAUrtx9gWoUKsnJKWz9p3Er5je%2F3xfN1P4OnZBJ8l7UbMdkn3lVIhcHyw1Oxz%2F3xmYUymm31ewD%2BCB%2FKPpEfjuvIZ5%2FZwhMEOtjpSu6gaYhXiHR3N9gboMUB05mMnK39uuW6i0ATHhBV%2FfTZA5livR18yCw5BhqfTCZ2YfoifzKGr%2FWsVnI3GYx6p0okU6ahXzMMebxSfcDU0SRAunm9N4%2BJFRWRkNhajgLPHPtQHhe4eVLrcVAqsHsIBqaMTQ7g9J3nENSZ0TMqpJEI5POYup2mMhJdQJLYvZzf74b%2BxG%2Bbs9J5l8KGv9pcbAbuIfjS4YILIxpMwi0oJ8Jii5js3AmFV18Rhs5StHXflOZc9pVyKa0CqNWFLXR2ok%2FvdzrE6awK%2BYIW9hT2%2FL0Nr8GkB5iSlw3DXLKup1zFxu03y7EKaFlqrO2qyjxY898jpe%2BSPLzIi1NF5aAjV%2BNWMCzKkjt--IghsUth0qH0wqwuU--H4xcyLz0LRA1ZKIrqpVZ%2FA%3D%3D&quot; />">
@@ -787,12 +787,12 @@
 
     <input type="hidden" name="type" class="js-site-search-type-field">
 
-    
+
 <div class="Overlay--hidden " data-modal-dialog-overlay>
   <modal-dialog data-action="close:qbsearch-input#handleClose cancel:qbsearch-input#handleClose" data-target="qbsearch-input.searchSuggestionsDialog" role="dialog" id="search-suggestions-dialog" aria-modal="true" aria-labelledby="search-suggestions-dialog-header" data-view-component="true" class="Overlay Overlay--width-large Overlay--height-auto">
       <h1 id="search-suggestions-dialog-header" class="sr-only">Search code, repositories, users, issues, pull requests...</h1>
     <div class="Overlay-body Overlay-body--paddingNone">
-      
+
           <div data-view-component="true">        <div class="search-suggestions position-fixed width-full color-shadow-large border color-fg-default color-bg-default overflow-hidden d-flex flex-column query-builder-container"
           style="border-radius: 12px;"
           data-target="qbsearch-input.queryBuilderContainer"
@@ -1075,7 +1075,7 @@
   </div>
   <div data-action="click:qbsearch-input#retract" class="dark-backdrop position-fixed" hidden data-target="qbsearch-input.darkBackdrop"></div>
   <div class="color-fg-default">
-    
+
 <dialog-helper>
   <dialog data-target="qbsearch-input.feedbackDialog" data-action="close:qbsearch-input#handleDialogClose cancel:qbsearch-input#handleDialogClose" id="feedback-dialog" aria-modal="true" aria-labelledby="feedback-dialog-title" aria-describedby="feedback-dialog-description" data-view-component="true" class="Overlay Overlay-whenNarrow Overlay--size-medium Overlay--motion-scaleFade">
     <div data-view-component="true" class="Overlay-header">
@@ -1084,7 +1084,7 @@
       <h1 class="Overlay-title " id="feedback-dialog-title">
         Provide feedback
       </h1>
-        
+
     </div>
     <div class="Overlay-actionWrap">
       <button data-close-dialog-id="feedback-dialog" aria-label="Close" type="button" data-view-component="true" class="close-button Overlay-closeButton"><svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-x">
@@ -1092,7 +1092,7 @@
 </svg></button>
     </div>
   </div>
-  
+
 </div>
       <scrollable-region data-labelled-by="feedback-dialog-title">
         <div data-view-component="true" class="Overlay-body">        <!-- '"` --><!-- </textarea></xmp> --></option></form><form id="code-search-feedback-form" data-turbo="false" action="/search/feedback" accept-charset="UTF-8" method="post"><input type="hidden" data-csrf="true" name="authenticity_token" value="C5pk1A/qcsvpuxcNmp4JnlRz1t/ztRB//xy/HT9/JnOnvYyv78PXi2xAmFRXDvITcjchMI8NrWAQhoXgjgv2Cw==" />
@@ -1110,7 +1110,7 @@
 </dialog></dialog-helper>
 
     <custom-scopes data-target="qbsearch-input.customScopesManager">
-    
+
 <dialog-helper>
   <dialog data-target="custom-scopes.customScopesModalDialog" data-action="close:qbsearch-input#handleDialogClose cancel:qbsearch-input#handleDialogClose" id="custom-scopes-dialog" aria-modal="true" aria-labelledby="custom-scopes-dialog-title" aria-describedby="custom-scopes-dialog-description" data-view-component="true" class="Overlay Overlay-whenNarrow Overlay--size-medium Overlay--motion-scaleFade">
     <div data-view-component="true" class="Overlay-header Overlay-header--divided">
@@ -1127,7 +1127,7 @@
 </svg></button>
     </div>
   </div>
-  
+
 </div>
       <scrollable-region data-labelled-by="custom-scopes-dialog-title">
         <div data-view-component="true" class="Overlay-body">        <div data-target="custom-scopes.customScopesModalDialogFlash"></div>
@@ -1214,7 +1214,7 @@
 </header>
 
       <div hidden="hidden" data-view-component="true" class="js-stale-session-flash stale-session-flash flash flash-warn flash-full mb-3">
-  
+
         <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-alert">
     <path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path>
 </svg>
@@ -1228,7 +1228,7 @@
 </button><tool-tip id="tooltip-284ec7cc-9ddd-430f-9d4e-896512d45121" for="icon-button-f4f6ec56-7151-4df1-81b8-276e2bd51cba" popover="manual" data-direction="s" data-type="label" data-view-component="true" class="sr-only position-absolute">Dismiss alert</tool-tip>
 
 
-  
+
 </div>
     </div>
 
@@ -1247,7 +1247,7 @@
 
 
   <template class="js-flash-template">
-    
+
 <div class="flash flash-full   {{ className }}">
   <div >
     <button autofocus class="flash-close js-flash-close" type="button" aria-label="Dismiss this message">
@@ -1256,7 +1256,7 @@
 </svg>
     </button>
     <div aria-atomic="true" role="alert" class="js-flash-alert">
-      
+
       <div>{{ message }}</div>
 
     </div>
@@ -1266,7 +1266,7 @@
 </div>
 
 
-    
+
     <include-fragment class="js-notification-shelf-include-fragment" data-base-src="https://github.com/notifications/beta/shelf"></include-fragment>
 
 
@@ -1281,29 +1281,29 @@
   >
         <div itemscope itemtype="http://schema.org/SoftwareSourceCode" class="">
     <main id="js-repo-pjax-container" >
-      
-      
-    
-
-    
 
 
 
 
 
 
-  
+
+
+
+
+
+
   <div id="repository-container-header"  class="pt-3 hide-full-screen" style="background-color: var(--page-header-bgColor, var(--color-page-header-bg));" data-turbo-replace>
 
       <div class="d-flex flex-nowrap flex-justify-end mb-3  px-3 px-lg-5" style="gap: 1rem;">
 
         <div class="flex-auto min-width-0 width-fit">
-            
+
   <div class=" d-flex flex-wrap flex-items-center wb-break-word f3 text-normal">
       <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-repo color-fg-muted mr-2">
     <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"></path>
 </svg>
-    
+
     <span class="author flex-self-stretch" itemprop="author">
       <a class="url fn" rel="author" data-hovercard-type="organization" data-hovercard-url="/orgs/maxmind/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="/maxmind">
         maxmind
@@ -1321,8 +1321,8 @@
 
         <div id="repository-details-container" class="flex-shrink-0" data-turbo-replace style="max-width: 70%;">
             <ul class="pagehead-actions flex-shrink-0 d-none d-md-inline" style="padding: 2px 0;">
-    
-      
+
+
 
   <li>
             <a href="/login?return_to=%2Fmaxmind%2FMaxMind-DB" rel="nofollow" id="repository-details-watch-button" data-hydro-click="{&quot;event_type&quot;:&quot;authentication.click&quot;,&quot;payload&quot;:{&quot;location_in_page&quot;:&quot;notification subscription menu watch&quot;,&quot;repository_id&quot;:null,&quot;auth_type&quot;:&quot;LOG_IN&quot;,&quot;originating_url&quot;:&quot;https://github.com/maxmind/MaxMind-DB/blob/main/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb&quot;,&quot;user_id&quot;:null}}" data-hydro-click-hmac="f94fb54b42fcd02d5ae7d4a8a475dbe5b885ab7fe382f8a8696e4d078bca1770" aria-label="You must be signed in to change notification settings" data-view-component="true" class="btn-sm btn">    <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-bell mr-2">
@@ -1367,7 +1367,7 @@
   <ul data-view-component="true" class="UnderlineNav-body list-style-none">
       <li data-view-component="true" class="d-inline-flex">
   <a id="code-tab" href="/maxmind/MaxMind-DB" data-tab-item="i0code-tab" data-selected-links="repo_source repo_downloads repo_commits repo_releases repo_tags repo_branches repo_packages repo_deployments repo_attestations /maxmind/MaxMind-DB" data-pjax="#repo-content-pjax-container" data-turbo-frame="repo-content-turbo-frame" data-hotkey="g c" data-analytics-event="{&quot;category&quot;:&quot;Underline navbar&quot;,&quot;action&quot;:&quot;Click tab&quot;,&quot;label&quot;:&quot;Code&quot;,&quot;target&quot;:&quot;UNDERLINE_NAV.TAB&quot;}" aria-current="page" data-view-component="true" class="UnderlineNav-item no-wrap js-responsive-underlinenav-item js-selected-navigation-item selected">
-    
+
               <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-code UnderlineNav-octicon d-none d-sm-inline">
     <path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"></path>
 </svg>
@@ -1375,11 +1375,11 @@
           <span id="code-repo-tab-count" data-pjax-replace="" data-turbo-replace="" title="Not available" data-view-component="true" class="Counter"></span>
 
 
-    
+
 </a></li>
       <li data-view-component="true" class="d-inline-flex">
   <a id="issues-tab" href="/maxmind/MaxMind-DB/issues" data-tab-item="i1issues-tab" data-selected-links="repo_issues repo_labels repo_milestones /maxmind/MaxMind-DB/issues /_view_fragments/issues/index/maxmind/MaxMind-DB/layout" data-pjax="#repo-content-pjax-container" data-turbo-frame="repo-content-turbo-frame" data-hotkey="g i" data-analytics-event="{&quot;category&quot;:&quot;Underline navbar&quot;,&quot;action&quot;:&quot;Click tab&quot;,&quot;label&quot;:&quot;Issues&quot;,&quot;target&quot;:&quot;UNDERLINE_NAV.TAB&quot;}" data-view-component="true" class="UnderlineNav-item no-wrap js-responsive-underlinenav-item js-selected-navigation-item">
-    
+
               <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-issue-opened UnderlineNav-octicon d-none d-sm-inline">
     <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path>
 </svg>
@@ -1387,11 +1387,11 @@
           <span id="issues-repo-tab-count" data-pjax-replace="" data-turbo-replace="" title="2" data-view-component="true" class="Counter">2</span>
 
 
-    
+
 </a></li>
       <li data-view-component="true" class="d-inline-flex">
   <a id="pull-requests-tab" href="/maxmind/MaxMind-DB/pulls" data-tab-item="i2pull-requests-tab" data-selected-links="repo_pulls checks /maxmind/MaxMind-DB/pulls" data-pjax="#repo-content-pjax-container" data-turbo-frame="repo-content-turbo-frame" data-hotkey="g p" data-analytics-event="{&quot;category&quot;:&quot;Underline navbar&quot;,&quot;action&quot;:&quot;Click tab&quot;,&quot;label&quot;:&quot;Pull requests&quot;,&quot;target&quot;:&quot;UNDERLINE_NAV.TAB&quot;}" data-view-component="true" class="UnderlineNav-item no-wrap js-responsive-underlinenav-item js-selected-navigation-item">
-    
+
               <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-git-pull-request UnderlineNav-octicon d-none d-sm-inline">
     <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path>
 </svg>
@@ -1399,11 +1399,11 @@
           <span id="pull-requests-repo-tab-count" data-pjax-replace="" data-turbo-replace="" title="0" hidden="hidden" data-view-component="true" class="Counter">0</span>
 
 
-    
+
 </a></li>
       <li data-view-component="true" class="d-inline-flex">
   <a id="actions-tab" href="/maxmind/MaxMind-DB/actions" data-tab-item="i3actions-tab" data-selected-links="repo_actions /maxmind/MaxMind-DB/actions" data-pjax="#repo-content-pjax-container" data-turbo-frame="repo-content-turbo-frame" data-hotkey="g a" data-analytics-event="{&quot;category&quot;:&quot;Underline navbar&quot;,&quot;action&quot;:&quot;Click tab&quot;,&quot;label&quot;:&quot;Actions&quot;,&quot;target&quot;:&quot;UNDERLINE_NAV.TAB&quot;}" data-view-component="true" class="UnderlineNav-item no-wrap js-responsive-underlinenav-item js-selected-navigation-item">
-    
+
               <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-play UnderlineNav-octicon d-none d-sm-inline">
     <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773 4.264 2.559a.25.25 0 0 1 0 .428l-4.264 2.559A.25.25 0 0 1 6 10.559V5.442a.25.25 0 0 1 .379-.215Z"></path>
 </svg>
@@ -1411,22 +1411,22 @@
           <span id="actions-repo-tab-count" data-pjax-replace="" data-turbo-replace="" title="Not available" data-view-component="true" class="Counter"></span>
 
 
-    
+
 </a></li>
       <li data-view-component="true" class="d-inline-flex">
   <a id="security-tab" href="/maxmind/MaxMind-DB/security" data-tab-item="i4security-tab" data-selected-links="security overview alerts policy token_scanning code_scanning /maxmind/MaxMind-DB/security" data-pjax="#repo-content-pjax-container" data-turbo-frame="repo-content-turbo-frame" data-hotkey="g s" data-analytics-event="{&quot;category&quot;:&quot;Underline navbar&quot;,&quot;action&quot;:&quot;Click tab&quot;,&quot;label&quot;:&quot;Security&quot;,&quot;target&quot;:&quot;UNDERLINE_NAV.TAB&quot;}" data-view-component="true" class="UnderlineNav-item no-wrap js-responsive-underlinenav-item js-selected-navigation-item">
-    
+
               <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-shield UnderlineNav-octicon d-none d-sm-inline">
     <path d="M7.467.133a1.748 1.748 0 0 1 1.066 0l5.25 1.68A1.75 1.75 0 0 1 15 3.48V7c0 1.566-.32 3.182-1.303 4.682-.983 1.498-2.585 2.813-5.032 3.855a1.697 1.697 0 0 1-1.33 0c-2.447-1.042-4.049-2.357-5.032-3.855C1.32 10.182 1 8.566 1 7V3.48a1.75 1.75 0 0 1 1.217-1.667Zm.61 1.429a.25.25 0 0 0-.153 0l-5.25 1.68a.25.25 0 0 0-.174.238V7c0 1.358.275 2.666 1.057 3.86.784 1.194 2.121 2.34 4.366 3.297a.196.196 0 0 0 .154 0c2.245-.956 3.582-2.104 4.366-3.298C13.225 9.666 13.5 8.36 13.5 7V3.48a.251.251 0 0 0-.174-.237l-5.25-1.68ZM8.75 4.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 1.5 0ZM9 10.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path>
 </svg>
         <span data-content="Security">Security</span>
           <include-fragment src="/maxmind/MaxMind-DB/security/overall-count" accept="text/fragment+html"></include-fragment>
 
-    
+
 </a></li>
       <li data-view-component="true" class="d-inline-flex">
   <a id="insights-tab" href="/maxmind/MaxMind-DB/pulse" data-tab-item="i5insights-tab" data-selected-links="repo_graphs repo_contributors dependency_graph dependabot_updates pulse people community /maxmind/MaxMind-DB/pulse" data-pjax="#repo-content-pjax-container" data-turbo-frame="repo-content-turbo-frame" data-analytics-event="{&quot;category&quot;:&quot;Underline navbar&quot;,&quot;action&quot;:&quot;Click tab&quot;,&quot;label&quot;:&quot;Insights&quot;,&quot;target&quot;:&quot;UNDERLINE_NAV.TAB&quot;}" data-view-component="true" class="UnderlineNav-item no-wrap js-responsive-underlinenav-item js-selected-navigation-item">
-    
+
               <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-graph UnderlineNav-octicon d-none d-sm-inline">
     <path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"></path>
 </svg>
@@ -1434,7 +1434,7 @@
           <span id="insights-repo-tab-count" data-pjax-replace="" data-turbo-replace="" title="Not available" data-view-component="true" class="Counter"></span>
 
 
-    
+
 </a></li>
 </ul>
     <div style="visibility:hidden;" data-view-component="true" class="UnderlineNav-actions js-responsive-underlinenav-overflow position-absolute pr-3 pr-md-4 pr-lg-5 right-0">      <action-menu data-select-variant="none" data-view-component="true">
@@ -1447,125 +1447,125 @@
 
 <anchored-position id="action-menu-e84b9ab2-72d2-43a1-b085-aa1026380fe5-overlay" anchor="action-menu-e84b9ab2-72d2-43a1-b085-aa1026380fe5-button" align="start" side="outside-bottom" anchor-offset="normal" popover="auto" data-view-component="true">
   <div data-view-component="true" class="Overlay Overlay--size-auto">
-    
+
       <div data-view-component="true" class="Overlay-body Overlay-body--paddingNone">          <action-list>
   <div data-view-component="true">
     <ul aria-labelledby="action-menu-e84b9ab2-72d2-43a1-b085-aa1026380fe5-button" id="action-menu-e84b9ab2-72d2-43a1-b085-aa1026380fe5-list" role="menu" data-view-component="true" class="ActionListWrap--inset ActionListWrap">
         <li hidden="hidden" data-menu-item="i0code-tab" data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
-    
-    
+
+
     <a tabindex="-1" id="item-ccd9c3e2-5255-469b-b4c9-2c5fdbf2c5e2" href="/maxmind/MaxMind-DB" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
         <span class="ActionListItem-visual ActionListItem-visual--leading">
           <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-code">
     <path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"></path>
 </svg>
         </span>
-      
+
         <span data-view-component="true" class="ActionListItem-label">
           Code
 </span></a>
-  
+
 </li>
         <li hidden="hidden" data-menu-item="i1issues-tab" data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
-    
-    
+
+
     <a tabindex="-1" id="item-3d3c95b0-66de-4a78-871d-305ef57c78b2" href="/maxmind/MaxMind-DB/issues" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
         <span class="ActionListItem-visual ActionListItem-visual--leading">
           <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-issue-opened">
     <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path>
 </svg>
         </span>
-      
+
         <span data-view-component="true" class="ActionListItem-label">
           Issues
 </span></a>
-  
+
 </li>
         <li hidden="hidden" data-menu-item="i2pull-requests-tab" data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
-    
-    
+
+
     <a tabindex="-1" id="item-c23a29c1-f30e-4b53-bd0e-d2c50261a683" href="/maxmind/MaxMind-DB/pulls" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
         <span class="ActionListItem-visual ActionListItem-visual--leading">
           <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-git-pull-request">
     <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path>
 </svg>
         </span>
-      
+
         <span data-view-component="true" class="ActionListItem-label">
           Pull requests
 </span></a>
-  
+
 </li>
         <li hidden="hidden" data-menu-item="i3actions-tab" data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
-    
-    
+
+
     <a tabindex="-1" id="item-754af8c7-a855-4564-bdc6-8018bcb7d432" href="/maxmind/MaxMind-DB/actions" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
         <span class="ActionListItem-visual ActionListItem-visual--leading">
           <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-play">
     <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773 4.264 2.559a.25.25 0 0 1 0 .428l-4.264 2.559A.25.25 0 0 1 6 10.559V5.442a.25.25 0 0 1 .379-.215Z"></path>
 </svg>
         </span>
-      
+
         <span data-view-component="true" class="ActionListItem-label">
           Actions
 </span></a>
-  
+
 </li>
         <li hidden="hidden" data-menu-item="i4security-tab" data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
-    
-    
+
+
     <a tabindex="-1" id="item-77417382-e4c0-45be-aa07-a5cf3d20e24b" href="/maxmind/MaxMind-DB/security" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
         <span class="ActionListItem-visual ActionListItem-visual--leading">
           <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-shield">
     <path d="M7.467.133a1.748 1.748 0 0 1 1.066 0l5.25 1.68A1.75 1.75 0 0 1 15 3.48V7c0 1.566-.32 3.182-1.303 4.682-.983 1.498-2.585 2.813-5.032 3.855a1.697 1.697 0 0 1-1.33 0c-2.447-1.042-4.049-2.357-5.032-3.855C1.32 10.182 1 8.566 1 7V3.48a1.75 1.75 0 0 1 1.217-1.667Zm.61 1.429a.25.25 0 0 0-.153 0l-5.25 1.68a.25.25 0 0 0-.174.238V7c0 1.358.275 2.666 1.057 3.86.784 1.194 2.121 2.34 4.366 3.297a.196.196 0 0 0 .154 0c2.245-.956 3.582-2.104 4.366-3.298C13.225 9.666 13.5 8.36 13.5 7V3.48a.251.251 0 0 0-.174-.237l-5.25-1.68ZM8.75 4.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 1.5 0ZM9 10.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path>
 </svg>
         </span>
-      
+
         <span data-view-component="true" class="ActionListItem-label">
           Security
 </span></a>
-  
+
 </li>
         <li hidden="hidden" data-menu-item="i5insights-tab" data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
-    
-    
+
+
     <a tabindex="-1" id="item-3c3eee1d-d3b8-4e1b-8421-2a5770a686e1" href="/maxmind/MaxMind-DB/pulse" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
         <span class="ActionListItem-visual ActionListItem-visual--leading">
           <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-graph">
     <path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"></path>
 </svg>
         </span>
-      
+
         <span data-view-component="true" class="ActionListItem-label">
           Insights
 </span></a>
-  
+
 </li>
-</ul>    
+</ul>
 </div></action-list>
 
 
 </div>
-      
+
 </div></anchored-position>  </focus-group>
 </action-menu></div>
 </nav>
 
   </div>
 
-  
+
 
 
 
 <turbo-frame id="repo-content-turbo-frame" target="_top" data-turbo-action="advance" class="">
     <div id="repo-content-pjax-container" class="repository-content " >
-    
 
 
 
-    
-      
-    
+
+
+
+
 
 
 
@@ -1577,12 +1577,12 @@
 <react-app
   app-name="react-code-view"
   initial-path="/maxmind/MaxMind-DB/blob/main/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb"
-  style="display: block; min-height: calc(100vh - 64px)" 
+  style="display: block; min-height: calc(100vh - 64px)"
   data-ssr="true"
   data-lazy="false"
   data-alternate="false"
 >
-  
+
   <script type="application/json" data-target="react-app.embeddedData">{"payload":{"allShortcutsEnabled":false,"fileTree":{"bad-data/libmaxminddb":{"items":[{"name":"libmaxminddb-offset-integer-overflow.mmdb","path":"bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb","contentType":"file"}],"totalCount":1},"bad-data":{"items":[{"name":"libmaxminddb","path":"bad-data/libmaxminddb","contentType":"directory"},{"name":"maxminddb-golang","path":"bad-data/maxminddb-golang","contentType":"directory"},{"name":"maxminddb-python","path":"bad-data/maxminddb-python","contentType":"directory"},{"name":"README.md","path":"bad-data/README.md","contentType":"file"}],"totalCount":4},"":{"items":[{"name":".github","path":".github","contentType":"directory"},{"name":"bad-data","path":"bad-data","contentType":"directory"},{"name":"cmd","path":"cmd","contentType":"directory"},{"name":"pkg","path":"pkg","contentType":"directory"},{"name":"source-data","path":"source-data","contentType":"directory"},{"name":"test-data","path":"test-data","contentType":"directory"},{"name":".gitattributes","path":".gitattributes","contentType":"file"},{"name":".gitconfig","path":".gitconfig","contentType":"file"},{"name":".gitignore","path":".gitignore","contentType":"file"},{"name":".golangci.toml","path":".golangci.toml","contentType":"file"},{"name":".perltidyallrc","path":".perltidyallrc","contentType":"file"},{"name":".tidyallrc","path":".tidyallrc","contentType":"file"},{"name":"LICENSE-APACHE","path":"LICENSE-APACHE","contentType":"file"},{"name":"LICENSE-MIT","path":"LICENSE-MIT","contentType":"file"},{"name":"MaxMind-DB-spec.md","path":"MaxMind-DB-spec.md","contentType":"file"},{"name":"README.md","path":"README.md","contentType":"file"},{"name":"go.mod","path":"go.mod","contentType":"file"},{"name":"go.sum","path":"go.sum","contentType":"file"},{"name":"perltidyrc","path":"perltidyrc","contentType":"file"},{"name":"tidyall.ini","path":"tidyall.ini","contentType":"file"}],"totalCount":20}},"fileTreeProcessingTime":6.499586,"foldersToFetch":[],"repo":{"id":11322705,"defaultBranch":"main","name":"MaxMind-DB","ownerLogin":"maxmind","currentUserCanPush":false,"isFork":false,"isEmpty":false,"createdAt":"2013-07-10T20:00:45.000Z","ownerAvatar":"https://avatars.githubusercontent.com/u/1181834?v=4","public":true,"private":false,"isOrgOwned":true},"codeLineWrapEnabled":false,"symbolsExpanded":false,"treeExpanded":true,"refInfo":{"name":"main","listCacheKey":"v0:1718833793.0","canEdit":false,"refType":"branch","currentOid":"ff23af9cfc6d7c422dabce1430a8628a4ee82e99"},"path":"bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb","currentUser":null,"blob":{"rawLines":null,"stylingDirectives":null,"colorizedLines":null,"csv":null,"csvError":null,"dependabotInfo":{"showConfigurationBanner":false,"configFilePath":null,"networkDependabotPath":"/maxmind/MaxMind-DB/network/updates","dismissConfigurationNoticePath":"/settings/dismiss-notice/dependabot_configuration_notice","configurationNoticeDismissed":null},"displayName":"libmaxminddb-offset-integer-overflow.mmdb","displayUrl":"https://github.com/maxmind/MaxMind-DB/blob/main/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb?raw=true","headerInfo":{"blobSize":"412 Bytes","deleteTooltip":"You must be signed in to make or propose changes","editTooltip":"You must be signed in to make or propose changes","ghDesktopPath":"https://desktop.github.com","isGitLfs":false,"onBranch":true,"shortPath":"b76f354","siteNavLoginPath":"/login?return_to=https%3A%2F%2Fgithub.com%2Fmaxmind%2FMaxMind-DB%2Fblob%2Fmain%2Fbad-data%2Flibmaxminddb%2Flibmaxminddb-offset-integer-overflow.mmdb","isCSV":false,"isRichtext":false,"toc":null,"lineInfo":{"truncatedLoc":null,"truncatedSloc":null},"mode":"file"},"image":false,"isCodeownersFile":null,"isPlain":false,"isValidLegacyIssueTemplate":false,"issueTemplate":null,"discussionTemplate":null,"language":null,"languageID":null,"large":false,"planSupportInfo":{"repoIsFork":null,"repoOwnedByCurrentUser":null,"requestFullPath":"/maxmind/MaxMind-DB/blob/main/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb","showFreeOrgGatedFeatureMessage":null,"showPlanSupportBanner":null,"upgradeDataAttributes":null,"upgradePath":null},"publishBannersInfo":{"dismissActionNoticePath":"/settings/dismiss-notice/publish_action_from_dockerfile","releasePath":"/maxmind/MaxMind-DB/releases/new?marketplace=true","showPublishActionBanner":false},"rawBlobUrl":"https://github.com/maxmind/MaxMind-DB/raw/main/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb","renderImageOrRaw":true,"richText":null,"renderedFileInfo":null,"shortPath":null,"symbolsEnabled":true,"tabSize":8,"topBannersInfo":{"overridingGlobalFundingFile":false,"globalPreferredFundingPath":null,"showInvalidCitationWarning":false,"citationHelpUrl":"https://docs.github.com/github/creating-cloning-and-archiving-repositories/creating-a-repository-on-github/about-citation-files","actionsOnboardingTip":null},"truncated":false,"viewable":false,"workflowRedirectUrl":null,"symbols":null},"copilotInfo":null,"copilotAccessAllowed":false,"csrf_tokens":{"/maxmind/MaxMind-DB/branches":{"post":"phYxrF4YBZI0WhSdhsC4VwKR-IU_fmiilVFoJL3UVQ1fyhLTbeWcVLQi7_W9la0ncRVtY4MUHZEwTxM8cicn4A"},"/repos/preferences":{"post":"aJito8P-IjhhCWOJ7KwdDw8U4wllp6pXee4R73rmoY_OR7nCheG5Kj5CcuMHiaYJwQGMoJ6yANGund4X6KoYBg"}}},"title":"MaxMind-DB/bad-data/libmaxminddb/libmaxminddb-offset-integer-overflow.mmdb at main · maxmind/MaxMind-DB","appPayload":{"helpUrl":"https://docs.github.com","findFileWorkerPath":"/assets-cdn/worker/find-file-worker-1583894afd38.js","findInFileWorkerPath":"/assets-cdn/worker/find-in-file-worker-3a63a487027b.js","githubDevUrl":null,"enabled_features":{"code_nav_ui_events":false,"react_blob_overlay":false,"copilot_conversational_ux_embedding_update":false,"copilot_smell_icebreaker_ux":true,"copilot_workspace":false}}}</script>
   <div data-target="react-app.reactRoot"><style data-styled="true" data-styled-version="5.3.6">.jUriTl{font-weight:600;font-size:32px;margin:0;display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;font-size:14px;}/*!sc*/
 .cgQnMS{font-weight:600;font-size:32px;margin:0;}/*!sc*/
@@ -2231,7 +2231,7 @@ data-styled.g63[id="SegmentedControl__SegmentedControlList-sc-1rzig82-0"]{conten
           <footer class="footer pt-8 pb-6 f6 color-fg-muted p-responsive" role="contentinfo" >
   <h2 class='sr-only'>Footer</h2>
 
-  
+
 
 
   <div class="d-flex flex-justify-center flex-items-center flex-column-reverse flex-lg-row flex-wrap flex-lg-nowrap">
