@@ -62,6 +62,7 @@ envoy_mobile_android_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/common/http/filters/test_kv_store:filter_java_proto",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
@@ -83,6 +84,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/common/http/filters/test_event_tracker:filter_java_proto",
     ],
 )
 
@@ -103,6 +105,7 @@ envoy_mobile_android_test(
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/common/http/filters/test_logger:filter_java_proto",
     ],
 )
 
@@ -241,6 +244,7 @@ envoy_mobile_android_test(
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
+        "//library/common/extensions/filters/http/local_error:filter_java_proto",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
@@ -262,6 +266,7 @@ envoy_mobile_android_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/common/http/filters/assertion:filter_java_proto",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
@@ -282,6 +287,7 @@ envoy_mobile_android_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/common/http/filters/assertion:filter_java_proto",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
@@ -302,6 +308,7 @@ envoy_mobile_android_test(
     native_lib_name = "envoy_jni_with_test_extensions",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/common/http/filters/assertion:filter_java_proto",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )

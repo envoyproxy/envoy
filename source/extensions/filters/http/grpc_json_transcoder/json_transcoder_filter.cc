@@ -18,6 +18,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
+#include "absl/strings/str_join.h"
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
 #include "google/api/httpbody.pb.h"
@@ -43,6 +44,7 @@ using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
 using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
 
 namespace Envoy {
 namespace Extensions {
@@ -229,6 +231,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
+  capture_unknown_query_parameters_ = proto_config.capture_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
   case_insensitive_enum_parsing_ = proto_config.case_insensitive_enum_parsing();
   if (proto_config.has_max_request_body_size()) {
@@ -327,7 +330,8 @@ bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_statu
 absl::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) const {
+    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info,
+    UnknownQueryParams& unknown_params) const {
 
   ASSERT(!disabled_);
   const std::string method(headers.getMethodValue());
@@ -361,7 +365,11 @@ absl::Status JsonTranscoderConfig::createTranscoder(
     status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
                                             &resolved_binding.field_path);
     if (!status.ok()) {
-      if (ignore_unknown_query_parameters_) {
+      if (capture_unknown_query_parameters_) {
+        auto binding_key = absl::StrJoin(binding.field_path, ".");
+        (*unknown_params.mutable_key())[binding_key].add_values(binding.value);
+        continue;
+      } else if (ignore_unknown_query_parameters_) {
         continue;
       }
       return status;
@@ -464,8 +472,9 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto status =
-      per_route_config_->createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
+  const auto status = per_route_config_->createTranscoder(headers, request_in_, response_in_,
+                                                          transcoder_, method_, unknown_params_);
+
   if (!status.ok()) {
     ENVOY_STREAM_LOG(debug, "Failed to transcode request headers: {}", *decoder_callbacks_,
                      status.message());
@@ -904,7 +913,8 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage(Buffer::Instance* dat
   stats_->transcoder_request_buffer_bytes_.sub(initial_request_data_.length());
   message_payload.move(initial_request_data_);
   HttpBodyUtils::appendHttpBodyEnvelope(message_payload, method_->request_body_field_path,
-                                        std::move(content_type_), request_data_.length());
+                                        std::move(content_type_), request_data_.length(),
+                                        unknown_params_);
   content_type_.clear();
   stats_->transcoder_request_buffer_bytes_.sub(request_data_.length());
   message_payload.move(request_data_);

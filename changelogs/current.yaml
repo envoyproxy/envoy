@@ -49,6 +49,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_proc
+  change: |
+    Timeout errors in external processor now returns 504 Gateway Timeout to downstream clients.
+    The previous behavior was returning 500 Internal Server Error.
 - area: dfp
   change: |
     Changed dynamic forward proxy so local reply errors include DNS resolution details.  This behavior can be temporarily
@@ -130,6 +134,12 @@ minor_behavior_changes:
   change: |
     Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
     guarded by ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2``.
+- area: http
+  change: |
+    http: envoy will now proxy 104 headers from upstream, though as with 100s only the first 1xx response
+    headers will be sent.104 headers are designated by ietf's draft-ietf-httpbis-resumable-upload rfc.
+    This behavioral can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.proxy_104`` to ``false``.
 - area: jwt_authn
   change: |
     Changes the behavior of the
@@ -137,6 +147,10 @@ minor_behavior_changes:
     config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
     used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
+- area: http
+  change: |
+    Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
+    by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -317,6 +331,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
 - area: hot_restart
   change: |
     Added new command-line flag :option:`--skip-hot-restart-parent-stats`.
@@ -471,6 +488,11 @@ new_features:
   change: |
     Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_id_token_set_cookie>`
     to disable setting the ID Token cookie.
+- area: dns_filter
+  change: |
+    Added support for wildcard resolution in :ref:`inline_dns_table
+    <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ServerContextConfig.inline_dns_table>`
+    when DNS filter is working in server mode.
 
 deprecated:
 - area: tracing
