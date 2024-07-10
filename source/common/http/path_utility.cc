@@ -83,11 +83,8 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
 
   std::string decoded_path{path};
-  std::map<const char*, const char*> replacements;
-  replacements["%2F"] = "/";
-  replacements["%2f"] = "/";
-  replacements["%5C"] = "\\";
-  replacements["%5c"] = "\\";
+  static const std::vector<std::pair<absl::string_view, absl::string_view>> replacements{
+      {"2F", "/"}, {"2f", "/"},  {"5C", "\\"},  {"5c", "\\"},};
   headers.setPath(absl::StrCat(absl::StrReplaceAll(decoded_path, replacements), query));
 
   // Path length will not match if there were unescaped %2f or %5c
