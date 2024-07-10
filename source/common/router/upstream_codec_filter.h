@@ -72,7 +72,8 @@ public:
           // Use this to communicate to the upstream request to not force-terminate.
           transport_failure_reason = "codec_error";
         } else {
-          transport_failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
+          std::string original = transport_failure_reason;
+          transport_failure_reason = absl::StrCat(original, "|codec_error");
         }
       }
       filter_.callbacks_->resetStream(reason, transport_failure_reason);
