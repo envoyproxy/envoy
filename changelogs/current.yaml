@@ -333,6 +333,9 @@ removed_config_or_runtime:
 new_features:
 - area: redis
   change: |
+    Added support for all Bloom 1.0.0 commands.
+- area: redis
+  change: |
     Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
 - area: hot_restart
   change: |
