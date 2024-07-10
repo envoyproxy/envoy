@@ -464,6 +464,7 @@ UDP
 UDS
 UHV
 UNC
+UPN
 URI
 URL
 USEVC
@@ -875,6 +876,7 @@ inotify
 inserter
 instantiation
 instantiations
+interop
 interpretable
 intra
 ints
@@ -1177,6 +1179,7 @@ refcount
 referencee
 referer
 refetch
+reframed
 refvec
 regex
 regexes
@@ -1207,6 +1210,7 @@ resolv
 resolvers
 responder
 restarter
+resumable
 resync
 ret
 retransmissions

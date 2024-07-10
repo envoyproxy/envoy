@@ -88,16 +88,25 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
 
 bool isBlockingAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           absl::string_view cluster_name) {
+  bool blocking_ads_cluster = false;
   if (bootstrap.dynamic_resources().has_ads_config()) {
     const auto& ads_config_source = bootstrap.dynamic_resources().ads_config();
     // We only care about EnvoyGrpc, not GoogleGrpc, because we only need to delay ADS mux
     // initialization if it uses an Envoy cluster that needs to be initialized first. We don't
     // depend on the same cluster initialization when opening a gRPC stream for GoogleGrpc.
-    return (ads_config_source.grpc_services_size() > 0 &&
-            ads_config_source.grpc_services(0).has_envoy_grpc() &&
-            ads_config_source.grpc_services(0).envoy_grpc().cluster_name() == cluster_name);
+    blocking_ads_cluster =
+        (ads_config_source.grpc_services_size() > 0 &&
+         ads_config_source.grpc_services(0).has_envoy_grpc() &&
+         ads_config_source.grpc_services(0).envoy_grpc().cluster_name() == cluster_name);
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      // Validate the failover server if there is one.
+      blocking_ads_cluster |=
+          (ads_config_source.grpc_services_size() == 2 &&
+           ads_config_source.grpc_services(1).has_envoy_grpc() &&
+           ads_config_source.grpc_services(1).envoy_grpc().cluster_name() == cluster_name);
+    }
   }
-  return false;
+  return blocking_ads_cluster;
 }
 
 } // namespace
@@ -447,14 +456,22 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
-      RETURN_IF_STATUS_NOT_OK(factory_or_error);
-      ads_mux_ = factory->create(factory_or_error.value()->createUncachedRawAsyncClient(), nullptr,
-                                 dispatcher_, random_, *stats_.rootScope(),
-                                 dyn_resources.ads_config(), local_info_,
-                                 std::move(custom_config_validators), std::move(backoff_strategy),
-                                 makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 0);
+      RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
+      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+            *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 1);
+        RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
+        factory_failover = std::move(factory_failover_or_error.value());
+      }
+      ads_mux_ = factory->create(
+          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
+          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          std::move(custom_config_validators), std::move(backoff_strategy),
+          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -470,12 +487,20 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
-      RETURN_IF_STATUS_NOT_OK(factory_or_error);
+      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 0);
+      RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
+      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+            *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 1);
+        RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
+        factory_failover = std::move(factory_failover_or_error.value());
+      }
       ads_mux_ = factory->create(
-          factory_or_error.value()->createUncachedRawAsyncClient(), nullptr, dispatcher_, random_,
-          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
+          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
     }
@@ -568,7 +593,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false);
+        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0);
     RETURN_IF_STATUS_NOT_OK(factory_or_error);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(),

@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -257,12 +257,19 @@ message ExternalProcessor {
   RouteCacheAction route_cache_action = 18
       [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 
+  // Specifies the deferred closure timeout for gRPC stream that connects to external processor. Currently, the deferred stream closure
+  // is only used in :ref:`observability_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.observability_mode>`.
+  // In observability mode, gRPC streams may be held open to the external processor longer than the lifetime of the regular client to
+  // backend stream lifetime. In this case, Envoy will eventually timeout the external processor stream according to this time limit.
+  // The default value is 5000 milliseconds (5 seconds) if not specified.
+  google.protobuf.Duration deferred_close_timeout = 19;
+
   // Specify the maximum limit of
   // :ref:`more_chunks <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.more_chunks>`
   // the external processor can stream back at one occasion, i.e, the max limit of N in the M:N streaming.
   // This is to avoid the external processor send infinite number of chunks to stall Envoy.
   // BTW, there is no limit for M as that's controlled by Envoy itself.
-  uint32 max_more_chunks = 19;
+  uint32 max_more_chunks = 20;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of

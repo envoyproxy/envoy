@@ -234,6 +234,22 @@ generate_x509_cert san_uri ca
 generate_rsa_key san_ip
 generate_x509_cert san_ip ca
 
+# Generate san_othername_cert.pem.
+generate_rsa_key san_othername
+generate_x509_cert san_othername ca
+
+# Generate san_dns_and_othername_cert.pem.
+generate_rsa_key san_multiple_othername
+generate_x509_cert san_multiple_othername ca
+
+# Generate san_multiple_othername_string_type.pem.
+generate_rsa_key san_multiple_othername_string_type
+generate_x509_cert san_multiple_othername_string_type ca
+
+# Generate san_dns_and_othername_cert.pem.
+generate_rsa_key san_dns_and_othername
+generate_x509_cert san_dns_and_othername ca
+
 # Concatenate san_ip_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat san_ip_cert.pem intermediate_ca_cert.pem > san_ip_chain.pem
 

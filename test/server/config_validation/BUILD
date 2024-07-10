@@ -50,6 +50,7 @@ envoy_cc_test(
     ],
     env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
     deps = [
+        "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
