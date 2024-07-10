@@ -4,6 +4,11 @@ load(
     "envoy_package",
     "envoy_select_enable_http3",
     "envoy_select_enable_http_datagrams",
+    "envoy_select_nghttp2",
+)
+load(
+    "//bazel:envoy_internal.bzl",
+    "envoy_external_dep_path",
 )
 
 licenses(["notice"])  # Apache 2
@@ -545,7 +550,6 @@ envoy_cc_library(
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_adapter",
     ],
     deps = [
@@ -568,7 +572,7 @@ envoy_cc_library(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ] + envoy_select_enable_http_datagrams([
         "@com_github_google_quiche//:quiche_common_structured_headers_lib",
-    ]),
+    ]) + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
 
 envoy_cc_library(

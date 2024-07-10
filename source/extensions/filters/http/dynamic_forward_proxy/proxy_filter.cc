@@ -266,8 +266,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   latchTime(decoder_callbacks_, DNS_START);
+  const bool is_proxying = isProxying();
   auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
-      headers.Host()->value().getStringView(), default_port, isProxying(), force_cache_refresh,
+      headers.Host()->value().getStringView(), default_port, is_proxying, force_cache_refresh,
       *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
@@ -281,6 +282,10 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
+    if (is_proxying) {
+      ENVOY_BUG(host.has_value(), "Proxying request but no host entry in DNS cache.");
+      return Http::FilterHeadersStatus::Continue;
+    }
     if (!host.has_value() || !host.value()->address()) {
       onDnsResolutionFail((host.has_value() && *host) ? ((*host)->details()) : "no_host");
       return Http::FilterHeadersStatus::StopIteration;
