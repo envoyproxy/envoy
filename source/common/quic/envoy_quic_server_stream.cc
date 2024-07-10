@@ -195,9 +195,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #endif
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
-       Http::HeaderUtility::isConnectUdpRequest(*headers))) {
+  if (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
+      Http::HeaderUtility::isConnectUdpRequest(*headers)) {
     useCapsuleProtocol();
     // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass
     // the default Datagram queue.
@@ -365,11 +364,12 @@ void EnvoyQuicServerStream::OnConnectionClosed(const quic::QuicConnectionCloseFr
   // Run reset callback before closing the stream so that the watermark change will not trigger
   // callbacks.
   if (!local_end_stream_) {
-    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
-                                                                 session()->OneRttKeysAvailable())
-                          : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
-                      quic::QuicErrorCodeToString(frame.quic_error_code));
+    runResetCallbacks(
+        source == quic::ConnectionCloseSource::FROM_SELF
+            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                   session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+        absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|", frame.error_details));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(frame, source);
 }

@@ -191,7 +191,7 @@ message JwtProvider {
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
   // not removed in the request. Default value is false.
-  // caveat: only works for from_header & has no effect for JWTs extracted through from_params & from_cookies.
+  // caveat: only works for from_header/from_params & has no effect for JWTs extracted through from_cookies.
   bool forward = 5;
 
   // Two fields below define where to extract the JWT from an HTTP request.
@@ -395,7 +395,7 @@ message RemoteJwks {
   //      cluster: jwt.www.googleapis.com|443
   //      timeout: 1s
   //
-  config.core.v3.HttpUri http_uri = 1;
+  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 10 minutes.

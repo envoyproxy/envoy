@@ -317,6 +317,22 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
+TEST_F(FilterTest, RequestRateLimitedXRateLimitHeadersWithoutRunningDecodeHeaders) {
+  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
+
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-reset"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-reset"));
+}
+
 static constexpr absl::string_view descriptor_config_yaml = R"(
 stat_prefix: test
 token_bucket:

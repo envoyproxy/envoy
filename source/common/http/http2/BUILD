@@ -2,6 +2,11 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_nghttp2",
+)
+load(
+    "//bazel:envoy_internal.bzl",
+    "envoy_external_dep_path",
 )
 
 licenses(["notice"])  # Apache 2
@@ -24,7 +29,6 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_adapter",
         "abseil_optional",
         "abseil_inlined_vector",
@@ -62,7 +66,7 @@ envoy_cc_library(
         "//source/common/network:common_connection_filter_states_lib",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
 
 # Separate library for some nghttp2 setup stuff to avoid having tests take a
@@ -117,16 +121,13 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/runtime:runtime_features_lib",
-    ],
+    ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
 
 envoy_cc_library(
     name = "protocol_constraints_lib",
     srcs = ["protocol_constraints.cc"],
     hdrs = ["protocol_constraints.h"],
-    external_deps = [
-        "nghttp2",
-    ],
     deps = [
         ":codec_stats_lib",
         "//envoy/network:connection_interface",
@@ -134,5 +135,5 @@ envoy_cc_library(
         "//source/common/common:dump_state_utils",
         "//source/common/http:status_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )

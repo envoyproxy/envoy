@@ -727,9 +727,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     }
     if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
                                Http::Headers::get().MethodValues.Connect) ||
-        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-         absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
-                                Http::Headers::get().UpgradeValues.ConnectUdp))) {
+        absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                               Http::Headers::get().UpgradeValues.ConnectUdp)) {
       if (Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.http_route_connect_proxy_by_default")) {
         if (upgrade_config.has_connect_config()) {
@@ -1689,8 +1688,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
                                                    const StreamInfo::StreamInfo& stream_info,
                                                    uint64_t random_value) const {
   if ((Http::HeaderUtility::isConnect(headers) ||
-       (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        Http::HeaderUtility::isConnectUdpRequest(headers))) &&
+       Http::HeaderUtility::isConnectUdpRequest(headers)) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
   }

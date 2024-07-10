@@ -57,14 +57,6 @@
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
 
-#ifdef ENVOY_MOBILE_XDS
-#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
-#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
-#include "source/common/tls/cert_validator/default_validator.h"
-#endif
-
 #if !defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 #endif
@@ -204,18 +196,6 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 #endif
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
-#endif
-
-#ifdef ENVOY_MOBILE_XDS
-  // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
-  // supports for xDS.
-  Config::forceRegisterAdsConfigSubscriptionFactory();
-  Config::forceRegisterGrpcConfigSubscriptionFactory();
-  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
-  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
-  Config::forceRegisterGrpcMuxFactory();
-  Config::forceRegisterNewGrpcMuxFactory();
-  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
 #endif
 }
 

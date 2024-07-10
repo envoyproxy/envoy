@@ -185,6 +185,7 @@ paths:
     - source/extensions/matching
     - source/extensions/network
     - source/extensions/path
+    - source/extensions/quic/server_preferred_address
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/retry
