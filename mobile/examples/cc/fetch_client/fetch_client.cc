@@ -84,6 +84,7 @@ envoy_status_t Fetch::sendRequest(absl::string_view url_string,
   };
   stream_callbacks.on_complete_ =
       [&request_finished, &protocols](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        std::cerr << "RESPONSE FLAGS in on_complete_: " << final_intel.response_flags << "\n";
         std::cerr << "Request finished after "
                   << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
         protocols.push_back(static_cast<Http::Protocol>(final_intel.upstream_protocol));
@@ -92,6 +93,7 @@ envoy_status_t Fetch::sendRequest(absl::string_view url_string,
   stream_callbacks.on_error_ = [&request_finished, &status](const EnvoyError& error,
                                                             envoy_stream_intel,
                                                             envoy_final_stream_intel final_intel) {
+    std::cerr << "RESPONSE FLAGS in on_error_: " << final_intel.response_flags << "\n";
     status = ENVOY_FAILURE;
     std::cerr << "Request failed after " << final_intel.stream_end_ms - final_intel.stream_start_ms
               << "ms with error message: " << error.message_ << "\n";
@@ -99,6 +101,7 @@ envoy_status_t Fetch::sendRequest(absl::string_view url_string,
   };
   stream_callbacks.on_cancel_ = [&request_finished](envoy_stream_intel,
                                                     envoy_final_stream_intel final_intel) {
+    std::cerr << "RESPONSE FLAGS in on_cancel_: " << final_intel.response_flags << "\n";
     std::cerr << "Request cancelled after "
               << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
     request_finished.Notify();
