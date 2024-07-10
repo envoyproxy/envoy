@@ -1935,10 +1935,10 @@ max_ejection_time_jitter: 13s
   addHosts({"tcp://127.0.0.4:80"});
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_,
-                                                              dispatcher_, runtime_, time_system_,
-                                                              event_logger_, random_)
-                                             .value());
+  std::shared_ptr<DetectorImpl> detector(
+      DetectorImpl::create(cluster_, outlier_detection_, dispatcher_, runtime_, time_system_,
+                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
+          .value());
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
