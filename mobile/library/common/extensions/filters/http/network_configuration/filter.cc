@@ -110,20 +110,10 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
         // so that, if the stream is canceled and the filter chain is torn down in the meantime,
         // we will fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
         // proxies.
-        if (auto caller_ptr = weak_self.lock()) {
-          if (caller_ptr->decoder_callbacks_ == nullptr) {
-            return;
-          }
-          Network::ProxySettingsConstSharedPtr proxy_settings =
-              Network::ProxySettings::create(proxies);
-          // Post the proxy resolution callback to the network thread's dispatcher.
-          caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, proxy_settings]() {
-            // Again, the stream may have been canceled in the interim, so try aquiring the
-            // filter through its weak_ptr before proceding with the proxy resolution callback.
-            if (auto filter_ptr = weak_self.lock()) {
-              filter_ptr->onProxyResolutionComplete(proxy_settings);
-            }
-          });
+        if (auto filter_ptr = weak_self.lock()) {
+          // This call does not need to be posted on the dispatcher, because
+          // onProxyResolutionComplete posts continuing with decoding to the dispatcher already.
+          filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
         }
       });
 
