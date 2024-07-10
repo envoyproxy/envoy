@@ -3318,7 +3318,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_CALL(*router_->retry_state_,
               shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
-                              RetryState::DoRetryResetCallback callback) {
+                              RetryState::DoRetryResetCallback callback, bool) {
         EXPECT_EQ(RetryState::Http3Used::No, http3_used);
         router_->retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/false); };
         return RetryStatus::Yes;
@@ -3379,7 +3379,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   EXPECT_CALL(*router_->retry_state_,
               shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
-                              RetryState::DoRetryResetCallback callback) {
+                              RetryState::DoRetryResetCallback callback, bool) {
         EXPECT_EQ(RetryState::Http3Used::Yes, http3_used);
         router_->retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/true); };
         return RetryStatus::Yes;
@@ -3660,7 +3660,7 @@ TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
   // The 100-continue will result in resetting retry_state_, so when the stream
   // is reset we won't even check shouldRetryReset() (or shouldRetryHeaders()).
   EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
-  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   Http::ResponseHeaderMapPtr continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
