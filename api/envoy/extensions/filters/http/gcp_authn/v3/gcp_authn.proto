@@ -7,6 +7,7 @@ import "envoy/config/core/v3/http_uri.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -24,9 +25,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message GcpAuthnFilterConfig {
   // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
-  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+  //
+  // This field is deprecated because it does not match the API surface provided by the google auth libraries.
+  // Control planes should not attempt to override the metadata server URI.
+  // The cluster and timeout can be configured using the `cluster` and `timeout` fields instead.
+  config.core.v3.HttpUri http_uri = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Retry policy for fetching tokens. This field is optional.
+  // Not supported by all data planes.
   config.core.v3.RetryPolicy retry_policy = 2;
 
   // Token cache configuration. This field is optional.
@@ -34,7 +40,22 @@ message GcpAuthnFilterConfig {
 
   // Request header location to extract the token. By default (i.e. if this field is not specified), the token
   // is extracted to the Authorization HTTP header, in the format "Authorization: Bearer <token>".
-  TokenHeader token_header = 4;
+  //
+  // This field is deprecated because it does not match the API surface provided by the google auth libraries.
+  // Control planes should not attempt to override the token header.
+  TokenHeader token_header = 4 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Cluster to send traffic to the GCE metadata server. Not supported
+  // by all data planes; a data plane may instead have its own mechanism
+  // for contacting the metadata server.
+  string cluster = 5 [(validate.rules).string = {min_len: 1}];
+
+  // Timeout for fetching the tokens from the GCE metadata server.
+  // Not supported by all data planes.
+  google.protobuf.Duration timeout = 6 [(validate.rules).duration = {
+    lt {seconds: 4294967296}
+    gte {}
+  }];
 }
 
 // Audience is the URL of the receiving service that performs token authentication.
