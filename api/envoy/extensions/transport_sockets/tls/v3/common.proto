@@ -161,7 +161,7 @@ message TlsParameters {
   // By default, Envoy as a server uses its preferred cipher during the handshake.
   // Setting this to true would allow the downstream client's preferred cipher to be used instead.
   // Has no effect when using TLSv1_3.
-  bool enable_client_cipher_preference = 6;
+  bool prefer_client_ciphers = 6;
 }
 
 // BoringSSL private key method configuration. The private key methods are used for external

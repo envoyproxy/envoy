@@ -153,10 +153,10 @@ TEST_F(SslContextImplTest, TestServerCipherPreference) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_EQ(cfg.get()->enableClientCipherPreference(), false);
+  EXPECT_EQ(cfg.get()->preferClientCiphers(), false);
 }
 
-TEST_F(SslContextImplTest, TestEnableClientCipherPreference) {
+TEST_F(SslContextImplTest, TestPreferClientCiphers) {
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -165,13 +165,13 @@ TEST_F(SslContextImplTest, TestEnableClientCipherPreference) {
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
     tls_params:
-      enable_client_cipher_preference: true
+      prefer_client_ciphers: true
   )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_EQ(cfg.get()->enableClientCipherPreference(), true);
+  EXPECT_EQ(cfg.get()->preferClientCiphers(), true);
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {

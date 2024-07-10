@@ -468,8 +468,8 @@ new_features:
     to disable setting the ID Token cookie.
 - area: tls
   change: |
-    Added :ref:`enable_client_cipher_preference
-    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.enable_client_cipher_preference>`
+    Added :ref:`prefer_client_ciphers
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.prefer_client_ciphers>`
     to support enabling client cipher preference instead of server's for TLS handshakes.
 
 deprecated:

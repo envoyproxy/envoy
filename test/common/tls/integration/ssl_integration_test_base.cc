@@ -10,7 +10,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setEcdsaCert(server_ecdsa_cert_)
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
-                                  .setEnableClientCipherPreference(enable_client_cipher_preference_)
+                                  .setPreferClientCiphers(prefer_client_ciphers_)
                                   .setTlsV13(server_tlsv1_3_)
                                   .setCurves(server_curves_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_)

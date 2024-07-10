@@ -295,7 +295,7 @@ TEST_P(SslIntegrationTest, TestServerCipherPreference) {
 // Test client preference of cipher suites. Same server preference is followed as in the previous.
 // "ECDHE-RSA-AES256-GCM-SHA384" should be used based on client preference.
 TEST_P(SslIntegrationTest, ClientCipherPreference) {
-  enable_client_cipher_preference_ = true;
+  prefer_client_ciphers_ = true;
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection(
       ClientSslTransportOptions{}

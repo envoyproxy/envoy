@@ -51,7 +51,7 @@ public:
   /**
    * @return true if the client cipher preference is enabled, false otherwise.
    */
-  virtual bool enableClientCipherPreference() const PURE;
+  virtual bool preferClientCiphers() const PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
