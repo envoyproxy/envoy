@@ -4355,7 +4355,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* http_filter = old_protocol_options.add_http_filters();
+      http_filter->set_name("envoy.filters.http.upstream_codec");
+      http_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
@@ -4426,7 +4429,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityModeWithLogg
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* http_filter = old_protocol_options.add_http_filters();
+      http_filter->set_name("envoy.filters.http.upstream_codec");
+      http_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
