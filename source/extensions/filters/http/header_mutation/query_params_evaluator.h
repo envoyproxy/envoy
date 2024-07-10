@@ -18,22 +18,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderMutation {
 
-using KeyValueAppendProto =
-    envoy::config::core::v3::KeyValueAppend;
-using KeyValueAppendActionProto =
-    envoy::config::core::v3::KeyValueAppend_KeyValueAppendAction;
-using KeyValueMutationProto =
-    envoy::config::core::v3::KeyValueMutation;
+using KeyValueAppendProto = envoy::config::core::v3::KeyValueAppend;
+using KeyValueAppendActionProto = envoy::config::core::v3::KeyValueAppend_KeyValueAppendAction;
+using KeyValueMutationProto = envoy::config::core::v3::KeyValueMutation;
 
 enum class AppendAction {
-  AppendIfExistsOrAdd = envoy::config::core::v3::
-      KeyValueAppend_KeyValueAppendAction_APPEND_IF_EXISTS_OR_ADD,
-  AddIfAbsent = envoy::config::core::v3::
-      KeyValueAppend_KeyValueAppendAction_ADD_IF_ABSENT,
-  OverwriteIfExistsOrAdd = envoy::config::core::v3::
-      KeyValueAppend_KeyValueAppendAction_OVERWRITE_IF_EXISTS_OR_ADD,
-  OverwriteIfExists = envoy::config::core::v3::
-      KeyValueAppend_KeyValueAppendAction_OVERWRITE_IF_EXISTS,
+  AppendIfExistsOrAdd = envoy::config::core::v3::KeyValueAppend::APPEND_IF_EXISTS_OR_ADD,
+  AddIfAbsent = envoy::config::core::v3::KeyValueAppend::ADD_IF_ABSENT,
+  OverwriteIfExistsOrAdd = envoy::config::core::v3::KeyValueAppend::OVERWRITE_IF_EXISTS_OR_ADD,
+  OverwriteIfExists = envoy::config::core::v3::KeyValueAppend::OVERWRITE_IF_EXISTS,
 };
 
 class QueryParamsEvaluator;
