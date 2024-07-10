@@ -270,7 +270,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
                   "Streamed mode body response has more_chunks set to true. more_chunk_count_ {}, "
                   "maxMoreChunks {}",
                   more_chunk_count_, filter_.config().maxMoreChunks());
-        // MxN streaming will only be supported if the ext_proc filter has max_more_chunks
+        // more_chunks will only be supported if the ext_proc filter has max_more_chunks
         // configured to be none zero.
         if (filter_.config().maxMoreChunks() == 0 ||
             more_chunk_count_ > filter_.config().maxMoreChunks()) {
