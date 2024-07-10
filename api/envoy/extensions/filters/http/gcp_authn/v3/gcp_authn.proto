@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.gcp_authn.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
