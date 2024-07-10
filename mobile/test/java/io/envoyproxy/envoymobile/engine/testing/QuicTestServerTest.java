@@ -10,7 +10,6 @@ import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 
 import java.util.Collections;
@@ -34,8 +33,7 @@ public class QuicTestServerTest {
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
-    JniLibrary.load();
+    JniLibrary.loadTestLibrary();
   }
 
   @Before

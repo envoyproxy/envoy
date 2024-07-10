@@ -43,7 +43,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -97,7 +96,6 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       dispatcher_(api_->allocateDispatcher("main_thread")),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -262,9 +260,9 @@ void InstanceBase::updateServerStats() {
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   if (!options().hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() +
-                                          parent_stats.parent_connections_);
   }
+  server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                        parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires().value_or(0));
 
@@ -622,6 +620,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = createOverloadManager();
+  null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
 
@@ -767,7 +766,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
-  runtime().initialize(clusterManager());
+  RETURN_IF_NOT_OK(runtime().initialize(clusterManager()));
 
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
@@ -819,8 +818,9 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
@@ -891,7 +891,7 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> post_init_cb)
+                     OverloadManager& null_overload_manager, std::function<void()> post_init_cb)
     : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
           post_init_cb();
@@ -926,6 +926,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
   // Start overload manager before workers.
   overload_manager.start();
+  null_overload_manager.start();
 
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
@@ -966,11 +967,12 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
-                                    access_log_manager_, init_manager_, overloadManager(), [this] {
-                                      notifyCallbacksForStage(Stage::PostInit);
-                                      startWorkers();
-                                    });
+  const auto run_helper =
+      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
+                overloadManager(), nullOverloadManager(), [this] {
+                  notifyCallbacksForStage(Stage::PostInit);
+                  startWorkers();
+                });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -1122,8 +1124,9 @@ Network::DnsResolverSharedPtr InstanceBase::getOrCreateDnsResolver() {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
-    dns_resolver_ =
-        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
+    dns_resolver_ = THROW_OR_RETURN_VALUE(
+        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config),
+        Network::DnsResolverSharedPtr);
   }
   return dns_resolver_;
 }

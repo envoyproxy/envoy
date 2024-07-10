@@ -38,10 +38,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     cidr_set.reserve(ip_tag.ip_list().size());
     for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
 
-      // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
-      Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
-      if (cidr_entry.isValid()) {
-        cidr_set.emplace_back(std::move(cidr_entry));
+      absl::StatusOr<Network::Address::CidrRange> cidr_or_error =
+          Network::Address::CidrRange::create(entry);
+      if (cidr_or_error.status().ok()) {
+        cidr_set.emplace_back(std::move(cidr_or_error.value()));
       } else {
         throw EnvoyException(
             fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",

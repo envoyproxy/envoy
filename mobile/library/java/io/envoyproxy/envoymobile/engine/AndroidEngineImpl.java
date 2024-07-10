@@ -26,7 +26,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
     if (ContextUtils.getApplicationContext() == null) {
       ContextUtils.initApplicationContext(context.getApplicationContext());
     }
-    AndroidJniLibrary.load(context);
     AndroidNetworkMonitor.load(context, envoyEngine);
     if (enableProxying) {
       AndroidProxyMonitor.load(context, envoyEngine);

@@ -22,6 +22,5 @@
 hdsConfig:
   apiType: GRPC
   requestTimeout: 0.014024704s
-  transportApiVersion: V3
 
 enableDispatcherStats: true

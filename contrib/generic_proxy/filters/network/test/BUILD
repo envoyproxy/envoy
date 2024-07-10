@@ -103,6 +103,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/integration:base_integration_test_lib",
+        "//test/integration:common_extensions_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:registry_lib",

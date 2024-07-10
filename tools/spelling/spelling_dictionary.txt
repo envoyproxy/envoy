@@ -464,6 +464,7 @@ UDP
 UDS
 UHV
 UNC
+UPN
 URI
 URL
 USEVC
@@ -696,6 +697,8 @@ deleter
 delim
 denylist
 deque
+dep
+deps
 deprecations
 dereference
 dereferences
@@ -873,6 +876,7 @@ inotify
 inserter
 instantiation
 instantiations
+interop
 interpretable
 intra
 ints
@@ -1175,6 +1179,7 @@ refcount
 referencee
 referer
 refetch
+reframed
 refvec
 regex
 regexes
@@ -1205,6 +1210,7 @@ resolv
 resolvers
 responder
 restarter
+resumable
 resync
 ret
 retransmissions
@@ -1349,6 +1355,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars

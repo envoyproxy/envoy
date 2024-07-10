@@ -51,6 +51,8 @@ namespace {
 // Limit the size of buffer for data used for retries.
 // This is currently fixed to 64KB.
 constexpr uint64_t kBufferLimitForRetry = 1 << 16;
+// Response buffer limit 32MB.
+constexpr uint64_t kBufferLimitForResponse = 32 * 1024 * 1024;
 } // namespace
 
 class AsyncStreamImpl;
@@ -74,12 +76,14 @@ public:
   Server::Configuration::CommonFactoryContext& factory_context_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  static const absl::string_view ResponseBufferLimit;
 
 private:
   template <typename T> T* internalStartRequest(T* async_request);
   const Router::FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
+  Runtime::Loader& runtime_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestSharedImpl;
@@ -92,7 +96,7 @@ private:
 class AsyncStreamImpl : public virtual AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
                         public Event::DeferredDeletable,
-                        Logger::Loggable<Logger::Id::http>,
+                        public Logger::Loggable<Logger::Id::http>,
                         public LinkedObject<AsyncStreamImpl>,
                         public ScopeTrackedObject {
 public:
@@ -124,7 +128,7 @@ public:
   }
 
   void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) override {
-    ASSERT(!watermark_callbacks_);
+    ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
       watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
@@ -132,7 +136,7 @@ public:
   }
 
   void removeWatermarkCallbacks() override {
-    ASSERT(watermark_callbacks_);
+    ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
       watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
     }
@@ -161,6 +165,7 @@ protected:
   // Callback to listen for low/high/overflow watermark events.
   absl::optional<std::reference_wrapper<DecoderFilterWatermarkCallbacks>> watermark_callbacks_;
   bool complete_{};
+  const bool discard_response_body_;
 
 private:
   void cleanup();
@@ -325,6 +330,8 @@ protected:
   Tracing::SpanPtr child_span_;
   std::unique_ptr<ResponseMessageImpl> response_;
   bool cancelled_{};
+  bool response_buffer_overlimit_{};
+  const uint64_t response_buffer_limit_;
 };
 
 class AsyncOngoingRequestImpl final : public AsyncClient::OngoingRequest,

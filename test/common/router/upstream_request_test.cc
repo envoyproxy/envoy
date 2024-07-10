@@ -4,6 +4,7 @@
 #include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/test_common/test_runtime.h"
 
@@ -217,16 +218,16 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   auto connection_info_provider =
       router_filter_interface_.client_connection_.stream_info_.downstream_connection_info_provider_;
   connection_info_provider->setRemoteAddress(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
+      Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:5678"));
   connection_info_provider->setLocalAddress(
-      Network::Utility::parseInternetAddressAndPort("5.6.7.8:5678"));
+      Network::Utility::parseInternetAddressAndPortNoThrow("5.6.7.8:5678"));
   connection_info_provider->setDirectRemoteAddressForTest(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
+      Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:5678"));
 
   // Dump State
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   upstream_request_->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 

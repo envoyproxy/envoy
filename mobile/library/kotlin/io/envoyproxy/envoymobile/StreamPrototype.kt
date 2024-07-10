@@ -156,7 +156,7 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
    * @param executor Executor on which to receive callback events.
    * @return A new set of engine callbacks.
    */
-  internal fun createCallbacks(executor: Executor?): EnvoyHTTPCallbacksAdapter {
+  protected fun createCallbacks(executor: Executor?): EnvoyHTTPCallbacksAdapter {
     return EnvoyHTTPCallbacksAdapter(executor, callbacks)
   }
 }

@@ -75,8 +75,8 @@ public:
     mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
     const_cast<std::vector<AccessLog::InstanceSharedPtr>&>(config_->accessLogs())
         .push_back(mock_access_logger_);
-    upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
-    upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
+    upstream_local_address_ = *Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
+    upstream_remote_address_ = *Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {
       upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
       upstream_connection_data_.push_back(
@@ -1096,9 +1096,9 @@ TEST_P(TcpProxyTest, AccessLogUpstreamLocalAddress) {
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_P(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+      *Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
+      *Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
 
   const std::vector<std::string> uriSan{"someSan"};
   auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
@@ -1114,9 +1114,9 @@ TEST_P(TcpProxyTest, AccessLogPeerUriSan) {
 // Test that access log fields %DOWNSTREAM_TLS_SESSION_ID% is correctly logged.
 TEST_P(TcpProxyTest, AccessLogTlsSessionId) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+      *Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
+      *Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
 
   const std::string tlsSessionId{
       "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
@@ -1134,9 +1134,9 @@ TEST_P(TcpProxyTest, AccessLogTlsSessionId) {
 // %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
 TEST_P(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+      *Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
+      *Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();

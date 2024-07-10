@@ -43,6 +43,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
     ],

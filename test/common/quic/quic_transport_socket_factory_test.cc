@@ -25,8 +25,9 @@ public:
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
-    Network::DownstreamTransportSocketFactoryPtr transport_socket_factory =
-        config_factory_.createTransportSocketFactory(proto_config, context_, {});
+    Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+        Network::DownstreamTransportSocketFactoryPtr);
     EXPECT_EQ(expect_early_data,
               static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory)
                   .earlyDataEnabled());
@@ -119,11 +120,12 @@ public:
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(nullptr));
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
-    factory_.emplace(std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
+    factory_ = *Quic::QuicClientTransportSocketFactory::create(
+        std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-  absl::optional<Quic::QuicClientTransportSocketFactory> factory_;
+  std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{
       new NiceMock<Ssl::MockClientContextConfig>};

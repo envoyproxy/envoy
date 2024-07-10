@@ -1,5 +1,8 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include <cstdint>
+#include <limits>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/empty_string.h"
@@ -26,6 +29,7 @@ constexpr absl::string_view QUERY_SEPERATOR = "&";
 constexpr absl::string_view QUERY_SPLITTER = "?";
 constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view S3_SERVICE_NAME = "s3";
+constexpr absl::string_view S3_OUTPOSTS_SERVICE_NAME = "s3-outposts";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
 constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
@@ -122,8 +126,9 @@ std::string Utility::createCanonicalRequest(
  */
 std::string Utility::canonicalizePathString(absl::string_view path_string,
                                             absl::string_view service_name) {
-  // If service is S3, do not normalize but only encode the path
-  if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME)) {
+  // If service is S3 or outposts, do not normalize but only encode the path
+  if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME) ||
+      absl::EqualsIgnoreCase(service_name, S3_OUTPOSTS_SERVICE_NAME)) {
     return encodePathSegment(path_string, service_name);
   }
   // If service is not S3, normalize and encode the path
@@ -150,8 +155,8 @@ bool isReservedChar(const char c) {
 }
 
 void encodeS3Path(std::string& encoded, const char& c) {
-  // Do not encode '/' for S3
-  if (c == PATH_SPLITTER[0]) {
+  // Do not encode '/' for S3 and do not double encode
+  if ((c == PATH_SPLITTER[0]) || (c == '%')) {
     encoded.push_back(c);
   } else {
     absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
@@ -160,11 +165,13 @@ void encodeS3Path(std::string& encoded, const char& c) {
 
 std::string Utility::encodePathSegment(absl::string_view decoded, absl::string_view service_name) {
   std::string encoded;
+
   for (char c : decoded) {
     if (isReservedChar(c)) {
       // Escape unreserved chars from RFC 3986
       encoded.push_back(c);
-    } else if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME)) {
+    } else if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME) ||
+               absl::EqualsIgnoreCase(service_name, S3_OUTPOSTS_SERVICE_NAME)) {
       encodeS3Path(encoded, c);
     } else {
       // TODO: @aws, There is some inconsistency between AWS services if this should be double
@@ -230,20 +237,47 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
   });
 }
 
+/**
+ * This function generates an STS Endpoint from a region string.
+ * If a SigV4A region set has been provided, it will use the first region in region set, and if
+ * that region still contains a wildcard, the STS Endpoint will be set to us-east-1 global endpoint
+ * (or FIPS if compiled for FIPS support)
+ */
 std::string Utility::getSTSEndpoint(absl::string_view region) {
-  if (region == "cn-northwest-1" || region == "cn-north-1") {
-    return fmt::format("sts.{}.amazonaws.com.cn", region);
+  std::string single_region;
+
+  // If we contain a comma or asterisk it looks like a region set.
+  if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
+    // Use the first element from a region set if we have multiple regions specified.
+    const std::vector<std::string> region_v = absl::StrSplit(region, ',');
+    // If we still have a * in the first element, then send them to us-east-1 fips or global
+    // endpoint.
+    if (absl::StrContains(region_v[0], '*')) {
+#ifdef ENVOY_SSL_FIPS
+      return "sts-fips.us-east-1.amazonaws.com";
+#else
+      return "sts.amazonaws.com";
+#endif
+    }
+    single_region = region_v[0];
+  } else {
+    // Otherwise it's a standard region, so use that.
+    single_region = region;
+  }
+
+  if (single_region == "cn-northwest-1" || single_region == "cn-north-1") {
+    return fmt::format("sts.{}.amazonaws.com.cn", single_region);
   }
 #ifdef ENVOY_SSL_FIPS
   // Use AWS STS FIPS endpoints in FIPS mode https://docs.aws.amazon.com/general/latest/gr/sts.html.
   // Note: AWS GovCloud doesn't have separate fips endpoints.
   // TODO(suniltheta): Include `ca-central-1` when sts supports a dedicated FIPS endpoint.
-  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
-      region == "us-west-2") {
-    return fmt::format("sts-fips.{}.amazonaws.com", region);
+  if (single_region == "us-east-1" || single_region == "us-east-2" ||
+      single_region == "us-west-1" || single_region == "us-west-2") {
+    return fmt::format("sts-fips.{}.amazonaws.com", single_region);
   }
 #endif
-  return fmt::format("sts.{}.amazonaws.com", region);
+  return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
 static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
@@ -473,12 +507,24 @@ int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
                                              const int64_t integer_default) {
   absl::StatusOr<Envoy::Json::ValueType> value_or_error;
   value_or_error = json_object->getValue(integer_value);
-  if ((!value_or_error.ok()) || (!absl::holds_alternative<int64_t>(value_or_error.value()))) {
-
+  if (!value_or_error.ok() || ((!absl::holds_alternative<double>(value_or_error.value())) &&
+                               (!absl::holds_alternative<int64_t>(value_or_error.value())))) {
     ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
     return integer_default;
   }
-  return absl::get<int64_t>(value_or_error.value());
+  auto json_integer = value_or_error.value();
+  // Handle double formatted integers IE exponent format such as 1.714449238E9
+  if (auto* double_integer = absl::get_if<double>(&json_integer)) {
+    if (*double_integer < 0) {
+      ENVOY_LOG_MISC(error, "Integer {} less than 0: {}", integer_value, *double_integer);
+      return integer_default;
+    } else {
+      return int64_t(*double_integer);
+    }
+  } else {
+    // Standard integer
+    return absl::get<int64_t>(json_integer);
+  }
 }
 
 } // namespace Aws

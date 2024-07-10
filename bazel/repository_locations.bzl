@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "25.3"
+PROTOBUF_VERSION = "26.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "25.3"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "9eae1f20f70cccc912d1c318c3929b86aebf5afd4b0f32c196ef682c222ed5ae",
-    linux_x86_64 = "f853e691868d0557425ea290bf7ba6384eef2fa9b04c323afab49a770ba9da80",
-    osx_aarch_64 = "d0fcd6d3b3ef6f22f1c47cc30a80c06727e1eccdddcaf0f4a3be47c070ffd3fe",
-    osx_x86_64 = "247e003b8e115405172eacc50bd19825209d85940728e766f0848eee7c80e2a1",
-    win64 = "d6b336b852726364313330631656b7f395dde5b1141b169f5c4b8d43cdf01482",
+    linux_aarch_64 = "64a3b3b5f7dac0c8f9cf1cb85b2b1a237eb628644f6bcb0fb8f23db6e0d66181",
+    linux_x86_64 = "a7be2928c0454f132c599e25b79b7ad1b57663f2337d7f7e468a1d59b98ec1b0",
+    osx_aarch_64 = "26a29befa8891ecc48809958c909d284f2b9539a2eb47f22cadc631fe6abe8fd",
+    osx_x86_64 = "febd8821c3a2a23f72f4641471e0ab6486f4fb07b68111490a27a31681465b3c",
+    win64 = "9090d135a1159042b13b4e51b210e40cb820d85a5032a6eca5f9b3ca3bdfb539",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -33,10 +33,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Gazelle",
         project_desc = "Bazel BUILD file generator for Go projects",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = "0.36.0",
-        sha256 = "75df288c4b31c81eb50f51e2e14f4763cb7548daae126817247064637fd9ea62",
+        version = "0.37.0",
+        sha256 = "d76bf7a60fd8b050444090dfa2837a4eaf9829e1165618ee35dceca5cbdf58d5",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
-        release_date = "2024-04-03",
+        release_date = "2024-05-24",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE",
@@ -116,17 +116,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
-        # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
+        # 1. Open https://chromiumdash.appspot.com/releases?platform=Linux and find the latest Stable release.
+        # 2. In the info for that release, open the "Branch Base Commit" link, then open DEPS, and use the <boringssl_revision>.
         #
-        # chromium-118.0.5993.54 (linux/beta)
-        version = "45cf810dbdbd767f09f8cb0b0fcccd342c39041f",
-        sha256 = "f1f421738e9ba39dd88daf8cf3096ddba9c53e2b6b41b32fff5a3ff82f4cd162",
+        # chromium-126.0.6478.55 (linux/stable)
+        version = "2db0eb3f96a5756298dcd7f9319e56a98585bd10",
+        sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2023-08-28",
+        release_date = "2024-04-29",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -148,12 +147,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
         project_url = "https://github.com/aspect-build/bazel-lib",
-        version = "2.7.6",
-        sha256 = "3a702a082560c94c2f1a9b34996a2f1364aeb979641cece34a7868508bae552e",
+        version = "2.7.7",
+        sha256 = "f8ea96b0151bf90b0330662cb02361849c642ebd5bbaeed84b361883b267117d",
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2024-05-23",
+        release_date = "2024-05-28",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/aspect-build/bazel-lib/blob/v{version}/LICENSE",
@@ -621,13 +620,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Datadog C++ Tracing Library",
         project_desc = "Datadog distributed tracing for C++",
         project_url = "https://github.com/DataDog/dd-trace-cpp",
-        version = "0.2.0",
-        sha256 = "4462f0893fa08e4ada2ebaa8f9c023ae16cdde549d77bb8c75226328221f026c",
+        version = "0.2.2",
+        sha256 = "ee524a9b70d39dcfd815b90d9d6fc5599db7989dff072980bff90bae81c4daf7",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.datadog"],
-        release_date = "2024-04-02",
+        release_date = "2024-06-21",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md",
@@ -934,11 +933,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "d19643d265b978383352b3143f04c0641eea75a75235c111cc01a1350173180e",
+        sha256 = "4fc5ff1b2c339fb86cd3a25f0b5311478ab081e65ad258c6789359cd84d421f8",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-02-15",
+        release_date = "2024-03-27",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1065,12 +1064,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Packaging rules for Bazel",
         project_desc = "Bazel rules for the packaging distributions",
         project_url = "https://github.com/bazelbuild/rules_pkg",
-        version = "0.10.1",
-        sha256 = "d330dbe3e3004241ddb9b377416ffc5c823e3e2c08c0d56a7e1935499e7f8577",
+        version = "1.0.0",
+        sha256 = "cc1d6f58eb9bc2bfad247b20f07725dda2d6b119b62b11f1dab9a094a24222e6",
         strip_prefix = "rules_pkg-{version}",
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2024-02-08",
+        release_date = "2024-06-03",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_pkg/blob/{version}/LICENSE",
     ),
@@ -1192,12 +1191,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "1397c94d55af0bfc142ac7dda923cf2726857755",
-        sha256 = "ae33ab0056fd5119d9aae15abfcb69e5d6f021ec5e18e77535ec0fe0c49dfa66",
+        version = "ee470ff425efc46ddba7cce7c7355d0f706424b2",
+        sha256 = "c6fa6340783f0eff5db95ac0f38e1d7b465c4aa8a29c5e8cae5d2f64838be9f1",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-05-16",
+        release_date = "2024-07-01",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1570,7 +1569,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2024-02-15",
+            release_date = "2024-03-27",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",

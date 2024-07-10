@@ -57,6 +57,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_connection_debug_visitor_factory_interface",
+    hdrs = ["envoy_quic_connection_debug_visitor_factory_interface.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:process_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "@com_github_google_quiche//:quic_core_connection_lib",
+        "@com_github_google_quiche//:quic_core_session_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_connection_helper_lib",
     hdrs = ["envoy_quic_connection_helper.h"],
     tags = ["nofips"],
@@ -267,8 +282,12 @@ envoy_cc_library(
         "envoy_quic_server_session.h",
         "envoy_quic_server_stream.h",
     ],
+    external_deps = [
+        "abseil_optional",
+    ],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_connection_debug_visitor_factory_interface",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_crypto_stream_factory_lib",
@@ -375,6 +394,7 @@ envoy_cc_library(
     hdrs = ["envoy_quic_dispatcher.h"],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_connection_debug_visitor_factory_interface",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_crypto_stream_factory_lib",
@@ -399,6 +419,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_factory_lib",
+        ":envoy_quic_connection_debug_visitor_factory_interface",
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_dispatcher_lib",
         ":envoy_quic_packet_writer_lib",
@@ -487,7 +508,7 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
-        "//source/common/tls:context_config_lib",
+        "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
         "//source/common/tls:server_ssl_socket_lib",
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
@@ -643,6 +664,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",
+        "//envoy/server:factory_context_interface",
         "@com_github_google_quiche//:quic_platform_socket_address",
     ],
 )
