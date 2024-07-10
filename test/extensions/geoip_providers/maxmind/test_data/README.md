@@ -8,3 +8,6 @@ For testing purposes one could generate geolocation databases with custom data b
   go run main.go --source source --target out-data
   ```
 * Mmdb files should be generated in the `out-data` directory after running the command in previous step.
+
+# Testing mmdb lookup errors
+In order to make the mmdb client to fail to read the mmdb file, one needs to provide corrupted data. The easiest way to get such data is to copy the corrupted data sample from [Maxmind repository](https://github.com/maxmind/MaxMind-DB/tree/main/bad-data), like it was done with `test_data/libmaxminddb-offset-integer-overflow.mmdb`.

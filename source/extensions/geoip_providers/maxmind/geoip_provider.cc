@@ -212,9 +212,9 @@ void GeoipProvider::lookupInAsnDb(
     // Used for testing.
     synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
     RELEASE_ASSERT(isp_db_ptr, "Maxmind asn database must be initialised for performing lookups");
-    auto isp_db = isp_db_ptr.get();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
+        isp_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
