@@ -84,10 +84,10 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
 
   std::string decoded_path{path};
   static const std::vector<std::pair<absl::string_view, absl::string_view>> replacements{
-      {"2F", "/"},
-      {"2f", "/"},
-      {"5C", "\\"},
-      {"5c", "\\"},
+      {"%2F", "/"},
+      {"%2f", "/"},
+      {"%5C", "\\"},
+      {"%5c", "\\"},
   };
   headers.setPath(absl::StrCat(absl::StrReplaceAll(decoded_path, replacements), query));
 
