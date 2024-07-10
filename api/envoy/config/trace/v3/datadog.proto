@@ -20,15 +20,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Remote Configuration feature.
 message DatadogRemoteConfig {
-  // Allows to configure and change the tracer behaviour from Datadog's user interface.
-  // Default value is ``false``, which disable the feature.
-  // [#comment: This feature can drastically increase the number of connections to the Datadog Agent.
-  // Each tracer regularly polls for configuration updates, and the number of tracers is the product
-  // of the number of listeners and worker threads.]
-  bool enabled = 1;
-
   // Frequency at which new configuration updates are queried.
-  google.protobuf.Duration polling_interval = 2;
+  // [#comment: If no value is provided, the default value is delegated to the Datadog tracing library.]
+  google.protobuf.Duration polling_interval = 1;
 }
 
 // Configuration for the Datadog tracer.
@@ -47,6 +41,10 @@ message DatadogConfig {
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_cluster>` above.
   string collector_hostname = 3;
 
-  // Remote Configuration.
+  // Enables and configures remote configuration.
+  // Remote Configuration allows to configure the tracer from Datadog's user interface.
+  // [#comment: This feature can drastically increase the number of connections to the Datadog Agent.
+  // Each tracer regularly polls for configuration updates, and the number of tracers is the product
+  // of the number of listeners and worker threads.]
   DatadogRemoteConfig remote_config = 4;
 }
