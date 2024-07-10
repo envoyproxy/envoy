@@ -18,22 +18,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderMutation {
 
-using QueryParameterValueOptionProto =
-    envoy::config::common::mutation_rules::v3::QueryParameterValueOption;
-using QueryParameterAppendActionProto =
-    envoy::config::common::mutation_rules::v3::QueryParameterValueOption_QueryParameterAppendAction;
-using QueryParameterMutationProto =
-    envoy::config::common::mutation_rules::v3::QueryParameterMutation;
+using KeyValueAppendProto =
+    envoy::config::core::v3::KeyValueAppend;
+using KeyValueAppendActionProto =
+    envoy::config::core::v3::KeyValueAppend_KeyValueAppendAction;
+using KeyValueMutationProto =
+    envoy::config::core::v3::KeyValueMutation;
 
 enum class AppendAction {
-  AppendIfExistsOrAdd = envoy::config::common::mutation_rules::v3::
-      QueryParameterValueOption_QueryParameterAppendAction_APPEND_IF_EXISTS_OR_ADD,
-  AddIfAbsent = envoy::config::common::mutation_rules::v3::
-      QueryParameterValueOption_QueryParameterAppendAction_ADD_IF_ABSENT,
-  OverwriteIfExistsOrAdd = envoy::config::common::mutation_rules::v3::
-      QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS_OR_ADD,
-  OverwriteIfExists = envoy::config::common::mutation_rules::v3::
-      QueryParameterValueOption_QueryParameterAppendAction_OVERWRITE_IF_EXISTS,
+  AppendIfExistsOrAdd = envoy::config::core::v3::
+      KeyValueAppend_KeyValueAppendAction_APPEND_IF_EXISTS_OR_ADD,
+  AddIfAbsent = envoy::config::core::v3::
+      KeyValueAppend_KeyValueAppendAction_ADD_IF_ABSENT,
+  OverwriteIfExistsOrAdd = envoy::config::core::v3::
+      KeyValueAppend_KeyValueAppendAction_OVERWRITE_IF_EXISTS_OR_ADD,
+  OverwriteIfExists = envoy::config::core::v3::
+      KeyValueAppend_KeyValueAppendAction_OVERWRITE_IF_EXISTS,
 };
 
 class QueryParamsEvaluator;
@@ -42,7 +42,7 @@ using QueryParamsEvaluatorPtr = std::unique_ptr<QueryParamsEvaluator>;
 class QueryParamsEvaluator {
 public:
   QueryParamsEvaluator(
-      const Protobuf::RepeatedPtrField<QueryParameterMutationProto>& query_param_mutations);
+      const Protobuf::RepeatedPtrField<KeyValueMutationProto>& query_param_mutations);
 
   /**
    * Processes headers first through query parameter removals then through query parameter
@@ -58,7 +58,7 @@ protected:
   QueryParamsEvaluator() = default;
 
 private:
-  std::vector<QueryParameterMutationProto> mutations_;
+  std::vector<KeyValueMutationProto> mutations_;
   Formatter::FormatterPtr formatter_;
 };
 

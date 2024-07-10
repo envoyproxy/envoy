@@ -83,8 +83,8 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
     query_parameter_mutations:
     - remove: route-remove-me
     - append:
-        append_action: APPEND_IF_EXISTS_OR_ADD
-        query_parameter:
+        action: APPEND_IF_EXISTS_OR_ADD
+        entry:
           key: route-param
           value: route-value
   )EOF";
@@ -102,8 +102,8 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
     query_parameter_mutations:
     - remove: global-remove-me
     - append:
-        append_action: APPEND_IF_EXISTS_OR_ADD
-        query_parameter:
+        action: APPEND_IF_EXISTS_OR_ADD
+        entry:
           key: global-param
           value: global-value
   )EOF";

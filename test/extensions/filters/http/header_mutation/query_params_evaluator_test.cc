@@ -25,13 +25,13 @@ public:
   }
 
   void addParamToAdd(absl::string_view key, absl::string_view value, AppendAction append_action) {
-    auto* qp = envoy::config::core::v3::QueryParameter::default_instance().New();
+    auto* qp = envoy::config::core::v3::KeyValue::default_instance().New();
     qp->set_key(key);
     qp->set_value(value);
 
-    auto* vo = QueryParameterValueOptionProto::default_instance().New();
-    vo->set_append_action(static_cast<QueryParameterAppendActionProto>(append_action));
-    vo->set_allocated_query_parameter(qp);
+    auto* vo = KeyValueAppendProto::default_instance().New();
+    vo->set_action(static_cast<KeyValueAppendActionProto>(append_action));
+    vo->set_allocated_entry(qp);
 
     auto* mutation = mutations_.Add();
     mutation->set_allocated_append(vo);
@@ -48,7 +48,7 @@ public:
                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  Protobuf::RepeatedPtrField<QueryParameterMutationProto> mutations_;
+  Protobuf::RepeatedPtrField<KeyValueMutationProto> mutations_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 

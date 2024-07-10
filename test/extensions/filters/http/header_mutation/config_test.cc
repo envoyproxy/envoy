@@ -43,8 +43,8 @@ TEST(FactoryTest, FactoryTest) {
     query_parameter_mutations:
     - remove: remove-me
     - append:
-        append_action: APPEND_IF_EXISTS_OR_ADD
-        query_parameter:
+        action: APPEND_IF_EXISTS_OR_ADD
+        entry:
           key: foo
           value: bar
   )EOF";

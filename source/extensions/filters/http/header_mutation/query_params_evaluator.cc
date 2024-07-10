@@ -17,7 +17,7 @@ namespace HeaderMutation {
 using Http::Utility::QueryParamsMulti;
 
 QueryParamsEvaluator::QueryParamsEvaluator(
-    const Protobuf::RepeatedPtrField<QueryParameterMutationProto>& query_param_mutations)
+    const Protobuf::RepeatedPtrField<KeyValueMutationProto>& query_param_mutations)
     : formatter_(std::make_unique<Formatter::FormatterImpl>("", true)) {
 
   for (const auto& query_param : query_param_mutations) {
@@ -40,10 +40,10 @@ void QueryParamsEvaluator::evaluateQueryParams(Http::RequestHeaderMap& headers,
       query_params.remove(mutation.remove());
     } else {
       const auto value_option = mutation.append();
-      const auto key = value_option.query_parameter().key();
-      const auto value = value_option.query_parameter().value();
+      const auto key = value_option.entry().key();
+      const auto value = value_option.entry().value();
       const auto formatter = std::make_unique<Formatter::FormatterImpl>(value, true);
-      switch (AppendAction(value_option.append_action())) {
+      switch (AppendAction(value_option.action())) {
       case AppendAction::AppendIfExistsOrAdd:
         query_params.add(key, formatter->formatWithContext(ctx, stream_info));
         break;
