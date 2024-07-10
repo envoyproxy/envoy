@@ -111,8 +111,9 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
         // we will fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
         // proxies.
         if (auto filter_ptr = weak_self.lock()) {
-          // This call does not need to be posted on the dispatcher, because
-          // onProxyResolutionComplete posts continuing with decoding to the dispatcher already.
+          // This call does not need to be posted on the dispatcher, because all work happens on
+          // the same thread (Envoy Mobile has one thread) and onProxyResolutionComplete posts
+          // the continueDecoding call to the dispatcher already.
           filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
         }
       });
