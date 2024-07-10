@@ -1186,7 +1186,7 @@ public:
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context);
+                  ClusterFactoryContext& cluster_context, absl::Status& creation_status);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed.

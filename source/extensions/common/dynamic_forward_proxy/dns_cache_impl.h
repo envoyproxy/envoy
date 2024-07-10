@@ -69,6 +69,7 @@ public:
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
   void forceRefreshHosts() override;
+  void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) override;
 
 private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
@@ -269,6 +270,9 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
+  absl::Mutex ip_version_to_remove_lock_;
+  absl::optional<Network::Address::IpVersion>
+      ip_version_to_remove_ ABSL_GUARDED_BY(ip_version_to_remove_lock_) = absl::nullopt;
 };
 
 } // namespace DynamicForwardProxy

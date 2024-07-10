@@ -161,7 +161,12 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+      PANIC(message);
+#else
       throw Network::SocketOptionException(message);
+#endif
+
     } else {
       ENVOY_LOG(debug, "{}", message);
     }
@@ -190,13 +195,18 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   auto listen_and_apply_options = [](Envoy::Network::SocketSharedPtr socket, int tcp_backlog_size) {
     const auto rc = socket->ioHandle().listen(tcp_backlog_size);
     if (rc.return_value_ != 0) {
-      throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
+      throwEnvoyExceptionOrPanic(fmt::format("cannot listen() errno={}", rc.errno_));
     }
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
-      throw Network::SocketOptionException(
+      std::string message =
           fmt::format("cannot set post-listen socket option on socket: {}",
-                      socket->connectionInfoProvider().localAddress()->asString()));
+                      socket->connectionInfoProvider().localAddress()->asString());
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+      PANIC(message);
+#else
+      throw Network::SocketOptionException(message);
+#endif
     }
   };
   // On all platforms we should listen on the first socket.
@@ -321,7 +331,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     for (auto i = 0; i < config.additional_addresses_size(); i++) {
       if (socket_type_ !=
           Network::Utility::protobufAddressSocketType(config.additional_addresses(i).address())) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("listener {}: has different socket type. The listener only "
                         "support same socket type for all the addresses.",
                         name_));
@@ -452,7 +462,7 @@ void ListenerImpl::checkIpv4CompatAddress(const Network::Address::InstanceConstS
       (address->ip()->version() != Network::Address::IpVersion::v6 ||
        (!address->ip()->isAnyAddress() &&
         address->ip()->ipv6()->v4CompatibleAddress() == nullptr))) {
-    throw EnvoyException(fmt::format(
+    throwEnvoyExceptionOrPanic(fmt::format(
         "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
         address->asStringView()));
   }
@@ -461,17 +471,17 @@ void ListenerImpl::checkIpv4CompatAddress(const Network::Address::InstanceConstS
 void ListenerImpl::validateConfig() {
   if (mptcp_enabled_) {
     if (socket_type_ != Network::Socket::Type::Stream) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("listener {}: enable_mptcp can only be used with TCP listeners", name_));
     }
     for (auto& address : addresses_) {
       if (address->type() != Network::Address::Type::Ip) {
-        throw EnvoyException(
+        throwEnvoyExceptionOrPanic(
             fmt::format("listener {}: enable_mptcp can only be used with IP addresses", name_));
       }
     }
     if (!Api::OsSysCallsSingleton::get().supportsMptcp()) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "listener {}: enable_mptcp is set but MPTCP is not supported by the operating system",
           name_));
     }
@@ -489,9 +499,10 @@ void ListenerImpl::buildAccessLog(const envoy::config::listener::v3::Listener& c
 void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::Listener& config) {
   if (config.has_internal_listener()) {
     if (config.has_address() || !config.additional_addresses().empty()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': address should not be used "
-                                       "when an internal listener config is provided",
-                                       name_));
+      throwEnvoyExceptionOrPanic(
+          fmt::format("error adding listener '{}': address should not be used "
+                      "when an internal listener config is provided",
+                      name_));
     }
     if ((config.has_connection_balance_config() &&
          config.connection_balance_config().has_exact_balance()) ||
@@ -500,11 +511,11 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
         || (config.has_freebind() && config.freebind().value()) || config.has_tcp_backlog_size() ||
         config.has_tcp_fast_open_queue_length() ||
         (config.has_transparent() && config.transparent().value())) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "error adding listener named '{}': has unsupported tcp listener feature", name_));
     }
     if (!config.socket_options().empty()) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("error adding listener named '{}': does not support socket option", name_));
     }
     std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
@@ -521,7 +532,7 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
                        "type.googleapis.com/"
                        "envoy.extensions.bootstrap.internal_listener.v3.InternalListener";
               })) {
-        throw EnvoyException(fmt::format(
+        throwEnvoyExceptionOrPanic(fmt::format(
             "error adding listener named '{}': InternalListener bootstrap extension is mandatory",
             name_));
       }
@@ -535,9 +546,10 @@ void ListenerImpl::buildInternalListener(const envoy::config::listener::v3::List
                          [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
                            return proto_address.address().has_envoy_internal_address();
                          })) {
-    throw EnvoyException(fmt::format("error adding listener named '{}': use internal_listener "
-                                     "field instead of address for internal listeners",
-                                     name_));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("error adding listener named '{}': use internal_listener "
+                    "field instead of address for internal listeners",
+                    name_));
   }
 }
 
@@ -561,10 +573,11 @@ void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Li
     return;
   }
   if (!reuse_port_ && concurrency > 1) {
-    throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
-                         "socket option results in "
-                         "unstable packet proxying. Configure the reuse_port listener option or "
-                         "set concurrency = 1.");
+    throwEnvoyExceptionOrPanic(
+        "Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
+        "socket option results in "
+        "unstable packet proxying. Configure the reuse_port listener option or "
+        "set concurrency = 1.");
   }
 
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config.udp_listener_config());
@@ -578,8 +591,8 @@ void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Li
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
     if (config.has_connection_balance_config()) {
-      throw EnvoyException("connection_balance_config is configured for QUIC listener which "
-                           "doesn't work with connection balancer.");
+      throwEnvoyExceptionOrPanic("connection_balance_config is configured for QUIC listener which "
+                                 "doesn't work with connection balancer.");
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
@@ -596,7 +609,7 @@ void ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Li
     }
 #endif
 #else
-    throw EnvoyException("QUIC is configured but not enabled in the build.");
+    throwEnvoyExceptionOrPanic("QUIC is configured but not enabled in the build.");
 #endif
   } else {
     udp_listener_config_->listener_factory_ =
@@ -693,7 +706,7 @@ void ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Liste
        !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("error adding listener '{}': no filter chains specified",
                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   } else if (udp_listener_config_ != nullptr &&
@@ -702,7 +715,7 @@ void ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Liste
     if (anyFilterChain(config, [](const auto& filter_chain) {
           return !filter_chain.has_transport_socket();
         })) {
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("error adding listener '{}': no transport socket "
                       "specified for connection oriented UDP listener",
                       absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
@@ -711,10 +724,11 @@ void ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Liste
              udp_listener_config_ != nullptr &&
              udp_listener_config_->listener_factory_->isTransportConnectionless()) {
 
-    throw EnvoyException(fmt::format("error adding listener '{}': {} filter chain(s) specified for "
-                                     "connection-less UDP listener.",
-                                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
-                                     config.filter_chains_size()));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("error adding listener '{}': {} filter chain(s) specified for "
+                    "connection-less UDP listener.",
+                    absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
+                    config.filter_chains_size()));
   }
 }
 
@@ -760,8 +774,9 @@ void ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Li
             Envoy::Registry::FactoryRegistry<Network::ConnectionBalanceFactory>::getFactoryByType(
                 connection_balance_library_type);
         if (factory == nullptr) {
-          throw EnvoyException(fmt::format("Didn't find a registered implementation for type: '{}'",
-                                           connection_balance_library_type));
+          throwEnvoyExceptionOrPanic(
+              fmt::format("Didn't find a registered implementation for type: '{}'",
+                          connection_balance_library_type));
         }
         connection_balancers_.emplace(
             address.asString(),
@@ -770,7 +785,7 @@ void ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Li
         break;
       }
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::BALANCE_TYPE_NOT_SET: {
-        throw EnvoyException("No valid balance type for connection balance");
+        throwEnvoyExceptionOrPanic("No valid balance type for connection balance");
       }
       }
     } else {

@@ -15,7 +15,8 @@ public:
   ~MockClient() override;
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
               (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-               const Envoy::Http::AsyncClient::StreamOptions&));
+               const Envoy::Http::AsyncClient::StreamOptions&,
+               Envoy::Http::DecoderFilterWatermarkCallbacks*));
 };
 
 class MockStream : public ExternalProcessorStream {

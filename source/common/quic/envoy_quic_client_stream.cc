@@ -92,9 +92,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      (Http::HeaderUtility::isCapsuleProtocol(headers) ||
-       Http::HeaderUtility::isConnectUdpRequest(headers))) {
+  if (Http::HeaderUtility::isCapsuleProtocol(headers) ||
+      Http::HeaderUtility::isConnectUdpRequest(headers)) {
     useCapsuleProtocol();
     if (Http::HeaderUtility::isConnectUdpRequest(headers)) {
       // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
@@ -384,11 +383,12 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
 void EnvoyQuicClientStream::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
-    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
-                          ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
-                                                                 session()->OneRttKeysAvailable())
-                          : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
-                      quic::QuicErrorCodeToString(frame.quic_error_code));
+    runResetCallbacks(
+        source == quic::ConnectionCloseSource::FROM_SELF
+            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                   session()->OneRttKeysAvailable())
+            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+        absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|", frame.error_details));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(frame, source);
 }
