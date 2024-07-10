@@ -248,7 +248,7 @@ public:
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
         .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
                                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-          cb(Network::DnsResolver::ResolutionStatus::Success,
+          cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
           return nullptr;

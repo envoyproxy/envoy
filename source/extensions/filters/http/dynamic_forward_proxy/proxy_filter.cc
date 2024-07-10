@@ -184,7 +184,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
-          .resolve(nullptr)
+          .resolve(nullptr, nullptr)
           .factory_.implementsSecureTransport()) {
     default_port = 443;
   }
@@ -266,8 +266,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   latchTime(decoder_callbacks_, DNS_START);
+  const bool is_proxying = isProxying();
   auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
-      headers.Host()->value().getStringView(), default_port, isProxying(), force_cache_refresh,
+      headers.Host()->value().getStringView(), default_port, is_proxying, force_cache_refresh,
       *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
@@ -281,8 +282,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
+    if (is_proxying) {
+      ENVOY_BUG(host.has_value(), "Proxying request but no host entry in DNS cache.");
+      return Http::FilterHeadersStatus::Continue;
+    }
     if (!host.has_value() || !host.value()->address()) {
-      onDnsResolutionFail();
+      onDnsResolutionFail((host.has_value() && *host) ? ((*host)->details()) : "no_host");
       return Http::FilterHeadersStatus::StopIteration;
     }
     addHostAddressToFilterState(host.value()->address());
@@ -387,7 +392,7 @@ void ProxyFilter::onClusterInitTimeout() {
                                      absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);
 }
 
-void ProxyFilter::onDnsResolutionFail() {
+void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
   if (isProxying()) {
     decoder_callbacks_->continueDecoding();
     return;
@@ -395,9 +400,14 @@ void ProxyFilter::onDnsResolutionFail() {
 
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
-                                     ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                     absl::nullopt, RcDetails::get().DnsResolutionFailure);
+  std::string details_str = "";
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_details")) {
+    details_str = StringUtil::replaceAllEmptySpace(details);
+    ASSERT(details_str != "not_resolved");
+  }
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::ServiceUnavailable, ResponseStrings::get().DnsResolutionFailure, nullptr,
+      absl::nullopt, absl::StrCat(RcDetails::get().DnsResolutionFailure, "{", details_str, "}"));
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
@@ -409,7 +419,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   circuit_breaker_.reset();
 
   if (!host_info->address()) {
-    onDnsResolutionFail();
+    onDnsResolutionFail(host_info->details());
     return;
   }
   addHostAddressToFilterState(host_info->address());

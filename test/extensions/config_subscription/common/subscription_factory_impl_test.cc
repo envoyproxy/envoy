@@ -213,9 +213,90 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultiton) {
   EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                          fmt::format("{}::.DELTA_.GRPC must have a "
-                                      "single gRPC service specified:",
+                          fmt::format("{}::.DELTA_.GRPC must have no "
+                                      "more than 1 gRPC services specified:",
                                       config.mutable_api_config_source()->GetTypeName()));
+}
+
+// Validate that failover is accepted.
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
+  // Once "envoy.restart_features.xds_failover_support" is deprecated, the
+  // "GrpcClusterMultiton" test above will be removed and this one kept.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+  envoy::config::core::v3::ConfigSource config;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+
+  config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+
+  // A single entry is accepted.
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster_foo");
+  primary_clusters.insert("static_cluster_foo");
+
+  {
+    envoy::config::core::v3::GrpcService expected_grpc_service;
+    expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster_foo");
+
+    EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+            return std::make_unique<Grpc::MockAsyncClient>();
+          }));
+          return async_client_factory;
+        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+
+    subscriptionFromConfigSource(config);
+  }
+
+  // 2 entries (primary and failover) are accepted.
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster_bar");
+  primary_clusters.insert("static_cluster_bar");
+
+  {
+    envoy::config::core::v3::GrpcService expected_grpc_service;
+    expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster_foo");
+
+    EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+    // A factory will only be created for the primary source, because the
+    // failover source is only supported for ADS.
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+            return std::make_unique<Grpc::MockAsyncClient>();
+          }));
+          return async_client_factory;
+        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+
+    subscriptionFromConfigSource(config);
+  }
+
+  // 3 entries are rejected.
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster_baz");
+  primary_clusters.insert("static_cluster_baz");
+
+  {
+    EXPECT_CALL(cm_, primaryClusters()).Times(2).WillRepeatedly(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
+
+    EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
+                            fmt::format("{}::.DELTA_.GRPC must have no "
+                                        "more than 2 gRPC services specified:",
+                                        config.mutable_api_config_source()->GetTypeName()));
+  }
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {

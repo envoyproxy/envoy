@@ -46,8 +46,9 @@ convertPriority(const envoy::config::endpoint::v3::ClusterLoadAssignment& load_a
 
 LogicalDnsCluster::LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                      ClusterFactoryContext& context,
-                                     Network::DnsResolverSharedPtr dns_resolver)
-    : ClusterImplBase(cluster, context), dns_resolver_(dns_resolver),
+                                     Network::DnsResolverSharedPtr dns_resolver,
+                                     absl::Status& creation_status)
+    : ClusterImplBase(cluster, context, creation_status), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
@@ -95,10 +96,10 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address_, dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
-        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 
@@ -187,9 +188,13 @@ LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cl
         "LOGICAL_DNS clusters must NOT have a custom resolver name set");
   }
 
-  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(new LogicalDnsCluster(
-                            cluster, context, std::move(dns_resolver_or_error.value()))),
-                        nullptr);
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::make_pair(
+      std::shared_ptr<LogicalDnsCluster>(new LogicalDnsCluster(
+          cluster, context, std::move(dns_resolver_or_error.value()), creation_status)),
+      nullptr);
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 /**

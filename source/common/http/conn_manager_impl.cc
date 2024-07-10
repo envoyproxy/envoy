@@ -669,9 +669,7 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
 // Sends a GOAWAY if too many streams have been reset prematurely on this
 // connection.
 void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.send_goaway_for_premature_rst_streams") ||
-      closed_non_internally_destroyed_requests_ == 0) {
+  if (closed_non_internally_destroyed_requests_ == 0) {
     return;
   }
 
@@ -1260,9 +1258,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
-  // Rewrites the host of CONNECT-UDP requests.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      HeaderUtility::isConnectUdpRequest(*request_headers_) &&
+  // Rewrite the host of CONNECT-UDP requests.
+  if (HeaderUtility::isConnectUdpRequest(*request_headers_) &&
       !HeaderUtility::rewriteAuthorityForConnectUdp(*request_headers_)) {
     sendLocalReply(Code::NotFound, "The path is incorrect for CONNECT-UDP", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().InvalidPath);

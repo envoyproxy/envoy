@@ -836,8 +836,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
+    if (Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
       upstream_protocol = UpstreamProtocol::UDP;
     } else if (method == Http::Headers::get().MethodValues.Connect ||
                (route_entry_->connectConfig()->allow_post() &&
@@ -1415,7 +1414,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
   const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
+      transport_failure_reason.empty() ? "" : absl::StrCat("|", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 

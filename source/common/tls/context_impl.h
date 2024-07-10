@@ -21,7 +21,6 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -47,7 +46,7 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
-  Extensions::TransportSockets::Tls::Ocsp::OcspResponseWrapperPtr ocsp_response_;
+  std::unique_ptr<OcspResponseWrapper> ocsp_response_;
   bool is_ecdsa_{};
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};

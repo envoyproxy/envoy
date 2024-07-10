@@ -22,6 +22,7 @@ public:
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual void notifyFilterDestroy() PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
@@ -42,7 +43,8 @@ public:
   virtual ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const Http::AsyncClient::StreamOptions& options) PURE;
+        const Http::AsyncClient::StreamOptions& options,
+        Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

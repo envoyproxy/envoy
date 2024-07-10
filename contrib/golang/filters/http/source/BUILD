@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@com_google_cel_cpp//eval/public:activation",
