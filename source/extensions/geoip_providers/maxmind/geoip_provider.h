@@ -148,8 +148,6 @@ private:
   const Singleton::InstanceSharedPtr owner_;
   // Used for testing only.
   mutable Thread::ThreadSynchronizer synchronizer_;
-
-  friend class ActiveDownstreamConnectionsMonitorTest;
 };
 
 using GeoipProviderSharedPtr = std::shared_ptr<GeoipProvider>;
