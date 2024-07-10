@@ -13,8 +13,10 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
-#include "nghttp2/nghttp2.h"
 
+#ifdef ENVOY_NGHTTP2
+#include "nghttp2/nghttp2.h"
+#endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "quiche/common/structured_headers.h"
 #endif
@@ -203,12 +205,14 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
 
 bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   if (!header_key.empty() && header_key[0] == ':') {
+#ifdef ENVOY_NGHTTP2
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.sanitize_http2_headers_without_nghttp2")) {
       // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
       return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
                                        header_key.size()) != 0;
     }
+#endif
     header_key.remove_prefix(1);
     if (header_key.empty()) {
       return false;
@@ -232,13 +236,14 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  if (Runtime::runtimeFeatureEnabled(
+#ifdef ENVOY_NGHTTP2
+  if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_validate_authority_with_quiche")) {
-    return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
-  } else {
     return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
                                    header_value.size()) != 0;
   }
+#endif
+  return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {

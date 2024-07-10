@@ -924,8 +924,10 @@ envoy_cc_test_library(
     ],
 )
 
+# The light verson of this library allows Envoy mobile e2e tests to pull minimal
+# dependencies, so keep as few libraries as possible in scope of the excepton-free builds.
 envoy_cc_test_library(
-    name = "http_integration_lib",
+    name = "http_integration_lib_light",
     srcs = [
         "http_integration.cc",
     ],
@@ -936,7 +938,7 @@ envoy_cc_test_library(
         "//test/config/integration/certs",
     ],
     deps = [
-        ":integration_lib",
+        ":integration_lib_light",
         ":test_host_predicate_lib",
         "//envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
@@ -946,6 +948,22 @@ envoy_cc_test_library(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/http/http2:http2_frame",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "http_integration_lib",
+    deps = [
+        ":common_extensions_lib",
+        ":http_integration_lib_light",
+        ":integration_lib",
+        ":test_host_predicate_lib",
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
@@ -956,12 +974,6 @@ envoy_cc_test_library(
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/test_common:registry_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
 )
 
@@ -1102,6 +1114,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "common_extensions_lib",
+    deps = [
+        "//source/common/http:rds_lib",
+        "//source/common/router:scoped_rds_lib",
+        "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/network/dns_resolver/cares:config",
+    ],
+)
+
+envoy_cc_test_library(
     name = "base_integration_test_lib",
     srcs = [
         "base_integration_test.cc",
@@ -1116,20 +1146,9 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/http:rds_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_socket_lib",
-        "//source/extensions/clusters/eds:eds_lib",
-        "//source/extensions/clusters/static:static_cluster_lib",
-        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
-        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
-        "//source/extensions/load_balancing_policies/cluster_provided:config",
-        "//source/extensions/load_balancing_policies/least_request:config",
-        "//source/extensions/load_balancing_policies/maglev:config",
-        "//source/extensions/load_balancing_policies/random:config",
-        "//source/extensions/load_balancing_policies/round_robin:config",
-        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/request_id/uuid:config",
         "//source/server:process_context_lib",
         "//source/server:proto_descriptors_lib",
@@ -1211,7 +1230,7 @@ envoy_cc_test_library(
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
-        "//source/server:options_lib",
+        "//source/server:options_base",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
         "//test/common/upstream:utility_lib",
@@ -1237,8 +1256,10 @@ envoy_cc_test_library(
     ],
 )
 
+# The light verson of this library allows Envoy mobile e2e tests to pull minimal
+# dependencies, so keep as few libraries as possible in scope of the excepton-free builds.
 envoy_cc_test_library(
-    name = "integration_lib",
+    name = "integration_lib_light",
     hdrs = [
         "integration.h",
     ],
@@ -1275,7 +1296,6 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http:rds_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/listener_manager:connection_handler_lib",
@@ -1283,7 +1303,6 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
-        "//source/common/router:scoped_rds_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
@@ -1291,10 +1310,6 @@ envoy_cc_test_library(
         "//source/common/tls:server_context_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/access_loggers/file:config",
-        "//source/extensions/health_checkers/grpc:health_checker_lib",
-        "//source/extensions/health_checkers/http:health_checker_lib",
-        "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -1315,6 +1330,21 @@ envoy_cc_test_library(
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "integration_lib",
+    hdrs = [
+        "integration.h",
+    ],
+    deps = [
+        ":common_extensions_lib",
+        ":integration_lib_light",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/health_checkers/grpc:health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
     ],
 )
 

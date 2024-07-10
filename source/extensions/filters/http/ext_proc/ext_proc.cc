@@ -184,8 +184,10 @@ FilterConfig::FilterConfig(
     Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
-      route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
-      max_message_timeout_ms_(max_message_timeout_ms),
+      route_cache_action_(config.route_cache_action()),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
+                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -356,7 +358,8 @@ Filter::StreamOpenState Filter::openStream() {
 
     // TODO(tyxia) Switch to address of stream
     stream_ = config_->threadLocalStreamManager().store(decoder_callbacks_->streamId(),
-                                                        std::move(stream_object), config_->stats());
+                                                        std::move(stream_object), config_->stats(),
+                                                        config_->deferredCloseTimeout());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -1378,7 +1381,7 @@ void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher
                                             uint64_t stream_id) {
   derferred_close_timer =
       dispatcher.createTimer([this, stream_id] { closeStreamOnTimer(stream_id); });
-  derferred_close_timer->enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {

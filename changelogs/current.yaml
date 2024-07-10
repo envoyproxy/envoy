@@ -487,6 +487,11 @@ new_features:
   change: |
     Added :ref:`disable_id_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_id_token_set_cookie>`
     to disable setting the ID Token cookie.
+- area: dns_filter
+  change: |
+    Added support for wildcard resolution in :ref:`inline_dns_table
+    <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ServerContextConfig.inline_dns_table>`
+    when DNS filter is working in server mode.
 
 deprecated:
 - area: tracing

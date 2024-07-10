@@ -152,7 +152,7 @@ public:
 private:
   void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
   void onDnsResolutionFail(absl::string_view details);
-  bool isProxying();
+  virtual bool isProxying();
 
   const ProxyFilterConfigSharedPtr config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
