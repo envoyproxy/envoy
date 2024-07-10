@@ -65,18 +65,18 @@ public:
         filter_.deferred_reset_ = true;
         return;
       }
+      std::string failure_reason = transport_failure_reason;
       if (reason == Http::StreamResetReason::LocalReset) {
         if (!Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.report_stream_reset_error_code")) {
           ASSERT(transport_failure_reason.empty());
           // Use this to communicate to the upstream request to not force-terminate.
-          transport_failure_reason = "codec_error";
+          failure_reason = "codec_error";
         } else {
-          std::string original = transport_failure_reason;
-          transport_failure_reason = absl::StrCat(original, "|codec_error");
+          failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
         }
       }
-      filter_.callbacks_->resetStream(reason, transport_failure_reason);
+      filter_.callbacks_->resetStream(reason, failure_reason);
     }
     void onAboveWriteBufferHighWatermark() override {
       filter_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
