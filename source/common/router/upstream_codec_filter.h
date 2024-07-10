@@ -13,6 +13,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
@@ -64,9 +65,15 @@ public:
         filter_.deferred_reset_ = true;
         return;
       }
-      if (reason == Http::StreamResetReason::LocalReset && transport_failure_reason.empty()) {
-        // Use this to communicate to the upstream request to not force-terminate.
-        transport_failure_reason = "codec_error";
+      if (reason == Http::StreamResetReason::LocalReset) {
+        if (!Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.report_stream_reset_error_code")) {
+          ASSERT(transport_failure_reason.empty());
+          // Use this to communicate to the upstream request to not force-terminate.
+          transport_failure_reason = "codec_error";
+        } else {
+          transport_failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
+        }
       }
       filter_.callbacks_->resetStream(reason, transport_failure_reason);
     }

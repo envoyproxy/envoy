@@ -814,7 +814,7 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   // tell the router the stream reset, and let the router make the decision to
   // send a local reply, or retry the stream.
   if (reset_reason == Http::StreamResetReason::LocalReset &&
-      transport_failure_reason != "codec_error") {
+      !absl::StrContains(transport_failure_reason, "codec_error")) {
     upstream_request_.parent_.callbacks()->resetStream();
     return;
   }
