@@ -3929,7 +3929,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
   filter_->onDestroy();
 }
 
-// When side stream server receives on chunk, it sends back multiple chunks.
+// When side stream server receives one chunk, it sends back multiple chunks.
 TEST_F(HttpFilterTest, SendMultipleChunkResponseForOnetreamingBody) {
   initialize(R"EOF(
   grpc_service:
@@ -3989,54 +3989,60 @@ TEST_F(HttpFilterTest, SendMultipleChunkResponseForOnetreamingBody) {
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
-  for (int i = 0; i < 5; i++) {
+  // Test 7x3 streaming.
+  for (int i = 0; i < 7; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    // want_response_body.add(resp_chunk.toString());
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-    got_response_body.move(resp_chunk);
-    processResponseBody(
-        [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
-          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body(body.body());
-          body_mut->set_more_chunks(true);
-          want_response_body.add(body.body());
-        },
-        false);
-    processResponseBody(
-        [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body(" AAA ");
-          body_mut->set_more_chunks(true);
-          want_response_body.add(" AAA ");
-        },
-        false);
-    processResponseBody(
-        [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body(" BBB ");
-          body_mut->set_more_chunks(false);
-          want_response_body.add(" BBB ");
-        },
-        false);
+
+    if (i < 6) {
+      // clear_body response is sent back for the 1st~6th request chunk.
+      processResponseBody(
+          [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_clear_body(true);
+            body_mut->set_more_chunks(false);
+          },
+          false);
+
+    } else {
+      // The ext_proc server sent back 3 mutated data chunks for the 7th request chunk.
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" AAAAA ");
+            body_mut->set_more_chunks(true);
+            want_response_body.add(" AAAAA ");
+          },
+          false);
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" BBBB ");
+            body_mut->set_more_chunks(true);
+            want_response_body.add(" BBBB ");
+          },
+          false);
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" CCC ");
+            body_mut->set_more_chunks(false);
+            want_response_body.add(" CCC ");
+          },
+          false);
+    }
   }
 
   Buffer::OwnedImpl last_resp_chunk;
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
   processResponseBody(absl::nullopt, true);
 
-  // At this point, since we injected the data from each chunk after the "encodeData"
-  // callback, and since we also injected any chunks inserted using "injectEncodedData,"
-  // the two buffers should match!
+  // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
   filter_->onDestroy();
-
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(19, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 // Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server

@@ -345,8 +345,8 @@ new_features:
   change: |
     implemented API
     :ref:`more_chunks <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.more_chunks>`
-    to support N receied chunks for one sent chunk case when Envoy processing messages from the external processor in the STREAMED mode.
-- area: ext_proc
+    to support MxN streaming for Envoy external processing.
+- area: ext_authz
   change: |
     added
     :ref:`decoder_header_mutation_rules <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.decoder_header_mutation_rules>`
