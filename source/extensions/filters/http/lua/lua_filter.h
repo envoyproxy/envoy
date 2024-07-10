@@ -410,7 +410,7 @@ public:
   }
 
   const LuaFilterStats& stats() const { return stats_; }
-  bool bufferBody() const { return buffer_body_; }
+  bool flowControl() const { return flow_control_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -424,7 +424,7 @@ private:
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
-  bool buffer_body_{true};
+  bool flow_control_{false};
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;

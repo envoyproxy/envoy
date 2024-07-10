@@ -899,7 +899,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 }
 
 // Test verifies that request body is not buffered during Http_call
-// when buffer_body API is set to false;
+// when flow_control API is set to true;
 TEST_F(LuaHttpFilterTest, HttpCallWithWatermarking) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -926,7 +926,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithWatermarking) {
   InSequence s;
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   // Indicate that buffering body should not happen.
-  proto_config.mutable_buffer_body()->set_value(false);
+  proto_config.mutable_flow_control()->set_value(true);
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
   envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
   setupConfig(proto_config, per_route_proto_config);

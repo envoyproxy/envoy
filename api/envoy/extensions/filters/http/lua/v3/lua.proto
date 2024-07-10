@@ -82,12 +82,12 @@ message Lua {
   //
   string stat_prefix = 4;
 
-  // Determines if HTTP body is buffered when Lua script executes httpCall.
-  // If the setting is false, Envoy will put pressure on the downstream client to stop sending
-  // data. If the setting is true, Envoy will try to buffer entire body sent by downstream client,
-  // but buffering may exceed maximum buffer limit per connection and the connection may be dropped.
-  // Defaults to true.
-  google.protobuf.BoolValue buffer_body = 5;
+  // Determines if Envoy will exercise flow control when receiving HTTP body when Lua script executes httpCall.
+  // If the setting is true, Envoy will put backpressure on the downstream client to stop sending
+  // data. If the setting is false, Envoy will not put any backpressure on downstream client
+  // and will buffer HTTP body. Note that buffering may exceed maximum buffer limit per connection and the connection may be dropped.
+  // Defaults to false.
+  google.protobuf.BoolValue flow_control = 5;
 }
 
 message LuaPerRoute {
