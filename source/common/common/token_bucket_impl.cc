@@ -76,6 +76,7 @@ uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, dou
 
   const double time_now = timeNowInSeconds();
   const double used_fill_rate = fill_rate_ * factor;
+  const double used_max_tokens = max_tokens_ * factor;
 
   double time_old = time_in_seconds_.load(std::memory_order_relaxed);
   double time_new{};
@@ -84,7 +85,7 @@ uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, dou
       return 0;
     }
 
-    const double total_tokens = std::min(max_tokens_, (time_now - time_old) * used_fill_rate);
+    const double total_tokens = std::min(used_max_tokens, (time_now - time_old) * used_fill_rate);
     const uint64_t available_tokens = static_cast<uint64_t>(std::floor(tokens));
 
     if (available_tokens < tokens) {
