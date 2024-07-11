@@ -35,8 +35,9 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
     proxy_address = addr_instance.value()->asString();
   }
 
+  const bool tls_exclusive = !outer_config.allow_non_tls();
   return std::make_unique<UpstreamHttp11ConnectSocketFactory>(
-      std::move(inner_transport_factory.value()), proxy_address);
+      std::move(inner_transport_factory.value()), proxy_address, tls_exclusive);
 }
 
 ProtobufTypes::MessagePtr UpstreamHttp11ConnectSocketConfigFactory::createEmptyConfigProto() {

@@ -30,15 +30,17 @@ public:
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
                               std::shared_ptr<const Upstream::HostDescription> host,
-                              bool legacy_behavior = true);
+                              bool tls_exclusive, absl::optional<std::string> proto_proxy_addr);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
-  bool legacyBehavior() const { return legacy_behavior_; }
+
+  // Exposed for testing.
+  bool tlsExclusive() const { return tls_exclusive_; }
+  std::string headerBuffer() const { return header_buffer_.toString(); }
 
 private:
-  void legacyConstructor();
   void generateHeader();
   Network::IoResult writeHeader();
 
@@ -47,17 +49,18 @@ private:
   Buffer::OwnedImpl header_buffer_{};
   bool need_to_strip_connect_response_{};
   // The legacy behavior of this transport socket required configuration via filter state metadata
-  // and only sent a CONNECT request if using a TLS transport to the target host.
-  bool legacy_behavior_{};
+  // and sent a CONNECT request iff using a TLS transport to the target host.
+  bool tls_exclusive_{};
 };
 
 class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
   UpstreamHttp11ConnectSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      absl::optional<std::string> proto_proxy_address = absl::nullopt);
+      absl::optional<std::string> proto_proxy_address = absl::nullopt, bool tls_exclusive = true);
 
-  absl::optional<std::string> proxyAddress() const { return proto_proxy_address_; }
+  absl::optional<std::string> protoProxyAddress() const { return proto_proxy_address_; }
+  bool tlsExclusive() const { return tls_exclusive_; }
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -68,6 +71,7 @@ public:
 
 private:
   absl::optional<std::string> proto_proxy_address_;
+  bool tls_exclusive_;
 };
 
 // This is a utility class for isValidConnectResponse. It is only exposed for

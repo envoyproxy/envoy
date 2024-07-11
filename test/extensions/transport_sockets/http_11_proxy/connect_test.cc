@@ -64,11 +64,7 @@ public:
     }
     initializeOptions(std::move(info));
     setAddress();
-    if (info != nullptr) {
-      initializeSockets(hostname, info->proxy_address->asString());
-    } else {
-      initializeSockets(hostname, absl::nullopt);
-    }
+    initializeSockets(hostname);
   }
 
   Network::TransportSocketOptionsConstSharedPtr options_;
@@ -100,7 +96,7 @@ protected:
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  void initializeSockets(std::string hostname, absl::optional<std::string> proxy_address) {
+  void initializeSockets(std::string hostname) {
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
     EXPECT_CALL(*inner_socket_, ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
@@ -114,13 +110,83 @@ protected:
     EXPECT_CALL(hostref, hostname()).Times(AnyNumber()).WillRepeatedly(ReturnRef(hostname));
 
     connect_socket_ = std::make_unique<UpstreamHttp11ConnectSocket>(
-        std::move(inner_socket), options_, host, !proxy_address.has_value());
+        std::move(inner_socket), options_, host, true, absl::nullopt);
     connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
+    connect_socket_->onConnected();
+  }
+
+  void proxyAddressConfigBehaviorProtos(bool test_metadata_override) {
+    const std::string proxy_url = "proxyurl.biz.cx.lol";
+    constexpr uint16_t proxy_port = 1337;
+    const std::string proxy_addr = fmt::format("{}:{}", proxy_url, proxy_port);
+
+    // Create the proxy info struct, which is populated via the filter state metadata. This won't be
+    // used if 'test_metadata_override' is false.
+    const std::string proxy_info_hostname = "proxy.info.hostname";
+    const std::string proxy_info_addr = "filterstate.proxy.address";
+    Network::Address::InstanceConstSharedPtr fs_proxy_address =
+        Network::Utility::parseInternetAddressAndPortNoThrow(proxy_info_addr);
+
+    auto http11_proxy_info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
+        proxy_info_hostname, fs_proxy_address);
+
+    // We need this for comparisons later.
+    Network::TransportSocketOptions::Http11ProxyInfo proxy_info_copy = *http11_proxy_info;
+
+    if (test_metadata_override) {
+      initializeOptions(std::move(http11_proxy_info));
+    } else {
+      // We are not testing filter state metadata overrides, so we don't pass a proxy info struct
+      // here. We'll expect the proxy address to come from the protobuf config.
+      initializeOptions(nullptr);
+    }
+
+    // Let's manually initialize the sockets for this test, since we need to make an actual host
+    // description.
+    auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
+    inner_socket_ = inner_socket.get();
+    EXPECT_CALL(*inner_socket_, ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
+    EXPECT_CALL(Const(*inner_socket_), ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
+    ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+
+    // Represents the target host that will appear inside the CONNECT request.
+    const std::string hostip = "3.3.3.2";
+    constexpr uint16_t hostport = 11111;
+    auto host = std::make_shared<Upstream::MockHostDescription>();
+    auto hostaddr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(hostip, hostport)};
+    EXPECT_CALL(*host, address()).Times(AnyNumber()).WillRepeatedly(Return(hostaddr));
+    connect_socket_ = std::make_unique<UpstreamHttp11ConnectSocket>(
+        std::move(inner_socket), options_, host, false /* tls_exclusive */, proxy_addr);
+    connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
+    connect_socket_->onConnected();
+
+    // We expect just the connect header to be written by the outer socket, since everything else
+    // will get buffered. Note the IP/port combo in this header is the target host that we expect
+    // the proxy to open a CONNECT tunnel to.
+    std::string expected_connect_data =
+        test_metadata_override
+            ? fmt::format("CONNECT {}:{} HTTP/1.1\r\n\r\n", proxy_info_copy.hostname, 443)
+            : fmt::format("CONNECT {}:{} HTTP/1.1\r\n\r\n", hostip, hostport);
+
+    std::string written_data;
+    EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_connect_data)))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+          written_data = buffer.toString();
+          auto length = buffer.length();
+          buffer.drain(length);
+          return Api::IoCallUint64Result(length, Api::IoError::none());
+        }));
+
+    Buffer::OwnedImpl msg("blah");
+    auto result = connect_socket_->doWrite(msg, false);
+    EXPECT_EQ(absl::nullopt, result.err_code_);
+    EXPECT_CALL(*inner_socket_, onConnected());
     connect_socket_->onConnected();
   }
 };
 
-// Test proxy address configuration via filter state exhibits expected behavior.
+// Test proxy address configuration via filter state overrides the proto config.
 TEST_P(Http11ConnectTest, ProxyAddressConfigBehaviorLegacy) {
   // Hostname of the upstream that the CONNECT proxy would send to.
   const std::string hostname = "www.foo.com";
@@ -135,7 +201,7 @@ TEST_P(Http11ConnectTest, ProxyAddressConfigBehaviorLegacy) {
       hostname, fs_proxy_address);
 
   initializeOptions(std::move(http11_proxy_info));
-  initializeSockets(hostname, absl::nullopt);
+  initializeSockets(hostname);
 
   // We expect just the connect header to be written by the outer socket, since everything else will
   // get buffered.
@@ -158,54 +224,12 @@ TEST_P(Http11ConnectTest, ProxyAddressConfigBehaviorLegacy) {
 
 // Test proxy address configuration via protobuf.
 TEST_P(Http11ConnectTest, ProxyAddressConfigBehaviorProtos) {
-  const std::string proxy_url = "proxyurl.biz.cx.lol";
-  constexpr uint16_t proxy_port = 1337;
-  const std::string proxy_addr = fmt::format("{}:{}", proxy_url, proxy_port);
+  proxyAddressConfigBehaviorProtos(false);
+}
 
-  // We don't pass a proxy info struct here. Those are created only when there is filter state
-  // information to populate it from and we get our proxy information from the outer transport
-  // socket protobuf config.
-  initializeOptions(nullptr);
-
-  // Let's manually initialize the sockets for this test, since we need to make an actual host
-  // description.
-  auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
-  inner_socket_ = inner_socket.get();
-  EXPECT_CALL(*inner_socket_, ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
-  EXPECT_CALL(Const(*inner_socket_), ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
-  ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
-
-  // Represents the target host that will appear inside the CONNECT request.
-  const std::string hostip = "3.3.3.2";
-  constexpr uint16_t hostport = 11111;
-  auto host = std::make_shared<Upstream::MockHostDescription>();
-  auto hostaddr = Network::Address::InstanceConstSharedPtr{
-      new Network::Address::Ipv4Instance(hostip, hostport)};
-  EXPECT_CALL(*host, address()).Times(AnyNumber()).WillRepeatedly(Return(hostaddr));
-  connect_socket_ = std::make_unique<UpstreamHttp11ConnectSocket>(
-      std::move(inner_socket), options_, host, false /* legacy behavior */);
-  connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
-  connect_socket_->onConnected();
-
-  // We expect just the connect header to be written by the outer socket, since everything else will
-  // get buffered. Note the IP/port combo in this header is the target host that we expect the proxy
-  // to open a CONNECT tunnel to.
-  std::string expected_connect_data =
-      fmt::format("CONNECT {}:{} HTTP/1.1\r\n\r\n", hostip, hostport);
-  std::string written_data;
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_connect_data)))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
-        written_data = buffer.toString();
-        auto length = buffer.length();
-        buffer.drain(length);
-        return Api::IoCallUint64Result(length, Api::IoError::none());
-      }));
-
-  Buffer::OwnedImpl msg("blah");
-  auto result = connect_socket_->doWrite(msg, false);
-  EXPECT_EQ(absl::nullopt, result.err_code_);
-  EXPECT_CALL(*inner_socket_, onConnected());
-  connect_socket_->onConnected();
+// Test that filter state metadata overrides the proxy address from the proto config.
+TEST_P(Http11ConnectTest, MetadataOverridesProxyAddressConfig) {
+  proxyAddressConfigBehaviorProtos(true);
 }
 
 // Test injects CONNECT only once
@@ -490,6 +514,7 @@ public:
   std::unique_ptr<UpstreamHttp11ConnectSocketFactory> factory_;
 };
 
+// Verify that in the absence of filter state metadata, the factory gets the correct proxy address.
 TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
   std::string proxy_addr = "1.2.3.4:5678";
 
@@ -497,13 +522,13 @@ TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
   EXPECT_CALL(*inner_factory, createTransportSocket(_, _))
       .WillRepeatedly(Invoke([&](Network::TransportSocketOptionsConstSharedPtr,
                                  std::shared_ptr<const Upstream::HostDescription>) {
-        auto mts = std::make_unique<Network::MockTransportSocket>();
+        auto mts = std::make_unique<NiceMock<Network::MockTransportSocket>>();
         testing::Mock::AllowLeak(mts.get());
         return mts;
       }));
 
-  auto factory =
-      std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(inner_factory), proxy_addr);
+  auto factory = std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(inner_factory),
+                                                                      proxy_addr, false);
   auto hd = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
 
@@ -514,9 +539,39 @@ TEST_F(SocketFactoryTest, MakeSocketWithProtoProxyAddr) {
 
   // We never set any filter state metadata, so check if the factory gets the proxy address and that
   // it causes us to not use legacy behavior.
-  EXPECT_TRUE(factory->proxyAddress().has_value());
-  EXPECT_EQ(proxy_addr, factory->proxyAddress().value());
-  EXPECT_FALSE(ts->legacyBehavior());
+  EXPECT_TRUE(factory->protoProxyAddress().has_value());
+  EXPECT_EQ(proxy_addr, factory->protoProxyAddress().value());
+  EXPECT_FALSE(ts->tlsExclusive());
+}
+
+// Verify filter state metadata overrides the proto proxy address.
+TEST_F(SocketFactoryTest, OverrideProtoProxyAddr) {
+  std::string proxy_addr = "1.2.3.4:5678";
+
+  auto inner_factory = std::make_unique<Network::MockTransportSocketFactory>();
+  EXPECT_CALL(*inner_factory, createTransportSocket(_, _))
+      .WillRepeatedly(Invoke([&](Network::TransportSocketOptionsConstSharedPtr,
+                                 std::shared_ptr<const Upstream::HostDescription>) {
+        auto mts = std::make_unique<NiceMock<Network::MockTransportSocket>>();
+        testing::Mock::AllowLeak(mts.get());
+        return mts;
+      }));
+
+  auto factory = std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(inner_factory),
+                                                                      proxy_addr, false);
+  auto hd = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto tso = std::make_shared<Network::TransportSocketOptionsImpl>();
+
+  auto tsptr = factory->createTransportSocket(tso, hd);
+  EXPECT_THAT(tsptr.get(), testing::NotNull());
+  UpstreamHttp11ConnectSocket* ts = static_cast<UpstreamHttp11ConnectSocket*>(tsptr.get());
+  EXPECT_THAT(ts, testing::NotNull());
+
+  // We never set any filter state metadata, so check if the factory gets the proxy address and that
+  // it causes us to not use legacy behavior.
+  EXPECT_TRUE(factory->protoProxyAddress().has_value());
+  EXPECT_EQ(proxy_addr, factory->protoProxyAddress().value());
+  EXPECT_FALSE(ts->tlsExclusive());
 }
 
 // Test createTransportSocket returns nullptr if inner call returns nullptr
@@ -666,7 +721,8 @@ TEST(ParseTest, ContentLengthZeroHttp11) {
 
 class SocketConfigFactoryTest : public testing::Test {};
 
-TEST_F(SocketConfigFactoryTest, VerifyConfigPropagatesProxyAddr) {
+void verifyConfigPropagatesExclusivity(bool tls_exclusivity) {
+  const bool allow_non_tls = !tls_exclusivity;
   std::shared_ptr<UpstreamHttp11ConnectSocketConfigFactory> scf =
       std::make_shared<UpstreamHttp11ConnectSocketConfigFactory>();
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
@@ -676,6 +732,7 @@ TEST_F(SocketConfigFactoryTest, VerifyConfigPropagatesProxyAddr) {
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport cfg;
   cfg.mutable_proxy_address()->set_port_value(port);
   cfg.mutable_proxy_address()->set_address(addr);
+  cfg.set_allow_non_tls(allow_non_tls);
 
   auto inner_socket = cfg.mutable_transport_socket();
   envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
@@ -692,7 +749,13 @@ TEST_F(SocketConfigFactoryTest, VerifyConfigPropagatesProxyAddr) {
   auto ts = factory->createTransportSocket(tso, host);
   auto sock = static_cast<UpstreamHttp11ConnectSocket*>(ts.get());
 
-  EXPECT_FALSE(sock->legacyBehavior());
+  // We never set the TLS exclusivity, so we can also check that it defaults to exclusive TLS.
+  EXPECT_EQ(tls_exclusivity, sock->tlsExclusive());
+}
+
+TEST_F(SocketConfigFactoryTest, VerifyConfigPropagatesTlsExclusivity) {
+  verifyConfigPropagatesExclusivity(true);
+  verifyConfigPropagatesExclusivity(false);
 }
 
 } // namespace

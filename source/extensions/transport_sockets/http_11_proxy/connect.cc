@@ -30,23 +30,34 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options,
-    std::shared_ptr<const Upstream::HostDescription> host, bool legacy_behavior)
+    std::shared_ptr<const Upstream::HostDescription> host, bool tls_exclusive,
+    absl::optional<std::string> proto_proxy_addr)
     : PassthroughSocket(std::move(transport_socket)), options_(options),
-      legacy_behavior_(legacy_behavior) {
-  if (legacy_behavior_) {
-    legacyConstructor();
+      tls_exclusive_(tls_exclusive) {
+
+  // If the TLS criteria can't be met, there will be no CONNECT proxying.
+  const bool tls_criteria_met = (tls_exclusive && transport_socket_->ssl()) || !tls_exclusive;
+  if (!tls_criteria_met) {
     return;
   }
 
-  header_buffer_.add(
-      absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
-  need_to_strip_connect_response_ = true;
-}
-
-void UpstreamHttp11ConnectSocket::legacyConstructor() {
-  if (options_ && options_->http11ProxyInfo() && transport_socket_->ssl()) {
+  if (options_ && options_->http11ProxyInfo()) {
+    // Historically, this transport socket could only be configured via filter state metadata and
+    // was required to wrap a TLS transport socket to add the CONNECT header. The original behavior
+    // for the metadata configuration (which we must maintain) would send a CONNECT header to the
+    // proxy address found in the filter state metadata on port 443. Therefore, the port is
+    // hardcoded in this case.
     header_buffer_.add(
         absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
+    need_to_strip_connect_response_ = true;
+    return;
+  }
+
+  // Since there's no filter state metadata providing a proxy address, we only want to add a CONNECT
+  // header if there was a proxy address configured in the transport socket's proto config.
+  if (proto_proxy_addr.has_value()) {
+    header_buffer_.add(
+        absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
     need_to_strip_connect_response_ = true;
   }
 }
@@ -143,9 +154,9 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
 
 UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-    absl::optional<std::string> proto_proxy_address)
+    absl::optional<std::string> proto_proxy_address, bool tls_exclusive)
     : PassthroughFactory(std::move(transport_socket_factory)),
-      proto_proxy_address_(proto_proxy_address) {}
+      proto_proxy_address_(proto_proxy_address), tls_exclusive_(tls_exclusive) {}
 
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,
@@ -156,8 +167,7 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
   }
 
   return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host,
-
-                                                       !proto_proxy_address_.has_value());
+                                                       tls_exclusive_, proto_proxy_address_);
 }
 
 void UpstreamHttp11ConnectSocketFactory::hashKey(

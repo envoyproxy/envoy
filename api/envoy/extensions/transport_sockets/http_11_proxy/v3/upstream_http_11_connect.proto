@@ -19,20 +19,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for HTTP/1.1 proxy transport sockets.
 //
-// If this transport socket is configured with the proxy_address field set,
-// then the proxy address will be used for upstream connections.
-//
-// If the proxy_address field is not set, then the proxy address will be
-// read from the stream info set by an intermediate filter (as the test filter
-// does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`). This
-// method of configuration will only preface H1 CONNECT headers to TLS
-// connections.
-//
 // When the transport socket is configured, upstream connections will be directed to the specified
 // proxy address rather than the host's address and will have a raw HTTP/1.1 CONNECT header prefaced
-// to the payload, and 200 response stripped (if less than 200 bytes). In the case of proxy
-// addresses read from stream info set by an intermediate filter, this only applies to TLS
-// connections. Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
+// to the payload, and 200 response stripped (if less than 200 bytes).
+//
+// The proxy address will first be read from the stream info set by an intermediate filter (as the test
+// filter does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`). In the absence of
+// the stream info metadata, the proxy address set in the 'proxy_address' field is used. In the absence
+// of both, connections will not be proxied.
+//
+// .. warning::
+//    For historical reasons, this transport socket will only proxy TLS traffic unless users
+//    explicitly set the 'allow_non_tls' flag to true.
 //
 // .. warning::
 //     This transport socket is not compatible with HTTP/3, plaintext HTTP/2.
@@ -43,4 +41,7 @@ message Http11ProxyUpstreamTransport {
   // The address of the proxy to connect to. If set, stream info set by an intermediate filter will
   // be ignored.
   config.core.v3.SocketAddress proxy_address = 2;
+
+  // If true, the transport socket will not exclusively proxy TLS.
+  bool allow_non_tls = 3;
 }
