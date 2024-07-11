@@ -98,7 +98,7 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
                                          Network::ProxyResolverApi* proxy_resolver) {
-  ASSERT(Thread::MainThread::isMainOrTestThread());
+  RELEASE_ASSERT(Thread::MainThread::isMainOrTestThread());
   ASSERT(proxy_resolver != nullptr, "proxy_resolver must not be null.");
 
   const std::string target_url = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
@@ -107,16 +107,13 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
       target_url, proxy_settings_,
       [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
-        ASSERT(Thread::MainThread::isMainOrTestThread());
+        RELEASE_ASSERT(Thread::MainThread::isMainOrTestThread());
         // This is the callback invoked from the Apple APIs resolving the PAC file URL, which
         // gets invoked on the Envoy thread. We keep a weak_ptr to this filter instance
         // so that, if the stream is canceled and the filter chain is torn down in the meantime,
         // we will fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
         // proxies.
         if (auto filter_ptr = weak_self.lock()) {
-          // This call does not need to be posted on the dispatcher, because all work happens on
-          // the same thread (Envoy Mobile has one thread) and onProxyResolutionComplete posts
-          // the continueDecoding call to the dispatcher already.
           filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
         }
       });
