@@ -1,6 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -86,6 +88,31 @@ envoy_extension_cc_mock(
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "rbac_filter_fuzz_proto",
+    srcs = ["rbac_filter_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "rbac_filter_fuzz_test",
+    srcs = ["rbac_filter_fuzz_test.cc"],
+    corpus = "rbac_filter_corpus",
+    deps = [
+        ":rbac_filter_fuzz_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

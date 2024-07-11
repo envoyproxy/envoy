@@ -103,8 +103,6 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
   private static final String TAG = CronvoyUrlRequest.class.getSimpleName();
   private static final String USER_AGENT = "User-Agent";
   private static final String CONTENT_TYPE = "Content-Type";
-  private static final Executor DIRECT_EXECUTOR = new DirectExecutor();
-
   private final String mUserAgent;
   private final HeadersList mRequestHeaders = new HeadersList();
   private final Collection<Object> mRequestAnnotations;
@@ -766,22 +764,10 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
 
   private static class HeadersList extends ArrayList<Map.Entry<String, String>> {}
 
-  private static class DirectExecutor implements Executor {
-    @Override
-    public void execute(Runnable runnable) {
-      runnable.run();
-    }
-  }
-
   private class CronvoyHttpCallbacks implements EnvoyHTTPCallbacks {
 
     private final AtomicInteger mCancelState = new AtomicInteger(CancelState.READY);
     private volatile boolean mEndStream = false; // Accessed by different Threads
-
-    @Override
-    public Executor getExecutor() {
-      return DIRECT_EXECUTOR;
-    }
 
     @Override
     public void onHeaders(Map<String, List<String>> headers, boolean endStream,
@@ -796,7 +782,12 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       if (responseCode >= 300 && responseCode < 400) {
         setUrlResponseInfo(headers, responseCode);
         List<String> locationFields = mUrlResponseInfo.getAllHeaders().get("location");
-        locationField = locationFields == null ? null : locationFields.get(0);
+        if (locationFields != null && !locationFields.isEmpty() &&
+            !locationFields.get(0).isEmpty()) {
+          locationField = locationFields.get(0);
+        } else {
+          locationField = null;
+        }
       } else {
         locationField = null;
       }
@@ -880,15 +871,19 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
         return;
       }
 
+      ByteBuffer userBuffer = mUserCurrentReadBuffer;
+      mUserCurrentReadBuffer = null; // Avoid the reference to a potentially large buffer.
+      int dataRead = data.remaining();
+      // It is important to copy the `data` into the `userBuffer` outside the thread execution
+      // because the `data` is backed by a direct `ByteBuffer` and it will be destroyed once
+      // the `onData` completes.
+      userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
       Runnable task = new Runnable() {
         @Override
         public void run() {
           checkCallingThread();
           try {
-            ByteBuffer userBuffer = mUserCurrentReadBuffer;
-            mUserCurrentReadBuffer = null; // Avoid the reference to a potentially large buffer.
-            int dataRead = data.remaining();
-            userBuffer.put(data); // NPE ==> BUG, BufferOverflowException ==> User not behaving.
+
             if (dataRead > 0 || !endStream) {
               mWaitingOnRead.set(true);
               mCallback.onReadCompleted(CronvoyUrlRequest.this, mUrlResponseInfo, userBuffer);

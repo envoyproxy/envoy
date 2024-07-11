@@ -1,0 +1,21 @@
+config {
+  stat_prefix: ")"
+  filter_enabled_metadata {
+    filter: "i"
+    path {
+      key: "="
+    }
+    value {
+      string_match {
+        safe_regex {
+          google_re2 {
+            max_program_size {
+            }
+          }
+          regex: "........... }\n                              values {\n  ...................................................\177...................."
+        }
+      }
+    }
+  }
+}
+

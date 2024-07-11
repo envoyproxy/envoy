@@ -19,11 +19,14 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  TimeSource& time_source)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
-      cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
+      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(cm),
+      remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
-      metadata_parser_(Router::HeaderParser::configure(
-          config.initial_metadata(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)),
+      metadata_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.initial_metadata(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)),
       retry_policy_(
           config.has_retry_policy()
               ? absl::optional<envoy::config::route::v3::
@@ -83,14 +86,45 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   if (!options.retry_policy.has_value() && parent_.retryPolicy().has_value()) {
     options_.setRetryPolicy(*parent_.retryPolicy());
   }
+
+  // Apply parent `skip_envoy_headers_` setting from configuration, if no per-stream
+  // override. (i.e., no override of default stream option from true to false)
+  if (options.send_internal) {
+    options_.setSendInternal(!parent_.skip_envoy_headers_);
+  }
+  if (options.send_xff) {
+    options_.setSendXff(!parent_.skip_envoy_headers_);
+  }
+
   // Configure the maximum frame length
   decoder_.setMaxFrameLength(parent_.max_recv_message_length_);
+
+  if (options.parent_span_ != nullptr) {
+    const std::string child_span_name =
+        options.child_span_name_.empty()
+            ? absl::StrCat("async ", service_full_name, ".", method_name, " egress")
+            : options.child_span_name_;
+
+    current_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
+                                                     parent.time_source_.systemTime());
+    current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.remote_cluster_name_);
+    current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.host_name_.empty()
+                                                                    ? parent.remote_cluster_name_
+                                                                    : parent.host_name_);
+    current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+  } else {
+    current_span_ = std::make_unique<Tracing::NullSpan>();
+  }
+
+  if (options.sampled_.has_value()) {
+    current_span_->setSampled(options.sampled_.value());
+  }
 }
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
   if (thread_local_cluster == nullptr) {
-    callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
+    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
   }
@@ -100,7 +134,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
   if (stream_ == nullptr) {
-    callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
+    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
     return;
   }
@@ -118,6 +152,13 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
                                             options_.parent_context.stream_info);
 
+  Tracing::HttpTraceContext trace_context(headers_message_->headers());
+  Tracing::UpstreamContext upstream_context(nullptr,                         // host_
+                                            cluster_info_.get(),             // cluster_
+                                            Tracing::ServiceType::EnvoyGrpc, // service_type_
+                                            true                             // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
@@ -198,14 +239,24 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
-  callbacks_.onRemoteClose(grpc_status.value(), grpc_message);
+  notifyRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
   callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
-  callbacks_.onRemoteClose(grpc_status, message);
+  notifyRemoteClose(grpc_status, message);
   resetStream();
+}
+
+void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
+                                        const std::string& message) {
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+  current_span_->finishSpan();
+  callbacks_.onRemoteClose(status, message);
 }
 
 void AsyncStreamImpl::onComplete() {
@@ -229,6 +280,8 @@ void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stre
 void AsyncStreamImpl::closeStream() {
   Buffer::OwnedImpl empty_buffer;
   stream_->sendData(empty_buffer, true);
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  current_span_->finishSpan();
 }
 
 void AsyncStreamImpl::resetStream() { cleanup(); }

@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import java.nio.ByteBuffer;
@@ -22,6 +23,7 @@ public class JniLibrary {
     if (System.getProperty("envoy_jni_library_name") != null) {
       envoyLibraryName = System.getProperty("envoy_jni_library_name");
     }
+    load();
   }
 
   // Load and initialize Envoy and its dependencies, but only once.
@@ -58,16 +60,13 @@ public class JniLibrary {
    * Open an underlying HTTP stream. Note: Streams must be started before other
    * other interaction can can occur.
    *
-   * @param engine,  handle to the stream's associated engine.
-   * @param stream,  handle to the stream to be started.
-   * @param context, context that contains dispatch logic to fire callbacks
-   *                 callbacks.
-   * @param explicitFlowControl, whether explicit flow control should be enabled
-   *                             for the stream.
-   * @return envoy_stream, with a stream handle and a success status, or a failure
-   * status.
+   * @param engine  handle to the stream's associated engine.
+   * @param stream  handle to the stream to be started.
+   * @param callbacks context that contains dispatch logic to fire callbacks.
+   * @param explicitFlowControl whether explicit flow control should be enabled for the stream.
+   * @return a stream handle and a success status, or a failure status.
    */
-  protected static native int startStream(long engine, long stream, JvmCallbackContext context,
+  protected static native int startStream(long engine, long stream, EnvoyHTTPCallbacks callbacks,
                                           boolean explicitFlowControl);
 
   /**
@@ -263,7 +262,7 @@ public class JniLibrary {
    * Mimic a call to AndroidNetworkLibrary#addTestRootCertificate from native code.
    * To be used for testing only.
    *
-   * @param rootCert DER encoded bytes of the certificate.
+   * @param cert DER encoded bytes of the certificate.
    */
   public static native void callAddTestRootCertificateFromNative(byte[] cert);
 
@@ -274,7 +273,7 @@ public class JniLibrary {
    */
   public static native void callClearTestRootCertificateFromNative();
 
-  /*
+  /**
    * Given a filter name, create the proto config for adding the native filter
    *
    * @param filterName the name of the native filter
@@ -302,9 +301,5 @@ public class JniLibrary {
       long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain,
-      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
-      String rtdsResourceName, long rtdsTimeoutSeconds, String xdsAddress, long xdsPort,
-      byte[][] xdsGrpcInitialMetadata, String xdsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone, byte[] nodeMetadata, String cdsResourcesLocator,
-      long cdsTimeoutSeconds, boolean enableCds);
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards);
 }

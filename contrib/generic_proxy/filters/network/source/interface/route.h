@@ -8,6 +8,7 @@
 #include "envoy/router/router.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -87,7 +88,7 @@ using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
 class RouteMatcher : public Rds::Config {
 public:
-  virtual RouteEntryConstSharedPtr routeEntry(const Request& request) const PURE;
+  virtual RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const PURE;
 };
 using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
 

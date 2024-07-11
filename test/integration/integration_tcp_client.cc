@@ -55,7 +55,7 @@ IntegrationTcpClient::IntegrationTcpClient(
       }));
 
   connection_ = dispatcher.createClientConnection(
-      Network::Utility::resolveUrl(fmt::format(
+      *Network::Utility::resolveUrl(fmt::format(
           "tcp://{}:{}",
           destination_address.empty() ? Network::Test::getLoopbackAddressUrlString(version)
                                       : destination_address,

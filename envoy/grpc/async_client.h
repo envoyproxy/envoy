@@ -70,6 +70,20 @@ public:
    * @returns the stream info object associated with this stream.
    */
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /***
+   * Register a callback to be called when high/low write buffer watermark events occur on the
+   * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
+   * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
+   * will trigger ENVOY_BUG.
+   */
+  virtual void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks& callbacks) PURE;
+
+  /***
+   * Remove previously set watermark callbacks. If there's no watermark callback registered, this
+   * method will trigger ENVOY_BUG.
+   */
+  virtual void removeWatermarkCallbacks() PURE;
 };
 
 class RawAsyncRequestCallbacks {
@@ -175,7 +189,6 @@ public:
 
   /**
    * Start a gRPC stream asynchronously.
-   * TODO(mattklein123): Determine if tracing should be added to streaming requests.
    * @param service_full_name full name of the service (i.e. service_method.service()->full_name()).
    * @param method_name name of the method (i.e. service_method.name()).
    * @param callbacks the callbacks to be notified of stream status.

@@ -131,7 +131,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
 
 .. literalinclude:: _include/sds-source-example.yaml
    :language: yaml
-   :lines: 1-103
+   :lines: 1-97
    :linenos:
    :lineno-start: 1
    :caption: :download:`sds-source-example.yaml <_include/sds-source-example.yaml>`

@@ -21,7 +21,6 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -47,7 +46,7 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
-  Extensions::TransportSockets::Tls::Ocsp::OcspResponseWrapperPtr ocsp_response_;
+  std::unique_ptr<OcspResponseWrapper> ocsp_response_;
   bool is_ecdsa_{};
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
@@ -62,12 +61,12 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
-  void loadCertificateChain(const std::string& data, const std::string& data_path);
-  void loadPrivateKey(const std::string& data, const std::string& data_path,
-                      const std::string& password);
-  void loadPkcs12(const std::string& data, const std::string& data_path,
-                  const std::string& password);
-  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
+  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
+  absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
+                              const std::string& password);
+  absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
+                          const std::string& password);
+  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 } // namespace Ssl
 
@@ -118,7 +117,7 @@ protected:
 
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               Server::Configuration::CommonFactoryContext& factory_context,
-              Ssl::ContextAdditionalInitFunc additional_init);
+              Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -129,8 +128,9 @@ protected:
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
 
-  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
-  std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
+  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl, absl::Status& parse_status);
+  std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
+                                          absl::Status& parse_status);
 
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
@@ -171,6 +171,16 @@ protected:
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
+
+class ServerContextFactory : public Envoy::Config::UntypedFactory {
+public:
+  std::string category() const override { return "envoy.ssl.server_context_factory"; }
+  virtual Ssl::ServerContextSharedPtr
+  createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                      const std::vector<std::string>& server_names,
+                      Server::Configuration::CommonFactoryContext& factory_context,
+                      Ssl::ContextAdditionalInitFunc additional_init) PURE;
+};
 
 } // namespace Tls
 } // namespace TransportSockets

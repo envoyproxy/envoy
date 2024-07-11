@@ -76,15 +76,31 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   }
 }
 
+absl::StatusOr<std::unique_ptr<ServerContextImpl>>
+ServerContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                          const std::vector<std::string>& server_names,
+                          Server::Configuration::CommonFactoryContext& factory_context,
+                          Ssl::ContextAdditionalInitFunc additional_init) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<ServerContextImpl>(new ServerContextImpl(
+      scope, config, server_names, factory_context, additional_init, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      Server::Configuration::CommonFactoryContext& factory_context,
-                                     Ssl::ContextAdditionalInitFunc additional_init)
-    : ContextImpl(scope, config, factory_context, additional_init),
+                                     Ssl::ContextAdditionalInitFunc additional_init,
+                                     absl::Status& creation_status)
+    : ContextImpl(scope, config, factory_context, additional_init, creation_status),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
+  if (!creation_status.ok()) {
+    return;
+  }
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throwEnvoyExceptionOrPanic("Server TlsCertificates must have a certificate specified");
   }
@@ -179,7 +195,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
       }
     } else {
       auto response_or_error =
-          Ocsp::OcspResponseWrapper::create(ocsp_resp_bytes, factory_context_.timeSource());
+          Ocsp::OcspResponseWrapperImpl::create(ocsp_resp_bytes, factory_context_.timeSource());
       THROW_IF_STATUS_NOT_OK(response_or_error, throw);
       if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
         throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
@@ -676,6 +692,20 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
   return ssl_select_cert_success;
 }
+
+Ssl::ServerContextSharedPtr ServerContextFactoryImpl::createServerContext(
+    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+    const std::vector<std::string>& server_names,
+    Server::Configuration::CommonFactoryContext& factory_context,
+    Ssl::ContextAdditionalInitFunc additional_init) {
+  auto factory_or_error = ServerContextImpl::create(scope, config, server_names, factory_context,
+                                                    std::move(additional_init));
+  THROW_IF_NOT_OK(factory_or_error.status());
+  return std::move(factory_or_error.value());
+}
+
+REGISTER_FACTORY(ServerContextFactoryImpl, ServerContextFactory);
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

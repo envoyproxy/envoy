@@ -18,7 +18,6 @@ dynamic_resources {
         value: nan
       }
     }
-    transport_api_version: V3
   }
 }
 layered_runtime {

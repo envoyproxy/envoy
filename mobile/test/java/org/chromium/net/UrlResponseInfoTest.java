@@ -3,7 +3,6 @@ package org.chromium.net;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -13,11 +12,12 @@ import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 import org.chromium.net.testing.Feature;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests for {@link UrlResponseInfo}.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class UrlResponseInfoTest {
   /**
    * Test for public API of {@link UrlResponseInfo}.

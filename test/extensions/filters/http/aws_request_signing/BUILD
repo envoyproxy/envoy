@@ -38,10 +38,12 @@ envoy_extension_cc_test(
     srcs = ["aws_request_signing_integration_test.cc"],
     extension_names = ["envoy.filters.http.aws_request_signing"],
     deps = [
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//source/extensions/filters/http/aws_request_signing:config",
         "//test/extensions/common/aws:aws_mocks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
     ],
 )

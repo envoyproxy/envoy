@@ -25,9 +25,14 @@ using MutationsProto = envoy::extensions::filters::http::header_mutation::v3::Mu
 
 class Mutations {
 public:
+  using HeaderMutations = Http::HeaderMutations;
+
   Mutations(const MutationsProto& config)
-      : request_mutations_(config.request_mutations()),
-        response_mutations_(config.response_mutations()) {}
+      : request_mutations_(THROW_OR_RETURN_VALUE(
+            HeaderMutations::create(config.request_mutations()), std::unique_ptr<HeaderMutations>)),
+        response_mutations_(
+            THROW_OR_RETURN_VALUE(HeaderMutations::create(config.response_mutations()),
+                                  std::unique_ptr<HeaderMutations>)) {}
 
   void mutateRequestHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext& ctx,
                             const StreamInfo::StreamInfo& stream_info) const;
@@ -35,8 +40,8 @@ public:
                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:
-  const Http::HeaderMutations request_mutations_;
-  const Http::HeaderMutations response_mutations_;
+  const std::unique_ptr<HeaderMutations> request_mutations_;
+  const std::unique_ptr<HeaderMutations> response_mutations_;
 };
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {

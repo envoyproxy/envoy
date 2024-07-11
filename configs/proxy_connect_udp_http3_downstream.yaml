@@ -72,9 +72,5 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
         upstream_tls_context:
-          common_tls_context:
-            tls_certificates:
-            - certificate_chain:
-                filename: certs/servercert.pem
-              private_key:
-                filename: certs/serverkey.pem
+          # SAN of the certs/servercert.pem used for local testing. Update this if using a different certificate.
+          sni: lyft.com

@@ -80,10 +80,14 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   const auto short_date = short_date_formatter_.now(time_source_);
 
   if (!query_string_) {
+    // Explicitly remove Authorization and security token header if present
+    headers.remove(Http::CustomHeaders::get().Authorization);
+    headers.remove(SignatureHeaders::get().SecurityToken);
+
     if (credentials.sessionToken()) {
-      headers.addCopy(SignatureHeaders::get().SecurityToken, credentials.sessionToken().value());
+      headers.setCopy(SignatureHeaders::get().SecurityToken, credentials.sessionToken().value());
     }
-    headers.addCopy(SignatureHeaders::get().Date, long_date);
+    headers.setCopy(SignatureHeaders::get().Date, long_date);
     addRegionHeader(headers, override_region);
   }
 
@@ -137,7 +141,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     const auto authorization_header = createAuthorizationHeader(
         credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
 
-    headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
+    headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
     // Sanitize logged authorization header
     std::vector<std::string> sanitised_header =

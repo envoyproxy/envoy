@@ -54,9 +54,10 @@ public:
    * @param resource_decoder how incoming opaque resource objects are to be decoded.
    * @param options subscription options.
    *
-   * @return SubscriptionPtr subscription object corresponding for config and type_url.
+   * @return SubscriptionPtr subscription object corresponding for config and type_url or error
+   * status.
    */
-  virtual SubscriptionPtr subscriptionFromConfigSource(
+  virtual absl::StatusOr<SubscriptionPtr> subscriptionFromConfigSource(
       const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
       Stats::Scope& scope, SubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
@@ -73,9 +74,10 @@ public:
    *                  CollectionSubscription object.
    * @param resource_decoder how incoming opaque resource objects are to be decoded.
    *
-   * @return SubscriptionPtr subscription object corresponding for collection_locator.
+   * @return SubscriptionPtr subscription object corresponding for collection_locator or error
+   * status.
    */
-  virtual SubscriptionPtr
+  virtual absl::StatusOr<SubscriptionPtr>
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,
                                 absl::string_view type_url, Stats::Scope& scope,
@@ -115,8 +117,9 @@ public:
   std::string category() const override { return "envoy.config_mux"; }
   virtual void shutdownAll() PURE;
   virtual std::shared_ptr<GrpcMux>
-  create(std::unique_ptr<Grpc::RawAsyncClient>&& async_client, Event::Dispatcher& dispatcher,
-         Random::RandomGenerator& random, Stats::Scope& scope,
+  create(std::unique_ptr<Grpc::RawAsyncClient>&& async_client,
+         std::unique_ptr<Grpc::RawAsyncClient>&& async_failover_client,
+         Event::Dispatcher& dispatcher, Random::RandomGenerator& random, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info,
          std::unique_ptr<CustomConfigValidators>&& config_validators,

@@ -110,6 +110,9 @@ TEST_F(UpstreamConnTest, WriteAndClose) {
   EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(upstream_connection_));
   upConn_->onPoolReady(std::move(data), nullptr);
 
+  EXPECT_CALL(upstream_connection_, enableHalfClose(true));
+  upConn_->enableHalfClose(true);
+
   Buffer::OwnedImpl someData("123");
   EXPECT_CALL(upstream_connection_, write(_, false));
   upConn_->write(someData, false);

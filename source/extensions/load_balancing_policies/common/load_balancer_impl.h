@@ -33,6 +33,22 @@ inline bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hos
   return num_preconnect_picks >= healthy_hosts;
 }
 
+// Distributes load between priorities based on the per priority availability and the normalized
+// total availability. Load is assigned to each priority according to how available each priority is
+// adjusted for the normalized total availability.
+//
+// @param per_priority_load vector of loads that should be populated.
+// @param per_priority_availability the percentage availability of each priority, used to determine
+// how much load each priority can handle.
+// @param total_load the amount of load that may be distributed. Will be updated with the amount of
+// load remaining after distribution.
+// @param normalized_total_availability the total availability, up to a max of 100. Used to
+// scale the load when the total availability is less than 100%.
+// @return the first available priority and the remaining load
+std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
+                                          const PriorityAvailability& per_priority_availability,
+                                          size_t total_load, size_t normalized_total_availability);
+
 class LoadBalancerConfigHelper {
 public:
   template <class LegacyProto>
@@ -351,15 +367,6 @@ private:
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRoutingNew();
-
-  /**
-   * @return decision on quick exit from locality aware routing based on cluster configuration.
-   * This gets recalculated on update callback.
-   *
-   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to reduce the risk of changes.
-   */
   bool earlyExitNonLocalityRouting();
 
   /**
@@ -374,29 +381,11 @@ private:
    * matches the ordering of upstream localities in the input upstream_hosts_per_locality.
    */
   absl::FixedArray<LocalityPercentages>
-  calculateLocalityPercentagesNew(const HostsPerLocality& local_hosts_per_locality,
-                                  const HostsPerLocality& upstream_hosts_per_locality);
-
-  /**
-   * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
-   * The result is stored as integer number and scaled by 10000 multiplier for better precision.
-   * Caller is responsible for allocation/de-allocation of `ret`.
-   *
-   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to reduce the risk of changes.
-   */
-  void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
+  calculateLocalityPercentages(const HostsPerLocality& local_hosts_per_locality,
+                               const HostsPerLocality& upstream_hosts_per_locality);
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
-   */
-  void regenerateLocalityRoutingStructuresNew();
-
-  /**
-   * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
-   *
-   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to reduce the risk of changes.
    */
   void regenerateLocalityRoutingStructures();
 
@@ -452,7 +441,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;
-  const bool use_new_locality_routing_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;

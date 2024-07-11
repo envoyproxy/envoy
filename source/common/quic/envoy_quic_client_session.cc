@@ -103,6 +103,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
         std::vector<std::string>(transport_socket_factory_->supportedAlpnProtocols().begin(),
                                  transport_socket_factory_->supportedAlpnProtocols().end());
   }
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
+#endif
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {

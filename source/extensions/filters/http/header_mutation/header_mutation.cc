@@ -15,13 +15,13 @@ namespace HeaderMutation {
 void Mutations::mutateRequestHeaders(Http::HeaderMap& headers,
                                      const Formatter::HttpFormatterContext& ctx,
                                      const StreamInfo::StreamInfo& stream_info) const {
-  request_mutations_.evaluateHeaders(headers, ctx, stream_info);
+  request_mutations_->evaluateHeaders(headers, ctx, stream_info);
 }
 
 void Mutations::mutateResponseHeaders(Http::HeaderMap& headers,
                                       const Formatter::HttpFormatterContext& ctx,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  response_mutations_.evaluateHeaders(headers, ctx, stream_info);
+  response_mutations_->evaluateHeaders(headers, ctx, stream_info);
 }
 
 PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config)
