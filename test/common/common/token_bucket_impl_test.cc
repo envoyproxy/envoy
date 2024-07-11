@@ -151,8 +151,6 @@ TEST_F(AtomicTokenBucketImplTest, MaxBucketSize) {
   EXPECT_EQ(1, token_bucket.fillRate());
   EXPECT_EQ(3, token_bucket.maxTokens());
   EXPECT_EQ(3, token_bucket.remainingTokens());
-  EXPECT_EQ(1.5, token_bucket.maxTokens(0.5));
-  EXPECT_EQ(1.5, token_bucket.remainingTokens(0.5));
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
   time_system_.setMonotonicTime(std::chrono::seconds(10));
