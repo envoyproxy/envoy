@@ -4053,7 +4053,7 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
   EXPECT_FALSE(encoding_watermarked);
 
   // Now sends a few normal requests and responses.
-  for (int i = 0; i< 3; i++) {
+  for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
@@ -4070,7 +4070,7 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
-   // Now do another 3x4 streaming.
+  // Now do another 3x4 streaming.
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 10);
@@ -4170,7 +4170,7 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-   // Then the ext_proc server sent back 3 mutated data chunks for the 7th request chunk.
+  // Then the ext_proc server sent back 3 mutated data chunks for the 7th request chunk.
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
@@ -4249,7 +4249,6 @@ TEST_F(HttpFilterTest, SendMoreChunksOverConfigLimit) {
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
   filter_->onDestroy();
 }
-
 
 // Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
 // sends back response with clear_route_cache set to true, it is ignored.
