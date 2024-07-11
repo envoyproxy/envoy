@@ -2733,10 +2733,10 @@ for-each@^0.3.3:
   dependencies:
     is-callable "^1.1.3"
 
-framer-motion@^11.2.10:
-  version "11.2.10"
-  resolved "https://registry.yarnpkg.com/framer-motion/-/framer-motion-11.2.10.tgz#c8671e33e8f8d4abbd95efd20d3b8a888f457ed7"
-  integrity sha512-/gr3PLZUVFCc86a9MqCUboVrALscrdluzTb3yew+2/qKBU8CX6nzs918/SRBRCqaPbx0TZP10CB6yFgK2C5cYQ==
+framer-motion@^11.3.0:
+  version "11.3.0"
+  resolved "https://registry.yarnpkg.com/framer-motion/-/framer-motion-11.3.0.tgz#dd2fe041577c520b2bf1b136b3ed31f866308f54"
+  integrity sha512-hjYjMUQaWuqilwRr5kC0CunHZFVMtKWHy/IdL/LPRBD0C491DKTvYwQRJ5qRXEAOT+Rth7Vi4XBe4TA4bFOn3A==
   dependencies:
     tslib "^2.4.0"
 
