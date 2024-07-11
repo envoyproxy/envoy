@@ -333,8 +333,14 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
+- area: oauth2
+  change: |
+    Removed ``envoy.reloadable_features.oauth_use_url_encoding`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for all Bloom 1.0.0 commands.
 - area: redis
   change: |
     Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
@@ -463,6 +469,12 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: formatter
+  change: |
+    added formatters for :ref:`METADATA(VIRTUAL_HOST)<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>`.
+- area: quic
+  change: |
+    Added new interface to QuicListenerFilter that is called on receiving the first packet.
 - area: quic
   change: |
     Added :ref:`DataSourceServerPreferredAddressConfig

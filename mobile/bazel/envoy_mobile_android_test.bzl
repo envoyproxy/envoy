@@ -23,9 +23,8 @@ def _contains_all(srcs, extension):
     return True
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, native_lib_name = "", deps = [], native_deps = [], repository = "", exec_properties = {}):
+def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], repository = "", exec_properties = {}):
     dependencies = deps + [
-        repository + "//bazel:envoy_mobile_test_suite",
         "@maven//:androidx_annotation_annotation",
         "@maven//:androidx_test_core",
         "@maven//:androidx_test_ext_junit",
@@ -51,8 +50,8 @@ def envoy_mobile_android_test(name, srcs, native_lib_name = "", deps = [], nativ
             data = native_deps,
             deps = dependencies,
             manifest = repository + "//bazel:test_manifest.xml",
-            custom_package = "io.envoyproxy.envoymobile.tests",
-            test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
+            custom_package = test_class.rsplit(".", 1)[0],
+            test_class = test_class,
             jvm_flags = jvm_flags(native_lib_name),
             exec_properties = exec_properties,
         )
@@ -63,8 +62,8 @@ def envoy_mobile_android_test(name, srcs, native_lib_name = "", deps = [], nativ
             data = native_deps,
             deps = dependencies,
             manifest = repository + "//bazel:test_manifest.xml",
-            custom_package = "io.envoyproxy.envoymobile.tests",
-            test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
+            custom_package = test_class.rsplit(".", 1)[0],
+            test_class = test_class,
             jvm_flags = jvm_flags(native_lib_name),
             exec_properties = exec_properties,
         )

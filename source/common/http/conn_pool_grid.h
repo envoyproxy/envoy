@@ -127,7 +127,6 @@ public:
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host);
 
-  private:
     // Called if the initial HTTP/3 connection fails.
     // Returns true if an HTTP/3 happy eyeballs attempt can be kicked off
     // (runtime guard is on, IPv6 and IPv6 addresses are present, happy eyeballs
@@ -135,8 +134,9 @@ public:
     bool shouldAttemptSecondHttp3Connection();
     // This kicks off an HTTP/3 happy eyeballs attempt, connecting to the second
     // address in the host's address list.
-    void attemptSecondHttp3Connection();
+    ConnectivityGrid::StreamCreationResult attemptSecondHttp3Connection();
 
+  private:
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
