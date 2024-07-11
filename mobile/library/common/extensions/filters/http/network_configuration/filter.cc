@@ -2,6 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -98,7 +99,8 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
                                          Network::ProxyResolverApi* proxy_resolver) {
-  RELEASE_ASSERT(Thread::MainThread::isMainOrTestThread());
+  RELEASE_ASSERT(Thread::MainThread::isMainOrTestThread(),
+                 "NetworkConfigurationProxy::resolveProxy not running on main thread.");
   ASSERT(proxy_resolver != nullptr, "proxy_resolver must not be null.");
 
   const std::string target_url = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
@@ -107,7 +109,9 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
       target_url, proxy_settings_,
       [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
-        RELEASE_ASSERT(Thread::MainThread::isMainOrTestThread());
+        RELEASE_ASSERT(
+            Thread::MainThread::isMainOrTestThread(),
+            "NetworkConfigurationProxy PAC proxy resolver callback not running on main thread.");
         // This is the callback invoked from the Apple APIs resolving the PAC file URL, which
         // gets invoked on the Envoy thread. We keep a weak_ptr to this filter instance
         // so that, if the stream is canceled and the filter chain is torn down in the meantime,
