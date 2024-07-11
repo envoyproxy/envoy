@@ -452,20 +452,20 @@ TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
 
   // Flip both flags to a non-default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", true},
-       {"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", false}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_false", true},
+       {"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true", false}});
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip one flag back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", false}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_false", false}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip the other back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", true}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true", true}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
 }

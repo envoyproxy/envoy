@@ -655,7 +655,7 @@ TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
 TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_disable_version_draft_29",
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_disable_version_draft_29",
       "false");
   initialize();
 
@@ -1529,7 +1529,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithEnvoyReset) {
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header",
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_act_upon_invalid_header",
       "false");
 
   useAccessLog(

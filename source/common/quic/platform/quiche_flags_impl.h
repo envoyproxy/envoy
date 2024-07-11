@@ -43,9 +43,9 @@ private:
 } // namespace quiche
 
 // Flag declarations
-#define QUIC_FLAG(flag, ...) ABSL_DECLARE_FLAG(bool, envoy_##flag);
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
+#define QUICHE_FLAG(type, flag, ...) ABSL_DECLARE_FLAG(type, envoy_##flag);
+#include "quiche/common/quiche_feature_flags_list.h"
+#undef QUICHE_FLAG
 
 #define QUICHE_PROTOCOL_FLAG(type, flag, ...) ABSL_DECLARE_FLAG(type, envoy_##flag);
 #include "quiche/common/quiche_protocol_flags_list.h"
@@ -57,14 +57,14 @@ namespace quiche {
 
 #define SetQuicheFlagImpl(flag, value) absl::SetFlag(&FLAGS_envoy_##flag, value)
 
-#define GetQuicheReloadableFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
+#define GetQuicheReloadableFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quiche_reloadable_flag_##flag)
 
 #define SetQuicheReloadableFlagImpl(flag, value)                                                   \
-  absl::SetFlag(&FLAGS_envoy_quic_reloadable_flag_##flag, value)
+  absl::SetFlag(&FLAGS_envoy_quiche_reloadable_flag_##flag, value)
 
-#define GetQuicheRestartFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quic_restart_flag_##flag)
+#define GetQuicheRestartFlagImpl(flag) absl::GetFlag(FLAGS_envoy_quiche_restart_flag_##flag)
 
 #define SetQuicheRestartFlagImpl(flag, value)                                                      \
-  absl::SetFlag(&FLAGS_envoy_quic_restart_flag_##flag, value)
+  absl::SetFlag(&FLAGS_envoy_quiche_restart_flag_##flag, value)
 
 } // namespace quiche

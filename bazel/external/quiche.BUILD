@@ -2888,8 +2888,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_flags_list_lib",
-    hdrs = ["quiche/quic/core/quic_flags_list.h"],
+    name = "quiche_feature_flags_list_lib",
+    hdrs = ["quiche/common/quiche_feature_flags_list.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],

@@ -20,7 +20,7 @@
 namespace {
 
 #define QUICHE_RELOADABLE_FLAG_OVERRIDE(flag_name, value)                                          \
-  {STRINGIFY(quic_reloadable_flag_##flag_name), value},
+  {STRINGIFY(quiche_reloadable_flag_##flag_name), value},
 constexpr std::pair<absl::string_view, bool> quiche_reloadable_flag_overrides[]{
     OVERRIDDEN_RELOADABLE_FLAGS(QUICHE_RELOADABLE_FLAG_OVERRIDE)};
 #undef QUICHE_RELOADABLE_FLAG_OVERRIDE
@@ -67,9 +67,10 @@ template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int
 } // namespace
 
 // Flag definitions
-#define QUIC_FLAG(flag, value) ABSL_FLAG(bool, envoy_##flag, maybeOverride(#flag, value), "");
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
+#define QUICHE_FLAG(type, flag, internal_value, external_value, doc)                               \
+  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, external_value), doc);
+#include "quiche/common/quiche_feature_flags_list.h"
+#undef QUICHE_FLAG
 
 #define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                         \
   ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, value), help);
@@ -102,10 +103,10 @@ namespace {
 absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() {
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
-  ASSERT(absl::GetFlag(FLAGS_envoy_quic_restart_flag_quic_testonly_default_true) == true);
-#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_envoy_" #flag, &FLAGS_envoy_##flag);
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
+  ASSERT(absl::GetFlag(FLAGS_envoy_quiche_restart_flag_quic_testonly_default_true) == true);
+#define QUICHE_FLAG(type, flag, ...) flags.emplace("FLAGS_envoy_" #flag, &FLAGS_envoy_##flag);
+#include "quiche/common/quiche_feature_flags_list.h"
+#undef QUICHE_FLAG
   return flags;
 }
 
