@@ -30,9 +30,9 @@ message GcpAuthnFilterConfig {
   //
   // This field is deprecated because it does not match the API surface provided by the google auth libraries.
   // Control planes should not attempt to override the metadata server URI.
-  // The cluster and timeout can be configured using the `cluster` and `timeout` fields instead.
+  // The cluster and timeout can be configured using the ``cluster`` and ``timeout`` fields instead.
   // For backward compatibility, the cluster and timeout configured in this field will be used
-  // if the new `cluster` and `timeout` fields are not set.
+  // if the new ``cluster`` and ``timeout`` fields are not set.
   config.core.v3.HttpUri http_uri = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
