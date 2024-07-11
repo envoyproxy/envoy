@@ -35,17 +35,17 @@ index 10c34b10f..5c0cb0128 100644
 
    // Override to maybe close the write side after writing.
    void OnCanWrite() override;
-diff --git a/quiche/quic/core/quic_flags_list.h b/quiche/quic/core/quic_flags_list.h
-index 61fa4f9e6..6737823a5 100644
---- a/quiche/quic/core/quic_flags_list.h
-+++ b/quiche/quic/core/quic_flags_list.h
-@@ -6,7 +6,8 @@
- 
- #ifdef QUIC_FLAG
- 
--QUIC_FLAG(quic_reloadable_flag_quic_stop_reading_also_stops_header_decompression, false)
-+// If true, QUIC stream will not continue decompressing buffer headers after StopReading() called.
-+QUIC_FLAG(quic_reloadable_flag_quic_stop_reading_also_stops_header_decompression, true)
- // A testonly reloadable flag that will always default to false.
- QUIC_FLAG(quic_reloadable_flag_quic_testonly_default_false, false)
- // A testonly reloadable flag that will always default to true.
+diff --git a/quiche/common/quiche_feature_flags_list.h b/quiche/common/quiche_feature_flags_list.h
+index 27181430f..6c790fe6d 100755
+--- a/quiche/common/quiche_feature_flags_list.h
++++ b/quiche/common/quiche_feature_flags_list.h
+@@ -45,7 +45,8 @@ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_pacing_remove_non_initial_burst, f
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_priority_respect_incremental, false, false, "If true, respect the incremental parameter of each stream in QuicWriteBlockedList.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_require_handshake_confirmation, true, true, "If true, require handshake confirmation for QUIC connections, functionally disabling 0-rtt handshakes.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_send_placeholder_ticket_when_encrypt_ticket_fails, false, true, "If true, when TicketCrypter fails to encrypt a session ticket, quic::TlsServerHandshaker will send a placeholder ticket, instead of an empty one, to the client.")
+-QUICHE_FLAG(bool, quiche_reloadable_flag_quic_stop_reading_also_stops_header_decompression, false, false, "")
++
++QUICHE_FLAG(bool, quiche_reloadable_flag_quic_stop_reading_also_stops_header_decompression, false, true, "If true, QUIC stream will not continue decompressing buffer headers after StopReading() called.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_test_peer_addr_change_after_normalize, false, false, "If true, QuicConnection::ProcessValidatedPacket will use normalized address to test peer address changes.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_testonly_default_false, false, false, "A testonly reloadable flag that will always default to false.")
+ QUICHE_FLAG(bool, quiche_reloadable_flag_quic_testonly_default_true, true, true, "A testonly reloadable flag that will always default to true.")

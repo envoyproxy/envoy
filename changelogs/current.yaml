@@ -155,6 +155,11 @@ minor_behavior_changes:
   change: |
     Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
     by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
+- area: quic
+  change: |
+    A change in QUICHE has renamed all flags formerly of the form ``quic_reloadable_flag_...`` to ``quiche_reloadable_flag_...``.
+    Likewise, for ``quic_restart_flag_...``, now ``quiche_restart_flag_...``. Consequently, all Envoy flags of those forms with an
+    ``envoy_quic_...`` prefix have been similarly renamed to ``envoy_quiche_...``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
