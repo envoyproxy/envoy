@@ -124,6 +124,13 @@ envoy.clusters.redis:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.clusters.dns_srv:
+  categories:
+  - envoy.clusters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig
 envoy.clusters.logical_dns:
   categories:
   - envoy.clusters

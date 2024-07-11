@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.dns_srv.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dns_srv/v3;dns_srvv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Cluster Configuration Via SRV record]
+//
+//
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+// clusters:
+//   - name: unique_name
+//     cluster_type:
+//       name: envoy.clusters.dns_srv
+//       typed_config:
+//     	  "@type": type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.ClusterConfig
+//     	  srv_names:
+//            - srv_name: _unique_name._tcp.example.com
+//     respect_dns_ttl: true
+//     dns_resolvers:
+//     - address:
+//         socket_address:
+//          address: 8.8.8.8
+//          port_value: 53
+// [#extension: envoy.clusters.dns_srv]
+
+// [#next-free-field: 2]
+message DnsSrvClusterConfig {
+  // option (udpa.annotations.versioning).previous_message_type =
+  //     "envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig";
+
+  repeated SrvName srv_names = 1;
+}
+
+message SrvName {
+  string srv_name = 1;
+}

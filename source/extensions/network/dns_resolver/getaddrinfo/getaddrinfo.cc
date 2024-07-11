@@ -189,6 +189,13 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
   ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");
 }
 
+ActiveDnsQuery*
+GetAddrInfoDnsResolver::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
+                                   DnsLookupFamily dns_lookup_family ABSL_ATTRIBUTE_UNUSED,
+                                   ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
+  // TODO: implement me
+  return nullptr;
+}
 // Register the CaresDnsResolverFactory
 REGISTER_FACTORY(GetAddrInfoDnsResolverFactory, DnsResolverFactory);
 
