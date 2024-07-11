@@ -1386,7 +1386,7 @@ envoy_cc_library(
     srcs = ["quiche/http2/core/http2_frame_decoder_adapter.cc"],
     hdrs = [
         "quiche/http2/core/http2_frame_decoder_adapter.h",
-        "quiche/spdy/core/http2_frame_decoder_adapter.h"
+        "quiche/spdy/core/http2_frame_decoder_adapter.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
