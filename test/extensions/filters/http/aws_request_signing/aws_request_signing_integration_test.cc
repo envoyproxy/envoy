@@ -270,7 +270,6 @@ public:
         [&yaml_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 cfg) {
-          ENVOY_LOG_MISC(debug, "{}", yaml_config);
           envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute
               per_route_config;
           TestUtility::loadFromYaml(yaml_config, per_route_config);
@@ -552,7 +551,6 @@ public:
 };
 
 TEST_F(CdsInteractionTest, ClusterRemovalRecreatesSTSCluster) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // STS cluster requires dns mocking
   dnsSetup();
