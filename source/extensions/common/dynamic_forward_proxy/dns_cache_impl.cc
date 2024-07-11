@@ -335,6 +335,11 @@ void DnsCacheImpl::forceRefreshHosts() {
   }
 }
 
+void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) {
+  absl::MutexLock lock{&ip_version_to_remove_lock_};
+  ip_version_to_remove_ = ip_version;
+}
+
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
             host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());
@@ -358,6 +363,26 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  absl::optional<MonotonicTime> resolution_time,
                                  bool is_proxy_lookup) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+    {
+      absl::MutexLock lock{&ip_version_to_remove_lock_};
+      if (ip_version_to_remove_.has_value()) {
+        if (config_.preresolve_hostnames_size() > 0) {
+          IS_ENVOY_BUG(
+              "Unable to delete IP version addresses when DNS preresolve hostnames are not empty.");
+        } else {
+          response.remove_if([ip_version_to_remove =
+                                  *ip_version_to_remove_](const Network::DnsResponse& dns_resp) {
+            // Ignore the loopback address because a socket interface can still support both IPv4
+            // and IPv6 but has no outgoing IPv4/IPv6 connectivity.
+            return !Network::Utility::isLoopbackAddress(*dns_resp.addrInfo().address_) &&
+                   dns_resp.addrInfo().address_->ip()->version() == ip_version_to_remove;
+          });
+        }
+      }
+    }
+  }
   ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
                   "main thread resolve complete for host '{}': {}", host,
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -396,7 +421,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                               *(response.front().addrInfo().address_), primary_host_info->port_)
                         : nullptr;
   auto address_list = DnsUtils::generateAddressList(response, primary_host_info->port_);
-
   // Only the change the address if:
   // 1) The new address is valid &&
   // 2a) The host doesn't yet have an address ||

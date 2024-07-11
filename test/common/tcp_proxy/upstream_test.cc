@@ -3,6 +3,7 @@
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
@@ -192,7 +193,7 @@ TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   this->setupUpstream();
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   this->upstream_->responseDecoder().dumpState(ostream, 1);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
@@ -657,7 +658,7 @@ TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   this->setup();
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   this->upstream_->responseDecoder().dumpState(ostream, 1);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
