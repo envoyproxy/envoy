@@ -167,6 +167,7 @@ private:
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
   bool respect_system_proxy_settings_ = false;
+  int ios_network_service_type_ = 0;
 #endif
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
