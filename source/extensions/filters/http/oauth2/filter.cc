@@ -729,7 +729,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                          refresh_token_cookie_tail_http_only));
+                                         refresh_token_cookie_tail_http_only));
   }
 }
 
