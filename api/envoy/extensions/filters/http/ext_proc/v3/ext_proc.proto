@@ -267,7 +267,7 @@ message ExternalProcessor {
   // Specify the maximum limit of
   // :ref:`more_chunks <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.more_chunks>`
   // the external processor can stream back at one occasion, i.e, the max limit of N in the M:N streaming.
-  // This is to avoid the external processor send infinite number of chunks to stall Envoy.
+  // This is to avoid the external processor sends infinite number of chunks to stall Envoy.
   // BTW, there is no limit for M as that's controlled by Envoy itself.
   uint32 max_more_chunks = 20;
 }

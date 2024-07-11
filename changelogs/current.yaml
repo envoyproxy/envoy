@@ -405,7 +405,7 @@ new_features:
   change: |
     implemented API
     :ref:`more_chunks <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.more_chunks>`
-    to support MxN streaming for Envoy external processing.
+    to support M:N streaming for Envoy external processing.
 - area: ext_authz
   change: |
     added

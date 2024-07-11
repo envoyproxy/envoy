@@ -265,7 +265,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       if (common_response.has_body_mutation() && common_response.body_mutation().more_chunks()) {
         more_chunk_count_++;
-
         ENVOY_LOG(debug,
                   "Streamed mode body response has more_chunks set to true. more_chunk_count_ {}, "
                   "maxMoreChunks {}",
