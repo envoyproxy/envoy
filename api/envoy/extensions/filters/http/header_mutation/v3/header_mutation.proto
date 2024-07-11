@@ -20,10 +20,11 @@ message Mutations {
   // The request mutations are applied before the request is forwarded to the upstream cluster.
   repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 1;
 
+  // The query parameter mutations are applied after request mutations before the request is forwarded to the upstream cluster.
+  repeated config.core.v3.KeyValueMutation query_parameter_mutations = 3;
+
   // The response mutations are applied before the response is sent to the downstream client.
   repeated config.common.mutation_rules.v3.HeaderMutation response_mutations = 2;
-
-  repeated config.core.v3.KeyValueMutation query_parameter_mutations = 3;
 }
 
 // Per route configuration for the header mutation filter.
