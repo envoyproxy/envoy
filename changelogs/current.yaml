@@ -149,7 +149,7 @@ minor_behavior_changes:
     ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
 - area: custom response filter
   change: |
-    Prevent the redirect  policy from sending 100 as the overridden response code as the custom response must
+    Prevent the redirect policy from sending 100 as the overridden response code as the custom response must
     be complete.
 - area: http
   change: |
