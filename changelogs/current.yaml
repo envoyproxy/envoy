@@ -470,6 +470,9 @@ new_features:
     added formatters for :ref:`METADATA(VIRTUAL_HOST)<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>`.
 - area: quic
   change: |
+    Added new interface to QuicListenerFilter that is called on receiving the first packet.
+- area: quic
+  change: |
     Added :ref:`DataSourceServerPreferredAddressConfig
     <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig>` for cases when
     the control plane does not know the correct configuration for the server preferred address.
