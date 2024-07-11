@@ -31,6 +31,7 @@ public:
 protected:
   bool server_tlsv1_3_{false};
   std::vector<std::string> server_curves_;
+  std::vector<std::string> server_ciphers_;
   bool server_rsa_cert_{true};
   bool server_rsa_cert_ocsp_staple_{false};
   bool server_ecdsa_cert_{false};

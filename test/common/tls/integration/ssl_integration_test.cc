@@ -275,10 +275,12 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   checkStats();
 }
 
-// Test server preference of cipher suites. Default server order is ECDHE-RSA-AES128-GCM-SHA256
+// Test server preference of cipher suites. Server order is ECDHE-RSA-AES128-GCM-SHA256
 // followed by ECDHE-RSA-AES256-GCM-SHA384. "ECDHE-RSA-AES128-GCM-SHA256" should be used based on
 // server preference.
 TEST_P(SslIntegrationTest, TestServerCipherPreference) {
+  server_ciphers_.push_back("ECDHE-RSA-AES128-GCM-SHA256");
+  server_ciphers_.push_back("ECDHE-RSA-AES256-GCM-SHA384");
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection(
       ClientSslTransportOptions{}
@@ -296,6 +298,8 @@ TEST_P(SslIntegrationTest, TestServerCipherPreference) {
 // "ECDHE-RSA-AES256-GCM-SHA384" should be used based on client preference.
 TEST_P(SslIntegrationTest, ClientCipherPreference) {
   prefer_client_ciphers_ = true;
+  server_ciphers_.push_back("ECDHE-RSA-AES128-GCM-SHA256");
+  server_ciphers_.push_back("ECDHE-RSA-AES256-GCM-SHA384");
   initialize();
   codec_client_ = makeHttpConnection(makeSslClientConnection(
       ClientSslTransportOptions{}

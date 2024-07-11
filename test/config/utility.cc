@@ -1502,6 +1502,9 @@ void ConfigHelper::initializeTls(
   for (const auto& curve : options.curves_) {
     common_tls_context.mutable_tls_params()->add_ecdh_curves(curve);
   }
+  for (const auto& cipher : options.ciphers_) {
+    common_tls_context.mutable_tls_params()->add_cipher_suites(cipher);
+  }
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(

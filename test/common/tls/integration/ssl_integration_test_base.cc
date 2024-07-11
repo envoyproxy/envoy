@@ -13,6 +13,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setPreferClientCiphers(prefer_client_ciphers_)
                                   .setTlsV13(server_tlsv1_3_)
                                   .setCurves(server_curves_)
+                                  .setCiphers(server_ciphers_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_)
                                   .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
                                                       keylog_local_negative_,

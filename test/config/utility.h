@@ -75,6 +75,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setCiphers(const std::vector<std::string>& ciphers) {
+      ciphers_ = ciphers;
+      return *this;
+    }
+
     ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
       curves_ = curves;
       return *this;
@@ -136,6 +141,7 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     std::vector<std::string> curves_;
+    std::vector<std::string> ciphers_;
     bool expect_client_ecdsa_cert_{false};
     bool keylog_local_filter_{false};
     bool keylog_remote_filter_{false};
