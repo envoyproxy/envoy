@@ -472,10 +472,7 @@ public:
    * @param packet the received packet.
    * @return status used by the filter manager to manage further filter iteration.
    */
-  // TODO(pksohn): make this interface PURE when all known implementations are updated.
-  virtual FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket&) {
-    return FilterStatus::Continue;
-  };
+  virtual FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
 
 using QuicListenerFilterPtr = std::unique_ptr<QuicListenerFilter>;
@@ -501,7 +498,7 @@ public:
 
   virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                                     Connection& connection) PURE;
-  virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&){};
+  virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
 
 /**
