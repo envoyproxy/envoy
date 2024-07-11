@@ -23,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.gcp_authn]
 
 // Filter configuration.
+// [#next-free-field: 7]
 message GcpAuthnFilterConfig {
   // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
@@ -32,7 +33,8 @@ message GcpAuthnFilterConfig {
   // The cluster and timeout can be configured using the `cluster` and `timeout` fields instead.
   // For backward compatibility, the cluster and timeout configured in this field will be used
   // if the new `cluster` and `timeout` fields are not set.
-  config.core.v3.HttpUri http_uri = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+  config.core.v3.HttpUri http_uri = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Retry policy for fetching tokens. This field is optional.
   // Not supported by all data planes.
