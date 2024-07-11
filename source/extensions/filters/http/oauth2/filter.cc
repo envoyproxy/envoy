@@ -129,7 +129,7 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   }
 }
 
-Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
+Http::Utility::QueryParamsMulti buildAuthorizationQueryParams(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
   auto query_params =
       Http::Utility::QueryParamsMulti::parseQueryString(proto_config.authorization_endpoint());
@@ -185,7 +185,7 @@ FilterConfig::FilterConfig(
     const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
-      authorization_query_params_(buildAutorizationQueryParams(proto_config)),
+      authorization_query_params_(buildAuthorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
@@ -389,9 +389,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
   }
 
-  // At this point, we *are* on /_oauth. We believe this request comes from the authorization
-  // server and we expect the query strings to contain the information required to get the access
-  // token
+  // At this point, we are on callback path, configured via `redirect_path_matcher`. We believe
+  // this request comes from the authorization server via an HTTP 302 redirect and we expect the
+  // query strings to contain the information required to get the access token from the auth
+  // server.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError()).has_value()) {
     sendUnauthorizedResponse();
@@ -560,12 +561,8 @@ std::string OAuth2Filter::getEncodedToken() const {
   auto token_secret = config_->tokenSecret();
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   std::string encoded_token;
-  if (config_->forwardBearerToken()) {
-    encoded_token =
-        encodeHmac(token_secret_vec, host_, new_expires_, access_token_, id_token_, refresh_token_);
-  } else {
-    encoded_token = encodeHmac(token_secret_vec, host_, new_expires_);
-  }
+  encoded_token =
+      encodeHmac(token_secret_vec, host_, new_expires_, access_token_, id_token_, refresh_token_);
   return encoded_token;
 }
 
@@ -715,28 +712,24 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
       Http::Headers::get().SetCookie,
       absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, cookie_tail_http_only));
 
-  // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
-  // auth server.
-  if (config_->forwardBearerToken()) {
+  headers.addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
+
+  if (!id_token_.empty()) {
+    const std::string id_token_cookie_tail_http_only =
+        fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
+        absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
+  }
 
-    if (!id_token_.empty()) {
-      const std::string id_token_cookie_tail_http_only =
-          fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
-      headers.addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
-    }
-
-    if (!refresh_token_.empty()) {
-      const std::string refresh_token_cookie_tail_http_only =
-          fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
-      headers.addReferenceKey(Http::Headers::get().SetCookie,
-                              absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                           refresh_token_cookie_tail_http_only));
-    }
+  if (!refresh_token_.empty()) {
+    const std::string refresh_token_cookie_tail_http_only =
+        fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
+    headers.addReferenceKey(Http::Headers::get().SetCookie,
+                            absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
+                                         refresh_token_cookie_tail_http_only));
   }
 }
 
