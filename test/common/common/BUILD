@@ -267,6 +267,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "trie_lookup_table_test",
+    srcs = ["trie_lookup_table_test.cc"],
+    deps = ["//source/common/common:trie_lookup_table_lib"],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     external_deps = [
@@ -393,20 +399,20 @@ envoy_benchmark_test(
 )
 
 envoy_cc_benchmark_binary(
-    name = "utility_trie_speed_test",
-    srcs = ["utility_trie_speed_test.cc"],
+    name = "trie_lookup_table_speed_test",
+    srcs = ["trie_lookup_table_speed_test.cc"],
     external_deps = [
         "abseil_strings",
         "benchmark",
     ],
     deps = [
-        "//source/common/common:utility_lib",
+        "//source/common/common:trie_lookup_table_lib",
     ],
 )
 
 envoy_benchmark_test(
-    name = "utility_trie_speed_test_benchmark_test",
-    benchmark_binary = "utility_trie_speed_test",
+    name = "trie_lookup_table_speed_test_benchmark_test",
+    benchmark_binary = "trie_lookup_table_speed_test",
 )
 
 envoy_cc_test(

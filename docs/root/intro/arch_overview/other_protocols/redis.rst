@@ -265,6 +265,16 @@ For details on each command's usage see the official
   XRANGE, Stream
   XREVRANGE, Stream
   XTRIM, Stream
+  BF.ADD, Bloom
+  BF.CARD, Bloom
+  BF.EXISTS, Bloom
+  BF.INFO, Bloom
+  BF.INSERT, Bloom
+  BF.LOADCHUNK, Bloom
+  BF.MADD, Bloom
+  BF.MEXISTS, Bloom
+  BF.RESERVE, Bloom
+  BF.SCANDUMP, Bloom
 
 Failure modes
 -------------

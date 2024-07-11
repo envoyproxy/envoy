@@ -79,13 +79,14 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
   parent_.onConnectionAttemptFailed(this, reason, transport_failure_reason, host);
 }
 
-void ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
+ConnectivityGrid::StreamCreationResult
+ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
   has_tried_http3_alternate_address_ = true;
   auto attempt =
       std::make_unique<ConnectionAttemptCallbacks>(*this, *grid_.getOrCreateHttp3AlternativePool());
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   // Kick off a new stream attempt.
-  connection_attempts_.front()->newStream();
+  return connection_attempts_.front()->newStream();
 }
 
 bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
@@ -391,10 +392,19 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   ConnectionPool::Instance* pool = getOrCreateHttp3Pool();
   Instance::StreamOptions overriding_options = options;
   bool delay_tcp_attempt = true;
+  bool delay_alternate_http3_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
     if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
       overriding_options.can_send_early_data_ = false;
       delay_tcp_attempt = false;
+    }
+    if (http3_pool_ && http3_alternate_pool_ && !http3_pool_->hasActiveConnections() &&
+        http3_alternate_pool_->hasActiveConnections()) {
+      // If it looks like the main HTTP/3 pool is not functional and the
+      // alternate works, don't wait 300ms before attempting to use the
+      // alternate pool.
+      // TODO(alyssawilk) look into skipping the original pool if this is the case.
+      delay_alternate_http3_attempt = false;
     }
   } else {
     pool = getOrCreateHttp2Pool();
@@ -408,6 +418,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object is queued to be deleted.
     return nullptr;
+  }
+  if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
+    if (ret->attemptSecondHttp3Connection() == StreamCreationResult::ImmediateResult) {
+      return nullptr;
+    }
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.
