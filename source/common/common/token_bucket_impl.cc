@@ -1,5 +1,6 @@
 #include "source/common/common/token_bucket_impl.h"
 
+#include <atomic>
 #include <chrono>
 
 namespace Envoy {
@@ -7,16 +8,6 @@ namespace Envoy {
 namespace {
 // The minimal fill rate will be one second every year.
 constexpr double kMinFillRate = 1.0 / (365 * 24 * 60 * 60);
-
-// Convert seconds duration (in double representation) to nanoseconds duration.
-std::chrono::nanoseconds toNanoseconds(double value) {
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(value));
-}
-
-// Convert nanoseconds duration to seconds duration (in double representation).
-double toSeconds(std::chrono::nanoseconds value) {
-  return std::chrono::duration_cast<std::chrono::duration<double>>(value).count();
-}
 
 } // namespace
 
@@ -71,32 +62,30 @@ AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& ti
                                              double fill_rate, bool init_fill)
     : max_tokens_(max_tokens), fill_rate_(std::max(std::abs(fill_rate), kMinFillRate)),
       time_source_(time_source) {
-  auto time_in_nanoseconds = time_source.monotonicTime();
+  auto time_in_seconds = timeNowInSeconds();
   if (init_fill) {
-    time_in_nanoseconds -= toNanoseconds(max_tokens_ / fill_rate_);
+    time_in_seconds -= max_tokens_ / fill_rate_;
   }
-  time_in_nanoseconds_.store(time_in_nanoseconds);
+  time_in_seconds_.store(time_in_seconds, std::memory_order_relaxed);
 }
 
 uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, double factor) {
   ASSERT(factor >= 0.0);
   ASSERT(factor <= 1.0);
 
-  const MonotonicTime time_now = time_source_.monotonicTime();
-  MonotonicTime time_expected = time_in_nanoseconds_.load();
-  MonotonicTime time_new{};
-
+  const double time_now = timeNowInSeconds();
   const double used_fill_rate = fill_rate_ * factor;
 
+  double time_old = time_in_seconds_.load(std::memory_order_relaxed);
+  double time_new{};
   do {
-    if (time_now <= time_expected) {
+    if (time_now <= time_old) {
       return 0;
     }
 
-    const double total_tokens =
-        std::min(max_tokens_, toSeconds(time_now - time_expected) * used_fill_rate);
+    const double total_tokens = std::min(max_tokens_, (time_now - time_old) * used_fill_rate);
+    const uint64_t available_tokens = static_cast<uint64_t>(std::floor(tokens));
 
-    const uint64_t available_tokens = static_cast<uint64_t>(std::floor(total_tokens));
     if (available_tokens < tokens) {
       if (allow_partial) {
         tokens = available_tokens;
@@ -105,14 +94,24 @@ uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, dou
       }
     }
 
-    // Move the time_in_nanoseconds_ forward by the number of tokens consumed.
+    // Move the time_in_seconds_ forward by the number of tokens consumed.
     const double total_tokens_new = total_tokens - static_cast<double>(tokens);
-    time_new = time_now - toNanoseconds(total_tokens_new / used_fill_rate);
-
-    ASSERT(time_new >= time_expected);
-  } while (!time_in_nanoseconds_.compare_exchange_weak(time_expected, time_new));
+    time_new = time_now - (total_tokens_new / used_fill_rate);
+    ASSERT(time_new >= time_old);
+  } while (!time_in_seconds_.compare_exchange_weak(time_old, time_new, std::memory_order_relaxed));
 
   return tokens;
+}
+
+double AtomicTokenBucketImpl::remainingTokens(double factor) const {
+  const double time_now = timeNowInSeconds();
+  const double time_old = time_in_seconds_.load(std::memory_order_relaxed);
+  ASSERT(time_now >= time_old);
+  return std::min(max_tokens_, (time_now - time_old) * fill_rate_) * factor;
+}
+
+double AtomicTokenBucketImpl::timeNowInSeconds() const {
+  return std::chrono::duration<double>(time_source_.monotonicTime().time_since_epoch()).count();
 }
 
 } // namespace Envoy

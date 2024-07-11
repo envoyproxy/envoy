@@ -55,15 +55,40 @@ public:
    * @param tokens supplies the number of tokens to consume.
    * @param allow_partial supplies whether partial consumption is allowed.
    * @param factor supplies the factor to multiply the fill rate by. This is used to change the fill
-   * rate based on the requirement of the caller.
+   * rate based on the requirement of the caller. For example, if the caller wants to consume tokens
+   * based on dynamic overload or variable weight, the factor can be used.
    * @return the number of tokens consumed.
    */
   uint64_t consume(uint64_t tokens, bool allow_partial, double factor = 1.0);
 
+  /**
+   * Get the maximum number of tokens in the bucket. The actual maximum number of tokens in the
+   * bucket may be changed with the factor.
+   * @return the maximum number of tokens in the bucket.
+   */
+  double maxTokens(double factor = 1.0) const { return max_tokens_ * factor; }
+
+  /**
+   * Get the fill rate of the bucket. This is a constant for the lifetime of the bucket. But note
+   * the actual used fill rate will multiply the dynamic factor.
+   * @return the fill rate of the bucket.
+   */
+  double fillRate() const { return fill_rate_.load(); }
+
+  /**
+   * Get the remaining number of tokens in the bucket. This is a snapshot and may change after the
+   * call.
+   * @return the remaining number of tokens in the bucket.
+   */
+  double remainingTokens(double factor = 1.0) const;
+
 private:
+  double timeNowInSeconds() const;
+
   const double max_tokens_;
   const double fill_rate_;
-  std::atomic<MonotonicTime> time_in_nanoseconds_{};
+
+  std::atomic<double> time_in_seconds_{};
   TimeSource& time_source_;
 };
 

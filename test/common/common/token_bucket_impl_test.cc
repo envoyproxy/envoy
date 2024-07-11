@@ -136,6 +136,10 @@ protected:
 TEST_F(AtomicTokenBucketImplTest, Initialization) {
   AtomicTokenBucketImpl token_bucket{1, time_system_, -1.0};
 
+  EXPECT_EQ(1, token_bucket.fillRate());
+  EXPECT_EQ(1, token_bucket.maxTokens());
+  EXPECT_EQ(1, token_bucket.remainingTokens());
+
   EXPECT_EQ(1, token_bucket.consume(1, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
 }
@@ -143,6 +147,12 @@ TEST_F(AtomicTokenBucketImplTest, Initialization) {
 // Verifies TokenBucket's maximum capacity.
 TEST_F(AtomicTokenBucketImplTest, MaxBucketSize) {
   AtomicTokenBucketImpl token_bucket{3, time_system_, 1};
+
+  EXPECT_EQ(1, token_bucket.fillRate());
+  EXPECT_EQ(3, token_bucket.maxTokens());
+  EXPECT_EQ(3, token_bucket.remainingTokens());
+  EXPECT_EQ(1.5, token_bucket.maxTokens(0.5));
+  EXPECT_EQ(1.5, token_bucket.remainingTokens(0.5));
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
   time_system_.setMonotonicTime(std::chrono::seconds(10));
