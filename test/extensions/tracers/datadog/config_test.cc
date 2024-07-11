@@ -96,7 +96,7 @@ public:
 
 TEST_F(DatadogConfigTest, DefaultConfiguration) {
   envoy::config::trace::v3::DatadogConfig datadog_config;
-  EXPECT_EQ(datadog_config.remote_config().enabled(), false);
+  EXPECT_EQ(datadog_config.has_remote_config(), false);
 }
 
 TEST_F(DatadogConfigTest, ConfigureTracer) {
@@ -117,8 +117,7 @@ TEST_F(DatadogConfigTest, ConfigureTracer) {
   {
     const std::string yaml_conf = R"EOF(
       collector_cluster: fake_cluster
-      remote_config:
-        enabled: true
+      remote_config: {}
     )EOF";
 
     auto datadog_config = makeConfig<envoy::config::trace::v3::DatadogConfig>(yaml_conf);
@@ -167,7 +166,6 @@ TEST_F(DatadogConfigTest, ConfigureViaFactory) {
       collector_cluster: fake_cluster
       service_name: fake_file
       remote_config:
-        enabled: true
         polling_interval: "10s"
    )EOF");
 
