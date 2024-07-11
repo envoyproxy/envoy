@@ -150,6 +150,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dns
+  change: |
+    The DNS filter no longer returns FORMERR if a message has an ID of 0
 - area: admission control
   change: |
     Fixed the thread-local controller's average RPS calculation to be calculated over the full
