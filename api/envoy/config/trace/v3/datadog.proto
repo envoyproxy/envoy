@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the Remote Configuration feature.
 message DatadogRemoteConfig {
   // Frequency at which new configuration updates are queried.
-  // [#comment: If no value is provided, the default value is delegated to the Datadog tracing library.]
+  // If no value is provided, the default value is delegated to the Datadog tracing library.
   google.protobuf.Duration polling_interval = 1;
 }
 
@@ -43,8 +43,8 @@ message DatadogConfig {
 
   // Enables and configures remote configuration.
   // Remote Configuration allows to configure the tracer from Datadog's user interface.
-  // [#comment: This feature can drastically increase the number of connections to the Datadog Agent.
+  // This feature can drastically increase the number of connections to the Datadog Agent.
   // Each tracer regularly polls for configuration updates, and the number of tracers is the product
-  // of the number of listeners and worker threads.]
+  // of the number of listeners and worker threads.
   DatadogRemoteConfig remote_config = 4;
 }
