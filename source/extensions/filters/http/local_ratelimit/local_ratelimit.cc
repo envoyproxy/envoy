@@ -99,24 +99,9 @@ FilterConfig::FilterConfig(
       always_consume_default_token_bucket_, std::move(share_provider));
 }
 
-bool FilterConfig::requestAllowed(
+Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result FilterConfig::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   return rate_limiter_->requestAllowed(request_descriptors);
-}
-
-uint32_t
-FilterConfig::maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  return rate_limiter_->maxTokens(request_descriptors);
-}
-
-uint32_t FilterConfig::remainingTokens(
-    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  return rate_limiter_->remainingTokens(request_descriptors);
-}
-
-int64_t FilterConfig::remainingFillInterval(
-    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  return rate_limiter_->remainingFillInterval(request_descriptors);
 }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -155,18 +140,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     populateDescriptors(descriptors, headers);
   }
 
-  // Store descriptors which is used to generate x-ratelimit-* headers in encoding response headers.
-  stored_descriptors_ = descriptors;
-
   if (ENVOY_LOG_CHECK_LEVEL(debug)) {
     for (const auto& request_descriptor : descriptors) {
-      for (const Envoy::RateLimit::DescriptorEntry& entry : request_descriptor.entries_) {
-        ENVOY_LOG(debug, "populate descriptors: key={} value={}", entry.key_, entry.value_);
-      }
+      ENVOY_LOG(debug, "populate descriptor: {}", request_descriptor.toString());
     }
   }
 
-  if (requestAllowed(descriptors)) {
+  auto result = requestAllowed(descriptors);
+  // The global limiter, route limiter, or connection level limiter are all have longer life
+  // than the request, so we can safely store the token bucket context reference.
+  token_bucket_context_ = result.token_bucket_context;
+
+  if (result.allowed) {
     used_config_->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -194,46 +179,28 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   // We can never assume the decodeHeaders() was called before encodeHeaders().
-  if (used_config_->enabled() && used_config_->enableXRateLimitHeaders() &&
-      stored_descriptors_.has_value()) {
-    auto limit = maxTokens(stored_descriptors_.value());
-    auto remaining = remainingTokens(stored_descriptors_.value());
-    auto reset = remainingFillInterval(stored_descriptors_.value());
-
+  if (token_bucket_context_.has_value()) {
     headers.addReferenceKey(
-        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, limit);
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
+        token_bucket_context_->maxTokens());
     headers.addReferenceKey(
-        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining, remaining);
-    headers.addReferenceKey(
-        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset, reset);
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
+        token_bucket_context_->remainingTokens());
+    const auto reset = token_bucket_context_->remainingFillInterval();
+    if (reset.has_value()) {
+      headers.addReferenceKey(
+          HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset, reset.value());
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
 }
 
-bool Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
+Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
   return used_config_->rateLimitPerConnection()
              ? getPerConnectionRateLimiter().requestAllowed(request_descriptors)
              : used_config_->requestAllowed(request_descriptors);
-}
-
-uint32_t Filter::maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
-  return used_config_->rateLimitPerConnection()
-             ? getPerConnectionRateLimiter().maxTokens(request_descriptors)
-             : used_config_->maxTokens(request_descriptors);
-}
-
-uint32_t Filter::remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
-  return used_config_->rateLimitPerConnection()
-             ? getPerConnectionRateLimiter().remainingTokens(request_descriptors)
-             : used_config_->remainingTokens(request_descriptors);
-}
-
-int64_t
-Filter::remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
-  return used_config_->rateLimitPerConnection()
-             ? getPerConnectionRateLimiter().remainingFillInterval(request_descriptors)
-             : used_config_->remainingFillInterval(request_descriptors);
 }
 
 const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
