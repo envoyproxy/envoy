@@ -104,6 +104,7 @@ public:
   // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
   // API available on all platforms.
   EngineBuilder& respectSystemProxySettings(bool value);
+  EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
 #else
   // Only android supports c_ares
   EngineBuilder& setUseCares(bool use_cares);
