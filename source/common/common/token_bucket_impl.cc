@@ -69,6 +69,7 @@ AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& ti
   time_in_seconds_.store(time_in_seconds, std::memory_order_relaxed);
 }
 
+// This reference https://github.com/facebook/folly/blob/main/folly/TokenBucket.h.
 uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, double factor) {
   ASSERT(factor >= 0.0);
   ASSERT(factor <= 1.0);
