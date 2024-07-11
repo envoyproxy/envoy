@@ -49,6 +49,7 @@ envoy_cc_library(
     deps = [
         "//source/common/grpc:codec_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
 

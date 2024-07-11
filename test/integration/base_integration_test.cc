@@ -18,7 +18,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/server/proto_descriptors.h"
 
@@ -693,16 +693,18 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                                           std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    try {
+    TRY_NEEDS_AUDIT {
       Network::TcpListenSocket give_me_a_name(
           Network::Utility::getAddressWithPort(
               *Network::Test::getCanonicalLoopbackAddress(version_), port),
           nullptr, true);
       return AssertionSuccess();
-    } catch (const EnvoyException&) {
+    }
+    END_TRY
+    CATCH(const EnvoyException&, {
       // The nature of this function requires using a real sleep here.
       timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
-    }
+    });
   }
 
   return AssertionFailure() << "Timeout waiting for port availability";
