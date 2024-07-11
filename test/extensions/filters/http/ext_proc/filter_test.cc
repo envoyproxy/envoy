@@ -4182,7 +4182,7 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
   filter_->onDestroy();
 }
 
-// M:N error test case: the respose more_chunks count N exceeds the filter config.
+// M:N error test case: the response more_chunks count N exceeds the filter config.
 TEST_F(HttpFilterTest, SendMoreChunksOverConfigLimit) {
   initialize(R"EOF(
   grpc_service:
