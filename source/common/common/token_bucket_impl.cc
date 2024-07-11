@@ -64,19 +64,19 @@ AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& ti
       time_source_(time_source) {
   auto time_in_seconds = timeNowInSeconds();
   if (init_fill) {
-    time_in_seconds -= max_tokens_ / fill_rate_;
+    const double initial_time_window = max_tokens_ / fill_rate_;
+    if (initial_time_window < time_in_seconds) {
+      time_in_seconds -= initial_time_window;
+    } else {
+      ENVOY_BUG(true, "AtomicTokenBucketImpl: max_tokens / fill_rate is invalid.");
+    }
   }
   time_in_seconds_.store(time_in_seconds, std::memory_order_relaxed);
 }
 
 // This reference https://github.com/facebook/folly/blob/main/folly/TokenBucket.h.
-uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, double factor) {
-  ASSERT(factor >= 0.0);
-  ASSERT(factor <= 1.0);
-
+double AtomicTokenBucketImpl::consume(double tokens, bool allow_partial) {
   const double time_now = timeNowInSeconds();
-  const double used_fill_rate = fill_rate_ * factor;
-  const double used_max_tokens = max_tokens_ * factor;
 
   double time_old = time_in_seconds_.load(std::memory_order_relaxed);
   double time_new{};
@@ -85,31 +85,29 @@ uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial, dou
       return 0;
     }
 
-    const double total_tokens = std::min(used_max_tokens, (time_now - time_old) * used_fill_rate);
-    const uint64_t available_tokens = static_cast<uint64_t>(std::floor(tokens));
-
-    if (available_tokens < tokens) {
+    const double total_tokens = std::min(max_tokens_, (time_now - time_old) * fill_rate_);
+    if (total_tokens < tokens) {
       if (allow_partial) {
-        tokens = available_tokens;
+        tokens = total_tokens;
       } else {
         return 0;
       }
     }
 
     // Move the time_in_seconds_ forward by the number of tokens consumed.
-    const double total_tokens_new = total_tokens - static_cast<double>(tokens);
-    time_new = time_now - (total_tokens_new / used_fill_rate);
+    const double total_tokens_new = total_tokens - tokens;
+    time_new = time_now - (total_tokens_new / fill_rate_);
     ASSERT(time_new >= time_old);
   } while (!time_in_seconds_.compare_exchange_weak(time_old, time_new, std::memory_order_relaxed));
 
   return tokens;
 }
 
-double AtomicTokenBucketImpl::remainingTokens(double factor) const {
+double AtomicTokenBucketImpl::remainingTokens() const {
   const double time_now = timeNowInSeconds();
   const double time_old = time_in_seconds_.load(std::memory_order_relaxed);
   ASSERT(time_now >= time_old);
-  return std::min(max_tokens_, (time_now - time_old) * fill_rate_) * factor;
+  return std::min(max_tokens_, (time_now - time_old) * fill_rate_);
 }
 
 double AtomicTokenBucketImpl::timeNowInSeconds() const {
