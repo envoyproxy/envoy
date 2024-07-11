@@ -269,6 +269,15 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
                            {1}));
 }
 
+// Proto validation exception thrown should not print the debug string of the message.
+TEST_F(ProtobufUtilityTest, ValidationExceptionThrown) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  EXPECT_THROW_WITH_MESSAGE(
+      ProtoExceptionUtil::throwProtoValidationException("validation error", bootstrap),
+      EnvoyException,
+      "Proto constraint validation failed (validation error): envoy.config.bootstrap.v3.Bootstrap");
+}
+
 // Validated exception thrown when observed nested unknown field with any.
 TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
   // Constructs a nested message with unknown field
