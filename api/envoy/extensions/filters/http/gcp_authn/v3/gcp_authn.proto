@@ -51,7 +51,7 @@ message GcpAuthnFilterConfig {
   // Cluster to send traffic to the GCE metadata server. Not supported
   // by all data planes; a data plane may instead have its own mechanism
   // for contacting the metadata server.
-  string cluster = 5 [(validate.rules).string = {min_len: 1}];
+  string cluster = 5;
 
   // Timeout for fetching the tokens from the GCE metadata server.
   // Not supported by all data planes.
