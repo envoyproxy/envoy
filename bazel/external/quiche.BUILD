@@ -636,18 +636,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http2_core_http2_priority_write_scheduler_lib",
-    hdrs = ["quiche/http2/core/http2_priority_write_scheduler.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_core_protocol_lib",
-        ":quiche_common_platform",
-        ":spdy_core_intrusive_list_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "http2_core_priority_write_scheduler_lib",
     hdrs = ["quiche/http2/core/priority_write_scheduler.h"],
     copts = quiche_copts,
@@ -1521,16 +1509,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "spdy_core_write_scheduler_lib",
-    hdrs = ["quiche/spdy/core/write_scheduler.h"],
-    repository = "@envoy",
-    deps = [
-        ":http2_core_protocol_lib",
-        ":quiche_common_platform",
-    ],
-)
-
 envoy_cc_test_library(
     name = "http2_test_tools_test_utils_lib",
     srcs = ["quiche/http2/test_tools/spdy_test_utils.cc"],
@@ -1729,13 +1707,6 @@ envoy_cc_library(
         ":quic_platform_export",
         ":quic_platform_ip_address_family",
     ],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_port_utils",
-    hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
-    repository = "@envoy",
-    tags = ["nofips"],
 )
 
 envoy_cc_library(
