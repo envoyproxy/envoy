@@ -512,6 +512,7 @@ public:
 };
 
 TEST_F(CdsInteractionTest, ClusterRemovalRecreatesCluster) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // Web Identity Credentials only
 
