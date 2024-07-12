@@ -38,7 +38,6 @@ public:
 
   // Exposed for testing.
   bool tlsExclusive() const { return tls_exclusive_; }
-  std::string headerBuffer() const { return header_buffer_.toString(); }
 
 private:
   void generateHeader();
@@ -60,7 +59,6 @@ public:
       absl::optional<std::string> proto_proxy_address = absl::nullopt, bool tls_exclusive = true);
 
   absl::optional<std::string> protoProxyAddress() const { return proto_proxy_address_; }
-  bool tlsExclusive() const { return tls_exclusive_; }
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
