@@ -1173,8 +1173,8 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:quic_platform_base",
     )
     native.bind(
-        name = "quiche_spdy_hpack",
-        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
+        name = "quiche_http2_hpack",
+        actual = "@com_github_google_quiche//:http2_hpack_hpack_lib",
     )
     native.bind(
         name = "quiche_http2_hpack_decoder",
