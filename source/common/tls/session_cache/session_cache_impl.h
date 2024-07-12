@@ -33,7 +33,7 @@ class GrpcClientImpl : public Client,
                        public TlsSessionAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcClientImpl(Grpc::RawAsyncClientSharedPtr& async_client,
+  GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl() override;
 
@@ -63,7 +63,8 @@ private:
   Network::TransportSocketCallbacks* callbacks_;
   SSL* ssl_;
   int index_;
-  const Protobuf::MethodDescriptor& service_method_;
+  const Protobuf::MethodDescriptor& service_method_store_;
+  const Protobuf::MethodDescriptor& service_method_fetch_;
 };
 
 /**

@@ -41,6 +41,16 @@ public:
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
 
+  bool enableTlsSessionCache() const override { return enable_tls_session_cache_; }
+
+  const envoy::config::core::v3::GrpcService& tlsSessionCacheGrpcService() const override {
+    return tls_session_cache_grpc_service_;
+  }
+
+  std::chrono::milliseconds tlsSessionCacheGrpcTimeout() const override {
+    return tls_session_cache_grpc_timeout_;
+  }
+
 private:
   ServerContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
@@ -71,6 +81,9 @@ private:
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
+  bool enable_tls_session_cache_;
+  envoy::config::core::v3::GrpcService tls_session_cache_grpc_service_;
+  std::chrono::milliseconds tls_session_cache_grpc_timeout_;
 };
 
 } // namespace Tls

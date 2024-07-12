@@ -20,11 +20,13 @@ namespace TransportSockets {
 namespace Tls {
 namespace SessionCache {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr& async_client,
+GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
-      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.tls_session_cache.v3.TlsSessionCacheService.TlsSession")) {}
+      service_method_store_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.tls_session_cache.v3.TlsSessionCacheService.TlsSessionStore")),
+      service_method_fetch_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.tls_session_cache.v3.TlsSessionCacheService.TlsSessionFetch")) {}
 
 GrpcClientImpl::~GrpcClientImpl() {}
 
@@ -42,7 +44,7 @@ void GrpcClientImpl::storeTlsSessionCache(Network::TransportSocketCallbacks* cal
   request.set_type(::envoy::service::tls_session_cache::v3::STORE);
   ENVOY_LOG(debug, "Sending request to store session_id: {} and session_key: {}", session_id,
             *session_data);
-  async_client_->send(service_method_, request, *this, Envoy::Tracing::NullSpan::instance(),
+  async_client_->send(service_method_store_, request, *this, Envoy::Tracing::NullSpan::instance(),
                       Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
@@ -57,7 +59,7 @@ void GrpcClientImpl::fetchTlsSessionCache(Network::TransportSocketCallbacks* cal
   request.set_session_id(session_id);
   request.set_type(::envoy::service::tls_session_cache::v3::FETCH);
   ENVOY_LOG(debug, "Sending request to fetch session_id: {}", session_id);
-  async_client_->send(service_method_, request, *this, Envoy::Tracing::NullSpan::instance(),
+  async_client_->send(service_method_fetch_, request, *this, Envoy::Tracing::NullSpan::instance(),
                       Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 

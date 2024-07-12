@@ -13,7 +13,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: TLS session cache service]
 
 service TlsSessionCacheService {
-  rpc TlsSession(TlsSessionRequest) returns (TlsSessionResponse) {
+  rpc TlsSessionStore(TlsSessionRequest) returns (TlsSessionResponse) {
+  }
+
+  rpc TlsSessionFetch(TlsSessionRequest) returns (TlsSessionResponse) {
   }
 }
 
