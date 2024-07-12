@@ -19,7 +19,7 @@
 #include "source/common/stats/allocator_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
+#include "source/server/options_impl_base.h"
 #include "source/server/server.h"
 
 #include "test/integration/server_stats.h"
@@ -39,8 +39,8 @@ struct FieldValidationConfig {
   bool ignore_unknown_dynamic_fields = false;
 };
 
-// Create OptionsImpl structures suitable for tests. Disables hot restart.
-OptionsImpl createTestOptionsImpl(
+// Create OptionsImplBase structures suitable for tests. Disables hot restart.
+OptionsImplBase createTestOptionsImpl(
     const std::string& config_path, const std::string& config_yaml,
     Network::Address::IpVersion ip_version,
     FieldValidationConfig validation_config = FieldValidationConfig(), uint32_t concurrency = 1,
@@ -560,7 +560,7 @@ protected:
   // functions server(), statStore(), and adminAddress() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
-  virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+  virtual void createAndRunEnvoyServer(OptionsImplBase& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
@@ -635,7 +635,7 @@ public:
   }
 
 private:
-  void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+  void createAndRunEnvoyServer(OptionsImplBase& options, Event::TimeSystem& time_system,
                                Network::Address::InstanceConstSharedPtr local_address,
                                ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,

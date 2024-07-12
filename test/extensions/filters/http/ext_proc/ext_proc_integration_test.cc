@@ -44,7 +44,7 @@ using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
-using Extensions::HttpFilters::ExternalProcessing::DEFAULT_CLOSE_TIMEOUT_MS;
+using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
@@ -544,8 +544,8 @@ protected:
                                    return true;
                                  });
     // Verify the new timer is not started and the original timer timeouts,
-    // and downstream receives 500.
-    verifyDownstreamResponse(*response, 500);
+    // and downstream receives 504.
+    verifyDownstreamResponse(*response, 504);
   }
 
   void addMutationSetHeaders(const int count,
@@ -2379,7 +2379,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
                                });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
@@ -2423,7 +2423,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
       << "expected traceparent header";
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
@@ -2442,7 +2442,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
                                });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 // Same as the previous test but on the response path, since there are separate
@@ -2463,7 +2463,7 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeout) {
                                 });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutWithLogging) {
@@ -2484,7 +2484,7 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutWithLogging) {
                                 });
 
   // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 504);
 }
 
 // Send a request,  wait longer than the "message timeout" before sending a response
@@ -4157,7 +4157,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
@@ -4200,7 +4200,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
@@ -4218,7 +4218,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
@@ -4250,11 +4250,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   verifyDownstreamResponse(*response, 200);
   EXPECT_THAT(*(response->trailers()), HasNoHeader("x-modified-trailers"));
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 1000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
@@ -4272,11 +4274,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 1000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
@@ -4294,7 +4298,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
@@ -4385,9 +4389,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
@@ -4486,7 +4487,7 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
   handleUpstreamRequest();
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {

@@ -9,7 +9,7 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/common/utility.h"
+#include "source/common/common/trie_lookup_table.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"

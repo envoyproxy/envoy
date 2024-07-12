@@ -29,8 +29,11 @@ build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
+build --define=nghttp2=disabled
 build --define=envoy_yaml=disabled
 build --define=envoy_full_protos=disabled
+build --define envoy_exceptions=disabled
+build: --copt=-fno-exceptions
 
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
 # This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
@@ -242,6 +245,7 @@ test:mobile-remote-ci-android --config=mobile-test-android
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
+# TODO(alyssar) remove in a follow-up PR
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
