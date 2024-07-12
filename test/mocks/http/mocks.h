@@ -237,8 +237,8 @@ class MockSidestreamWatermarkCallbacks : public SidestreamWatermarkCallbacks {
 public:
   ~MockSidestreamWatermarkCallbacks() override = default;
 
-  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, onSidestreamAboveHighWatermark, ());
+  MOCK_METHOD(void, onSidestreamBelowLowWatermark, ());
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,

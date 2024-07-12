@@ -34,16 +34,16 @@ public:
    * is the responsibility of the sidestreamWatermarkCallbacks implementation to handle unwinding
    * multiple high and low watermark calls.
    */
-  virtual void onAboveWriteBufferHighWatermark() PURE;
+  virtual void onSidestreamAboveHighWatermark() PURE;
 
   /**
    * Called when the sidestream connection or stream goes from over its high watermark to under its
-   * low watermark. As with onAboveWriteBufferHighWatermark above, this may be called independently
+   * low watermark. As with onSidestreamAboveHighWatermark above, this may be called independently
    * when both the stream and the connection go under the low watermark limit, and the callee must
    * ensure that the flow of data does not resume until all callers which were above their high
    * watermarks have gone below.
    */
-  virtual void onBelowWriteBufferLowWatermark() PURE;
+  virtual void onSidestreamBelowLowWatermark() PURE;
 };
 
 /**

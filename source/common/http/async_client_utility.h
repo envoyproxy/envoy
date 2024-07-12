@@ -47,7 +47,7 @@ class StreamFilterSidestreamWatermarkCallbacks : public Http::SidestreamWatermar
 public:
   StreamFilterSidestreamWatermarkCallbacks() = default;
 
-  void onAboveWriteBufferHighWatermark() final {
+  void onSidestreamAboveHighWatermark() final {
     // Sidestream push back downstream, if callback is configured.
     if (decode_callback_ != nullptr) {
       decode_callback_->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -63,7 +63,7 @@ public:
     }
   }
 
-  void onBelowWriteBufferLowWatermark() final {
+  void onSidestreamBelowLowWatermark() final {
     if (decode_callback_ != nullptr) {
       decode_callback_->onDecoderFilterBelowWriteBufferLowWatermark();
     }

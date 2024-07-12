@@ -32,8 +32,8 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
   // Registering the new watermark callback.
   stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
   // Expect that flow control kicks in and watermark calls are triggered.
-  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
-  EXPECT_CALL(watermark_callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
 
   // Create send request with large request string.
   helloworld::HelloRequest request_msg;

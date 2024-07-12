@@ -131,14 +131,14 @@ public:
     ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onAboveWriteBufferHighWatermark();
+      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
     }
   }
 
   void removeWatermarkCallbacks() override {
     ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onBelowWriteBufferLowWatermark();
+      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
     watermark_callbacks_.reset();
   }
@@ -231,14 +231,14 @@ private:
   void onDecoderFilterAboveWriteBufferHighWatermark() override {
     ++high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onAboveWriteBufferHighWatermark();
+      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
     }
   }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
     ASSERT(high_watermark_calls_ != 0);
     --high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onBelowWriteBufferLowWatermark();
+      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
