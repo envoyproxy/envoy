@@ -36,7 +36,7 @@ message GcpAuthnFilterConfig {
   config.core.v3.HttpUri http_uri = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // Retry policy for fetching tokens. This field is optional.
+  // Retry policy for fetching tokens.
   // Not supported by all data planes.
   config.core.v3.RetryPolicy retry_policy = 2;
 
