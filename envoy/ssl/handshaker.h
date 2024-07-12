@@ -215,13 +215,19 @@ public:
   virtual ~TlsCertificateSelector() = default;
 
   /**
-   * select TLS context based on the client hello.
+   * Select TLS context based on the client hello in non-QUIC TLS handshake.
+   *
+   * @return selected_ctx should only not be null when status is SelectionStatus::Success, and it
+   * will have the same lifetime as ``ServerContextImpl``.
    */
   virtual SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                            CertificateSelectionCallbackPtr cb) PURE;
 
-  // Finds the best matching context. The returned context will have the same lifetime as
-  // ``ServerContextImpl``.
+  /**
+   * Finds the best matching context in QUIC TLS handshake, which doesn't support async mode yet.
+   *
+   * @return context will have the same lifetime as ``ServerContextImpl``.
+   */
   virtual std::pair<const Ssl::TlsContext&, OcspStapleAction>
   findTlsContext(absl::string_view sni, bool client_ecdsa_capable, bool client_ocsp_capable,
                  bool* cert_matched_sni) PURE;
