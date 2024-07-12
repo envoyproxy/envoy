@@ -306,6 +306,9 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
+    return virtualClusterFromEntries(headers);
+  }
 
 private:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
@@ -744,9 +747,6 @@ public:
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-    return vhost_->virtualClusterFromEntries(headers);
-  }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
 
@@ -911,10 +911,6 @@ public:
     }
     const TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return parent_->tlsContextMatchCriteria();
-    }
-
-    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-      return parent_->virtualCluster(headers);
     }
 
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
