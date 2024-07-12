@@ -1,5 +1,4 @@
 #include "source/common/common/token_bucket_impl.h"
-#include "token_bucket_impl.h"
 
 #include <atomic>
 #include <chrono>
