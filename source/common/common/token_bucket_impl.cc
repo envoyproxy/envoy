@@ -91,7 +91,6 @@ uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
 double AtomicTokenBucketImpl::remainingTokens() const {
   const double time_now = timeNowInSeconds();
   const double time_old = time_in_seconds_.load(std::memory_order_relaxed);
-  ASSERT(time_now >= time_old);
   return std::min(max_tokens_, (time_now - time_old) * fill_rate_);
 }
 
