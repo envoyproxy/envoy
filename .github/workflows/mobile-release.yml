@@ -72,13 +72,6 @@ jobs:
             --define=pom_version=$VERSION
             //:android_dist
           output: envoy
-        - target: xds-release
-          args: >-
-            build
-            --config=mobile-remote-release-clang-android-publish-xds
-            --define=pom_version=$VERSION
-            //:android_xds_dist
-          output: envoy_xds
 
   deploy:
     needs: release
@@ -92,7 +85,6 @@ jobs:
       matrix:
         include:
         - output: envoy
-        - output: envoy_xds
     steps:
     - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
       with:
