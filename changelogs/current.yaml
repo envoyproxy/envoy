@@ -491,6 +491,9 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
     An additional field ``oid`` is added to :ref:`SubjectAltNameMatcher
     <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>` to support this change.
+- area: retry
+  change: |
+    Added :ref:`reset-before-request retry policy <config_http_filters_router_x-envoy-retry-on>`.
 - area: ext_proc
   change: |
     Added support for observability mode which deprecates ``async_mode``. If enabled, each part of the HTTP request or response
