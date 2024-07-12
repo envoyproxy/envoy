@@ -1298,7 +1298,7 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
     has_configured_http_filters_ = !http_filters.empty();
-    static const std::string& upstream_codec_type_url =
+    static const std::string upstream_codec_type_url =
         envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
             .GetTypeName();
     if (http_filters.empty()) {
