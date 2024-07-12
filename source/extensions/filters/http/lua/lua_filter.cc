@@ -279,8 +279,10 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   }
 
   if (state_ == State::HttpCall) {
-    return filter_.config()->flowControl() ? Http::FilterDataStatus::StopIterationAndWatermark
-                                           : Http::FilterDataStatus::StopIterationAndBuffer;
+    return (Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.lua_flow_control_while_http_call"))
+               ? Http::FilterDataStatus::StopIterationAndWatermark
+               : Http::FilterDataStatus::StopIterationAndBuffer;
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
@@ -823,9 +825,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
                            Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_manager_(cluster_manager),
-      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
-      flow_control_(
-          static_cast<bool>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, flow_control, false))) {
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
       throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "

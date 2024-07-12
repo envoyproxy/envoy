@@ -4,8 +4,6 @@ package envoy.extensions.filters.http.lua.v3;
 
 import "envoy/config/core/v3/base.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -21,7 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
-// [#next-free-field: 6]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
@@ -81,13 +78,6 @@ message Lua {
   //         stat_prefix: bar_script # This emits lua.bar_script.errors etc.
   //
   string stat_prefix = 4;
-
-  // Determines if Envoy will exercise flow control when receiving HTTP body when Lua script executes httpCall.
-  // If the setting is true, Envoy will put backpressure on the downstream client to stop sending
-  // data. If the setting is false, Envoy will not put any backpressure on downstream client
-  // and will buffer HTTP body. Note that buffering may exceed maximum buffer limit per connection and the connection may be dropped.
-  // Defaults to false.
-  google.protobuf.BoolValue flow_control = 5;
 }
 
 message LuaPerRoute {

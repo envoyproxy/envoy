@@ -410,7 +410,6 @@ public:
   }
 
   const LuaFilterStats& stats() const { return stats_; }
-  bool flowControl() const { return flow_control_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -424,7 +423,6 @@ private:
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
-  bool flow_control_{false};
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
@@ -552,7 +550,6 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_.callbacks_ = &callbacks;
   };
-  FilterConfigConstSharedPtr config() const { return config_; }
 
 private:
   struct DecoderCallbacks : public FilterCallbacks {
