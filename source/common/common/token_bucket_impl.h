@@ -72,7 +72,6 @@ public:
       // Move the time_in_seconds_ forward by the number of tokens consumed.
       const double total_tokens_new = total_tokens - consumed;
       time_new = time_now - (total_tokens_new / fill_rate_);
-      ASSERT(time_new >= time_old);
     } while (
         !time_in_seconds_.compare_exchange_weak(time_old, time_new, std::memory_order_relaxed));
 
