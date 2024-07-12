@@ -57,6 +57,13 @@ public:
     // When the filter object is being destroyed,  `callbacks_` (which is a OptRef to filter object)
     // should be reset to avoid the dangling reference.
     callbacks_.reset();
+
+    if (grpc_side_stream_flow_control_ && !watermark_reset_) {
+      if (stream_ != nullptr) {
+        stream_.removeWatermarkCallbacks();
+        watermark_reset_ = true;
+      }
+    }
   }
 
   // AsyncStreamCallbacks
@@ -87,6 +94,7 @@ private:
   Grpc::AsyncStream<ProcessingRequest> stream_;
   Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
+  bool watermark_reset_ = false;
   const bool grpc_side_stream_flow_control_;
 };
 

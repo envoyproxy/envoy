@@ -404,9 +404,6 @@ void Filter::onDestroy() {
     // asynchronous, it is possible that filter instance is destroyed before the side stream request
     // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
     // closure is deferred upon filter destruction with a timer.
-
-    // Reset filter callbacks when stream is deferred closed.
-    watermark_callbacks_.resetFilterCallbacks();
     deferredCloseStream();
   } else {
     // Perform immediate close on the stream otherwise.
