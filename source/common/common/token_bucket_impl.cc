@@ -1,4 +1,5 @@
 #include "source/common/common/token_bucket_impl.h"
+#include "token_bucket_impl.h"
 
 #include <atomic>
 #include <chrono>
@@ -64,43 +65,28 @@ AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& ti
       time_source_(time_source) {
   auto time_in_seconds = timeNowInSeconds();
   if (init_fill) {
-    const double initial_time_window = max_tokens_ / fill_rate_;
-    if (initial_time_window < time_in_seconds) {
-      time_in_seconds -= initial_time_window;
-    } else {
-      ENVOY_BUG(true, "AtomicTokenBucketImpl: max_tokens / fill_rate is invalid.");
-    }
+    time_in_seconds -= max_tokens_ / fill_rate_;
   }
   time_in_seconds_.store(time_in_seconds, std::memory_order_relaxed);
 }
 
-// This reference https://github.com/facebook/folly/blob/main/folly/TokenBucket.h.
-double AtomicTokenBucketImpl::consume(double tokens, bool allow_partial) {
-  const double time_now = timeNowInSeconds();
+bool AtomicTokenBucketImpl::consume() {
+  constexpr auto consumed_cb = [](double total_tokens) -> double {
+    return total_tokens >= 1 ? 1 : 0;
+  };
+  return consume(consumed_cb) == 1;
+}
 
-  double time_old = time_in_seconds_.load(std::memory_order_relaxed);
-  double time_new{};
-  do {
-    if (time_now <= time_old) {
-      return 0;
+uint64_t AtomicTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
+  const auto consumed_cb = [tokens, allow_partial](double total_tokens) {
+    const auto consumed = static_cast<double>(tokens);
+    if (total_tokens >= consumed) {
+      return consumed; // There are enough tokens to consume.
     }
-
-    const double total_tokens = std::min(max_tokens_, (time_now - time_old) * fill_rate_);
-    if (total_tokens < tokens) {
-      if (allow_partial) {
-        tokens = total_tokens;
-      } else {
-        return 0;
-      }
-    }
-
-    // Move the time_in_seconds_ forward by the number of tokens consumed.
-    const double total_tokens_new = total_tokens - tokens;
-    time_new = time_now - (total_tokens_new / fill_rate_);
-    ASSERT(time_new >= time_old);
-  } while (!time_in_seconds_.compare_exchange_weak(time_old, time_new, std::memory_order_relaxed));
-
-  return tokens;
+    // If allow_partial is true, consume all available tokens.
+    return allow_partial ? std::max<double>(0, std::floor(total_tokens)) : 0;
+  };
+  return static_cast<uint64_t>(consume(consumed_cb));
 }
 
 double AtomicTokenBucketImpl::remainingTokens() const {

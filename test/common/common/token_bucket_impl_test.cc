@@ -142,6 +142,7 @@ TEST_F(AtomicTokenBucketImplTest, Initialization) {
 
   EXPECT_EQ(1, token_bucket.consume(1, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
+  EXPECT_EQ(false, token_bucket.consume());
 }
 
 // Verifies TokenBucket's maximum capacity.
@@ -165,7 +166,8 @@ TEST_F(AtomicTokenBucketImplTest, Consume) {
   EXPECT_EQ(0, token_bucket.consume(20, false));
   EXPECT_EQ(9, token_bucket.consume(9, false));
 
-  EXPECT_EQ(1, token_bucket.consume(1, false));
+  // consume() == consume(1, false)
+  EXPECT_EQ(true, token_bucket.consume());
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(999));
   EXPECT_EQ(0, token_bucket.consume(1, false));
@@ -215,6 +217,22 @@ TEST_F(AtomicTokenBucketImplTest, YearlyMinRefillRate) {
   EXPECT_EQ(0, token_bucket.consume(1, false));
   time_system_.setMonotonicTime(std::chrono::seconds(seconds_per_year));
   EXPECT_EQ(1, token_bucket.consume(1, false));
+}
+
+TEST_F(AtomicTokenBucketImplTest, ConsumeNegativeTokens) {
+  AtomicTokenBucketImpl token_bucket{10, time_system_, 1};
+
+  EXPECT_EQ(3, token_bucket.consume([](double) { return 3; }));
+  EXPECT_EQ(7, token_bucket.remainingTokens());
+  EXPECT_EQ(-3, token_bucket.consume([](double) { return -3; }));
+  EXPECT_EQ(10, token_bucket.remainingTokens());
+}
+
+TEST_F(AtomicTokenBucketImplTest, ConsumeSuperLargeTokens) {
+  AtomicTokenBucketImpl token_bucket{10, time_system_, 1};
+
+  EXPECT_EQ(100, token_bucket.consume([](double) { return 100; }));
+  EXPECT_EQ(-90, token_bucket.remainingTokens());
 }
 
 TEST_F(AtomicTokenBucketImplTest, MultipleThreadsConsume) {

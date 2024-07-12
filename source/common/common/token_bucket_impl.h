@@ -50,13 +50,48 @@ public:
   explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
                                  double fill_rate = 1.0, bool init_fill = true);
 
+  // This reference https://github.com/facebook/folly/blob/main/folly/TokenBucket.h.
+  template <class GetConsumedTokens> double consume(const GetConsumedTokens& cb) {
+    const double time_now = timeNowInSeconds();
+
+    double time_old = time_in_seconds_.load(std::memory_order_relaxed);
+    double time_new{};
+    double consumed{};
+    do {
+      const double total_tokens = std::min(max_tokens_, (time_now - time_old) * fill_rate_);
+      if (consumed = cb(total_tokens); consumed == 0) {
+        return 0;
+      }
+
+      // There are two special cases that should rarely happen in practice but we will not
+      // prevent them in this common template method:
+      // The consumed is negative. It means the token is added back to the bucket.
+      // The consumed is larger than total_tokens. It means the bucket is overflowed and future
+      // tokens are consumed.
+
+      // Move the time_in_seconds_ forward by the number of tokens consumed.
+      const double total_tokens_new = total_tokens - consumed;
+      time_new = time_now - (total_tokens_new / fill_rate_);
+      ASSERT(time_new >= time_old);
+    } while (
+        !time_in_seconds_.compare_exchange_weak(time_old, time_new, std::memory_order_relaxed));
+
+    return consumed;
+  }
+
   /**
-   * Consume tokens from the bucket.
-   * @param tokens supplies the number of tokens to consume.
-   * @param allow_partial supplies whether partial consumption is allowed.
+   * Consumes one tokens from the bucket.
+   * @return true if the token is consumed, false otherwise.
+   */
+  bool consume();
+
+  /**
+   * Consumes multiple tokens from the bucket.
+   * @param tokens the number of tokens to consume.
+   * @param allow_partial whether to allow partial consumption.
    * @return the number of tokens consumed.
    */
-  double consume(double tokens, bool allow_partial);
+  uint64_t consume(uint64_t tokens, bool allow_partial);
 
   /**
    * Get the maximum number of tokens in the bucket. The actual maximum number of tokens in the
