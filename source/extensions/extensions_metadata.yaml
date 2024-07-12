@@ -526,7 +526,7 @@ envoy.filters.http.rbac:
 envoy.filters.http.router:
   categories:
   - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.http.router.v3.Router
