@@ -246,7 +246,7 @@ envoy_cc_library(
         "//source/common/common:key_value_store_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
-        "@com_github_google_quiche//:spdy_core_alt_svc_wire_format_lib",
+        "@com_github_google_quiche//:http2_core_alt_svc_wire_format_lib",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

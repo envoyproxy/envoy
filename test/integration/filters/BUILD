@@ -38,6 +38,8 @@ envoy_cc_test_library(
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
+        "@com_github_google_quiche//:quic_core_packets_lib",
     ],
 )
 

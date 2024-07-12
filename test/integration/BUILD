@@ -1368,6 +1368,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/http/match_delegate:config",
+        "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
