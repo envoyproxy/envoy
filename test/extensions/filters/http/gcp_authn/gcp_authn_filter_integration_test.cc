@@ -223,15 +223,15 @@ public:
       cache_size: 100
   )EOF";
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_{};
-  bool use_new_config_ = false;
+  bool use_new_config_ = true;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
-  use_new_config_ = true;
+TEST_P(GcpAuthnFilterIntegrationTest, DEPRECATED_FEATURE_TEST(Basicflow)) {
+  use_new_config_ = false;
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
   int num = 2;
@@ -252,7 +252,6 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithNewConfig) {
-  use_new_config_ = true;
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
   int num = 2;
@@ -273,7 +272,6 @@ TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithNewConfig) {
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, OverrideDefaultHeader) {
-  use_new_config_ = true;
   initializeConfig(/*add_audience=*/true, /*configure_token_header=*/true);
   HttpIntegrationTest::initialize();
   int num = 2;
@@ -295,7 +293,6 @@ TEST_P(GcpAuthnFilterIntegrationTest, OverrideDefaultHeader) {
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
-  use_new_config_ = true;
   initializeConfig(/*add_audience=*/false);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
@@ -319,7 +316,6 @@ TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
 // This test is sending the request with body to verify that the filter chain iteration which has
 // been stopped by `decodeHeader`'s return status will not be resumed by `decodeData`.
 TEST_P(GcpAuthnFilterIntegrationTest, SendRequestWithBody) {
-  use_new_config_ = true;
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
   initiateClientConnection(/*send_request_body=*/true);
