@@ -2,6 +2,7 @@
 
 #include <sys/_types/_intptr_t.h>
 
+#include <algorithm>
 #include <chrono>
 #include <list>
 #include <memory>
@@ -58,11 +59,14 @@ DnsSrvCluster::DnsSrvCluster(
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
+      event_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       // load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()),
       // locality_lb_endpoints_(cluster.load_assignment().endpoints()),
       // load_assignment_(convertPriority(cluster.load_assignment())),
       dns_srv_cluster_(dns_srv_cluster) {
+
+  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   for (const auto& n : dns_srv_cluster_.srv_names()) {
     ENVOY_LOG(info, "DnsSrvCluster::DnsSrvCluster {}", n.srv_name());
@@ -94,151 +98,186 @@ void DnsSrvCluster::startResolve() {
             dns_srv_cluster_.srv_names().size());
   // info_->configUpdateStats().update_attempt_.inc();
 
+  active_resolve_list_.reset(new ResolveList(*this));
+
   active_dns_query_ = dns_resolver_->resolveSrv(
       // TODO get DnsLookupFamily from config
-      dns_srv_cluster_.srv_names()[0].srv_name(), Network::DnsLookupFamily::V4Only,
+      dns_srv_cluster_.srv_names()[0].srv_name(), dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status [[gnu::unused]],
              absl::string_view details [[gnu::unused]],
              std::list<Network::DnsResponse>&& response) -> void {
+        active_dns_query_ = nullptr;
+
         ENVOY_LOG(info, "Got DNS response");
         ENVOY_LOG(info, "details: {}", details);
 
         // PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
-        HostVector new_hosts;
-        absl::flat_hash_set<std::string> all_new_hosts;
-
-        const auto& locality_lb_endpoints = load_assignment_.endpoints()[0];
-        const auto& lb_endpoint_ = load_assignment_.endpoints()[0].lb_endpoints()[0];
-
-        PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
-        priority_state_manager.initializePriorityFor(locality_lb_endpoints);
-
         for (const auto& dns : response) {
           ENVOY_LOG(info, "SRV: host: {}, port: {}, weight: {}, prio: {}", dns.srv().host_,
                     dns.srv().port_, dns.srv().weight_, dns.srv().priority_);
-          // TODO: dns_resolver_->resolve(dns.srv().host_);
-          Network::Address::Ipv4Instance ipv4_address("127.0.0.1");
-          auto address = Network::Utility::getAddressWithPort(ipv4_address, dns.srv().port_);
 
-          if (all_new_hosts.count(address->asString()) > 0) {
-            continue;
-          }
-          // all_hosts.push_back(address);
-
-          // const auto& load_assignment = cluster_.load_assignment();
-
-          ENVOY_LOG(info, "Endpoints size: {}", load_assignment_.endpoints().size());
-          // load_assignment_.endpoints()[0].lb_endpoints()
-          new_hosts.emplace_back(new HostImpl(
-              info_, dns.srv().host_, address,
-              // TODO(zyfjeff): Created through metadata shared pool
-              std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
-              std::make_shared<const envoy::config::core::v3::Metadata>(
-                  locality_lb_endpoints.metadata()),
-              lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints.locality(),
-              lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints.priority(),
-              lb_endpoint_.health_status(), time_source_));
-          all_new_hosts.emplace(address->asString());
-
-          priority_state_manager.registerHostForPriority(new_hosts.back(), locality_lb_endpoints);
+          active_resolve_list_->addTarget(ResolveTargetPtr(
+              new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
+                                dns.srv().host_, dns.srv().port_)));
         }
 
-        HostVector all_hosts;
-        HostVector hosts_added;
-        HostVector hosts_removed;
-        HostVector hosts_;
-
-        updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, all_hosts_,
-                              all_new_hosts);
-
-        auto weighted_priority_health_ = load_assignment_.policy().weighted_priority_health();
-        auto current_priority = locality_lb_endpoints.priority();
-        auto overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
-
-        priority_state_manager.updateClusterPrioritySet(
-            current_priority,
-            std::move(priority_state_manager.priorityState()[current_priority].first), hosts_added,
-            hosts_removed, absl::nullopt, weighted_priority_health_, overprovisioning_factor_);
-
-        onPreInitComplete();
+        active_resolve_list_->noMoreTargets();
       });
-
-  //   active_dns_query_ = dns_resolver_->resolve(
-  //       dns_address_, dns_lookup_family_,
-  //       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
-  //              std::list<Network::DnsResponse>&& response) -> void {
-  //         active_dns_query_ = nullptr;
-  //         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_,
-  //         details);
-
-  //         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
-
-  //         // If the DNS resolver successfully resolved with an empty response list, the logical
-  //         DNS
-  //         // cluster does not update. This ensures that a potentially previously resolved address
-  //         does
-  //         // not stabilize back to 0 hosts.
-  //         if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
-  //           info_->configUpdateStats().update_success_.inc();
-  //           const auto addrinfo = response.front().addrInfo();
-  //           // TODO(mattklein123): Move port handling into the DNS interface.
-  //           ASSERT(addrinfo.address_ != nullptr);
-  //           Network::Address::InstanceConstSharedPtr new_address =
-  //               Network::Utility::getAddressWithPort(*(response.front().addrInfo().address_),
-  //                                                    dns_port_);
-  //           auto address_list = DnsUtils::generateAddressList(response, dns_port_);
-  // /*
-  //           if (!logical_host_) {
-  //             logical_host_ = std::make_shared<LogicalHost>(info_, hostname_, new_address,
-  //                                                           address_list, localityLbEndpoint(),
-  //                                                           lbEndpoint(), nullptr, time_source_);
-
-  //             const auto& locality_lb_endpoint = localityLbEndpoint();
-  //             PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
-  //             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
-  //             priority_state_manager.registerHostForPriority(logical_host_,
-  //             locality_lb_endpoint);
-
-  //             const uint32_t priority = locality_lb_endpoint.priority();
-  //             priority_state_manager.updateClusterPrioritySet(
-  //                 priority, std::move(priority_state_manager.priorityState()[priority].first),
-  //                 absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
-  //           }
-  // */
-  // /*
-  //           if (!current_resolved_address_ ||
-  //               (*new_address != *current_resolved_address_ ||
-  //                DnsUtils::listChanged(address_list, current_resolved_address_list_))) {
-  //             current_resolved_address_ = new_address;
-  //             current_resolved_address_list_ = address_list;
-
-  //             // Make sure that we have an updated address for admin display, health
-  //             // checking, and creating real host connections.
-  //             logical_host_->setNewAddresses(new_address, address_list, lbEndpoint());
-  //           }
-  // */
-
-  //           // reset failure backoff strategy because there was a success.
-  //           // failure_backoff_strategy_->reset();
-
-  //           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
-  //             final_refresh_rate = addrinfo.ttl_;
-  //           }
-  //           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-  //                     final_refresh_rate.count());
-  //         } else {
-  //           info_->configUpdateStats().update_failure_.inc();
-  //           final_refresh_rate =
-  //               std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs());
-  //           ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
-  //                     dns_address_, final_refresh_rate.count());
-  //         }
-
-  //         onPreInitComplete();
-  //         resolve_timer_->enableTimer(final_refresh_rate);
-  //       });
 }
+
+void DnsSrvCluster::allTargetsResolved() {
+  ASSERT(active_resolve_list_.get() != nullptr);
+
+  HostVector new_hosts;
+  absl::flat_hash_set<std::string> all_new_hosts;
+
+  const auto& locality_lb_endpoints = load_assignment_.endpoints()[0];
+  const auto& lb_endpoint_ = load_assignment_.endpoints()[0].lb_endpoints()[0];
+
+  PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+  priority_state_manager.initializePriorityFor(locality_lb_endpoints);
+
+  for (const auto& target : active_resolve_list_->getResolvedTargets()) {
+    // SRV query returns a number of instantances (hostnames), but each hostname
+    // may potentially be resolved in a number of IP addressess
+    for (auto& address : target->resolved_targets_) {
+
+      if (all_new_hosts.count(address->asString()) > 0) {
+        continue;
+      }
+
+      ENVOY_LOG(info, "Endpoints size: {}", load_assignment_.endpoints().size());
+      // load_assignment_.endpoints()[0].lb_endpoints()
+      new_hosts.emplace_back(new HostImpl(
+          info_, target->dns_address_, address,
+          // TODO(zyfjeff): Created through metadata shared pool
+          std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+          std::make_shared<const envoy::config::core::v3::Metadata>(
+              locality_lb_endpoints.metadata()),
+          lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints.locality(),
+          lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints.priority(),
+          lb_endpoint_.health_status(), time_source_));
+      all_new_hosts.emplace(address->asString());
+
+      priority_state_manager.registerHostForPriority(new_hosts.back(), locality_lb_endpoints);
+    }
+  }
+
+  HostVector all_hosts;
+  HostVector hosts_added;
+  HostVector hosts_removed;
+  HostVector hosts_;
+
+  updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, all_hosts_, all_new_hosts);
+
+  // Update host map for current resolve target.
+  for (const auto& host : hosts_removed) {
+    all_hosts_.erase(host->address()->asString());
+  }
+  for (const auto& host : hosts_added) {
+    all_hosts_.insert({host->address()->asString(), host});
+  }
+
+  auto weighted_priority_health_ = load_assignment_.policy().weighted_priority_health();
+  auto current_priority = locality_lb_endpoints.priority();
+  auto overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+
+  priority_state_manager.updateClusterPrioritySet(
+      current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
+      hosts_added, hosts_removed, absl::nullopt, weighted_priority_health_,
+      overprovisioning_factor_);
+
+  onPreInitComplete();
+
+  active_resolve_list_.reset();
+  // TODO: consider TTL returned by the DNS
+  resolve_timer_->enableTimer(dns_refresh_rate_ms_);
+}
+
+/////////////  DnsSrvCluster::ResolveList::ResolveList  //////////////////
+DnsSrvCluster::ResolveList::ResolveList(DnsSrvCluster& parent) : parent_(parent) {}
+
+void DnsSrvCluster::ResolveList::addTarget(ResolveTargetPtr new_target) {
+  new_target->startResolve();
+  active_targets_.emplace_back(std::move(new_target));
+}
+
+// callback, A/AAAA record resolved for one of the SRV record
+void DnsSrvCluster::ResolveList::targetResolved(ResolveTarget* target) {
+  auto p = std::find_if(
+      active_targets_.begin(), active_targets_.end(),
+      [target](const auto& container_value) { return container_value.get() == target; });
+
+  ASSERT(p != active_targets_.end());
+
+  resolved_targets_.push_back(std::move(*p));
+  active_targets_.erase(p);
+
+  maybeAllResolved();
+}
+
+void DnsSrvCluster::ResolveList::noMoreTargets() {
+  no_more_targets_ = true;
+  maybeAllResolved();
+}
+
+void DnsSrvCluster::ResolveList::maybeAllResolved() {
+  if (active_targets_.empty() && no_more_targets_) {
+    ENVOY_LOG(info, "All targets resolved for cluster {}", parent_.cluster_.name());
+    parent_.allTargetsResolved();
+  }
+}
+
+const std::list<DnsSrvCluster::ResolveTargetPtr>&
+DnsSrvCluster::ResolveList::getResolvedTargets() const {
+  return resolved_targets_;
+}
+
+/////////////  DnsSrvCluster::ResolveList::ResolveTarget  //////////////////
+
+DnsSrvCluster::ResolveTarget::ResolveTarget(DnsSrvCluster::ResolveList& parent,
+                                            Network::DnsResolverSharedPtr dns_resolver,
+                                            Network::DnsLookupFamily dns_lookup_family,
+                                            const std::string& dns_address, const uint32_t dns_port)
+    : parent_(parent), dns_resolver_(dns_resolver), dns_lookup_family_(dns_lookup_family),
+      dns_address_(dns_address), dns_port_(dns_port) {}
+
+DnsSrvCluster::ResolveTarget::~ResolveTarget() {
+  if (active_dns_query_) {
+    active_dns_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+  }
+}
+
+void DnsSrvCluster::ResolveTarget::startResolve() {
+  active_dns_query_ = dns_resolver_->resolve(
+      dns_address_, dns_lookup_family_,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
+             std::list<Network::DnsResponse>&& response) -> void {
+        ENVOY_LOG(info, "Resolved target '{}', details: {}, status: {}", dns_address_, details,
+                  static_cast<int>(status));
+
+        active_dns_query_ = nullptr;
+
+        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+          for (const auto& resp : response) {
+            const auto& addrinfo = resp.addrInfo();
+            ENVOY_LOG(info, "Resolved ip for '{}' = {}", dns_address_,
+                      addrinfo.address_->asStringView());
+
+            ASSERT(addrinfo.address_ != nullptr);
+            auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), dns_port_);
+
+            resolved_targets_.push_back(address);
+          }
+        }
+
+        resolve_status_ = status;
+        parent_.targetResolved(this);
+      });
+}
+
+/////////////  DnsSrvClusterFactory  //////////////////
 
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 DnsSrvClusterFactory::createClusterWithConfig(
