@@ -46,21 +46,26 @@ public:
   bool enableSubCluster() const override { return enable_sub_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context) const;
+
+  // Extensions::Common::DynamicForwardProxy::DfpCluster
   std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
   bool touch(const std::string& cluster_name) override;
   void checkIdleSubCluster();
 
-private:
-  friend class ClusterFactory;
-  friend class ClusterTest;
-
+protected:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
           const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager);
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+          absl::Status& creation_status);
+
+private:
+  friend class ClusterFactory;
+  friend class ClusterTest;
+
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
@@ -85,10 +90,13 @@ private:
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
   class LoadBalancer : public Upstream::LoadBalancer,
+                       public Extensions::Common::DynamicForwardProxy::DfpLb,
                        public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
     LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
+    // DfpLb
+    Upstream::HostConstSharedPtr findHostByName(const std::string& host) const override;
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not implemented.
@@ -153,7 +161,7 @@ private:
     Upstream::LoadBalancerFactorySharedPtr factory() override {
       return std::make_shared<LoadBalancerFactory>(cluster_);
     }
-    void initialize() override {}
+    absl::Status initialize() override { return absl::OkStatus(); }
 
   private:
     Cluster& cluster_;
@@ -161,7 +169,8 @@ private:
 
   void
   addOrUpdateHost(absl::string_view host,
-                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info)
+                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+                  std::unique_ptr<Upstream::HostVector>& hosts_added)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

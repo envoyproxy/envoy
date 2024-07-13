@@ -11,12 +11,16 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/http/utility.h"
+#include "source/common/http/http_option_limits.h"
+
+#include "absl/strings/string_view.h"
 
 #define OVERRIDDEN_RELOADABLE_FLAGS(KEY_VALUE_PAIR)                                                \
   /* Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by       \
    * default. */                                                                                   \
   KEY_VALUE_PAIR(quic_disable_version_draft_29, true)                                              \
+  /* Enable support for HTTP/3 metadata decoding in QUICHE. */                                     \
+  KEY_VALUE_PAIR(quic_enable_http3_metadata_decoding, true)                                        \
   /* This flag enables BBR, otherwise QUIC will use Cubic which is less performant */              \
   KEY_VALUE_PAIR(quic_default_to_bbr, true)
 
@@ -39,7 +43,7 @@
 namespace quiche {
 
 inline constexpr absl::string_view EnvoyQuicheReloadableFlagPrefix =
-    "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
+    "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_";
 
 inline constexpr absl::string_view EnvoyFeaturePrefix = "envoy.reloadable_features.";
 

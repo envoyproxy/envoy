@@ -18,7 +18,7 @@ TEST_F(StatsRenderTest, TextString) {
             render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"));
 }
 
-TEST_F(StatsRenderTest, TextHistogramNoBuckets) {
+TEST_F(StatsRenderTest, TextHistogramUnset) {
   StatsTextRender renderer(params_);
   constexpr absl::string_view expected =
       "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
@@ -57,6 +57,16 @@ TEST_F(StatsRenderTest, TextHistogramDetailed) {
       "  summary=P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) P90(308.5,308.5) "
       "P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) P99.9(309.985,309.985) "
       "P100(310,310)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, TextHistogramSummary) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
+      "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
+      "P99.9(309.985,309.985) P100(310,310)\n";
   EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
 }
 

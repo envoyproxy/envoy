@@ -20,9 +20,10 @@ namespace {
 
 using Envoy::Protobuf::util::MessageDifferencer;
 
-class FilterTest : public ::testing::Test {
+class CompositeFilterTest : public ::testing::Test {
 public:
-  FilterTest() : filter_(stats_, decoder_callbacks_.dispatcher()) {
+  CompositeFilterTest(bool is_upstream)
+      : filter_(stats_, decoder_callbacks_.dispatcher(), is_upstream) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -98,6 +99,11 @@ public:
   Http::TestResponseHeaderMapImpl default_response_headers_{{":status", "200"}};
   Http::TestResponseTrailerMapImpl default_response_trailers_{
       {"response-trailer", "something-else"}};
+};
+
+class FilterTest : public CompositeFilterTest {
+public:
+  FilterTest() : CompositeFilterTest(false) {}
 };
 
 TEST_F(FilterTest, StreamEncoderFilterDelegation) {
@@ -313,25 +319,269 @@ TEST(ConfigTest, TestConfig) {
         name: set-response-code
         config_discovery:
           config_source:
-              resource_api_version: V3
               path_config_source:
                 path: "{{ test_tmpdir }}/set_response_code.yaml"
           type_urls:
           - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-)EOF";
+  )EOF";
 
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
-                                                                server_factory_context};
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
+  for (bool is_downstream : {false, true}) {
+    Envoy::Http::Matching::HttpFilterActionContext action_context{
+        .is_downstream_ = is_downstream,
+        .stat_prefix_ = "test",
+        .factory_context_ = factory_context,
+        .upstream_factory_context_ = upstream_factory_context,
+        .server_factory_context_ = server_factory_context};
+    ExecuteFilterActionFactory factory;
+    EXPECT_THROW_WITH_MESSAGE(
+        factory.createActionFactoryCb(config, action_context,
+                                      ProtobufMessage::getStrictValidationVisitor()),
+        EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
+  }
+}
+
+TEST(ConfigTest, TestDynamicConfigInDownstream) {
+  const std::string yaml_string = R"EOF(
+      dynamic_config:
+        name: set-response-code
+        config_discovery:
+          config_source:
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createActionFactoryCb(config, action_context,
                                     ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
+      EnvoyException, "Failed to get downstream factory context or server factory context.");
+}
+
+TEST(ConfigTest, TestDynamicConfigInUpstream) {
+  const std::string yaml_string = R"EOF(
+      dynamic_config:
+        name: set-response-code
+        config_discovery:
+          config_source:
+              path_config_source:
+                path: "{{ test_tmpdir }}/set_response_code.yaml"
+          type_urls:
+          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDual
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = false,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = absl::nullopt};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Failed to get upstream factory context or server factory context.");
+}
+
+// For dual filter in downstream, if not overriding
+// createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
+// server_factory_context is provided in action_context.
+TEST(ConfigTest, CreateFilterFromServerContextDual) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: composite-action
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDualNoServerContext
+          code: 403
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException,
+      "DualFactoryBase: creating filter factory from server factory context is not supported");
+}
+
+// For dual filter in upstream,  Envoy exception will be thrown if no
+// upstream_factory_context provided in the action_context.
+TEST(ConfigTest, DualFilterNoUpstreamFactoryContext) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: composite-action
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigDualNoServerContext
+          code: 403
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = false,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Failed to get upstream filter factory creation function");
+}
+
+// For downstream filter, Envoy exception will be thrown if no factory_context
+// or server_factory_context provided in the action_context.
+TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: composite-action
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigNoServerContext
+          code: 403
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = absl::nullopt};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Failed to get downstream filter factory creation function");
+}
+
+// For downstream filter, if not overriding
+// createFilterFactoryFromProtoWithServerContext(), Envoy exception will be thrown if only
+// server_factory_context is provided in the action_context.
+TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: composite-action
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfigNoServerContext
+          code: 403
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "Creating filter factory from server factory context is not supported");
+}
+
+// Config test to check if sample_percent config is not specified.
+TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+   )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  ExecuteFilterActionFactory factory;
+  EXPECT_TRUE(factory.isSampled(config, runtime));
+}
+
+// Config test to check if sample_percent config is in place and feature enabled.
+TEST(ConfigTest, TestSamplePercentInPlaceFeatureEnabled) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+      sample_percent:
+        default_value:
+          numerator: 30
+          denominator: HUNDRED
+   )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  ExecuteFilterActionFactory factory;
+  EXPECT_CALL(runtime.snapshot_,
+              featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(testing::Return(true));
+  EXPECT_TRUE(factory.isSampled(config, runtime));
+}
+
+// Config test to check if sample_percent config is in place and feature not enabled.
+TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+      sample_percent:
+        runtime_key:
+   )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  ExecuteFilterActionFactory factory;
+  EXPECT_CALL(runtime.snapshot_,
+              featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(testing::Return(false));
+  EXPECT_FALSE(factory.isSampled(config, runtime));
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
@@ -340,7 +590,6 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
         name: actionName
         config_discovery:
           config_source:
-              resource_api_version: V3
               path_config_source:
                 path: "{{ test_tmpdir }}/set_response_code.yaml"
           type_urls:
@@ -349,10 +598,15 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
-                                                                server_factory_context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action = factory.createActionFactoryCb(config, action_context,
                                               ProtobufMessage::getStrictValidationVisitor())();
@@ -375,10 +629,15 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-  Envoy::Http::Matching::HttpFilterActionContext action_context{"test", factory_context,
-                                                                server_factory_context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = upstream_factory_context,
+      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   auto action = factory.createActionFactoryCb(config, action_context,
                                               ProtobufMessage::getStrictValidationVisitor())();
@@ -445,6 +704,41 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
   fields["otherRootFilterName"] = ValueUtil::stringValue("anyActionName");
   fields["rootFilterName"] = ValueUtil::stringValue("actionName");
   EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
+
+  EXPECT_CALL(*stream_filter, onStreamComplete());
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onStreamComplete();
+  filter_.onDestroy();
+}
+
+class UpstreamFilterTest : public CompositeFilterTest {
+public:
+  UpstreamFilterTest() : CompositeFilterTest(true) {}
+};
+
+TEST_F(UpstreamFilterTest, StreamEncoderFilterDelegationUpstream) {
+  auto stream_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(encoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(stream_filter);
+  };
+
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  ExecuteFilterAction action(factory_callback, "actionName");
+  EXPECT_CALL(success_counter_, inc());
+  filter_.onMatchCallback(action);
+
+  auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
+  EXPECT_EQ(nullptr, info);
+
+  doAllDecodingCallbacks();
+  expectDelegatedEncoding(*stream_filter);
+  doAllEncodingCallbacks();
 
   EXPECT_CALL(*stream_filter, onStreamComplete());
   EXPECT_CALL(*stream_filter, onDestroy());

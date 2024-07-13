@@ -3,12 +3,14 @@
 
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/client_context_impl.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/quic/test_utils.h"
-#include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
+#include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
@@ -35,7 +37,7 @@ class EnvoyQuicProofVerifierTest : public testing::Test {
 public:
   EnvoyQuicProofVerifierTest()
       : root_ca_cert_(cert_chain_.substr(cert_chain_.rfind("-----BEGIN CERTIFICATE-----"))),
-        leaf_cert_([=]() {
+        leaf_cert_([this]() {
           std::stringstream pem_stream(cert_chain_);
           std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
           return chain[0];
@@ -79,9 +81,10 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
-    auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
-        *store_.rootScope(), client_context_config_, time_system_);
-    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
+    auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
+        *store_.rootScope(), client_context_config_, factory_context_);
+    THROW_IF_NOT_OK(context_or_error.status());
+    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
   }
 
 protected:
@@ -98,7 +101,7 @@ protected:
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
       absl::nullopt};
   NiceMock<Stats::MockStore> store_;
-  Event::GlobalTimeSystem time_system_;
+  Server::Configuration::MockServerFactoryContext factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   Ssl::MockCertificateValidationContextConfig cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;

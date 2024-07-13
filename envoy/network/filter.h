@@ -14,7 +14,8 @@
 
 namespace quic {
 class QuicSocketAddress;
-}
+class QuicReceivedPacket;
+} // namespace quic
 
 namespace Envoy {
 
@@ -300,6 +301,14 @@ public:
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value of type protobuf any to set on the namespace. A merge will be performed with new
+   * values for the same key overriding existing.
+   */
+  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+
+  /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
    * connection.
    */
@@ -324,6 +333,14 @@ public:
    * @param success boolean telling whether the filter execution was successful or not.
    */
   virtual void continueFilterChain(bool success) PURE;
+
+  /**
+   * Overwrite the default use original dst setting for current connection. This allows the
+   * listener filter to control whether the connection should be forwarded to other listeners
+   * based on the original destination address or not.
+   * @param use_original_dst whether to use original destination address or not.
+   */
+  virtual void useOriginalDst(bool use_original_dst) PURE;
 };
 
 /**
@@ -449,6 +466,13 @@ public:
    */
   virtual FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                                             Connection& connection) PURE;
+
+  /**
+   * Called when the QUIC server session processes its first packet.
+   * @param packet the received packet.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
 
 using QuicListenerFilterPtr = std::unique_ptr<QuicListenerFilter>;
@@ -474,6 +498,7 @@ public:
 
   virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                                     Connection& connection) PURE;
+  virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
 
 /**

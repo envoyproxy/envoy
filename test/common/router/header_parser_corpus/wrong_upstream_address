@@ -1,0 +1,8 @@
+stream_info {
+  upstream_local_address {
+    socket_address {
+      address: "s"
+      named_port: ""
+    }
+  }
+}

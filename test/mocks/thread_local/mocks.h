@@ -74,8 +74,7 @@ public:
     }
     void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& main_callback) override {
       EXPECT_TRUE(was_set_);
-      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); },
-                              std::move(main_callback));
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
     bool isShutdown() const override { return parent_.shutdown_; }
 

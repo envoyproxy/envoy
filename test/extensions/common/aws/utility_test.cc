@@ -3,17 +3,15 @@
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Pair;
-using testing::Return;
-using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -155,6 +153,7 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
 
 // Headers in the exclusion list are not canonicalized
 TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
@@ -168,7 +167,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_exact(str);
     exclusion_list.emplace_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+            config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
   for (auto& match_str : prefixes) {
@@ -176,7 +175,7 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
     config.set_prefix(match_str);
     exclusion_list.emplace_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config));
+            config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,
@@ -321,6 +320,38 @@ TEST(UtilityTest, EncodeS3PathSegment) {
   EXPECT_EQ("/test/%5E%21%40%3D/-_~.", encoded_path);
 }
 
+// We assume that by the time our path has reached encodePathSegment, it has already been uriEncoded
+// These tests validate that we do not doubly encode these
+TEST(UtilityTest, CheckDoubleEncodingS3) {
+  const absl::string_view path = "/test%20file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3withSpace) {
+  const absl::string_view path = "/test file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3Outposts) {
+  const absl::string_view path = "/test%20file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3-outposts");
+  EXPECT_EQ("/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3Folder) {
+  const absl::string_view path = "/test%20folder/test%20file";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20folder/test%20file", encoded_path);
+}
+
+TEST(UtilityTest, CheckDoubleEncodingS3FolderPercentFile) {
+  const absl::string_view path = "/test%20folder/%25";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test%20folder/%25", encoded_path);
+}
+
 TEST(UtilityTest, CanonicalizeQueryString) {
   const absl::string_view query = "a=1&b=2";
   const auto canonical_query = Utility::canonicalizeQueryString(query);
@@ -409,43 +440,49 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   EXPECT_EQ("", names);
 }
 
-// Verify that we don't add a thread local cluster if it already exists.
-TEST(UtilityTest, ThreadLocalClusterExistsAlready) {
-  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(cm_, addOrUpdateCluster(_, _)).Times(0);
-  EXPECT_TRUE(Utility::addInternalClusterStatic(cm_, "cluster_name",
-                                                envoy::config::cluster::v3::Cluster::STATIC, ""));
-}
-
-// Verify that if thread local cluster doesn't exist we can create a new one.
-TEST(UtilityTest, AddStaticClusterSuccess) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
-}
-
-// Handle exception when adding thread local cluster fails.
-TEST(UtilityTest, AddStaticClusterFailure) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _))
-      .WillOnce(Throw(EnvoyException("exeption message")));
-  EXPECT_FALSE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:80"));
+// Verify that createInternalCluster returns correctly
+TEST(UtilityTest, CreateStaticClusterSuccess) {
+  auto cluster = Utility::createInternalClusterStatic(
+      "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1:443");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.1");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            443);
 }
 
 // Verify that for uri argument in addInternalClusterStatic port value is optional
 // and can contain request path which will be ignored.
-TEST(UtilityTest, AddStaticClusterSuccessEvenWithMissingPort) {
-  NiceMock<Upstream::MockClusterManager> cm_;
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, addOrUpdateCluster(WithName("cluster_name"), _)).WillOnce(Return(true));
-  EXPECT_TRUE(Utility::addInternalClusterStatic(
-      cm_, "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something"));
+TEST(UtilityTest, CreateStaticClusterSuccessEvenWithMissingPort) {
+  auto cluster = Utility::createInternalClusterStatic(
+      "cluster_name", envoy::config::cluster::v3::Cluster::STATIC, "127.0.0.1/something");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.1");
+  EXPECT_EQ(cluster.load_assignment()
+                .endpoints(0)
+                .lb_endpoints(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            80);
 }
 
 // The region is simply interpolated into sts.{}.amazonaws.com for most regions
@@ -481,6 +518,82 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   // No difference between fips vs non-fips endpoints in GovCloud.
   EXPECT_EQ("sts.us-gov-east-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-east-1"));
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
+}
+
+// Test edge case where a SigV4a region set is provided and also web identity provider is in use
+TEST(UtilityTest, CorrectlyConvertRegionSet) {
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*"));
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com",
+            Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+#else
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*"));
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+#endif
+  EXPECT_EQ("sts.ap-southeast-2.amazonaws.com",
+            Utility::getSTSEndpoint("ap-southeast-2,us-east-2"));
+  EXPECT_EQ("sts.ca-central-1.amazonaws.com",
+            Utility::getSTSEndpoint("ca-central-1,ap-southeast-2,eu-central-1"));
+}
+
+TEST(UtilityTest, JsonStringFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "testvalue");
+}
+
+TEST(UtilityTest, JsonStringNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"no_access_key_id\":\"testvalue\"}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration =
+      Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
+  EXPECT_EQ(expiration, "notfound");
+}
+
+TEST(UtilityTest, JsonIntegerFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  EXPECT_EQ(expiration, 5);
+}
+
+TEST(UtilityTest, JsonIntegerNotFound) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"noexpiration\":5}");
+  EXPECT_TRUE(test_json.ok());
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 0);
+}
+
+// Check we handle double formatted integer > 0
+TEST(UtilityTest, JsonIntegerExponent) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":1.714449238E9}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
+  // Should return default value
+  EXPECT_EQ(expiration, 1714449238);
+}
+
+// Check we handle double formatted integer < 0
+TEST(UtilityTest, JsonIntegerExponentInvalid) {
+  auto test_json = Json::Factory::loadFromStringNoThrow("{\"expiration\":-0.17144492389}");
+  EXPECT_TRUE(test_json.ok());
+  auto value_or_error = test_json.value()->getValue("expiration");
+  EXPECT_TRUE(value_or_error.ok());
+  EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
+  EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
+  const auto expiration =
+      Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 9999);
+  // Should return default value
+  EXPECT_EQ(expiration, 9999);
 }
 
 } // namespace

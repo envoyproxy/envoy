@@ -296,8 +296,13 @@ public:
                       const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
+    int32_t min_len = 24;
+    if (opcode == enumToSignedInt(OpCodes::CreateTtl)) {
+      min_len = 32;
+    }
+
     if (!txn) {
-      buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(min_len + path.length() + data.length());
       buffer.writeBEInt<int32_t>(xid);
       buffer.writeBEInt<int32_t>(opcode);
     }
@@ -311,6 +316,11 @@ public:
     // Flags.
     buffer.writeBEInt<int32_t>(create_flag_val);
 
+    if (opcode == enumToSignedInt(OpCodes::CreateTtl)) {
+      // Ttl.
+      buffer.writeBEInt<int64_t>(3000);
+    }
+
     return buffer;
   }
 
@@ -319,8 +329,13 @@ public:
       const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
+    int32_t min_len = 24;
+    if (opcode == enumToSignedInt(OpCodes::CreateTtl)) {
+      min_len = 32;
+    }
+
     if (!txn) {
-      buffer.writeBEInt<int32_t>(24 + path.length());
+      buffer.writeBEInt<int32_t>(min_len + path.length());
       buffer.writeBEInt<int32_t>(1000);
       buffer.writeBEInt<int32_t>(opcode);
     }
@@ -334,6 +349,11 @@ public:
     // Flags.
     buffer.writeBEInt<int32_t>(create_flag_val);
 
+    if (opcode == enumToSignedInt(OpCodes::CreateTtl)) {
+      // Ttl.
+      buffer.writeBEInt<int64_t>(3000);
+    }
+
     return buffer;
   }
 
@@ -342,15 +362,20 @@ public:
       const int32_t xid = 1000, const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
+    int32_t min_len = 24;
+    if (opcode == enumToSignedInt(OpCodes::CreateTtl)) {
+      min_len = 32;
+    }
+
     if (!txn) {
-      buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(min_len + path.length() + data.length());
       buffer.writeBEInt<int32_t>(xid);
       buffer.writeBEInt<int32_t>(opcode);
     }
 
     addString(buffer, path);
     addString(buffer, data);
-    // Deliberately not adding acls and flags to the buffer.
+    // Deliberately not adding acls, flags (and/or ttl) to the buffer.
     return buffer;
   }
 
@@ -368,7 +393,8 @@ public:
 
     addString(buffer, path);
     addString(buffer, data);
-    // Deliberately not adding acls and flags to the buffer and change the length accordingly.
+    // Deliberately not adding acls, flags (and/or ttl) to the buffer and change the length
+    // accordingly.
     return buffer;
   }
 
@@ -586,14 +612,20 @@ public:
       break;
     }
 
+    int32_t rq_bytes = 35;
+    if (opcode == OpCodes::CreateTtl) {
+      rq_bytes = 43;
+    }
+
     expectSetDynamicMetadata(
         {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flag)}},
-         {{"bytes", "35"}}});
+         {{"bytes", std::to_string(rq_bytes)}}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
     EXPECT_EQ(1UL, store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq")).value());
-    EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
-    EXPECT_EQ(35UL, store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq_bytes")).value());
+    EXPECT_EQ(static_cast<unsigned long>(rq_bytes), config_->stats().request_bytes_.value());
+    EXPECT_EQ(static_cast<unsigned long>(rq_bytes),
+              store_.counter(absl::StrCat("test.zookeeper.", opname, "_rq_bytes")).value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
     EXPECT_EQ(0UL,
               store_.counter(absl::StrCat("test.zookeeper.", opname, "_decoder_error")).value());
@@ -1319,8 +1351,8 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
-  EXPECT_EQ(266UL, config_->stats().request_bytes_.value());
-  EXPECT_EQ(266UL, config_->stats().multi_rq_bytes_.value());
+  EXPECT_EQ(274UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(274UL, config_->stats().multi_rq_bytes_.value());
   EXPECT_EQ(1UL, config_->stats().create_rq_.value());
   EXPECT_EQ(1UL, config_->stats().create2_rq_.value());
   EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());

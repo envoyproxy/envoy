@@ -28,11 +28,11 @@ private:
 class HeaderHashMethod : public HashMethodImplBase {
 public:
   HeaderHashMethod(const envoy::config::route::v3::RouteAction::HashPolicy::Header& header,
-                   bool terminal)
+                   bool terminal, Regex::Engine& regex_engine)
       : HashMethodImplBase(terminal), header_name_(header.header_name()) {
     if (header.has_regex_rewrite()) {
       const auto& rewrite_spec = header.regex_rewrite();
-      regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+      regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
       regex_rewrite_substitution_ = rewrite_spec.substitution();
     }
   }
@@ -82,7 +82,11 @@ public:
   CookieHashMethod(const std::string& key, const std::string& path,
                    const absl::optional<std::chrono::seconds>& ttl, bool terminal,
                    const CookieAttributeRefVector attributes)
-      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl), attributes_(attributes) {}
+      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl) {
+    for (const auto& attribute : attributes) {
+      attributes_.push_back(attribute);
+    }
+  }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
@@ -91,7 +95,11 @@ public:
     absl::optional<uint64_t> hash;
     std::string value = Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
-      value = add_cookie(key_, path_, ttl_.value(), attributes_);
+      CookieAttributeRefVector attributes;
+      for (const auto& attribute : attributes_) {
+        attributes.push_back(attribute);
+      }
+      value = add_cookie(key_, path_, ttl_.value(), attributes);
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -104,7 +112,7 @@ private:
   const std::string key_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
-  const CookieAttributeRefVector attributes_;
+  std::vector<CookieAttribute> attributes_;
 };
 
 class IpHashMethod : public HashMethodImplBase {
@@ -176,14 +184,15 @@ private:
 };
 
 HashPolicyImpl::HashPolicyImpl(
-    absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policies) {
+    absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policies,
+    Regex::Engine& regex_engine) {
 
   hash_impls_.reserve(hash_policies.size());
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
       hash_impls_.emplace_back(
-          new HeaderHashMethod(hash_policy->header(), hash_policy->terminal()));
+          new HeaderHashMethod(hash_policy->header(), hash_policy->terminal(), regex_engine));
       break;
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
       absl::optional<std::chrono::seconds> ttl;

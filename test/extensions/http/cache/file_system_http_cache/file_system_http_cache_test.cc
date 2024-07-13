@@ -77,7 +77,7 @@ public:
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
     TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
     ConfigProto cfg;
-    MessageUtil::unpackTo(cache_config.typed_config(), cfg);
+    EXPECT_TRUE(MessageUtil::unpackTo(cache_config.typed_config(), cfg).ok());
     cfg.set_cache_path(cache_path_);
     return cfg;
   }
@@ -262,7 +262,7 @@ CacheConfig varyAllowListConfig() {
 
 class MockSingletonManager : public Singleton::ManagerImpl {
 public:
-  MockSingletonManager() : Singleton::ManagerImpl(Thread::threadFactoryForTest()) {
+  MockSingletonManager() {
     // By default just act like a real SingletonManager, but allow overrides.
     ON_CALL(*this, get(_, _, _))
         .WillByDefault(std::bind(&MockSingletonManager::realGet, this, std::placeholders::_1,
@@ -370,7 +370,8 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Event::SimulatedTimeSystem time_system_;
   Http::TestRequestHeaderMapImpl request_headers_;
-  VaryAllowList vary_allow_list_{varyAllowListConfig().allowed_vary_headers()};
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  VaryAllowList vary_allow_list_{varyAllowListConfig().allowed_vary_headers(), factory_context_};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestResponseHeaderMapImpl response_headers_{
       {":status", "200"},

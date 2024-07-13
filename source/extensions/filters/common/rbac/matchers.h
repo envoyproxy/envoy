@@ -49,13 +49,15 @@ public:
    * proto message.
    */
   static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Permission& permission,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Principal config
    * proto message.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Principal& principal);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v3::Principal& principal,
+                                      Server::Configuration::CommonFactoryContext& context);
 };
 
 /**
@@ -76,8 +78,10 @@ public:
 class AndMatcher : public Matcher {
 public:
   AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules,
-             ProtobufMessage::ValidationVisitor& validation_visitor);
-  AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
+             ProtobufMessage::ValidationVisitor& validation_visitor,
+             Server::Configuration::CommonFactoryContext& context);
+  AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids,
+             Server::Configuration::CommonFactoryContext& context);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -93,12 +97,17 @@ private:
 class OrMatcher : public Matcher {
 public:
   OrMatcher(const envoy::config::rbac::v3::Permission::Set& set,
-            ProtobufMessage::ValidationVisitor& validation_visitor)
-      : OrMatcher(set.rules(), validation_visitor) {}
-  OrMatcher(const envoy::config::rbac::v3::Principal::Set& set) : OrMatcher(set.ids()) {}
+            ProtobufMessage::ValidationVisitor& validation_visitor,
+            Server::Configuration::CommonFactoryContext& context)
+      : OrMatcher(set.rules(), validation_visitor, context) {}
+  OrMatcher(const envoy::config::rbac::v3::Principal::Set& set,
+            Server::Configuration::CommonFactoryContext& context)
+      : OrMatcher(set.ids(), context) {}
   OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
-            ProtobufMessage::ValidationVisitor& validation_visitor);
-  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids);
+            ProtobufMessage::ValidationVisitor& validation_visitor,
+            Server::Configuration::CommonFactoryContext& context);
+  OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids,
+            Server::Configuration::CommonFactoryContext& context);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -110,10 +119,12 @@ private:
 class NotMatcher : public Matcher {
 public:
   NotMatcher(const envoy::config::rbac::v3::Permission& permission,
-             ProtobufMessage::ValidationVisitor& validation_visitor)
-      : matcher_(Matcher::create(permission, validation_visitor)) {}
-  NotMatcher(const envoy::config::rbac::v3::Principal& principal)
-      : matcher_(Matcher::create(principal)) {}
+             ProtobufMessage::ValidationVisitor& validation_visitor,
+             Server::Configuration::CommonFactoryContext& context)
+      : matcher_(Matcher::create(permission, validation_visitor, context)) {}
+  NotMatcher(const envoy::config::rbac::v3::Principal& principal,
+             Server::Configuration::CommonFactoryContext& context)
+      : matcher_(Matcher::create(principal, context)) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -128,7 +139,9 @@ private:
  */
 class HeaderMatcher : public Matcher {
 public:
-  HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher) : header_(matcher) {}
+  HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher,
+                Server::Configuration::CommonFactoryContext& context)
+      : header_(matcher, context) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -146,7 +159,9 @@ public:
   enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
   IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
-      : range_(Network::Address::CidrRange::create(range)), type_(type) {}
+      : range_(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(range),
+                                     Network::Address::CidrRange)),
+        type_(type) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
@@ -188,11 +203,12 @@ private:
  */
 class AuthenticatedMatcher : public Matcher {
 public:
-  AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth)
+  AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth,
+                       Server::Configuration::CommonFactoryContext& context)
       : matcher_(auth.has_principal_name()
                      ? absl::make_optional<
                            Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-                           auth.principal_name())
+                           auth.principal_name(), context)
                      : absl::nullopt) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
@@ -211,9 +227,10 @@ private:
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
-                ProtobufMessage::ValidationVisitor& validation_visitor)
-      : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
-        condition_(policy.condition()) {
+                ProtobufMessage::ValidationVisitor& validation_visitor,
+                Server::Configuration::CommonFactoryContext& context)
+      : permissions_(policy.permissions(), validation_visitor, context),
+        principals_(policy.principals(), context), condition_(policy.condition()) {
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
     }
@@ -242,8 +259,9 @@ private:
 
 class FilterStateMatcher : public Matcher {
 public:
-  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher)
-      : matcher_(matcher) {}
+  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                     Server::Configuration::CommonFactoryContext& context)
+      : matcher_(matcher, context) {}
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
@@ -260,9 +278,10 @@ class RequestedServerNameMatcher
     : public Matcher,
       Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> {
 public:
-  RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name)
+  RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name,
+                             Server::Configuration::CommonFactoryContext& context)
       : Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>(
-            requested_server_name) {}
+            requested_server_name, context) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -274,8 +293,9 @@ public:
  */
 class PathMatcher : public Matcher {
 public:
-  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path_matcher)
-      : path_matcher_(path_matcher) {}
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path_matcher,
+              Server::Configuration::CommonFactoryContext& context)
+      : path_matcher_(path_matcher, context) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;

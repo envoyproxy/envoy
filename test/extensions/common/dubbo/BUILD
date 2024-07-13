@@ -13,7 +13,6 @@ envoy_cc_test(
     name = "message_test",
     srcs = ["message_test.cc"],
     deps = [
-        "//source/extensions/common/dubbo:codec_lib",
         "//source/extensions/common/dubbo:message_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",

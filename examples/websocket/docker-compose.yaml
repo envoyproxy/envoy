@@ -19,6 +19,15 @@ services:
     ports:
     - "${PORT_PROXY0:-10000}:10000"
 
+  proxy-ws-route:
+    build:
+      context: .
+      dockerfile: ../shared/envoy/Dockerfile
+      args:
+        ENVOY_CONFIG: ./envoy-ws-route.yaml
+    ports:
+    - "${PORT_PROXY1:-15000}:10000"
+
   proxy-wss-wss:
     build:
       context: .
@@ -26,7 +35,7 @@ services:
       args:
         ENVOY_CONFIG: ./envoy-wss.yaml
     ports:
-    - "${PORT_PROXY1:-20000}:10000"
+    - "${PORT_PROXY2:-20000}:10000"
 
   proxy-wss-passthrough:
     build:
@@ -35,7 +44,7 @@ services:
       args:
         ENVOY_CONFIG: ./envoy-wss-passthrough.yaml
     ports:
-    - "${PORT_PROXY2:-30000}:10000"
+    - "${PORT_PROXY3:-30000}:10000"
 
   service-ws:
     build:

@@ -11,24 +11,30 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
                                                          Stats::Scope& scope)
     : client_manager_(client_manager), scope_(scope) {}
 
-ExternalProcessorStreamPtr
-ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
-                                   const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                   const StreamInfo::StreamInfo& stream_info) {
+ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
+    ExternalProcessorCallbacks& callbacks,
+    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+    const Http::AsyncClient::StreamOptions& options,
+    Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) {
   auto client_or_error =
       client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
   THROW_IF_STATUS_NOT_OK(client_or_error, throw);
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(client_or_error.value());
-  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, stream_info);
+  return ExternalProcessorStreamImpl::create(std::move(grpcClient), callbacks, options,
+                                             decoder_watermark_callbacks);
 }
 
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info) {
+    ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
+    Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) {
   auto stream =
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
-  if (stream->startStream(std::move(client), stream_info)) {
+  if (stream->startStream(std::move(client), options)) {
+    if (stream->grpcSidestreamFlowControl()) {
+      stream->stream_->setWatermarkCallbacks(*decoder_watermark_callbacks);
+    }
     return stream;
   }
   // Return nullptr on the start failure.
@@ -37,12 +43,10 @@ ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
 
 bool ExternalProcessorStreamImpl::startStream(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    const StreamInfo::StreamInfo& stream_info) {
+    const Http::AsyncClient::StreamOptions& options) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
-  grpc_context_.stream_info = &stream_info;
-  Http::AsyncClient::StreamOptions options;
-  options.setParentContext(grpc_context_);
+  grpc_context_ = options.parent_context;
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;
@@ -58,6 +62,9 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
 bool ExternalProcessorStreamImpl::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
+    if (grpc_side_stream_flow_control_) {
+      stream_.removeWatermarkCallbacks();
+    }
     stream_.closeStream();
     stream_closed_ = true;
     stream_.resetStream();
@@ -67,7 +74,11 @@ bool ExternalProcessorStreamImpl::close() {
 }
 
 void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& response) {
-  callbacks_.onReceiveMessage(std::move(response));
+  if (!callbacks_.has_value()) {
+    ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
+    return;
+  }
+  callbacks_->onReceiveMessage(std::move(response));
 }
 
 void ExternalProcessorStreamImpl::onCreateInitialMetadata(Http::RequestHeaderMap&) {}
@@ -77,12 +88,18 @@ void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTraile
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  callbacks_.logGrpcStreamInfo();
   stream_closed_ = true;
+
+  if (!callbacks_.has_value()) {
+    ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
+    return;
+  }
+
+  callbacks_->logGrpcStreamInfo();
   if (status == Grpc::Status::Ok) {
-    callbacks_.onGrpcClose();
+    callbacks_->onGrpcClose();
   } else {
-    callbacks_.onGrpcError(status);
+    callbacks_->onGrpcError(status);
   }
 }
 

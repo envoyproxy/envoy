@@ -116,8 +116,9 @@ Filter::NetworkFilterFactoriesList ProdListenerComponentFactory::createNetworkFi
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.serverFactoryContext()),
         is_terminal);
-    Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
+    Network::FilterFactoryCb callback = THROW_OR_RETURN_VALUE(
+        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context),
+        Network::FilterFactoryCb);
     ret.push_back(
         config_provider_manager.createStaticFilterConfigProvider(callback, proto_config.name()));
   }
@@ -143,7 +144,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
       const auto& name = proto_config.name();
       if (config_discovery.apply_default_config_without_warming() &&
           !config_discovery.has_default_config()) {
-        throw EnvoyException(fmt::format(
+        throwEnvoyExceptionOrPanic(fmt::format(
             "Error: listener filter config {} applied without warming but has no default config.",
             name));
       }
@@ -153,7 +154,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
             Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
                 getFactoryByType(factory_type_url);
         if (factory == nullptr) {
-          throw EnvoyException(fmt::format(
+          throwEnvoyExceptionOrPanic(fmt::format(
               "Error: no listener factory found for a required type URL {}.", factory_type_url));
         }
       }
@@ -196,9 +197,9 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   static_cast<const Protobuf::Message&>(proto_config.typed_config())));
     if (proto_config.config_type_case() ==
         envoy::config::listener::v3::ListenerFilter::ConfigTypeCase::kConfigDiscovery) {
-      throw EnvoyException(fmt::format("UDP listener filter: {} is configured with "
-                                       "unsupported dynamic configuration",
-                                       proto_config.name()));
+      throwEnvoyExceptionOrPanic(fmt::format("UDP listener filter: {} is configured with "
+                                             "unsupported dynamic configuration",
+                                             proto_config.name()));
       return ret;
     }
     // Now see if there is a factory that will accept the config.
@@ -233,7 +234,7 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
       const std::string& name = proto_config.name();
       if (config_discovery.apply_default_config_without_warming() &&
           !config_discovery.has_default_config()) {
-        throw EnvoyException(fmt::format(
+        throwEnvoyExceptionOrPanic(fmt::format(
             "Error: listener filter config {} applied without warming but has no default config.",
             name));
       }
@@ -241,7 +242,7 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
         absl::string_view factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
         if (Registry::FactoryRegistry<Server::Configuration::NamedQuicListenerFilterConfigFactory>::
                 getFactoryByType(factory_type_url) == nullptr) {
-          throw EnvoyException(fmt::format(
+          throwEnvoyExceptionOrPanic(fmt::format(
               "Error: no listener factory found for a required type URL {}.", factory_type_url));
         }
       }
@@ -290,7 +291,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       // This could be implemented in the future, since Unix domain sockets
       // support SOCK_DGRAM, but there would need to be a way to specify it in
       // envoy.api.v2.core.Pipe.
-      throw EnvoyException(
+      throwEnvoyExceptionOrPanic(
           fmt::format("socket type {} not supported for pipes", toString(socket_type)));
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
@@ -367,8 +368,8 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   }
 
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
-    workers_.emplace_back(
-        worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
+    workers_.emplace_back(worker_factory.createWorker(
+        i, server.overloadManager(), server.nullOverloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
@@ -493,7 +494,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
     return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     if (it == error_state_tracker_.end()) {
       it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }
@@ -502,7 +503,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
     it->second->set_details(e.what());
     it->second->mutable_failed_configuration()->PackFrom(config);
     return absl::InvalidArgumentError(e.what());
-  }
+  })
   error_state_tracker_.erase(it);
   return false;
 }
@@ -511,15 +512,15 @@ void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listen
                                                         const ListenerImpl& existing_listener) {
   bool same_socket_options = true;
   if (new_listener.reusePort() != existing_listener.reusePort()) {
-    throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
-                                     new_listener.name()));
+    throwEnvoyExceptionOrPanic(fmt::format(
+        "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
   }
 
   same_socket_options = existing_listener.socketOptionsEqual(new_listener);
   if (!same_socket_options && new_listener.reusePort() == false) {
-    throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
-                                     "when the reuse port isn't enabled",
-                                     new_listener.name()));
+    throwEnvoyExceptionOrPanic(fmt::format("Listener {}: doesn't support update any socket options "
+                                           "when the reuse port isn't enabled",
+                                           new_listener.name()));
   }
 
   if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
@@ -735,11 +736,11 @@ bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
     return true;
   }
   END_TRY
-  catch (EnvoyException& e) {
+  CATCH(EnvoyException & e, {
     ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}", listener.name(),
               e.what());
     return false;
-  }
+  });
 }
 
 void ListenerManagerImpl::addListenerToWorker(Worker& worker,
@@ -1069,10 +1070,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 #if defined(ENVOY_ENABLE_QUIC)
   if (is_quic &&
       dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
-    throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
-                                     "transport socket config specified for quic transport socket: "
-                                     "{}. \nUse QuicDownstreamTransport instead.",
-                                     transport_socket.DebugString()));
+    throwEnvoyExceptionOrPanic(
+        fmt::format("error building filter chain for quic listener: wrong "
+                    "transport socket config specified for quic transport socket: "
+                    "{}. \nUse QuicDownstreamTransport instead.",
+                    transport_socket.DebugString()));
   }
   const std::string hcm_str =
       "type.googleapis.com/"
@@ -1081,7 +1083,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
       (filter_chain.filters().empty() ||
        filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
            hcm_str)) {
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("error building network filter chain for quic listener: requires "
                     "http_connection_manager filter to be last in the chain."));
   }
@@ -1096,9 +1098,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
+  auto factory_or_error = config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                                      std::move(server_names));
+  THROW_IF_NOT_OK(factory_or_error.status());
   auto filter_chain_res = std::make_shared<FilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, factory_context_,
-                                                  std::move(server_names)),
+      std::move(factory_or_error.value()),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
                                                                  *filter_chain_factory_context),
       std::chrono::milliseconds(
@@ -1117,7 +1121,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
-    throw EnvoyException(message);
+    throwEnvoyExceptionOrPanic(message);
   }
 
   // Search through draining listeners to see if there is a listener that has a socket factory for
@@ -1180,12 +1184,12 @@ void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
     }
   }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     ENVOY_LOG(error, "listener '{}' failed to bind or apply socket options: {}", listener.name(),
               e.what());
     incListenerCreateFailureStat();
     throw e;
-  }
+  });
 }
 
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {

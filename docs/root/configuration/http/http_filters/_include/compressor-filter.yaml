@@ -21,15 +21,19 @@ static_resources:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
                   disabled: true
               routes:
-              - match: { prefix: "/static" }
-                route: { cluster: service }
+              - match:
+                  prefix: "/static"
+                route:
+                  cluster: service
                 typed_per_filter_config:
                   envoy.filters.http.compression:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
                     overrides:
                       response_direction_config:
-              - match: { prefix: "/" }
-                route: { cluster: service }
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: service
           http_filters:
           - name: envoy.filters.http.compressor
             typed_config:
@@ -38,8 +42,8 @@ static_resources:
                 common_config:
                   min_content_length: 100
                   content_type:
-                    - text/html
-                    - application/json
+                  - text/html
+                  - application/json
                 disable_on_etag_header: true
               request_direction_config:
                 common_config:

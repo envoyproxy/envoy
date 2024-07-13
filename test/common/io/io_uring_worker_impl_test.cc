@@ -24,7 +24,7 @@ class IoUringSocketTestImpl : public IoUringSocketEntry {
 public:
   IoUringSocketTestImpl(os_fd_t fd, IoUringWorkerImpl& parent)
       : IoUringSocketEntry(
-            fd, parent, [](uint32_t) {}, false) {}
+            fd, parent, [](uint32_t) { return absl::OkStatus(); }, false) {}
   void cleanupForTest() { cleanup(); }
 
   void write(Buffer::Instance&) override {}
@@ -170,7 +170,7 @@ TEST(IoUringWorkerImplTest, DelaySubmit) {
     worker.submitForTest();
     worker.submitForTest();
   }));
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
   EXPECT_CALL(dispatcher, deferredDelete_);
@@ -202,7 +202,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   auto& io_uring_socket = worker.addServerSocket(
-      fd, [](uint32_t) {}, false);
+      fd, [](uint32_t) { return absl::OkStatus(); }, false);
 
   // Add a write request.
   std::string data = "Hello";
@@ -222,7 +222,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
         cb(req, -EAGAIN, true);
       }));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   Buffer::OwnedImpl buf2;
   buf2.add(data);
@@ -254,7 +254,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
       .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -263,7 +263,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_EQ(0, worker.getSockets().size());
 }
@@ -291,7 +291,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   auto& io_uring_socket = worker.addServerSocket(
-      fd, [](uint32_t) {}, false);
+      fd, [](uint32_t) { return absl::OkStatus(); }, false);
 
   // Fake an injected completion.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -300,7 +300,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
         cb(req, -EAGAIN, true);
       }));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   // When close the socket, expect there still have a incomplete read
   // request, so it has to cancel the request first.
@@ -322,7 +322,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
       .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
       .RetiresOnSaturation();
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -331,7 +331,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_EQ(0, worker.getSockets().size());
 }
@@ -360,7 +360,7 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   worker->addServerSocket(
-      fd, [](uint32_t) {}, false);
+      fd, [](uint32_t) { return absl::OkStatus(); }, false);
 
   // The IoUringWorker will close all the existing sockets.
   Request* cancel_req = nullptr;
@@ -418,7 +418,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   auto& io_uring_socket = worker.addServerSocket(
-      fd, [](uint32_t) {}, false);
+      fd, [](uint32_t) { return absl::OkStatus(); }, false);
 
   // Disable the socket, then there will be no new read request.
   io_uring_socket.disableRead();
@@ -426,7 +426,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&read_req](const CompletionCb& cb) { cb(read_req, -EAGAIN, false); }));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   Request* write_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
@@ -452,7 +452,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
 
         cb(write_req, -EAGAIN, false);
       }));
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
@@ -461,7 +461,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
-  file_event_callback(Event::FileReadyType::Read);
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_EQ(0, worker.getSockets().size());
 }
@@ -481,7 +481,12 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   IoUringServerSocket socket(
-      0, worker, [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0, true);
+      0, worker,
+      [](uint32_t events) {
+        EXPECT_EQ(events, Event::FileReadyType::Closed);
+        return absl::OkStatus();
+      },
+      0, true);
   socket.enableRead();
   socket.disableRead();
 
@@ -507,7 +512,12 @@ TEST(IoUringWorkerImplTest, AvoidDuplicatedCloseRequest) {
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
   IoUringServerSocket socket(
-      0, worker, [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, 0, true);
+      0, worker,
+      [](uint32_t events) {
+        EXPECT_EQ(events, Event::FileReadyType::Closed);
+        return absl::OkStatus();
+      },
+      0, true);
 
   Request* close_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareClose(_, _))
@@ -531,7 +541,7 @@ TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInShutdownWriteSocketInjection) 
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
   IoUringServerSocket socket(
-      0, worker, [](uint32_t) {}, 0, false);
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
 
   // Shutdown and then shutdown completes.
   EXPECT_CALL(mock_io_uring, submit());
@@ -557,7 +567,7 @@ TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInCloseAfterShutdownWriteSocketI
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
   IoUringServerSocket socket(
-      0, worker, [](uint32_t) {}, 0, false);
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
 
   // Shutdown and then close.
   EXPECT_CALL(mock_io_uring, submit());
@@ -591,7 +601,12 @@ TEST(IoUringWorkerImplTest, CloseKeepFdOpenAndSaveData) {
       .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
   auto& socket = worker.addServerSocket(
-      0, [](uint32_t events) { EXPECT_EQ(events, Event::FileReadyType::Closed); }, false);
+      0,
+      [](uint32_t events) {
+        EXPECT_EQ(events, Event::FileReadyType::Closed);
+        return absl::OkStatus();
+      },
+      false);
 
   // Close the socket, but keep the fd open.
   Request* cancel_req = nullptr;
@@ -630,7 +645,7 @@ TEST(IoUringWorkerImplTest, NoOnConnectCallingBackInClosing) {
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
   IoUringClientSocket socket(
-      0, worker, [](uint32_t) {}, 0, false);
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
 
   auto addr = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
   EXPECT_CALL(mock_io_uring, submit()).Times(3);
@@ -666,7 +681,7 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
           DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
   IoUringClientSocket socket(
-      0, worker, [](uint32_t) {}, 0, false);
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
 
   auto addr = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
   EXPECT_CALL(mock_io_uring, submit());

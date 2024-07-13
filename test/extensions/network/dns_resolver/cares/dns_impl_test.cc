@@ -341,7 +341,8 @@ class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher), record_ttl_(0), cname_ttl_(0),
-        stream_info_(dispatcher.timeSource(), nullptr) {}
+        stream_info_(dispatcher.timeSource(), nullptr,
+                     StreamInfo::FilterState::LifeSpan::Connection) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
@@ -434,9 +435,9 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -458,7 +459,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
 
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
@@ -476,7 +478,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 
 TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
-  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
+  auto addr4 = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
   // First, create a resolver with no fallback. Check to see if cares default is
   // the only nameserver.
@@ -491,7 +493,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     auto resolver =
-        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+            .value();
     auto peer =
         std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
     only_has_default = peer->isCaresDefaultTheOnlyNameserver();
@@ -513,7 +516,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
 
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
@@ -535,11 +539,11 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4_a = Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
-  auto addr4_b = Network::Utility::parseInternetAddressAndPort("5.6.7.8:81");
+  auto addr4_a = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80");
+  auto addr4_b = Network::Utility::parseInternetAddressAndPortNoThrow("5.6.7.8:81");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6_a = Network::Utility::parseInternetAddressAndPort("[::2]:90");
-  auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
+  auto addr6_a = Network::Utility::parseInternetAddressAndPortNoThrow("[::2]:90");
+  auto addr6_b = Network::Utility::parseInternetAddressAndPortNoThrow("[::3]:91");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -574,7 +578,8 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -657,7 +662,8 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -680,14 +686,12 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        Network::DnsResolverFactory& dns_resolver_factory =
-            createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-        auto resolver =
-            dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
-      },
-      EnvoyException, "DNS resolver 'foo' is not an IP address");
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  EXPECT_EQ(dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+                .status()
+                .message(),
+            "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -713,6 +717,7 @@ public:
     }
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
+    cares.set_allocated_udp_max_queries(udpMaxQueries());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -733,6 +738,7 @@ public:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, *server_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     updateDnsResolverOptions();
 
@@ -748,7 +754,8 @@ public:
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     resolver_ =
-        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+            .value();
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
     resetChannel();
@@ -794,7 +801,8 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                  std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -825,14 +833,15 @@ public:
 
   ActiveDnsQuery* resolveWithNoRecordsExpectation(const std::string& address,
                                                   const DnsLookupFamily lookup_family) {
-    return resolver_->resolve(
-        address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          std::list<std::string> address_as_string_list = getAddressAsStringList(results);
-          EXPECT_EQ(0, address_as_string_list.size());
-          dispatcher_->exit();
-        });
+    return resolver_->resolve(address, lookup_family,
+                              [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                        std::list<DnsResponse>&& results) -> void {
+                                EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                std::list<std::string> address_as_string_list =
+                                    getAddressAsStringList(results);
+                                EXPECT_EQ(0, address_as_string_list.size());
+                                dispatcher_->exit();
+                              });
   }
 
   ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
@@ -840,6 +849,7 @@ public:
                                                     bool expected_to_execute) {
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
+                                                    absl::string_view,
                                                     std::list<DnsResponse>&& results) -> void {
                                 EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
@@ -852,6 +862,7 @@ public:
                                        const DnsLookupFamily lookup_family, T exception_object) {
     return resolver_->resolve(address, lookup_family,
                               [exception_object](DnsResolver::ResolutionStatus status,
+                                                 absl::string_view,
                                                  std::list<DnsResponse>&& results) -> void {
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
@@ -879,7 +890,7 @@ public:
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
             .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
               for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-                auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+                auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                 vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
               }
               return {0, 0};
@@ -946,6 +957,7 @@ protected:
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
+  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -1092,18 +1104,11 @@ TEST_P(DnsImplTest, CallbackException) {
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
-  EXPECT_EQ(nullptr, resolveWithException<std::runtime_error>("1.2.3.4", DnsLookupFamily::V4Only,
-                                                              std::runtime_error("runtime error")));
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
-                            "runtime error");
-  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 0 /*timeouts*/);
-
   EXPECT_EQ(nullptr,
             resolveWithException<std::string>("1.2.3.4", DnsLookupFamily::V4Only, std::string()));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "unknown");
-  checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
@@ -1504,11 +1509,10 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 TEST_P(DnsImplTest, PendingTimerEnable) {
   InSequence s;
   const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig config;
-  std::vector<Network::Address::InstanceConstSharedPtr> vec{};
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, vec, *stats_store_.rootScope());
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "", *stats_store_.rootScope());
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
@@ -2087,6 +2091,36 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(peer_->isChannelDirty());
+}
+
+class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  ProtobufWkt::UInt32Value* udpMaxQueries() const override {
+    auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
+    udp_max_queries->set_value(100);
+    return dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release());
+  }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForMaxUdpQueriesinTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_OPT_UDP_MAX_QUERIES` is set when UInt32 property
+// `udp_max_queries` is set.
+TEST_P(DnsImplAresFlagsForMaxUdpQueriesinTest, UdpMaxQueriesIsSet) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_UDP_MAX_QUERIES) == ARES_OPT_UDP_MAX_QUERIES);
+  EXPECT_TRUE(opts.udp_max_queries == 100);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
 }
 
 } // namespace Network

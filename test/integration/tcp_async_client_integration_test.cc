@@ -111,6 +111,38 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
   tcp_client->close();
 }
 
+TEST_P(TcpAsyncClientIntegrationTest, Reconnect) {
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  enableHalfClose(true);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello1", false));
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      [&](const std::string& data) -> bool { return data == "hello1"; }));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+
+  // We use the same tcp_client to ensure that a new upstream connection is created.
+  ASSERT_TRUE(tcp_client->write("hello2", false));
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(
+      [&](const std::string& data) -> bool { return data == "hello2"; }));
+
+  tcp_client->close();
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+}
+
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {

@@ -24,7 +24,7 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
   std::vector<uint8_t> fixed_input(required_fixed_input_length);
 
   const auto secret_key =
-      absl::StrCat(SigV4ASignatureConstants::get().SigV4ASignatureVersion, secret_access_key);
+      absl::StrCat(SigV4ASignatureConstants::SigV4ASignatureVersion, secret_access_key);
 
   enum SigV4AKeyDerivationResult result = AkdrNextCounter;
   uint8_t external_counter = 1;
@@ -36,10 +36,11 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
          (external_counter <= 254)) // MAX_KEY_DERIVATION_COUNTER_VALUE
   {
     fixed_input.clear();
-
     fixed_input.insert(fixed_input.begin(), {0x00, 0x00, 0x00, 0x01});
-    fixed_input.insert(fixed_input.end(), SigV4ASignatureConstants::get().SigV4ALabel.begin(),
-                       SigV4ASignatureConstants::get().SigV4ALabel.end());
+    // Workaround for asan optimization issue described here
+    // https://github.com/envoyproxy/envoy/pull/34377
+    absl::string_view s(SigV4ASignatureConstants::SigV4AAlgorithm);
+    fixed_input.insert(fixed_input.end(), s.begin(), s.end());
     fixed_input.insert(fixed_input.end(), 0x00);
     fixed_input.insert(fixed_input.end(), access_key_id.begin(), access_key_id.end());
     fixed_input.insert(fixed_input.end(), external_counter);
@@ -66,7 +67,6 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
       result = SigV4AKeyDerivationResult::AkdrSuccess;
       // PrivateKey d = c+1
       constantTimeAddOne(&k0);
-
       priv_key_num = BN_bin2bn(k0.data(), k0.size(), nullptr);
 
       // Create a new OpenSSL EC_KEY by curve nid for secp256r1 (NIST P-256)

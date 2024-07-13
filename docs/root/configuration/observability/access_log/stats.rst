@@ -46,4 +46,5 @@ The Fluentd access log has statistics rooted at the *access_logs.fluentd.<stat_p
   entries_lost, Counter, Total number of times an access log entry was discarded due to unavailable connection.
   entries_buffered, Counter, Total number of entries (access log record) that was buffered/
   events_sent, Counter, Total number of events (Fluentd Forward Mode events) sent to the upstream.
+  reconnect_attempts, Counter, Total number of times an attempt to reconnect to the upstream has been made.
   connections_closed, Counter, Total number of times a connection to the upstream cluster was closed.

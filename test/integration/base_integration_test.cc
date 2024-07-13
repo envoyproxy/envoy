@@ -18,8 +18,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
@@ -74,6 +74,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+  ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
 
 #ifndef ENVOY_ADMIN_FUNCTIONALITY
   config_helper_.addConfigModifier(
@@ -89,8 +91,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
 const BaseIntegrationTest::InstanceConstSharedPtrFn
 BaseIntegrationTest::defaultAddressFunction(Network::Address::IpVersion version) {
   return [version](int) {
-    return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
-                                                  0);
+    return Network::Utility::parseInternetAddressNoThrow(
+        Network::Test::getLoopbackAddressString(version), 0);
   };
 }
 
@@ -105,7 +107,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
     uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(
+      *Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
       nullptr));
@@ -150,10 +152,10 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
         std::vector<std::string>{});
   } else {
@@ -164,7 +166,8 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_,
+                                                        server_names);
   }
 }
 
@@ -425,6 +428,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
     const auto admin_addr =
         test_server->server().admin()->socket().connectionInfoProvider().localAddress();
     if (admin_addr->type() == Network::Address::Type::Ip) {
+      ENVOY_LOG(debug, "registered 'admin' as port {}.", admin_addr->ip()->port());
       registerPort("admin", admin_addr->ip()->port());
     }
   }
@@ -576,11 +580,11 @@ void BaseIntegrationTest::createXdsUpstream() {
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
-    auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+    auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
         std::vector<std::string>{});
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
@@ -608,15 +612,17 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_substring);
+                                       expect_node, expected_error_code, expected_error_substring,
+                                       stream);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, expected_error_code,
-                                        expected_error_substring, expect_node);
+                                        expected_resource_names_removed, stream,
+                                        expected_error_code, expected_error_substring, expect_node);
   }
 }
 
@@ -687,16 +693,18 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                                           std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    try {
+    TRY_NEEDS_AUDIT {
       Network::TcpListenSocket give_me_a_name(
           Network::Utility::getAddressWithPort(
               *Network::Test::getCanonicalLoopbackAddress(version_), port),
           nullptr, true);
       return AssertionSuccess();
-    } catch (const EnvoyException&) {
+    }
+    END_TRY
+    CATCH(const EnvoyException&, {
       // The nature of this function requires using a real sleep here.
       timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
-    }
+    });
   }
 
   return AssertionFailure() << "Timeout waiting for port availability";
@@ -720,10 +728,13 @@ BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
     bool expect_node) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  if (xds_stream == nullptr) {
+    xds_stream = xds_stream_.get();
+  }
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.

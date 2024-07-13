@@ -26,7 +26,8 @@ class RouteEntryImpl : public RouteEntry,
                        public std::enable_shared_from_this<RouteEntryImpl>,
                        public Logger::Loggable<Logger::Id::rocketmq> {
 public:
-  RouteEntryImpl(const envoy::extensions::filters::network::rocketmq_proxy::v3::Route& route);
+  RouteEntryImpl(const envoy::extensions::filters::network::rocketmq_proxy::v3::Route& route,
+                 Server::Configuration::CommonFactoryContext& context);
   ~RouteEntryImpl() override = default;
 
   // Router::RouteEntry
@@ -54,7 +55,7 @@ using RouteEntryImplConstSharedPtr = std::shared_ptr<const RouteEntryImpl>;
 class RouteMatcher : public Logger::Loggable<Logger::Id::rocketmq> {
 public:
   using RouteConfig = envoy::extensions::filters::network::rocketmq_proxy::v3::RouteConfiguration;
-  RouteMatcher(const RouteConfig& config);
+  RouteMatcher(const RouteConfig& config, Server::Configuration::CommonFactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata) const;
 

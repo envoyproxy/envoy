@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
@@ -21,8 +22,10 @@ public:
   MatcherConstPtr createMatcher(const char* config) {
     RequirementRule rule;
     TestUtility::loadFromYaml(config, rule);
-    return Matcher::create(rule);
+    return Matcher::create(rule, context_);
   }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(MatcherTest, TestMatchPrefix) {

@@ -37,7 +37,11 @@ UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr 
       config_(config, false) {
   parent_drained_callback_registrar_ = socket_->parentDrainedCallbackRegistrar();
   socket_->ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+      dispatcher,
+      [this](uint32_t events) {
+        onSocketEvent(events);
+        return absl::OkStatus();
+      },
       Event::PlatformDefaultTriggerType, paused() ? 0 : events_when_unpaused_);
   if (paused()) {
     parent_drained_callback_registrar_->registerParentDrainedCallback(
@@ -101,7 +105,7 @@ void UdpListenerImpl::handleReadCallback() {
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this, time_source_,
-      config_.prefer_gro_, packets_dropped_);
+      config_.prefer_gro_, /*allow_mmsg=*/true, packets_dropped_);
   if (result == nullptr) {
     // No error. The number of reads was limited by read rate. There are more packets to read.
     // Register to read more in the next event loop.
@@ -119,12 +123,13 @@ void UdpListenerImpl::handleReadCallback() {
 
 void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_address,
                                     Address::InstanceConstSharedPtr peer_address,
-                                    Buffer::InstancePtr buffer, MonotonicTime receive_time) {
+                                    Buffer::InstancePtr buffer, MonotonicTime receive_time,
+                                    uint8_t tos) {
   // UDP listeners are always configured with the socket option that allows pulling the local
   // address. This should never be null.
   ASSERT(local_address != nullptr);
   UdpRecvData recvData{
-      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time, tos};
   cb_.onData(std::move(recvData));
 }
 

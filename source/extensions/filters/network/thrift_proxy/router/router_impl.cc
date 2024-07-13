@@ -19,10 +19,11 @@ namespace ThriftProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
     : cluster_name_(route.route().cluster()),
-      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      rate_limit_policy_(route.route().rate_limits()),
+      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), context)),
+      rate_limit_policy_(route.route().rate_limits(), context),
       strip_service_name_(route.route().strip_service_name()),
       cluster_header_(route.route().cluster_header()),
       mirror_policies_(buildMirrorPolicies(route.route())) {
@@ -139,8 +140,9 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
-    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
-    : RouteEntryImplBase(route), method_name_(route.match().method_name()),
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
+    : RouteEntryImplBase(route, context), method_name_(route.match().method_name()),
       invert_(route.match().invert()) {
   if (method_name_.empty() && invert_) {
     throw EnvoyException("Cannot have an empty method name with inversion enabled");
@@ -162,8 +164,9 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 }
 
 ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
-    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
-    : RouteEntryImplBase(route), invert_(route.match().invert()) {
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route,
+    Server::Configuration::CommonFactoryContext& context)
+    : RouteEntryImplBase(route, context), invert_(route.match().invert()) {
   const std::string service_name = route.match().service_name();
   if (service_name.empty() && invert_) {
     throw EnvoyException("Cannot have an empty service name with inversion enabled");
@@ -193,17 +196,18 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 
 RouteMatcher::RouteMatcher(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
+    Server::Configuration::CommonFactoryContext& context) {
   using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
     RouteEntryImplBaseConstSharedPtr route_entry;
     switch (route.match().match_specifier_case()) {
     case RouteMatch::MatchSpecifierCase::kMethodName:
-      route_entry = std::make_shared<MethodNameRouteEntryImpl>(route);
+      route_entry = std::make_shared<MethodNameRouteEntryImpl>(route, context);
       break;
     case RouteMatch::MatchSpecifierCase::kServiceName:
-      route_entry = std::make_shared<ServiceNameRouteEntryImpl>(route);
+      route_entry = std::make_shared<ServiceNameRouteEntryImpl>(route, context);
       break;
     case RouteMatch::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_CORRUPT_ENUM;

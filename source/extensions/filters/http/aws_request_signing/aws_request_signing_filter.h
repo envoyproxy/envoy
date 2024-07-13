@@ -31,8 +31,6 @@ struct FilterStats {
   ALL_AWS_REQUEST_SIGNING_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-enum class SigningAlgorithm { SIGV4, SIGV4A };
-
 /**
  * Abstract filter configuration.
  */

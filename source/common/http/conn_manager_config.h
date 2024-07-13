@@ -366,6 +366,11 @@ public:
   virtual const absl::optional<std::string>& schemeToSet() const PURE;
 
   /**
+   * @return bool whether the scheme should be overwritten to match the upstream transport protocol.
+   */
+  virtual bool shouldSchemeMatchUpstream() const PURE;
+
+  /**
    * @return ConnectionManagerStats& the stats to write to.
    */
   virtual ConnectionManagerStats& stats() PURE;
@@ -545,5 +550,7 @@ public:
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
 };
+
+using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;
 } // namespace Http
 } // namespace Envoy

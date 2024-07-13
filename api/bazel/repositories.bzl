@@ -17,9 +17,12 @@ def api_dependencies():
         name = "bazel_skylib",
     )
     external_http_archive(
+        name = "rules_jvm_external",
+    )
+    external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:pgv.patch"],
+        patches = ["@envoy_api//bazel:pgv.patch"],
     )
     external_http_archive(
         name = "com_google_googleapis",
@@ -27,13 +30,6 @@ def api_dependencies():
 
     external_http_archive(
         name = "com_github_cncf_xds",
-    )
-
-    # Needed until @com_github_grpc_grpc renames @com_github_cncf_udpa
-    # to @com_github_cncf_xds as well.
-    external_http_archive(
-        name = "com_github_cncf_udpa",
-        location_name = "com_github_cncf_xds",
     )
 
     external_http_archive(
@@ -57,6 +53,9 @@ def api_dependencies():
     external_http_archive(
         name = "com_github_bufbuild_buf",
         build_file_content = BUF_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "dev_cel",
     )
 
     external_http_archive(

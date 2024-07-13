@@ -304,9 +304,6 @@ def _get_cc_proto_descriptor_library_aspect_provides():
 
 cc_proto_descriptor_library_aspect = aspect(
     attrs = _maybe_add({
-        #"_copts": attr.label(
-        #    default = "//:upb_proto_library_copts__for_generated_code_only_do_not_use",
-        #),
         "_gen_descriptor": attr.label(
             executable = True,
             cfg = "exec",
@@ -335,7 +332,6 @@ cc_proto_descriptor_library_aspect = aspect(
 )
 
 cc_proto_descriptor_library = rule(
-    output_to_genfiles = True,
     implementation = _cc_proto_descriptor_rule_impl,
     attrs = {
         "deps": attr.label_list(

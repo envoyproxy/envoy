@@ -322,11 +322,11 @@ steps:
 
 - script: |
     set -e
-    sudo .azure-pipelines/docker/save_cache.sh "$(Build.StagingDirectory)" /mnt/cache/all true true
+    sudo .azure-pipelines/docker/save_cache.sh "$(Build.StagingDirectory)" ${{ parameters.pathCacheTemp }}/all true true
     if id -u vsts &> /dev/null; then
-        sudo chown -R vsts:vsts /mnt/cache/all
+        sudo chown -R vsts:vsts ${{ parameters.pathCacheTemp }}/all
     else
-        sudo chown -R azure-pipelines:azure-pipelines /mnt/cache/all
+        sudo chown -R azure-pipelines:azure-pipelines ${{ parameters.pathCacheTemp }}/all
     fi
 
   displayName: "Cache/save (${{ parameters.cacheName}})"

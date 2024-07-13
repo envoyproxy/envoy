@@ -13,16 +13,12 @@
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/exe/platform_impl.h"
-#include "source/exe/process_wide.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/synchronization/notification.h"
-#include "library/cc/engine_builder.h"
-#include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
-#include "library/common/types/c_types.h"
 
 namespace Envoy {
 
@@ -30,20 +26,27 @@ class Fetch {
 public:
   Fetch();
 
-  void fetch(const std::vector<absl::string_view>& urls);
+  /**
+   * Sends requests to the specified URLs. When QUIC hints are not empty, HTTP/3 will be enabled.
+   * The `protocols` output parameter will be updated upon successful fetch.
+   */
+  envoy_status_t fetch(const std::vector<absl::string_view>& urls,
+                       const std::vector<absl::string_view>& quic_hints,
+                       std::vector<Http::Protocol>& protocols);
 
 private:
-  void runEngine(absl::Notification& engine_running);
-  void sendRequest(const absl::string_view url);
+  void runEngine(absl::Notification& engine_running,
+                 const std::vector<absl::string_view>& quic_hints);
+  envoy_status_t sendRequest(absl::string_view url, std::vector<Http::Protocol>& protocols);
 
-  Envoy::Thread::MutexBasicLockable lock_;
-  Envoy::Logger::Context logging_context_;
-  Envoy::PlatformImpl platform_impl_;
-  Envoy::Stats::SymbolTableImpl symbol_table_;
-  Envoy::Event::RealTimeSystem time_system_; // NO_CHECK_FORMAT(real_time)
-  Envoy::Stats::AllocatorImpl stats_allocator_;
-  Envoy::Stats::ThreadLocalStoreImpl store_root_;
-  Envoy::Random::RandomGeneratorImpl random_generator_;
+  Thread::MutexBasicLockable lock_;
+  Logger::Context logging_context_;
+  PlatformImpl platform_impl_;
+  Stats::SymbolTableImpl symbol_table_;
+  Event::RealTimeSystem time_system_; // NO_CHECK_FORMAT(real_time)
+  Stats::AllocatorImpl stats_allocator_;
+  Stats::ThreadLocalStoreImpl store_root_;
+  Random::RandomGeneratorImpl random_generator_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
 

@@ -1,7 +1,5 @@
 package org.chromium.net.testing;
 
-import static junit.framework.Assert.assertTrue;
-
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ExperimentalCronetEngine;
 

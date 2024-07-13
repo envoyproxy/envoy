@@ -13,6 +13,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/time/time.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/struct_utils.h"
 #include "jwt_verify_lib/verify.h"
@@ -59,7 +60,7 @@ public:
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface.
-  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+  void verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
               SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
               ClearRouteCacheCallback clear_route_cb) override;
@@ -110,7 +111,7 @@ private:
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
-  Http::HeaderMap* headers_{};
+  Http::RequestHeaderMap* headers_{};
   // The active span for the request
   Tracing::Span* parent_span_{&Tracing::NullSpan::instance()};
   // The callback function called to set the extracted payload and header from a verified JWT.
@@ -144,7 +145,7 @@ std::string AuthenticatorImpl::name() const {
   return "_UNKNOWN_";
 }
 
-void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+void AuthenticatorImpl::verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
                                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                                AuthenticatorCallback callback,
@@ -238,6 +239,25 @@ void AuthenticatorImpl::startVerify() {
                                           : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
   if (!is_allowed) {
     doneWithStatus(Status::JwtAudienceNotAllowed);
+    return;
+  }
+
+  const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
+
+  if (!sub_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
+    return;
+  }
+
+  absl::optional<absl::Time> exp;
+  if (jwt_->exp_) {
+    exp = absl::FromUnixSeconds(jwt_->exp_);
+  }
+  const bool exp_allowed = jwks_data_->isLifetimeAllowed(
+      absl::FromChrono(timeSource().systemTime()), exp ? &exp.value() : nullptr);
+
+  if (!exp_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
     return;
   }
 

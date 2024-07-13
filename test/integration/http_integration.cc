@@ -32,9 +32,10 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
@@ -241,19 +242,17 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   }
 #ifdef ENVOY_ENABLE_QUIC
   // Setting socket options is not supported for HTTP3.
-  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+  Network::Address::InstanceConstSharedPtr server_addr = *Network::Utility::resolveUrl(
       fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  auto& quic_transport_socket_factory_ref =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*quic_transport_socket_factory_);
   return Quic::createQuicNetworkConnection(
-      *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
+      *quic_connection_persistent_info_, quic_transport_socket_factory_->getCryptoConfig(),
       quic::QuicServerId(
-          quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
+          quic_transport_socket_factory_->clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
       *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, *stats_store_.rootScope(),
-      options, nullptr, connection_id_generator_, quic_transport_socket_factory_ref);
+      options, nullptr, connection_id_generator_, *quic_transport_socket_factory_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -276,13 +275,14 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
                         .value();
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-#ifdef ENVOY_ENABLE_QUIC
-  } else {
-    cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
-        http2_options.value(), quic::kStreamReceiveWindowLimit);
-    cluster->http3_options_.set_allow_extended_connect(true);
-#endif
   }
+#ifdef ENVOY_ENABLE_QUIC
+  cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+      http2_options.value(), quic::kStreamReceiveWindowLimit);
+  cluster->http3_options_.set_allow_extended_connect(true);
+  cluster->http3_options_.set_allow_metadata(true);
+#endif
+
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
 
@@ -323,7 +323,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
-            return Network::Utility::parseInternetAddress(
+            return Network::Utility::parseInternetAddressNoThrow(
                 Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
@@ -368,7 +368,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
   quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
-      *api_, stats_store_, context_manager_, san_to_match_);
+      *api_, stats_store_, context_manager_, thread_local_, san_to_match_);
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
@@ -838,12 +838,16 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_terminated; "
-            "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
-            "termination",
-            response->body());
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(response->headers().getProxyStatusValue(),
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
+              "ERROR|Closed_by_application}; UC\"");
+  } else {
+    EXPECT_EQ(response->headers().getProxyStatusValue(),
+              "envoy; error=connection_terminated; "
+              "details=\"upstream_reset_before_response_started{connection_termination}; UC\"");
+  }
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
@@ -967,6 +971,77 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(512U, response->body().size());
+}
+
+void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers = {{":method", "POST"},
+                                            {":path", "/test/long/url"},
+                                            {":scheme", "http"},
+                                            {":authority", "sni.lyft.com"},
+                                            {"x-forwarded-for", "10.0.0.1"},
+                                            {"x-envoy-retry-on", "reset-before-request"}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  auto status = request_encoder_->encodeHeaders(headers, false);
+  // Make sure we transmit headers successfully
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  // Reset the upstream connection after the headers have been sent
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  // We should get no new stream/retry
+  ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  cleanupUpstreamAndDownstream();
+}
+
+void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestBeforeHeaders() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "reset-before-request"}});
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  // Reset the upstream connection before the headers have been sent
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  // We should get a retry
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  // Send the request body to unblock the buffer filter
+  codec_client_->sendData(*request_encoder_, 1024, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(1024, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  codec_client_->close();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1024U, response->body().size());
 }
 
 void HttpIntegrationTest::testRetry() {
@@ -1782,6 +1857,40 @@ Http2Frame Http2RawFrameIntegrationTest::readFrame() {
 void Http2RawFrameIntegrationTest::sendFrame(const Http2Frame& frame) {
   ASSERT_TRUE(tcp_client_->connected());
   ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
+}
+
+absl::string_view upstreamToString(Http::CodecType type) {
+  switch (type) {
+  case Http::CodecType::HTTP1:
+    return "HttpUpstream";
+  case Http::CodecType::HTTP2:
+    return "Http2Upstream";
+  case Http::CodecType::HTTP3:
+    return "Http3Upstream";
+  }
+  return "UnknownUpstream";
+}
+
+absl::string_view downstreamToString(Http::CodecType type) {
+  switch (type) {
+  case Http::CodecType::HTTP1:
+    return "HttpDownstream_";
+  case Http::CodecType::HTTP2:
+    return "Http2Downstream_";
+  case Http::CodecType::HTTP3:
+    return "Http3Downstream_";
+  }
+  return "UnknownDownstream";
+}
+
+absl::string_view http2ImplementationToString(Http2Impl impl) {
+  switch (impl) {
+  case Http2Impl::Nghttp2:
+    return "Nghttp2";
+  case Http2Impl::Oghttp2:
+    return "Oghttp2";
+  }
+  return "UnknownHttp2Impl";
 }
 
 } // namespace Envoy

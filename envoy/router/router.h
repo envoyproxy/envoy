@@ -172,6 +172,12 @@ public:
    * @return bool Whether CORS policies are evaluated when filter is off.
    */
   virtual bool shadowEnabled() const PURE;
+
+  /**
+   * @return bool whether preflight requests with origin not matching
+   * configured allowed origins should be forwarded upstream.
+   */
+  virtual const absl::optional<bool>& forwardNotMatchingPreflights() const PURE;
 };
 
 /**
@@ -212,6 +218,7 @@ public:
   static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS                  = 0x1000;
   static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED                 = 0x2000;
   static constexpr uint32_t RETRY_ON_HTTP3_POST_CONNECT_FAILURE         = 0x4000;
+  static constexpr uint32_t RETRY_ON_RESET_BEFORE_REQUEST               = 0x8000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -434,13 +441,17 @@ public:
    *                   not. nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
-   * inline.
+   *                 inline.
+   * @param upstream_request_started indicates whether the first byte has been transmitted to the
+   *                                 upstream server.
+   *
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
-                                       DoRetryResetCallback callback) PURE;
+                                       DoRetryResetCallback callback,
+                                       bool upstream_request_started) PURE;
 
   /**
    * Determine whether a "hedged" retry should be sent after the per try
@@ -528,6 +539,11 @@ public:
    * @return true if the trace span should be sampled.
    */
   virtual bool traceSampled() const PURE;
+
+  /**
+   * @return true if host name should be suffixed with "-shadow".
+   */
+  virtual bool disableShadowHostSuffixAppend() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -1296,7 +1312,7 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
  * Shared part of the route configuration. This class contains interfaces that needn't depend on
  * router matcher. Then every virtualhost could keep a reference to the CommonConfig. When the
  * entire route config is destroyed, the part of CommonConfig will still live until all
- * virtualhosts are destroyed.
+ * virtual hosts are destroyed.
  */
 class CommonConfig {
 public:
@@ -1423,7 +1439,7 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 
   /**
-   * @return returns if the connection pool was iniitalized successfully.
+   * @return returns if the connection pool was initialized successfully.
    */
   virtual bool valid() const PURE;
 };
@@ -1526,6 +1542,17 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+
+  // TODO(vikaschoudhary16): Remove this api.
+  // This api is only used to enable half-close semantics on the upstream connection.
+  // This ideally should be done via calling connection.enableHalfClose() but since TcpProxy
+  // does not have access to the upstream connection, it is done via this api for now.
+  /**
+   * Enable half-close semantics on the upstream connection. Reading a remote half-close
+   * will not fully close the connection. This is off by default.
+   * @param enabled Whether to set half-close semantics as enabled or disabled.
+   */
+  virtual void enableHalfClose() PURE;
   /**
    * Enable/disable further data from this stream.
    */

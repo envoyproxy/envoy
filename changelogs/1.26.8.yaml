@@ -1,0 +1,13 @@
+date: April 4, 2024
+
+bug_fixes:
+- area: http2
+  change: |
+    Update nghttp2 to resolve CVE-2024-30255 (https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm).
+
+new_features:
+- area: google_grpc
+  change: |
+    Added an off-by-default runtime flag
+    ``envoy.reloadable_features.google_grpc_disable_tls_13`` to disable TLSv1.3
+    usage by gRPC SDK for ``google_grpc`` services.

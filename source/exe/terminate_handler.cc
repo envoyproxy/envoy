@@ -13,6 +13,9 @@
 namespace Envoy {
 
 std::terminate_handler TerminateHandler::logOnTerminate() const {
+  // Pre-populate the address mapping so it doesn't require signal-unsafe file
+  // actions during stack trace.
+  BackwardsTrace::addrMapping(/*setup=*/true);
   return std::set_terminate([]() {
     logException(std::current_exception());
     BACKTRACE_LOG();

@@ -35,6 +35,8 @@ public:
   void initializeThreadLocalClusters(const std::vector<std::string>& cluster_names);
 
   // Upstream::ClusterManager
+  MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
+  MOCK_METHOD(bool, initialized, ());
   MOCK_METHOD(bool, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster,
                const std::string& version_info));

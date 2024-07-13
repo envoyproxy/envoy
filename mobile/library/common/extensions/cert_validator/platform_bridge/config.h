@@ -2,7 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "source/common/tls/cert_validator/factory.h"
 
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge_cert_validator.h"
@@ -15,8 +15,9 @@ namespace Tls {
 class PlatformBridgeCertValidatorFactory : public CertValidatorFactory,
                                            public Config::TypedFactory {
 public:
-  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                       SslStats& stats, TimeSource& time_source) override;
+  CertValidatorPtr
+  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+                      Server::Configuration::CommonFactoryContext& context) override;
 
   std::string name() const override {
     return "envoy_mobile.cert_validator.platform_bridge_cert_validator";

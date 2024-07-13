@@ -91,10 +91,10 @@ struct RouteEntryImpl : public Router::RouteEntry {
       const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
           hash_policy,
-      const Router::RetryPolicy& retry_policy)
+      const Router::RetryPolicy& retry_policy, Regex::Engine& regex_engine)
       : retry_policy_(retry_policy), cluster_name_(cluster_name), timeout_(timeout) {
     if (!hash_policy.empty()) {
-      hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy, regex_engine);
     }
   }
 
@@ -212,10 +212,11 @@ struct RouteEntryImpl : public Router::RouteEntry {
 
 struct NullRouteImpl : public Router::Route {
   NullRouteImpl(const std::string cluster_name, const Router::RetryPolicy& retry_policy,
+                Regex::Engine& regex_engine,
                 const absl::optional<std::chrono::milliseconds>& timeout = {},
                 const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                     hash_policy = {})
-      : route_entry_(cluster_name, timeout, hash_policy, retry_policy) {}
+      : route_entry_(cluster_name, timeout, hash_policy, retry_policy, regex_engine) {}
 
   // Router::Route
   const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }

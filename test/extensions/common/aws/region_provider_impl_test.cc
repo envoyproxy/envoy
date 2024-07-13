@@ -56,7 +56,6 @@ TEST_F(EnvironmentRegionProviderTest, SomeRegion) {
 }
 
 TEST_F(EnvironmentRegionProviderTest, SomeRegionSigV4A) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   TestEnvironment::setEnvVar("AWS_SIGV4A_SIGNING_REGION_SET", "us-east-1,us-east-2", 1);
   EXPECT_EQ("us-east-1,us-east-2", provider_.getRegionSet().value());

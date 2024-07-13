@@ -80,8 +80,9 @@ TEST_F(DynatraceSamplerTest, TestWithoutParentContext) {
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
-  EXPECT_STREQ(
-      sampling_result.attributes->find("supportability.atm_sampling_ratio")->second.c_str(), "1");
+  EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
+                sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
+            1);
   EXPECT_STREQ(sampling_result.tracestate.c_str(), "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
@@ -96,8 +97,9 @@ TEST_F(DynatraceSamplerTest, TestWithUnknownParentContext) {
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
-  EXPECT_STREQ(
-      sampling_result.attributes->find("supportability.atm_sampling_ratio")->second.c_str(), "1");
+  EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
+                sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
+            1);
   // Dynatrace tracestate should be prepended
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
                "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,some_vendor=some_value");
@@ -114,8 +116,9 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextSampled) {
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
-  EXPECT_STREQ(
-      sampling_result.attributes->find("supportability.atm_sampling_ratio")->second.c_str(), "1");
+  EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
+                sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
+            1);
   // tracestate should be forwarded
   EXPECT_STREQ(sampling_result.tracestate.c_str(), dt_tracestate_sampled);
   // sampling decision from parent should be respected
@@ -183,10 +186,13 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextIgnored) {
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::Drop);
   EXPECT_EQ(sampling_result.attributes->size(), 2);
-  EXPECT_STREQ(
-      sampling_result.attributes->find("supportability.atm_sampling_ratio")->second.c_str(), "4");
-  EXPECT_STREQ(sampling_result.attributes->find("sampling.threshold")->second.c_str(),
-               "54043195528445952");
+  EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
+                sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
+            4);
+  EXPECT_EQ(opentelemetry::nostd::get<uint64_t>(
+                sampling_result.attributes->find("sampling.threshold")->second),
+            54043195528445952);
+
   // tracestate should be forwarded
   EXPECT_STREQ(sampling_result.tracestate.c_str(), dt_tracestate_ignored);
   // sampling decision from parent should be respected
@@ -205,8 +211,9 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextFromDifferentTenant) 
   // sampling decision on tracestate should be ignored because it is from a different tenant.
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
-  EXPECT_STREQ(
-      sampling_result.attributes->find("supportability.atm_sampling_ratio")->second.c_str(), "1");
+  EXPECT_EQ(opentelemetry::nostd::get<uint32_t>(
+                sampling_result.attributes->find("supportability.atm_sampling_ratio")->second),
+            1);
   // new Dynatrace tag should be prepended, already existing tag should be kept
   const char* exptected =
       "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95,6666ad40-980df25c@dt=fw4;4;4af38366;0;0;1;2;123;"

@@ -8,6 +8,7 @@
 #include "envoy/router/router.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/match_input.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +26,18 @@ using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpeci
  * part of these abstractions are protocol independent.
  */
 using RouteTypedMetadataFactory = Envoy::Router::HttpRouteTypedMetadataFactory;
+
+/**
+ * The simplest retry implementation. It only contains the number of retries.
+ */
+class RetryPolicy {
+public:
+  RetryPolicy(uint32_t num_retries) : num_retries_(num_retries) {}
+  uint32_t numRetries() const { return num_retries_; }
+
+private:
+  const uint32_t num_retries_{};
+};
 
 class RouteEntry {
 public:
@@ -59,12 +72,23 @@ public:
    * for this route.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return route timeout for this route.
+   */
+  virtual const std::chrono::milliseconds timeout() const PURE;
+
+  /**
+   * @return const RetryPolicy& the retry policy for this route.
+   */
+  virtual const RetryPolicy& retryPolicy() const PURE;
 };
+
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
 class RouteMatcher : public Rds::Config {
 public:
-  virtual RouteEntryConstSharedPtr routeEntry(const Request& request) const PURE;
+  virtual RouteEntryConstSharedPtr routeEntry(const MatchInput& request) const PURE;
 };
 using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
 

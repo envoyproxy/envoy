@@ -1,7 +1,7 @@
 #pragma once
 
 #include "source/common/common/empty_string.h"
-#include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
+#include "source/common/tls/connection_info_impl_base.h"
 
 #include "quiche/quic/core/quic_session.h"
 

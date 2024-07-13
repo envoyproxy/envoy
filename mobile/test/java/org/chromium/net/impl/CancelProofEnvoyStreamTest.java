@@ -4,13 +4,12 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertThrows;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
 import org.chromium.net.testing.ConditionVariable;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -21,7 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CancelProofEnvoyStreamTest {
 
   private static final ByteBuffer BYTE_BUFFER = ByteBuffer.allocateDirect(1);

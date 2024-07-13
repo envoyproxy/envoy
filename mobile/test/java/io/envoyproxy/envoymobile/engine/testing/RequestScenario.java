@@ -1,35 +1,18 @@
 package io.envoyproxy.envoymobile.engine.testing;
 
-import io.envoyproxy.envoymobile.AndroidEngineBuilder;
-import io.envoyproxy.envoymobile.Engine;
-import io.envoyproxy.envoymobile.EnvoyError;
-import io.envoyproxy.envoymobile.FinalStreamIntel;
-import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
-import io.envoyproxy.envoymobile.ResponseHeaders;
-import io.envoyproxy.envoymobile.ResponseTrailers;
-import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.StreamIntel;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class RequestScenario {
   public int responseBufferSize = 1000;

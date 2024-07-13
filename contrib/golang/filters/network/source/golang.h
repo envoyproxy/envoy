@@ -11,7 +11,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/network/golang/v3alpha/golang.pb.h"
@@ -115,15 +115,6 @@ public:
   FilterWeakPtr filter_ptr_{};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_;
-};
-
-class GoStringFilterState : public StreamInfo::FilterState::Object {
-public:
-  GoStringFilterState(absl::string_view value) : value_(value) {}
-  const std::string& value() const { return value_; }
-
-private:
-  const std::string value_;
 };
 
 } // namespace Golang

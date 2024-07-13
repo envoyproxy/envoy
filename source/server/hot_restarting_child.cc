@@ -49,9 +49,12 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
 // If restart_epoch is 0 there is no parent, so it's effectively already
 // drained and terminated.
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
-                                       const std::string& socket_path, mode_t socket_mode)
+                                       const std::string& socket_path, mode_t socket_mode,
+                                       bool skip_hot_restart_on_no_parent, bool skip_parent_stats)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
-      parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0) {
+      parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0),
+      skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent),
+      skip_parent_stats_(skip_parent_stats) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -66,12 +69,30 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
                                               socket_mode);
 }
 
+bool HotRestartingChild::abortDueToFailedParentConnection() {
+  if (!skip_hot_restart_on_no_parent_) {
+    return false;
+  }
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_request()->mutable_test_connection();
+  if (!main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request, true)) {
+    return true;
+  }
+  return false;
+}
+
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
+  if (abortDueToFailedParentConnection()) {
+    ENVOY_LOG(warn, "hot restart sendmsg() connection refused, falling back to regular restart");
+    absl::MutexLock lock(&registry_mu_);
+    parent_terminated_ = parent_drained_ = true;
+    return;
+  }
   socket_event_udp_forwarding_ = dispatcher.createFileEvent(
       udp_forwarding_rpc_stream_.domain_socket_,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        onSocketEventUdpForwarding();
+        return onSocketEventUdpForwarding();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
@@ -124,7 +145,7 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
 }
 
 std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
-  if (parent_terminated_) {
+  if (parent_terminated_ || skip_parent_stats_) {
     return nullptr;
   }
 
@@ -159,6 +180,7 @@ void HotRestartingChild::registerUdpForwardingListener(
 
 void HotRestartingChild::registerParentDrainedCallback(
     const Network::Address::InstanceConstSharedPtr& address, absl::AnyInvocable<void()> callback) {
+  absl::MutexLock lock(&registry_mu_);
   if (parent_drained_) {
     callback();
   } else {
@@ -167,6 +189,7 @@ void HotRestartingChild::registerParentDrainedCallback(
 }
 
 void HotRestartingChild::allDrainsImplicitlyComplete() {
+  absl::MutexLock lock(&registry_mu_);
   for (auto& drain_action : on_drained_actions_) {
     // Call the callback.
     std::move(drain_action.second)();
@@ -242,7 +265,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
 }
 
-void HotRestartingChild::onSocketEventUdpForwarding() {
+absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
   std::unique_ptr<HotRestartMessage> wrapped_request;
   while ((wrapped_request =
               udp_forwarding_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::No))) {
@@ -256,8 +279,12 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
     case HotRestartMessage::Request::kForwardedUdpPacket: {
       const auto& req = wrapped_request->request().forwarded_udp_packet();
       Network::UdpRecvData packet;
-      packet.addresses_.local_ = Network::Utility::resolveUrl(req.local_addr());
-      packet.addresses_.peer_ = Network::Utility::resolveUrl(req.peer_addr());
+      auto local_or_error = Network::Utility::resolveUrl(req.local_addr());
+      RETURN_IF_NOT_OK(local_or_error.status());
+      packet.addresses_.local_ = *local_or_error;
+      auto peer_or_error = Network::Utility::resolveUrl(req.peer_addr());
+      RETURN_IF_NOT_OK(peer_or_error.status());
+      packet.addresses_.peer_ = *peer_or_error;
       if (!packet.addresses_.local_ || !packet.addresses_.peer_) {
         break;
       }
@@ -275,6 +302,7 @@ void HotRestartingChild::onSocketEventUdpForwarding() {
     }
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace Server

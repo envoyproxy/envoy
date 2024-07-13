@@ -66,6 +66,85 @@ const char PublicKey[] = R"(
 }
 )";
 
+// Provider config with various subject constraints
+const char SubjectConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    subjects:
+      suffix: "@example.com"
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  spiffe_provider:
+    issuer: https://spiffe.example.com
+    subjects:
+      prefix: spiffe://spiffe.example.com/
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  no_subj_provider:
+    issuer: https://nosub.com
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  regex_provider:
+    issuer: https://regexsub.com
+    subjects:
+      safe_regex:
+      safe_regex:
+        regex: "spiffe://.*\\.example\\.com/.*"
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+
+)";
+
+// Provider config with various subject constraints
+const char ExpirationConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    max_lifetime:
+      seconds: 86400
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  spiffe_provider:
+    issuer: https://spiffe.example.com
+    require_expiration: true
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  noexp_provider:
+    issuer: https://noexp.example.com
+    require_expiration: false
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+)";
+
 // A good config.
 const char ExampleConfig[] = R"(
 providers:
@@ -77,7 +156,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
         timeout:
           seconds: 5
@@ -118,7 +197,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
         timeout:
           seconds: 5
@@ -147,7 +226,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
         timeout:
           seconds: 5
@@ -173,7 +252,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
         timeout:
           seconds: 5
@@ -423,7 +502,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_params: ["jwt_a"]
     forward_payload_header: example-auth-userinfo
@@ -433,7 +512,7 @@ providers:
     - other_service
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_params: ["jwt_b"]
     forward_payload_header: other-auth-userinfo
@@ -457,7 +536,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_headers:
     - name: a
@@ -471,7 +550,7 @@ providers:
     - other_service
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_headers:
     - name: a

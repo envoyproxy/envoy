@@ -3,8 +3,10 @@ package org.chromium.net.testing;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertNotSame;
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
 import static org.chromium.net.testing.CronetTestRule.assertContains;
 
 import android.os.StrictMode;
@@ -203,7 +205,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
       // Termination shouldn't take long. Use 1 min which should be more than enough.
       mExecutorService.awaitTermination(1, TimeUnit.MINUTES);
     } catch (InterruptedException e) {
-      assertTrue("ExecutorService is interrupted while waiting for termination", false);
+      fail("ExecutorService is interrupted while waiting for termination");
     }
     assertTrue(mExecutorService.isTerminated());
   }
@@ -295,7 +297,7 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
     checkExecutorThread();
     assertTrue(request.isDone());
     // Shouldn't happen after success.
-    assertTrue(mResponseStep != ResponseStep.ON_SUCCEEDED);
+    assertNotSame(mResponseStep, ResponseStep.ON_SUCCEEDED);
     // Should happen at most once for a single request.
     assertFalse(mOnErrorCalled);
     assertFalse(mOnCanceledCalled);

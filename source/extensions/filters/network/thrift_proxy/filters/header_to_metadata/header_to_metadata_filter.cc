@@ -26,7 +26,7 @@ absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) c
   return value;
 }
 
-Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
   selector_ =
       std::make_shared<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
 
@@ -44,15 +44,16 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 
   if (rule.has_on_present() && rule.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_present().regex_value_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 }
 
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
-                   header_to_metadata::v3::HeaderToMetadata& config) {
+                   header_to_metadata::v3::HeaderToMetadata& config,
+               Regex::Engine& regex_engine) {
   for (const auto& entry : config.request_rules()) {
-    request_rules_.emplace_back(entry);
+    request_rules_.emplace_back(entry, regex_engine);
   }
 }
 

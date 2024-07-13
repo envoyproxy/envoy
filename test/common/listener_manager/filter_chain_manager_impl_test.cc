@@ -19,7 +19,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -79,10 +79,10 @@ public:
     sockets_.push_back(mock_socket);
 
     if (absl::StartsWith(destination_address, "/")) {
-      local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
+      local_address_ = *Network::Address::PipeInstance::create(destination_address);
     } else {
       local_address_ =
-          Network::Utility::parseInternetAddress(destination_address, destination_port);
+          Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port);
     }
     mock_socket->connection_info_provider_->setLocalAddress(local_address_);
 
@@ -94,9 +94,9 @@ public:
         .WillByDefault(ReturnRef(application_protocols));
 
     if (absl::StartsWith(source_address, "/")) {
-      remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
+      remote_address_ = *Network::Address::PipeInstance::create(source_address);
     } else {
-      remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
+      remote_address_ = Network::Utility::parseInternetAddressNoThrow(source_address, source_port);
     }
     mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -128,11 +128,11 @@ public:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
   )EOF";
   const std::string filter_chain_matcher = R"EOF(
      matcher_tree:
@@ -284,6 +284,26 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
 
   EXPECT_TRUE(context0->drainDecision().drainClose());
   EXPECT_FALSE(context1->drainDecision().drainClose());
+}
+
+TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
+  envoy::config::listener::v3::FilterChain new_filter_chain1 = filter_chain_template_;
+  new_filter_chain1.mutable_filter_chain_match()->add_server_names("example.com");
+  envoy::config::listener::v3::FilterChain new_filter_chain2 = new_filter_chain1;
+
+  EXPECT_THROW_WITH_MESSAGE(filter_chain_manager_->addFilterChains(
+                                nullptr,
+                                std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                    &new_filter_chain1, &new_filter_chain2},
+                                nullptr, filter_chain_factory_builder_, *filter_chain_manager_),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': filter chain 'foo' has the "
+                            "same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+                            ". duplicate matcher is: "
+                            "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
+#endif
+  );
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));

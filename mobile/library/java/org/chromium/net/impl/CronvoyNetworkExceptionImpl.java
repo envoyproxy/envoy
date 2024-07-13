@@ -10,6 +10,7 @@ public class CronvoyNetworkExceptionImpl extends NetworkException {
   protected final int mErrorCode;
   // Cronet internal error code.
   protected final int mCronetInternalErrorCode;
+  protected final String mErrorDetails;
 
   /**
    * Constructs an exception with a specific error.
@@ -17,15 +18,33 @@ public class CronvoyNetworkExceptionImpl extends NetworkException {
    * @param message explanation of failure.
    * @param errorCode error code, one of {@link #ERROR_HOSTNAME_NOT_RESOLVED ERROR_*}.
    * @param cronetInternalErrorCode Cronet internal error code, one of
-   * <a href=https://chromium.googlesource.com/chromium/src/+/master/net/base/net_error_list.h>
+   * <a
+   * href=https://github.com/envoyproxy/envoy/blob/5451efd9b8f8a444431197050e45ba974ed4e9d8/mobile/library/java/org/chromium/net/impl/Errors.java#L43>
    * these</a>.
    */
   public CronvoyNetworkExceptionImpl(String message, int errorCode, int cronetInternalErrorCode) {
+    this(message, errorCode, cronetInternalErrorCode, "");
+  }
+
+  /**
+   * Constructs an exception with a specific error and a details string.
+   *
+   * @param message explanation of failure.
+   * @param errorCode error code, one of {@link #ERROR_HOSTNAME_NOT_RESOLVED ERROR_*}.
+   * @param cronetInternalErrorCode Cronet internal error code, one of
+   * <a
+   * href=https://github.com/envoyproxy/envoy/blob/5451efd9b8f8a444431197050e45ba974ed4e9d8/mobile/library/java/org/chromium/net/impl/Errors.java#L43>
+   * these</a>.
+   * @param errorDetails a string of error details.
+   */
+  public CronvoyNetworkExceptionImpl(String message, int errorCode, int cronetInternalErrorCode,
+                                     String errorDetails) {
     super(message, null);
     assert errorCode > 0 && errorCode < 12;
     assert cronetInternalErrorCode < 0;
     mErrorCode = errorCode;
     mCronetInternalErrorCode = cronetInternalErrorCode;
+    mErrorDetails = errorDetails;
   }
 
   @Override
@@ -67,4 +86,6 @@ public class CronvoyNetworkExceptionImpl extends NetworkException {
     b.append(", Retryable=").append(immediatelyRetryable());
     return b.toString();
   }
+
+  public String getErrorDetails() { return mErrorDetails; }
 }

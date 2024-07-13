@@ -8,7 +8,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/stats_utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
@@ -21,6 +20,7 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/types/optional.h"
@@ -31,6 +31,7 @@
 
 using testing::ContainsRegex;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Optional;
 using testing::Ref;
 using testing::Return;
@@ -54,26 +55,6 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
   config_source.mutable_initial_fetch_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(654));
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
-}
-
-TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  ASSERT_EQ(extracted_name, "http.rq_total");
-  ASSERT_EQ(tags.size(), 1);
-}
-
-TEST(UtilityTest, createTagProducerWithDefaultTgs) {
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = StatsUtility::createTagProducer(bootstrap, {{"foo", "bar"}});
-  ASSERT_TRUE(producer != nullptr);
-  Stats::TagVector tags;
-  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  EXPECT_EQ(extracted_name, "http.rq_total");
-  EXPECT_EQ(tags.size(), 2);
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
@@ -156,12 +137,11 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    EXPECT_EQ(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false)
-            .status()
-            .message(),
-        "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false, 0)
+                    .status()
+                    .message(),
+                HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
   }
 
   {
@@ -170,12 +150,12 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services();
     api_config_source.add_grpc_services();
     EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false)
+                                                       scope, false, 0)
                     .status()
                     .message(),
-                ContainsRegex(fmt::format("{}::.DELTA_.GRPC must have a single gRPC service "
-                                          "specified:",
-                                          api_config_source.GetTypeName())));
+                ContainsRegex(fmt::format(
+                    "{}::.DELTA_.GRPC must have no more than 1 gRPC services specified:",
+                    api_config_source.GetTypeName())));
   }
 
   {
@@ -184,7 +164,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names();
     // this also logs a warning for setting REST cluster names for a gRPC API config.
     EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false)
+                                                       scope, false, 0)
                     .status()
                     .message(),
                 ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
@@ -198,7 +178,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
     EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false)
+                                                       scope, false, 0)
                     .status()
                     .message(),
                 ContainsRegex(fmt::format("{}::.DELTA_.GRPC must not have a cluster name "
@@ -212,7 +192,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     // this also logs a warning for configuring gRPC clusters for a REST API config.
     EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false)
+                                                       scope, false, 0)
                     .status()
                     .message(),
                 ContainsRegex(fmt::format("{}, if not a gRPC type, must not have a gRPC service "
@@ -226,7 +206,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names("foo");
     EXPECT_THAT(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false)
+                                               false, 0)
             .status()
             .message(),
         ContainsRegex(fmt::format("{} type must be gRPC:", api_config_source.GetTypeName())));
@@ -241,7 +221,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
     EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
-                                                       scope, false)
+                                                       scope, false, 0)
                     .ok());
   }
 
@@ -252,9 +232,76 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_CALL(
         async_client_manager,
         factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
-    EXPECT_TRUE(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true)
-            .ok());
+    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, true, 0)
+                    .ok());
+  }
+}
+
+// Validates that when failover is supported, the validation works as expected.
+TEST(UtilityTest, FactoryForGrpcApiConfigSourceWithFailover) {
+  // When envoy.restart_features.xds_failover_support is deprecated, the
+  // following tests will need to be merged with the tests in
+  // FactoryForGrpcApiConfigSource.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+
+  NiceMock<Grpc::MockAsyncClientManager> async_client_manager;
+  Stats::MockStore store;
+  Stats::Scope& scope = *store.rootScope();
+
+  // No more than 2 config sources.
+  {
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source.add_grpc_services();
+    api_config_source.add_grpc_services();
+    api_config_source.add_grpc_services();
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false, 0)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format(
+                    "{}::.DELTA_.GRPC must have no more than 2 gRPC services specified:",
+                    api_config_source.GetTypeName())));
+  }
+
+  // A single gRPC service is valid.
+  {
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    envoy::config::core::v3::GrpcService expected_grpc_service;
+    expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+    EXPECT_CALL(async_client_manager,
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
+    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false, 0)
+                    .ok());
+  }
+
+  // 2 gRPC services is valid.
+  {
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("bar");
+
+    envoy::config::core::v3::GrpcService expected_grpc_service_foo;
+    expected_grpc_service_foo.mutable_envoy_grpc()->set_cluster_name("foo");
+    EXPECT_CALL(async_client_manager,
+                factoryForGrpcService(ProtoEq(expected_grpc_service_foo), Ref(scope), false));
+    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false, 0)
+                    .ok());
+
+    envoy::config::core::v3::GrpcService expected_grpc_service_bar;
+    expected_grpc_service_bar.mutable_envoy_grpc()->set_cluster_name("bar");
+    EXPECT_CALL(async_client_manager,
+                factoryForGrpcService(ProtoEq(expected_grpc_service_bar), Ref(scope), false));
+    EXPECT_TRUE(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false, 1)
+                    .ok());
   }
 }
 
@@ -545,7 +592,7 @@ TEST(UtilityTest, AnyWrongType) {
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
                                      out),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
@@ -563,7 +610,7 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
       Utility::translateAnyToFactoryConfig(typed_config,
                                            ProtobufMessage::getStrictValidationVisitor(), factory),
       EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST(UtilityTest, TranslateAnyToFactoryConfig) {
@@ -735,10 +782,10 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_EQ(
+  EXPECT_THAT(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(primary_clusters, *api_config_source)
           .message(),
-      "API configs must have either a gRPC service or a cluster name defined: api_type: GRPC\n");
+      HasSubstr("API configs must have either a gRPC service or a cluster name defined"));
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");

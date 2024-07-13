@@ -165,11 +165,18 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
                    const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::Drop;
-        std::map<std::string, std::string> attributes;
-        attributes["key"] = "value";
-        attributes["another_key"] = "another_value";
-        res.attributes =
-            std::make_unique<const std::map<std::string, std::string>>(std::move(attributes));
+        OtelAttributes attributes;
+        attributes["char_key"] = "char_value";
+        attributes["sv_key"] = absl::string_view("sv_value");
+        attributes["bool_key"] = true;
+        attributes["int_key"] = static_cast<int32_t>(123);
+        attributes["uint_key"] = static_cast<uint32_t>(123);
+        attributes["int64_t_key"] = static_cast<int64_t>(INT64_MAX);
+        attributes["uint64_t_key"] = static_cast<uint64_t>(UINT64_MAX);
+        attributes["double_key"] = 0.123;
+        attributes["not_supported_span"] = opentelemetry::nostd::span<bool>();
+
+        res.attributes = std::make_unique<const OtelAttributes>(std::move(attributes));
         res.tracestate = "this_is=another_tracesate";
         return res;
       });
@@ -178,6 +185,41 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   std::unique_ptr<Span> unsampled_span(dynamic_cast<Span*>(tracing_span.release()));
   EXPECT_FALSE(unsampled_span->sampled());
   EXPECT_STREQ(unsampled_span->tracestate().c_str(), "this_is=another_tracesate");
+  auto proto_span = unsampled_span->spanForTest();
+
+  auto get_attr_value =
+      [&proto_span](const char* name) -> ::opentelemetry::proto::common::v1::AnyValue* {
+    for (auto& key_value : *proto_span.mutable_attributes()) {
+      if (key_value.key() == name) {
+        return key_value.mutable_value();
+      }
+    }
+    return nullptr;
+  };
+
+  ASSERT_NE(get_attr_value("char_key"), nullptr);
+  EXPECT_STREQ(get_attr_value("char_key")->string_value().c_str(), "char_value");
+
+  ASSERT_NE(get_attr_value("sv_key"), nullptr);
+  EXPECT_STREQ(get_attr_value("sv_key")->string_value().c_str(), "sv_value");
+
+  ASSERT_NE(get_attr_value("bool_key"), nullptr);
+  EXPECT_EQ(get_attr_value("bool_key")->bool_value(), true);
+
+  ASSERT_NE(get_attr_value("int_key"), nullptr);
+  EXPECT_EQ(get_attr_value("int_key")->int_value(), 123);
+
+  ASSERT_NE(get_attr_value("uint_key"), nullptr);
+  EXPECT_EQ(get_attr_value("uint_key")->int_value(), 123);
+
+  ASSERT_NE(get_attr_value("int64_t_key"), nullptr);
+  EXPECT_EQ(get_attr_value("int64_t_key")->int_value(), INT64_MAX);
+
+  ASSERT_NE(get_attr_value("uint64_t_key"), nullptr);
+  EXPECT_EQ(get_attr_value("uint64_t_key")->int_value(), UINT64_MAX);
+
+  ASSERT_NE(get_attr_value("double_key"), nullptr);
+  EXPECT_EQ(get_attr_value("double_key")->double_value(), 0.123);
 }
 
 // Test that sampler receives trace_context

@@ -45,9 +45,9 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 }
 
 void MockRetryState::expectResetRetry() {
-  EXPECT_CALL(*this, shouldRetryReset(_, _, _))
+  EXPECT_CALL(*this, shouldRetryReset(_, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,
-                              DoRetryResetCallback callback) {
+                              DoRetryResetCallback callback, bool) {
         callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
       }));
@@ -182,6 +182,9 @@ MockScopeKeyBuilder::MockScopeKeyBuilder() {
       .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr { return nullptr; }));
 }
 MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
+
+MockGenericConnPool::MockGenericConnPool() { ON_CALL(*this, host()).WillByDefault(Return(host_)); }
+MockGenericConnPool::~MockGenericConnPool() = default;
 
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));

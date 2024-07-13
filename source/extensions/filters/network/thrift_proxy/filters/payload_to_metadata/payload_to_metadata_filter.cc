@@ -20,15 +20,17 @@ using FieldSelector = envoy::extensions::filters::network::thrift_proxy::filters
     payload_to_metadata::v3::PayloadToMetadata::FieldSelector;
 
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
-                   payload_to_metadata::v3::PayloadToMetadata& config) {
+                   payload_to_metadata::v3::PayloadToMetadata& config,
+               Regex::Engine& regex_engine) {
   trie_root_ = std::make_shared<Trie>();
   request_rules_.reserve(config.request_rules().size());
   for (const auto& entry : config.request_rules()) {
-    request_rules_.emplace_back(entry, static_cast<uint16_t>(request_rules_.size()), trie_root_);
+    request_rules_.emplace_back(entry, static_cast<uint16_t>(request_rules_.size()), trie_root_,
+                                regex_engine);
   }
 }
 
-Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
+Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root, Regex::Engine& regex_engine)
     : rule_(rule), rule_id_(rule_id) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("payload to metadata filter: neither `on_present` nor `on_missing` set");
@@ -41,7 +43,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 
   if (rule_.has_on_present() && rule_.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule_.on_present().regex_value_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
@@ -102,6 +104,7 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
 }
 
 FilterStatus TrieMatchHandler::messageEnd() {
+  ASSERT(steps_ == 0);
   ENVOY_LOG(trace, "TrieMatchHandler messageEnd");
   parent_.handleOnMissing();
   complete_ = true;
@@ -110,13 +113,12 @@ FilterStatus TrieMatchHandler::messageEnd() {
 
 FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
   ENVOY_LOG(trace, "TrieMatchHandler structBegin id: {}, steps: {}",
-            last_field_id_.has_value() ? std::to_string(last_field_id_.value())
-                                       : "top_level_struct",
-            steps_);
+            field_ids_.empty() ? "top_level_struct" : std::to_string(field_ids_.back()), steps_);
+  ASSERT(steps_ >= 0);
   assertNode();
-  if (last_field_id_.has_value()) {
-    if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end()) {
-      node_ = node_->children_[last_field_id_.value()];
+  if (!field_ids_.empty()) {
+    if (steps_ == 0 && node_->children_.find(field_ids_.back()) != node_->children_.end()) {
+      node_ = node_->children_[field_ids_.back()];
       ENVOY_LOG(trace, "name: {}", node_->name_);
     } else {
       steps_++;
@@ -136,37 +138,41 @@ FilterStatus TrieMatchHandler::structEnd() {
     // last decoder event
     node_ = nullptr;
   }
+  ASSERT(steps_ >= 0);
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType&, int16_t& field_id) {
-  last_field_id_ = field_id;
+  ENVOY_LOG(trace, "TrieMatchHandler fieldBegin id: {}", field_id);
+  field_ids_.push_back(field_id);
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::fieldEnd() {
-  last_field_id_.reset();
+  ENVOY_LOG(trace, "TrieMatchHandler fieldEnd");
+  field_ids_.pop_back();
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::stringValue(absl::string_view value) {
   assertLastFieldId();
-  ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", last_field_id_.value(), value);
+  ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", field_ids_.back(), value);
   return handleString(static_cast<std::string>(value));
 }
 
 template <typename NumberType> FilterStatus TrieMatchHandler::numberValue(NumberType value) {
   assertLastFieldId();
-  ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", last_field_id_.value(), value);
+  ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", field_ids_.back(), value);
   return handleString(std::to_string(value));
 }
 
 FilterStatus TrieMatchHandler::handleString(std::string value) {
+  ASSERT(steps_ >= 0);
   assertNode();
   assertLastFieldId();
-  if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end() &&
-      !node_->children_[last_field_id_.value()]->rule_ids_.empty()) {
-    auto on_present_node = node_->children_[last_field_id_.value()];
+  if (steps_ == 0 && node_->children_.find(field_ids_.back()) != node_->children_.end() &&
+      !node_->children_[field_ids_.back()]->rule_ids_.empty()) {
+    auto on_present_node = node_->children_[field_ids_.back()];
     ENVOY_LOG(trace, "name: {}", on_present_node->name_);
     parent_.handleOnPresent(std::move(value), on_present_node->rule_ids_);
   }
@@ -180,8 +186,8 @@ void TrieMatchHandler::assertNode() {
 }
 
 void TrieMatchHandler::assertLastFieldId() {
-  if (!last_field_id_.has_value()) {
-    throw EnvoyException("payload to metadata filter: invalid trie state, last_field_id is null");
+  if (field_ids_.empty()) {
+    throw EnvoyException("payload to metadata filter: invalid trie state, field_ids_ is null");
   }
 }
 

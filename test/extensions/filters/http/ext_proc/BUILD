@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
         "//source/common/http:context_lib",
+        "//source/common/http:rds_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
@@ -54,10 +55,9 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:stream_encoder_mock",
         "//test/mocks/http:stream_mock",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -88,7 +88,7 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -104,9 +104,32 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/ext_proc:client_lib",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "matching_utils_test",
+    size = "small",
+    srcs = ["matching_utils_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:matching_utils_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -120,6 +143,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -149,9 +173,11 @@ envoy_extension_cc_test(
     ],
     deps = [
         ":logging_test_filter_lib",
+        ":tracer_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
@@ -159,9 +185,11 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+        "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -340,5 +368,26 @@ envoy_extension_cc_test_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/ext_proc",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "tracer_test_filter_proto",
+    srcs = [":tracer_test_filter.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "tracer_test_filter_lib",
+    srcs = ["tracer_test_filter.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    external_deps = [
+    ],
+    deps = [
+        ":tracer_test_filter_proto_cc_proto",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:trace_context_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

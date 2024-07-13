@@ -10,7 +10,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.robolectric.Shadows.shadowOf;
 
-import android.content.Context;
 import android.content.Intent;
 import android.Manifest;
 import android.net.ConnectivityManager;
@@ -22,7 +21,6 @@ import android.util.Log;
 import androidx.test.filters.SmallTest;
 import androidx.test.rule.GrantPermissionRule;
 import java.io.IOException;
-import java.net.ConnectException;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -36,12 +34,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
+import org.chromium.net.impl.CronvoyNetworkExceptionImpl;
 import org.chromium.net.impl.CronvoyUrlRequest;
+import org.chromium.net.impl.CronvoyUrlRequestContext;
 import org.chromium.net.impl.Errors.EnvoyMobileError;
 import org.chromium.net.impl.Errors.NetError;
 import org.chromium.net.impl.CronvoyUrlResponseInfoImpl;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
 import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.FailurePhase;
 import org.chromium.net.testing.Feature;
@@ -79,7 +78,6 @@ public class CronetUrlRequestTest {
   @Rule
   public final RuleChain chain = RuleChain.outerRule(mTestRule).around(mRuntimePermissionRule);
 
-  private CronetTestFramework mTestFramework;
   private MockUrlRequestJobFactory mMockUrlRequestJobFactory;
 
   @Before
@@ -93,6 +91,11 @@ public class CronetUrlRequestTest {
   public void tearDown() {
     mMockUrlRequestJobFactory.shutdown();
     NativeTestServer.shutdownNativeTestServer();
+    // Calling AndroidNetworkMonitor.shutdown() will set the AndroidNetworkMonitor singleton
+    // instance to null so that the next EnvoyEngine creation will have a new AndroidNetworkMonitor
+    // instance instead of holding on a dangling EnvoyEngine because AndroidNetworkMonitor.load
+    // does not update the singleton instance to a new one if there is already an existing instance.
+    AndroidNetworkMonitor.shutdown();
   }
 
   private TestUrlRequestCallback startAndWaitForComplete(CronetEngine engine, String url)
@@ -955,7 +958,7 @@ public class CronetUrlRequestTest {
       StrictMode.setThreadPolicy(oldPolicy);
     }
     callback.blockForDone();
-    assertEquals(true, callback.mOnCanceledCalled);
+    assertTrue(callback.mOnCanceledCalled);
   }
 
   @Test
@@ -1365,7 +1368,7 @@ public class CronetUrlRequestTest {
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Read upload data length 2 exceeds expected length 1",
                    callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1397,7 +1400,7 @@ public class CronetUrlRequestTest {
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Read upload data length 8192 exceeds expected length 8191",
                    callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1425,7 +1428,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Sync read failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1453,7 +1456,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Sync length failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1481,7 +1484,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Async read failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   /** This test uses a direct executor for upload, and non direct for callbacks */
@@ -1515,7 +1518,7 @@ public class CronetUrlRequestTest {
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Inline execution is prohibited for this request",
                    callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   /** This test uses a direct executor for callbacks, and non direct for upload */
@@ -1549,7 +1552,7 @@ public class CronetUrlRequestTest {
     assertContains("Exception posting task to executor", callback.mError.getMessage());
     assertContains("Inline execution is prohibited for this request",
                    callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
     dataProvider.assertClosed();
   }
 
@@ -1607,7 +1610,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Thrown read failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1633,7 +1636,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Sync rewind failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1659,7 +1662,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Async rewind failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1685,7 +1688,7 @@ public class CronetUrlRequestTest {
 
     assertContains("Exception received from UploadDataProvider", callback.mError.getMessage());
     assertContains("Thrown rewind failure", callback.mError.getCause().getMessage());
-    assertEquals(null, callback.mResponseInfo);
+    assertNull(callback.mResponseInfo);
   }
 
   @Test
@@ -1767,6 +1770,7 @@ public class CronetUrlRequestTest {
     assertNull(callback.mResponseInfo);
     assertContains("Exception in CronetUrlRequest: net::ERR_CONNECTION_REFUSED",
                    callback.mError.getMessage());
+    assertEquals("", ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   private TestUrlRequestCallback throwOrCancel(FailureType failureType, ResponseStep failureStep,
@@ -1958,7 +1962,7 @@ public class CronetUrlRequestTest {
     class HangingUploadDataProvider extends UploadDataProvider {
       UploadDataSink mUploadDataSink;
       ByteBuffer mByteBuffer;
-      ConditionVariable mReadCalled = new ConditionVariable(false);
+      final ConditionVariable mReadCalled = new ConditionVariable(false);
 
       @Override
       public long getLength() {
@@ -2052,20 +2056,24 @@ public class CronetUrlRequestTest {
   @Feature({"Cronet"})
   public void testErrorCodes() throws Exception {
     checkSpecificErrorCode(EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED,
-                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED",
-                           false);
+                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED", false,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 26|http: 1");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_TERMINATION,
                            NetError.ERR_CONNECTION_CLOSED, NetworkException.ERROR_CONNECTION_CLOSED,
-                           "CONNECTION_CLOSED", true);
+                           "CONNECTION_CLOSED", true,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 6|http: 1");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE,
                            NetError.ERR_CONNECTION_REFUSED,
-                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false);
+                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 5|http: 1");
     checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_REMOTE_RESET, NetError.ERR_CONNECTION_RESET,
-                           NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true);
+                           NetworkException.ERROR_CONNECTION_RESET, "CONNECTION_RESET", true,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 4|http: 1");
     checkSpecificErrorCode(EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT,
-                           NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true);
-    checkSpecificErrorCode(0x2000, NetError.ERR_OTHER, NetworkException.ERROR_OTHER, "OTHER",
-                           false);
+                           NetworkException.ERROR_TIMED_OUT, "TIMED_OUT", true,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 16|http: 1");
+    checkSpecificErrorCode(0x2000, NetError.ERR_OTHER, NetworkException.ERROR_OTHER, "OTHER", false,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 13|http: 1");
   }
 
   /*
@@ -2089,7 +2097,8 @@ public class CronetUrlRequestTest {
     // send request and confirm errorcode
     checkSpecificErrorCode(
         EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_INTERNET_DISCONNECTED,
-        NetworkException.ERROR_INTERNET_DISCONNECTED, "INTERNET_DISCONNECTED", false);
+        NetworkException.ERROR_INTERNET_DISCONNECTED, "INTERNET_DISCONNECTED", false,
+        /*error_details=*/"rc: 400|ec: 0|rsp_flags: 26|http: 1");
 
     // bring back online since the AndroidNetworkMonitor class is a singleton
     connectivityManager.setActiveNetworkInfo(networkInfo);
@@ -2201,8 +2210,8 @@ public class CronetUrlRequestTest {
   }
 
   private void checkSpecificErrorCode(@EnvoyMobileError long envoyMobileError, NetError netError,
-                                      int errorCode, String name, boolean immediatelyRetryable)
-      throws Exception {
+                                      int errorCode, String name, boolean immediatelyRetryable,
+                                      String errorDetails) throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(mMockUrlRequestJobFactory.getCronetEngine(),
                                 MockUrlRequestJobFactory.getMockUrlWithFailure(envoyMobileError));
@@ -2217,6 +2226,7 @@ public class CronetUrlRequestTest {
     assertEquals(0, callback.mRedirectCount);
     assertTrue(callback.mOnErrorCalled);
     assertEquals(ResponseStep.ON_FAILED, callback.mResponseStep);
+    assertEquals(errorDetails, ((CronvoyNetworkExceptionImpl)callback.mError).getErrorDetails());
   }
 
   // Returns the contents of byteBuffer, from its position() to its limit(),
@@ -2306,6 +2316,10 @@ public class CronetUrlRequestTest {
         NativeTestServer.getFileURL("/notfound.html"), callback, callback.getExecutor());
     builder.setHttpMethod("HEAD").build().start();
     callback.blockForDone();
+    checkSpecificErrorCode(EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE,
+                           NetError.ERR_CONNECTION_REFUSED,
+                           NetworkException.ERROR_CONNECTION_REFUSED, "CONNECTION_REFUSED", false,
+                           /*error_details=*/"rc: 400|ec: 0|rsp_flags: 5|http: 1");
   }
 
   @Test
@@ -2324,8 +2338,8 @@ public class CronetUrlRequestTest {
   public void testManyRequests() throws Exception {
     String url = NativeTestServer.getMultiRedirectURL();
     final int numRequests = 1000;
-    TestUrlRequestCallback callbacks[] = new TestUrlRequestCallback[numRequests];
-    UrlRequest requests[] = new UrlRequest[numRequests];
+    TestUrlRequestCallback[] callbacks = new TestUrlRequestCallback[numRequests];
+    UrlRequest[] requests = new UrlRequest[numRequests];
     for (int i = 0; i < numRequests; i++) {
       // Share the first callback's executor to avoid creating too many single-threaded
       // executors and hence too many threads.

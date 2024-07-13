@@ -53,7 +53,7 @@ public:
                          address) {
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
-      RELEASE_ASSERT(io_handle_->isOpen(), "");
+      RELEASE_ASSERT(io_handle_ && io_handle_->isOpen(), "");
       setPrebindSocketOptions();
       setupSocket(options);
     } else {

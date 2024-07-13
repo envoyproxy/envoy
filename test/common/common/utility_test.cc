@@ -9,7 +9,7 @@
 
 #include "source/common/common/utility.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -227,7 +227,7 @@ TEST(OutputBufferStream, CannotOverwriteBuffer) {
 TEST(OutputBufferStream, DoesNotAllocateMemoryEvenIfWeTryToOverflowBuffer) {
   constexpr char data[] = "123";
   std::array<char, 2> buffer;
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
 
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ostream << data << std::endl;
@@ -266,7 +266,7 @@ TEST(StringUtil, WhitespaceChars) {
 
 TEST(StringUtil, itoa) {
   char buf[32];
-  EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(StringUtil::itoa(buf, 20, 1), 0), "itoa buffer too small");
 
   EXPECT_EQ(1UL, StringUtil::itoa(buf, sizeof(buf), 0));
   EXPECT_STREQ("0", buf);
@@ -1055,51 +1055,6 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));
   EXPECT_EQ("2018-04-03T23:06:09.000Z114",
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
-}
-
-TEST(TrieLookupTable, AddItems) {
-  TrieLookupTable<const char*> trie;
-  const char* cstr_a = "a";
-  const char* cstr_b = "b";
-  const char* cstr_c = "c";
-
-  EXPECT_TRUE(trie.add("foo", cstr_a));
-  EXPECT_TRUE(trie.add("bar", cstr_b));
-  EXPECT_EQ(cstr_a, trie.find("foo"));
-  EXPECT_EQ(cstr_b, trie.find("bar"));
-
-  // overwrite_existing = false
-  EXPECT_FALSE(trie.add("foo", cstr_c, false));
-  EXPECT_EQ(cstr_a, trie.find("foo"));
-
-  // overwrite_existing = true
-  EXPECT_TRUE(trie.add("foo", cstr_c));
-  EXPECT_EQ(cstr_c, trie.find("foo"));
-}
-
-TEST(TrieLookupTable, LongestPrefix) {
-  TrieLookupTable<const char*> trie;
-  const char* cstr_a = "a";
-  const char* cstr_b = "b";
-  const char* cstr_c = "c";
-
-  EXPECT_TRUE(trie.add("foo", cstr_a));
-  EXPECT_TRUE(trie.add("bar", cstr_b));
-  EXPECT_TRUE(trie.add("baro", cstr_c));
-
-  EXPECT_EQ(cstr_a, trie.find("foo"));
-  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
-  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
-
-  EXPECT_EQ(cstr_b, trie.find("bar"));
-  EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
-  EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
-  EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
-
-  EXPECT_EQ(nullptr, trie.find("toto"));
-  EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
-  EXPECT_EQ(nullptr, trie.find(" "));
-  EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
 }
 
 TEST(InlineStorageTest, InlineString) {

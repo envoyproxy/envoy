@@ -5,6 +5,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
@@ -75,12 +76,24 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTimeout:
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
+  case Http::StreamResetReason::ConnectError:
+    return quic::QUIC_STREAM_CONNECT_ERROR;
   case Http::StreamResetReason::LocalReset:
+    return quic::QUIC_STREAM_REQUEST_REJECTED;
   case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
-  default:
-    return quic::QUIC_BAD_APPLICATION_PAYLOAD;
+  case Http::StreamResetReason::ProtocolError:
+    return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
+  case Http::StreamResetReason::Overflow:
+    IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
+    break;
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::RemoteReset:
+    IS_ENVOY_BUG("Remote reset shouldn't be initiated by self.");
   }
+
+  ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
+  return quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE;
 }
 
 Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamErrorCode rst_err) {
@@ -89,10 +102,15 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::LocalConnectionFailure;
-  case quic::QUIC_BAD_APPLICATION_PAYLOAD:
-    return Http::StreamResetReason::ProtocolError;
-  default:
+  case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_EXCESSIVE_LOAD:
+  case quic::QUIC_HEADERS_TOO_LARGE:
+  case quic::QUIC_STREAM_REQUEST_REJECTED:
     return Http::StreamResetReason::LocalReset;
+  case quic::QUIC_STREAM_CANCELLED:
+    return Http::StreamResetReason::OverloadManager;
+  default:
+    return Http::StreamResetReason::ProtocolError;
   }
 }
 
@@ -101,9 +119,20 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::RemoteRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectionTermination;
+  case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
-  default:
+  case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_REQUEST_REJECTED:
+  case quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE:
+  case quic::QUIC_STREAM_EXCESSIVE_LOAD:
+  case quic::QUIC_HEADERS_TOO_LARGE:
     return Http::StreamResetReason::RemoteReset;
+  case quic::QUIC_STREAM_CANCELLED:
+    return Http::StreamResetReason::OverloadManager;
+  case quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR:
+  default:
+    return Http::StreamResetReason::ProtocolError;
   }
 }
 
@@ -137,18 +166,32 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const bool prefer_gro) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
+  size_t max_addresses_cache_size =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
+          ? 4u
+          : 0u;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
+      Network::Socket::Type::Datagram, local_addr, peer_addr,
+      Network::SocketCreationOptions{false, max_addresses_cache_size});
+  connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
-    ENVOY_LOG_MISC(error, "Failed to create socket");
+    ENVOY_LOG_MISC(error, "Failed to create quic socket");
     return connection_socket;
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
+  }
+  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+  }
   if (options != nullptr) {
     connection_socket->addOptions(options);
   }
@@ -296,6 +339,13 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
   const char* old_connection_id_ptr = old_connection_id.data();
   // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
   memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
+}
+
+quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
+  // Explicit Congestion Notification is encoded in the two least significant
+  // bits of the TOS byte of the IP header.
+  constexpr uint8_t kEcnMask = 0b00000011;
+  return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);
 }
 
 } // namespace Quic

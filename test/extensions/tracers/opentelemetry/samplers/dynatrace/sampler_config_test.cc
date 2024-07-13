@@ -14,25 +14,25 @@ namespace OpenTelemetry {
 TEST(SamplerConfigTest, TestParsing) {
   // default_root_spans_per_minute not set, ROOT_SPANS_PER_MINUTE_DEFAULT should be used
   SamplerConfig config(0);
-  config.parse("{\n \"rootSpansPerMinute\" : 2000 \n }");
+  EXPECT_TRUE(config.parse("{\n \"rootSpansPerMinute\" : 2000 \n }"));
   EXPECT_EQ(config.getRootSpansPerMinute(), 2000u);
-  config.parse("{\n \"rootSpansPerMinute\" : 10000 \n }");
+  EXPECT_TRUE(config.parse("{\n \"rootSpansPerMinute\" : 10000 \n }"));
   EXPECT_EQ(config.getRootSpansPerMinute(), 10000u);
 
   // unexpected json, default value should be used
-  config.parse("{}");
+  EXPECT_FALSE(config.parse("{}"));
   EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
 
-  config.parse("");
+  EXPECT_FALSE(config.parse(""));
   EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
 
-  config.parse("\\");
+  EXPECT_FALSE(config.parse("\\"));
   EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
 
-  config.parse(" { ");
+  EXPECT_FALSE(config.parse(" { "));
   EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
 
-  config.parse("{\n \"rootSpansPerMinute\" : 10000 "); // closing } is missing
+  EXPECT_FALSE(config.parse("{\n \"rootSpansPerMinute\" : 10000 ")); // closing } is missing
   EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
 }
 
@@ -41,19 +41,19 @@ TEST(SamplerConfigTest, TestDefaultConfig) {
   {
     SamplerConfig config(0);
     EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
-    config.parse(" { "); // parse invalid json, default value should still be used
+    EXPECT_FALSE(config.parse(" { ")); // parse invalid json, default value should still be used
     EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
   }
   {
     SamplerConfig config(900);
     EXPECT_EQ(config.getRootSpansPerMinute(), 900);
-    config.parse(" { ");
+    EXPECT_FALSE(config.parse(" { "));
     EXPECT_EQ(config.getRootSpansPerMinute(), 900);
   }
   {
     SamplerConfig config(SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
     EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
-    config.parse(" { ");
+    EXPECT_FALSE(config.parse(" { "));
     EXPECT_EQ(config.getRootSpansPerMinute(), SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT);
   }
 }

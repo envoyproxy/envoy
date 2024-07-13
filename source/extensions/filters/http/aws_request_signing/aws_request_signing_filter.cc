@@ -37,6 +37,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& host_rewrite = config.hostRewrite();
   const bool use_unsigned_payload = config.useUnsignedPayload();
 
+  absl::Status status;
+
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
   }
@@ -46,19 +48,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  TRY_NEEDS_AUDIT {
-    ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
-              use_unsigned_payload);
-    if (use_unsigned_payload) {
-      config.signer().signUnsignedPayload(headers);
-    } else {
-      config.signer().signEmptyPayload(headers);
-    }
-    config.stats().signing_added_.inc();
+  ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
+            use_unsigned_payload);
+  if (use_unsigned_payload) {
+    status = config.signer().signUnsignedPayload(headers);
+  } else {
+    status = config.signer().signEmptyPayload(headers);
   }
-  END_TRY catch (const EnvoyException& e) {
-    // TODO: sign should not throw to avoid exceptions in the request path
-    ENVOY_LOG(debug, "signing failed: {}", e.what());
+  if (status.ok()) {
+    config.stats().signing_added_.inc();
+  } else {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
     config.stats().signing_failed_.inc();
   }
 
@@ -83,16 +83,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const std::string hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
-  TRY_NEEDS_AUDIT {
-    ENVOY_LOG(debug, "aws request signing from decodeData");
-    ASSERT(request_headers_ != nullptr);
-    config.signer().sign(*request_headers_, hash);
+  ENVOY_LOG(debug, "aws request signing from decodeData");
+  ASSERT(request_headers_ != nullptr);
+  auto status = config.signer().sign(*request_headers_, hash);
+  if (status.ok()) {
     config.stats().signing_added_.inc();
     config.stats().payload_signing_added_.inc();
-  }
-  END_TRY catch (const EnvoyException& e) {
-    // TODO: sign should not throw to avoid exceptions in the request path
-    ENVOY_LOG(debug, "signing failed: {}", e.what());
+  } else {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
     config.stats().signing_failed_.inc();
     config.stats().payload_signing_failed_.inc();
   }

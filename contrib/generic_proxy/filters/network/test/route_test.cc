@@ -155,6 +155,19 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
 };
 
 /**
+ * Test the method that get timeout from the route entry.
+ */
+TEST_F(RouteEntryImplTest, RouteTimeout) {
+  const std::string yaml_config = R"EOF(
+    cluster: cluster_0
+    timeout: 10s
+  )EOF";
+  initialize(yaml_config);
+
+  EXPECT_EQ(10000, route_->timeout().count());
+};
+
+/**
  * Test the method that get route level per filter config from the route entry. In this case,
  * unexpected type is used to find the filter factory and finally an exception is thrown.
  */
@@ -174,7 +187,7 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
         value: { "key_0": "value_0" }
   )EOF";
 
-  // The configuraton will be rejected because the extension cannot be found.
+  // The configuration will be rejected because the extension cannot be found.
   EXPECT_THROW_WITH_MESSAGE(
       { initialize(yaml_config); }, EnvoyException,
       "Didn't find a registered implementation for 'envoy.filters.generic.mock_filter' with type "
@@ -528,18 +541,22 @@ TEST_F(RouteMatcherImplTest, RouteMatch) {
 
   // Exact host searching.
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
     FakeStreamCodecFactory::FakeRequest fake_request_0;
     fake_request_0.host_ = "service_0";
     fake_request_0.method_ = "method_0";
     fake_request_0.data_.insert({"key_0", "value_0"});
+    const MatchInput match_input_0(fake_request_0, stream_info, MatchAction::RouteAction);
 
     FakeStreamCodecFactory::FakeRequest fake_request_1;
     fake_request_1.host_ = "service_0";
     fake_request_1.method_ = "method_0";
     fake_request_1.data_.insert({"key_1", "value_1"});
+    const MatchInput match_input_1(fake_request_1, stream_info, MatchAction::RouteAction);
 
-    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
-    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+    auto route_entry_0 = route_matcher_->routeEntry(match_input_0);
+    auto route_entry_1 = route_matcher_->routeEntry(match_input_1);
 
     EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
     EXPECT_NE(route_entry_0.get(), nullptr);
@@ -549,18 +566,22 @@ TEST_F(RouteMatcherImplTest, RouteMatch) {
 
   // Prefix host searching.
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
     FakeStreamCodecFactory::FakeRequest fake_request_0;
     fake_request_0.host_ = "prefix_service_0";
     fake_request_0.method_ = "method_0";
     fake_request_0.data_.insert({"key_0", "value_0"});
+    const MatchInput match_input_0(fake_request_0, stream_info, MatchAction::RouteAction);
 
     FakeStreamCodecFactory::FakeRequest fake_request_1;
     fake_request_1.host_ = "prefix_service_0";
     fake_request_1.method_ = "method_0";
     fake_request_1.data_.insert({"key_1", "value_1"});
+    const MatchInput match_input_1(fake_request_1, stream_info, MatchAction::RouteAction);
 
-    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
-    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+    auto route_entry_0 = route_matcher_->routeEntry(match_input_0);
+    auto route_entry_1 = route_matcher_->routeEntry(match_input_1);
 
     EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
     EXPECT_NE(route_entry_0.get(), nullptr);
@@ -570,18 +591,22 @@ TEST_F(RouteMatcherImplTest, RouteMatch) {
 
   // Suffix host searching.
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
     FakeStreamCodecFactory::FakeRequest fake_request_0;
     fake_request_0.host_ = "service_0_suffix";
     fake_request_0.method_ = "method_0";
     fake_request_0.data_.insert({"key_0", "value_0"});
+    const MatchInput match_input_0(fake_request_0, stream_info, MatchAction::RouteAction);
 
     FakeStreamCodecFactory::FakeRequest fake_request_1;
     fake_request_1.host_ = "service_0_suffix";
     fake_request_1.method_ = "method_0";
     fake_request_1.data_.insert({"key_1", "value_1"});
+    const MatchInput match_input_1(fake_request_1, stream_info, MatchAction::RouteAction);
 
-    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
-    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+    auto route_entry_0 = route_matcher_->routeEntry(match_input_0);
+    auto route_entry_1 = route_matcher_->routeEntry(match_input_1);
 
     EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
     EXPECT_NE(route_entry_0.get(), nullptr);
@@ -591,18 +616,22 @@ TEST_F(RouteMatcherImplTest, RouteMatch) {
 
   // Catch all host.
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
     FakeStreamCodecFactory::FakeRequest fake_request_0;
     fake_request_0.host_ = "any_service";
     fake_request_0.method_ = "method_0";
     fake_request_0.data_.insert({"catch_all", "catch_all"});
+    const MatchInput match_input_0(fake_request_0, stream_info, MatchAction::RouteAction);
 
     FakeStreamCodecFactory::FakeRequest fake_request_1;
     fake_request_1.host_ = "any_service";
     fake_request_1.method_ = "method_0";
     fake_request_1.data_.insert({"catch_all", "catch_all"});
+    const MatchInput match_input_1(fake_request_1, stream_info, MatchAction::RouteAction);
 
-    auto route_entry_0 = route_matcher_->routeEntry(fake_request_0);
-    auto route_entry_1 = route_matcher_->routeEntry(fake_request_1);
+    auto route_entry_0 = route_matcher_->routeEntry(match_input_0);
+    auto route_entry_1 = route_matcher_->routeEntry(match_input_1);
 
     EXPECT_EQ(route_entry_0.get(), route_entry_1.get());
     EXPECT_NE(route_entry_0.get(), nullptr);
@@ -616,6 +645,7 @@ TEST_F(RouteMatcherImplTest, RouteMatch) {
  */
 TEST_F(RouteMatcherImplTest, RouteNotMatch) {
   initialize(RouteConfigurationYaml);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   // Test the service not match.
   {
@@ -623,8 +653,9 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
     fake_request.host_ = "prefix_service_1";
     fake_request.method_ = "method_0";
     fake_request.data_.insert({"key_0", "value_0"});
+    const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
-    EXPECT_EQ(nullptr, route_matcher_->routeEntry(fake_request));
+    EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 
   // Test the method not match.
@@ -633,8 +664,9 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
     fake_request.host_ = "service_0";
     fake_request.method_ = "method_x";
     fake_request.data_.insert({"key_0", "value_0"});
+    const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
-    EXPECT_EQ(nullptr, route_matcher_->routeEntry(fake_request));
+    EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 
   // Test the headers not match.
@@ -642,7 +674,9 @@ TEST_F(RouteMatcherImplTest, RouteNotMatch) {
     FakeStreamCodecFactory::FakeRequest fake_request;
     fake_request.host_ = "service_0";
     fake_request.method_ = "method_0";
-    EXPECT_EQ(nullptr, route_matcher_->routeEntry(fake_request));
+    const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
+
+    EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 }
 
@@ -709,6 +743,7 @@ virtual_hosts:
 
 TEST_F(RouteMatcherImplTest, NoHostMatch) {
   initialize(RouteConfigurationYamlWithoutDefaultHost);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   // Test the host not match.
   {
@@ -716,8 +751,9 @@ TEST_F(RouteMatcherImplTest, NoHostMatch) {
     fake_request.host_ = "any_service";
     fake_request.method_ = "method_0";
     fake_request.data_.insert({"key_0", "value_0"});
+    const MatchInput match_input(fake_request, stream_info, MatchAction::RouteAction);
 
-    EXPECT_EQ(nullptr, route_matcher_->routeEntry(fake_request));
+    EXPECT_EQ(nullptr, route_matcher_->routeEntry(match_input));
   }
 }
 

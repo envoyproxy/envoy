@@ -61,12 +61,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -166,7 +166,9 @@ filter_chain_matcher:
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
+  auto [cert, key] = quic_socket_factory.getTlsCertificateAndKey("", nullptr);
+  EXPECT_TRUE(cert != nullptr);
+  EXPECT_TRUE(key != nullptr);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 
   // Stop listening shouldn't close the socket.
@@ -274,12 +276,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -402,7 +404,7 @@ listener_filters:
   manager_->listeners()[0].get().filterChainFactory().createQuicListenerFilterChain(filter_manager);
   ASSERT_NE(nullptr, listener_filter);
   Network::MockListenerFilterCallbacks callbacks;
-  EXPECT_CALL(callbacks, filterState());
+  EXPECT_CALL(callbacks, filterState()).Times(2);
   EXPECT_CALL(callbacks, dispatcher()).WillOnce(ReturnRef(server_.dispatcher_));
   listener_filter->onAccept(callbacks);
   auto* added_filter_state =
@@ -433,12 +435,12 @@ filter_chains:
       common_tls_context:
         tls_certificates:
         - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
           private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
         validation_context:
           trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
           match_typed_subject_alt_names:
           - matcher:
               exact: localhost
@@ -482,12 +484,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -546,12 +548,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -604,12 +606,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -667,12 +669,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -731,12 +733,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost

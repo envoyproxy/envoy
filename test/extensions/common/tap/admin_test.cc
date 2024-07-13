@@ -130,7 +130,7 @@ public:
   void triggerTimeout() { attachedRequestBuffered()->onTimeout(attachedRequest()); }
 
   std::string makeBufferedAdminYaml(uint64_t max_traces, std::string timeout_s = "0s") {
-    const std::string buffered_admin_request_yaml_ =
+    constexpr absl::string_view buffered_admin_request_yaml_ =
         R"EOF(
 config_id: test_config_id
 tap_config:
@@ -142,7 +142,7 @@ tap_config:
           max_traces: {}
           timeout: {}
 )EOF";
-    return fmt::format(fmt::runtime(buffered_admin_request_yaml_), max_traces, timeout_s);
+    return fmt::format(buffered_admin_request_yaml_, max_traces, timeout_s);
   }
 
   // Cannot be moved into individual test cases as expected calls are validated on object

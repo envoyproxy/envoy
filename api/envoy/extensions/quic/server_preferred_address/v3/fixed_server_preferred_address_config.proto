@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.quic.server_preferred_address.v3;
 
+import "envoy/config/core/v3/address.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -12,7 +14,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/quic/server_preferred_address/v3;server_preferred_addressv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: QUIC server preferred address config]
+// [#protodoc-title: QUIC fixed server preferred address config]
 // [#extension: envoy.quic.server_preferred_address.fixed]
 
 // Configuration for FixedServerPreferredAddressConfig.
@@ -21,15 +23,41 @@ message FixedServerPreferredAddressConfig {
 
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
-  oneof ipv4_type {
-    // String representation of IPv4 address, i.e. "127.0.0.2".
-    // If not specified, none will be configured.
-    string ipv4_address = 1;
+  // Addresses for server preferred address for a single address family (IPv4 or IPv6).
+  message AddressFamilyConfig {
+    // The server preferred address sent to clients.
+    //
+    // Note: Envoy currently must receive all packets for a QUIC connection on the same port, so unless
+    // :ref:`dnat_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.AddressFamilyConfig.dnat_address>`
+    // is configured, the port for this address must be zero, and the listener's
+    // port will be used instead.
+    config.core.v3.SocketAddress address = 1;
+
+    // If there is a DNAT between the client and Envoy, the address that Envoy will observe
+    // server preferred address packets being sent to. If this is not specified, it is assumed
+    // there is no DNAT and the server preferred address packets will be sent to the address advertised
+    // to clients for server preferred address.
+    //
+    // Note: Envoy currently must receive all packets for a QUIC connection on the same port, so the
+    // port for this address must be zero, and the listener's port will be used instead.
+    config.core.v3.SocketAddress dnat_address = 2;
   }
 
-  oneof ipv6_type {
-    // String representation of IPv6 address, i.e. "::1".
-    // If not specified, none will be configured.
-    string ipv6_address = 2;
-  }
+  // String representation of IPv4 address, i.e. "127.0.0.2".
+  // If not specified, none will be configured.
+  string ipv4_address = 1;
+
+  // The IPv4 address to advertise to clients for Server Preferred Address.
+  // This field takes precedence over
+  // :ref:`ipv4_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv4_address>`.
+  AddressFamilyConfig ipv4_config = 3;
+
+  // String representation of IPv6 address, i.e. "::1".
+  // If not specified, none will be configured.
+  string ipv6_address = 2;
+
+  // The IPv6 address to advertise to clients for Server Preferred Address.
+  // This field takes precedence over
+  // :ref:`ipv6_address <envoy_v3_api_field_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig.ipv6_address>`.
+  AddressFamilyConfig ipv6_config = 4;
 }

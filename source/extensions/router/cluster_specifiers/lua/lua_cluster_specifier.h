@@ -4,6 +4,7 @@
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
@@ -23,6 +24,8 @@ public:
   }
 
   int clusterFunctionRef() { return lua_state_.getGlobalRef(cluster_function_slot_); }
+
+  void runtimeGC() { lua_state_.runtimeGC(); }
 
 private:
   uint64_t cluster_function_slot_{};
@@ -57,6 +60,11 @@ public:
 
   static ExportedFunctions exportedFunctions() { return {{"headers", static_luaHeaders}}; }
 
+  // All embedded references should be reset when the object is marked dead. This is to ensure that
+  // we won't do the resetting in the destructor, which may be called after the referenced
+  // coroutine's lua_State is closed. And if that happens, the resetting will cause a crash.
+  void onMarkDead() override { headers_wrapper_.reset(); }
+
 private:
   /**
    * @return a handle to the headers.
@@ -75,6 +83,11 @@ public:
                             Server::Configuration::CommonFactoryContext& context);
 
   ~LuaClusterSpecifierConfig() {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.allow_slot_destroy_on_worker_threads")) {
+      return;
+    }
+
     // The design of the TLS system does not allow TLS state to be modified in worker threads.
     // However, when the route configuration is dynamically updated via RDS, the old
     // LuaClusterSpecifierConfig object may be destructed in a random worker thread. Therefore, to

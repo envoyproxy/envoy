@@ -314,16 +314,32 @@ message SubjectAltNameMatcher {
     DNS = 2;
     URI = 3;
     IP_ADDRESS = 4;
+    OTHER_NAME = 5;
   }
 
   // Specification of type of SAN. Note that the default enum value is an invalid choice.
   SanType san_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 
   // Matcher for SAN value.
+  //
+  // The string matching for OTHER_NAME SAN values depends on their ASN.1 type:
+  //
+  //          * OBJECT: Validated against its dotted numeric notation (e.g., "1.2.3.4")
+  //          * BOOLEAN: Validated against strings "true" or "false"
+  //          * INTEGER/ENUMERATED: Validated against a string containing the integer value
+  //          * NULL: Validated against an empty string
+  //          * Other types: Validated directly against the string value
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
+
+  // OID Value which is required if OTHER_NAME SAN type is used.
+  // For example, UPN OID is 1.3.6.1.4.1.311.20.2.3
+  // (Reference: http://oid-info.com/get/1.3.6.1.4.1.311.20.2.3).
+  //
+  // If set for SAN types other than OTHER_NAME, it will be ignored.
+  string oid = 3;
 }
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -337,6 +353,9 @@ message CertificateValidationContext {
     // For HTTP connections, the result of certificate verification can be used in route matching. (
     // see :ref:`validated <envoy_v3_api_field_config.route.v3.RouteMatch.TlsContextMatchOptions.validated>` ).
     ACCEPT_UNTRUSTED = 1;
+  }
+
+  message SystemRootCerts {
   }
 
   reserved 4, 5;
@@ -378,19 +397,22 @@ message CertificateValidationContext {
   // can be treated as trust anchor as well. It allows verification with building valid partial chain instead
   // of a full chain.
   //
-  // Only one of ``trusted_ca`` and ``ca_certificate_provider_instance`` may be specified.
-  //
-  // [#next-major-version: This field and watched_directory below should ideally be moved into a
-  // separate sub-message, since there's no point in specifying the latter field without this one.]
+  // If ``ca_certificate_provider_instance`` is set, it takes precedence over ``trusted_ca``.
   config.core.v3.DataSource trusted_ca = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 
   // Certificate provider instance for fetching TLS certificates.
   //
-  // Only one of ``trusted_ca`` and ``ca_certificate_provider_instance`` may be specified.
+  // If set, takes precedence over ``trusted_ca``.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance ca_certificate_provider_instance = 13
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
+
+  // Use system root certs for validation.
+  // If present, system root certs are used only if neither of the ``trusted_ca``
+  // or ``ca_certificate_provider_instance`` fields are set.
+  // [#not-implemented-hide:]
+  SystemRootCerts system_root_certs = 17;
 
   // If specified, updates of a file-based ``trusted_ca`` source will be triggered
   // by this watch. This allows explicit control over the path watched, by

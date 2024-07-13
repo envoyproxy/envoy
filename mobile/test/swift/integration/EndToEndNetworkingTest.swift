@@ -23,6 +23,10 @@ final class EndToEndNetworkingTest: XCTestCase {
     .build()
 
     let engine = EngineBuilder()
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .build()
 
     var responseBuffer = Data()

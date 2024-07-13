@@ -11,17 +11,6 @@ constexpr uint32_t DefaultMaxConnectAttempts = 1;
 constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
 constexpr uint64_t DefaultMaxBufferedBytes = 16384;
 
-ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
-  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    auto* new_header = proto_out->add_headers();
-    new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(std::string(e.value().getStringView()));
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return proto_out;
-}
-
 const std::string& TunnelResponseHeaders::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.udp_proxy.propagate_response_headers");
 }
@@ -32,7 +21,9 @@ const std::string& TunnelResponseTrailers::key() {
 
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
-    : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
+    : header_parser_(
+          THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
+                                Envoy::Router::HeaderParserPtr)),
       target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
@@ -111,7 +102,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.serverFactoryContext().options().localAddressIpVersion())) {
-    ExceptionUtil::throwEnvoyException(
+    throw EnvoyException(
         "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
         "is not running with the CAP_NET_ADMIN capability.");
   }

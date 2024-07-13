@@ -255,6 +255,26 @@ For details on each command's usage see the official
   SETNX, String
   SETRANGE, String
   STRLEN, String
+  XACK, Stream
+  XADD, Stream
+  XAUTOCLAIM, Stream
+  XCLAIM, Stream
+  XDEL, Stream
+  XLEN, Stream
+  XPENDING, Stream
+  XRANGE, Stream
+  XREVRANGE, Stream
+  XTRIM, Stream
+  BF.ADD, Bloom
+  BF.CARD, Bloom
+  BF.EXISTS, Bloom
+  BF.INFO, Bloom
+  BF.INSERT, Bloom
+  BF.LOADCHUNK, Bloom
+  BF.MADD, Bloom
+  BF.MEXISTS, Bloom
+  BF.RESERVE, Bloom
+  BF.SCANDUMP, Bloom
 
 Failure modes
 -------------
@@ -302,3 +322,9 @@ response for each in place of the value.
   3) (error) upstream failure
   4) (error) upstream failure
   5) "echo"
+
+Protocol
+--------
+
+Although `RESP <https://redis.io/docs/reference/protocol-spec/>`_ is recommended for production use,
+`inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_ are also supported.

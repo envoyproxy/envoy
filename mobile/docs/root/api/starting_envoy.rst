@@ -16,7 +16,7 @@ After the stream client is obtained, it should be stored and used to start netwo
 **Kotlin example**::
 
   val streamClient = AndroidEngineBuilder(getApplication())
-    .addLogLevel(LogLevel.WARN)
+    .setLogLevel(LogLevel.WARN)
     ...
     .build()
     .streamClient()
@@ -24,7 +24,7 @@ After the stream client is obtained, it should be stored and used to start netwo
 **Swift example**::
 
   let streamClient = try EngineBuilder()
-    .addLogLevel(.warn)
+    .setLogLevel(.warn)
     ...
     .build()
     .streamClient()
@@ -110,7 +110,7 @@ Add a list of hostnames to preresolve on Engine startup.
   builder.addDNSPreresolveHostnames(["lyft.com", "google.com"])
 
 ~~~~~~~~~~~~~~~
-``addLogLevel``
+``setLogLevel``
 ~~~~~~~~~~~~~~~
 
 Specify the log level to be used when running the underlying Envoy engine.
@@ -118,10 +118,10 @@ Specify the log level to be used when running the underlying Envoy engine.
 **Example**::
 
   // Kotlin
-  builder.addLogLevel(LogLevel.WARN)
+  builder.setLogLevel(LogLevel.WARN)
 
   // Swift
-  builder.addLogLevel(.warn)
+  builder.setLogLevel(.warn)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``addStreamIdleTimeoutSeconds``
@@ -198,15 +198,15 @@ Add a C++ filter to the Envoy Mobile filter chain
     library to ``envoy_build_config/extensions_build_config.bzl`` is sufficient.
     For iOS, due to enthusiastic garbage collection, and for upstream CI, to catch bugs, you will
     also need to forceRegister the filter in ``envoy_build_config/extension_registry.cc``
+    Both platforms use proto syntax by default, but YAML is supported if you build with --define=envoy_yaml=enabled
 
 **Example**::
 
   // Kotlin
-  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
+  builder.addNativeFilter("envoy.filters.http.buffer", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } ")
 
   // Swift
-  builder.addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
-
+  builder.addNativeFilter("envoy.filters.http.buffer", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } ")
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -490,7 +490,7 @@ A maximum of 100 entries will be stored.
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-``setRuntimeGuard``
+``addRuntimeGuard``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Adds a runtime guard key value pair to envoy configuration.  The guard is of the short form "feature"
@@ -500,10 +500,10 @@ Note that Envoy will fail to start up in debug mode if an unknown guard is speci
 **Example**::
 
   // Kotlin
-  builder.setRuntimeGuard("feature", true)
+  builder.addRuntimeGuard("feature", true)
 
   // Swift
-  builder.setRuntimeGuard("feature", true)
+  builder.addRuntimeGuard("feature", true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``setXds``
@@ -594,7 +594,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
 **Kotlin example**::
 
   val streamClient = AndroidEngineBuilder(baseContext, Yaml(yamlFileString))
-    .addLogLevel(LogLevel.WARN)
+    .setLogLevel(LogLevel.WARN)
     ...
     .build()
     .streamClient()
@@ -602,7 +602,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
 **Swift example**::
 
   let streamClient = try EngineBuilder(yaml: yamlFileString)
-    .addLogLevel(.warn)
+    .setLogLevel(.warn)
     ...
     .build()
     .streamClient()

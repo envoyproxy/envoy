@@ -22,20 +22,20 @@ AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
     : dispatcher_(dispatcher), thread_local_cluster_(thread_local_cluster),
       cluster_info_(thread_local_cluster_.info()), context_(context),
       connect_timer_(dispatcher.createTimer([this]() { onConnectTimeout(); })),
-      enable_half_close_(enable_half_close) {
-  cluster_info_->trafficStats()->upstream_cx_active_.inc();
-  cluster_info_->trafficStats()->upstream_cx_total_.inc();
-}
-
-AsyncTcpClientImpl::~AsyncTcpClientImpl() {
-  cluster_info_->trafficStats()->upstream_cx_active_.dec();
-}
+      enable_half_close_(enable_half_close) {}
 
 bool AsyncTcpClientImpl::connect() {
+  if (connection_) {
+    return false;
+  }
+
   connection_ = std::move(thread_local_cluster_.tcpConn(context_).connection_);
   if (!connection_) {
     return false;
   }
+
+  cluster_info_->trafficStats()->upstream_cx_total_.inc();
+  cluster_info_->trafficStats()->upstream_cx_active_.inc();
   connection_->enableHalfClose(enable_half_close_);
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(std::make_shared<NetworkReadFilter>(*this));
@@ -109,17 +109,20 @@ void AsyncTcpClientImpl::reportConnectionDestroy(Network::ConnectionEvent event)
 void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    if (disconnected_) {
+    cluster_info_->trafficStats()->upstream_cx_active_.dec();
+    if (!connected_) {
       cluster_info_->trafficStats()->upstream_cx_connect_fail_.inc();
     }
 
-    if (!disconnected_ && conn_length_ms_ != nullptr) {
+    if (connected_ && conn_length_ms_ != nullptr) {
       conn_length_ms_->complete();
       conn_length_ms_.reset();
     }
+
     disableConnectTimeout();
     reportConnectionDestroy(event);
-    disconnected_ = true;
+
+    connected_ = false;
     if (connection_) {
       detected_close_ = connection_->detectedCloseType();
     }
@@ -127,10 +130,9 @@ void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
     dispatcher_.deferredDelete(std::move(connection_));
     if (callbacks_) {
       callbacks_->onEvent(event);
-      callbacks_ = nullptr;
     }
   } else {
-    disconnected_ = false;
+    connected_ = true;
     conn_connect_ms_->complete();
     conn_connect_ms_.reset();
     disableConnectTimeout();

@@ -52,6 +52,8 @@ envoy_cc_library(
         ":assert_lib",
         "//envoy/common:backoff_strategy_interface",
         "//envoy/common:random_generator_interface",
+        "//source/common/protobuf:utility_lib_header",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -456,6 +458,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trie_lookup_table_lib",
+    hdrs = ["trie_lookup_table.h"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -468,6 +475,18 @@ envoy_cc_library(
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "compiled_string_map_lib",
+    hdrs = ["compiled_string_map.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//envoy/common:pure_lib",
+        "//source/common/common:assert_lib",
     ],
 )
 

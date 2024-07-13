@@ -5,8 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(Admin::GenRequestFn admin_handler_fn)
-    : admin_handler_fn_(admin_handler_fn) {}
+AdminFilter::AdminFilter(const Admin& admin) : admin_(admin) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -87,12 +86,13 @@ void AdminFilter::onComplete() {
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Admin::RequestPtr handler = admin_handler_fn_(*this);
+  Admin::RequestPtr handler = admin_.makeRequest(*this);
   Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
+  // TODO(#31087): use high/lower watermarks to apply flow-control to the admin http port.
   bool more_data;
   do {
     Buffer::OwnedImpl response;

@@ -249,10 +249,9 @@ message HttpProtocolOptions {
   google.protobuf.Duration idle_timeout = 1;
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
-  // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // and if there are no active streams, the connection will be closed. If the connection is a
-  // downstream connection and there are any active streams, the drain sequence will kick-in,
-  // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
+  // was established. If not set, there is no max duration. When max_connection_duration is reached,
+  // the drain sequence will kick-in. The connection will be closed after the drain timeout period
+  // if there are no active streams. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration max_connection_duration = 3;
 
@@ -486,10 +485,10 @@ message Http2ProtocolOptions {
   // Allows proxying Websocket and other upgrades over H2 connect.
   bool allow_connect = 5;
 
-  // [#not-implemented-hide:] Hiding until envoy has full metadata support.
+  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
   // Still under implementation. DO NOT USE.
   //
-  // Allows metadata. See [metadata
+  // Allows sending and receiving HTTP/2 METADATA frames. See [metadata
   // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
@@ -618,7 +617,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -637,12 +636,27 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
   // Note that HTTP/3 CONNECT is not yet an RFC.
   bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Allows sending and receiving HTTP/3 METADATA frames. See [metadata
+  // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
+  // information.
+  bool allow_metadata = 6;
 }
 
 // A message to control transformations to the :scheme header
 message SchemeHeaderTransformation {
   oneof transformation {
     // Overwrite any Scheme header with the contents of this string.
+    // If set, takes precedence over match_upstream.
     string scheme_to_overwrite = 1 [(validate.rules).string = {in: "http" in: "https"}];
   }
+
+  // Set the Scheme header to match the upstream transport protocol. For example, should a
+  // request be sent to the upstream over TLS, the scheme header will be set to "https". Should the
+  // request be sent over plaintext, the scheme header will be set to "http".
+  // If scheme_to_overwrite is set, this field is not used.
+  bool match_upstream = 2;
 }

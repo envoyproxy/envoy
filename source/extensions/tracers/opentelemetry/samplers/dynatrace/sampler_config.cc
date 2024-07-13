@@ -8,18 +8,19 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-void SamplerConfig::parse(const std::string& json) {
+bool SamplerConfig::parse(const std::string& json) {
   const auto result = Envoy::Json::Factory::loadFromStringNoThrow(json);
   if (result.ok()) {
     const auto& obj = result.value();
     if (obj->hasObject("rootSpansPerMinute")) {
       const auto value = obj->getInteger("rootSpansPerMinute", default_root_spans_per_minute_);
       root_spans_per_minute_.store(value);
-      return;
+      return true;
     }
   }
   // Didn't get a value, reset to default
   root_spans_per_minute_.store(default_root_spans_per_minute_);
+  return false;
 }
 
 } // namespace OpenTelemetry

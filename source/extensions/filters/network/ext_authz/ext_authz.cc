@@ -22,9 +22,9 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Filter::callCheck() {
-  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
-                                                               config_->includePeerCertificate(),
-                                                               config_->destinationLabels());
+  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(
+      filter_callbacks_, check_request_, config_->includePeerCertificate(),
+      config_->includeTLSSession(), config_->destinationLabels());
   // Store start time of ext_authz filter call
   start_time_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   status_ = Status::Calling;

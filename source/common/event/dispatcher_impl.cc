@@ -55,16 +55,16 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : DispatcherImpl(name, api.threadFactory(), api.timeSource(), api.randomGenerator(),
-                     api.fileSystem(), time_system, scaled_timer_factory,
+    : DispatcherImpl(name, api.threadFactory(), api.timeSource(), api.fileSystem(), time_system,
+                     scaled_timer_factory,
                      watermark_factory != nullptr
                          ? watermark_factory
                          : std::make_shared<Buffer::WatermarkBufferFactory>(
                                api.bootstrap().overload_manager().buffer_factory_config())) {}
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& thread_factory,
-                               TimeSource& time_source, Random::RandomGenerator&,
-                               Filesystem::Instance& file_system, Event::TimeSystem& time_system,
+                               TimeSource& time_source, Filesystem::Instance& file_system,
+                               Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), thread_factory_(thread_factory), time_source_(time_source),
@@ -178,7 +178,7 @@ FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTri
       *this, fd,
       [this, cb](uint32_t events) {
         touchWatchdog();
-        cb(events);
+        return cb(events);
       },
       trigger, events)};
 }

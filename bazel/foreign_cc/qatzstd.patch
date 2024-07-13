@@ -1,0 +1,13 @@
+diff --git a/src/Makefile b/src/Makefile
+index 1abf10d..c5fa3a6 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -54,7 +54,7 @@ ifneq ($(ICP_ROOT), )
+ 	endif
+ else
+ 	QATFLAGS = -DINTREE
+-	LDFLAGS  = -lqat
++	LDFLAGS  += -lqat
+ 	ifneq ($(ENABLE_USDM_DRV), 0)
+ 		QATFLAGS += -DENABLE_USDM_DRV
+ 		LDFLAGS	 += -lusdm

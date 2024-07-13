@@ -1,3 +1,18 @@
+diff --git a/base/memory.h b/base/memory.h
+index 3552e19..0fbe618 100644
+--- a/base/memory.h
++++ b/base/memory.h
+@@ -166,8 +166,8 @@ std::enable_if_t<IsDerivedHeapDataV<F>, Handle<T>> HandleFactory<T>::Make(
+ #if defined(__cpp_lib_is_pointer_interconvertible) && \
+     __cpp_lib_is_pointer_interconvertible >= 201907L
+   // Only available in C++20.
+-  static_assert(std::is_pointer_interconvertible_base_of_v<Data, F>,
+-                "F must be pointer interconvertible to Data");
++//  static_assert(std::is_pointer_interconvertible_base_of_v<Data, F>,
++//                "F must be pointer interconvertible to Data");
+ #endif
+   if (memory_manager.memory_management() == MemoryManagement::kPooling) {
+     void* addr;
 diff --git a/eval/internal/interop.cc b/eval/internal/interop.cc
 index 3acde6c..20f8ea3 100644
 --- a/eval/internal/interop.cc

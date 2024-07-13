@@ -8,6 +8,8 @@
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
+#include "quiche/quic/core/qpack/qpack_encoder.h"
+#include "quiche/quic/core/qpack/qpack_instruction_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -15,7 +17,8 @@ namespace Quic {
 // This class is a quic stream and also a response encoder.
 class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public EnvoyQuicStream,
-                              public Http::ResponseEncoder {
+                              public Http::ResponseEncoder,
+                              public quic::QuicSpdyStream::MetadataVisitor {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
@@ -50,7 +53,8 @@ public:
     std::unique_ptr<StreamInfo::StreamInfoImpl> new_stream_info =
         std::make_unique<StreamInfo::StreamInfoImpl>(
             filterManagerConnection()->dispatcher().timeSource(),
-            filterManagerConnection()->connectionInfoProviderSharedPtr());
+            filterManagerConnection()->connectionInfoProviderSharedPtr(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
     new_stream_info->setFrom(stream_info, request_header_map.get());
     stats_gatherer_->setDeferredLoggingHeadersAndTrailers(
         request_header_map, response_header_map, response_trailer_map, std::move(new_stream_info));
@@ -69,7 +73,8 @@ public:
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
-  void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
+                          quic::ConnectionCloseSource source) override;
   void CloseWriteSide() override;
 
   void clearWatermarkBuffer();
@@ -77,6 +82,9 @@ public:
   // EnvoyQuicStream
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view header_name, absl::string_view header_value) override;
+
+  // quic::QuicSpdyStream::MetadataVisitor
+  void OnMetadataComplete(size_t frame_len, const quic::QuicHeaderList& header_list) override;
 
 protected:
   // EnvoyQuicStream

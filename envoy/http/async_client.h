@@ -9,6 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/tracer.h"
 
@@ -19,7 +20,8 @@
 namespace Envoy {
 namespace Router {
 class FilterConfig;
-}
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+} // namespace Router
 namespace Http {
 
 /**
@@ -45,7 +47,9 @@ public:
    */
   enum class FailureReason {
     // The stream has been reset.
-    Reset
+    Reset,
+    // The stream exceeds the response buffer limit.
+    ExceedResponseBufferLimit
   };
 
   /**
@@ -185,12 +189,13 @@ public:
      * Register a callback to be called when high/low write buffer watermark events occur on the
      * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
      * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
-     * will ASSERT-fail.
+     * will trigger ENVOY_BUG.
      */
     virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
 
     /***
-     * Remove previously set watermark callbacks.
+     * Remove previously set watermark callbacks. If there's no watermark callback registered, this
+     * method will trigger ENVOY_BUG.
      */
     virtual void removeWatermarkCallbacks() PURE;
 
@@ -249,6 +254,10 @@ public:
       send_xff = v;
       return *this;
     }
+    StreamOptions& setSendInternal(bool v) {
+      send_internal = v;
+      return *this;
+    }
     StreamOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       hash_policy = v;
@@ -263,6 +272,12 @@ public:
     // and then used by the subset load balancer.
     StreamOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
       metadata = m;
+      return *this;
+    }
+
+    // Set FilterState on async stream allowing upstream filters to access it.
+    StreamOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
+      filter_state = fs;
       return *this;
     }
 
@@ -294,7 +309,7 @@ public:
       retry_policy = absl::nullopt;
       return *this;
     }
-    StreamOptions& setFilterConfig(Router::FilterConfig& config) {
+    StreamOptions& setFilterConfig(const Router::FilterConfigSharedPtr& config) {
       filter_config_ = config;
       return *this;
     }
@@ -304,10 +319,35 @@ public:
       return *this;
     }
 
+    StreamOptions& setDiscardResponseBody(bool discard) {
+      discard_response_body = discard;
+      return *this;
+    }
+
+    StreamOptions& setIsShadowSuffixDisabled(bool d) {
+      is_shadow_suffixed_disabled = d;
+      return *this;
+    }
+
+    StreamOptions& setParentSpan(Tracing::Span& parent_span) {
+      parent_span_ = &parent_span;
+      return *this;
+    }
+    StreamOptions& setChildSpanName(const std::string& child_span_name) {
+      child_span_name_ = child_span_name;
+      return *this;
+    }
+    StreamOptions& setSampled(absl::optional<bool> sampled) {
+      sampled_ = sampled;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
-             send_xff == src.send_xff;
+             send_xff == src.send_xff && send_internal == src.send_internal &&
+             parent_span_ == src.parent_span_ && child_span_name_ == src.child_span_name_ &&
+             sampled_ == src.sampled_;
     }
 
     // The timeout supplies the stream timeout, measured since when the frame with
@@ -323,6 +363,9 @@ public:
     // If true, x-forwarded-for header will be added.
     bool send_xff{true};
 
+    // If true, x-envoy-internal header will be added.
+    bool send_internal{true};
+
     // Provides the hash policy for hashing load balancing strategies.
     Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
 
@@ -330,6 +373,7 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+    Envoy::StreamInfo::FilterStateSharedPtr filter_state;
 
     // Buffer memory account for tracking bytes.
     Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
@@ -339,82 +383,12 @@ public:
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
     const Router::RetryPolicy* parsed_retry_policy{nullptr};
 
-    OptRef<Router::FilterConfig> filter_config_;
+    Router::FilterConfigSharedPtr filter_config_;
 
     bool is_shadow{false};
-  };
 
-  /**
-   * A structure to hold the options for AsyncRequest object.
-   */
-  struct RequestOptions : public StreamOptions {
-    RequestOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
-      StreamOptions::setTimeout(v);
-      return *this;
-    }
-    RequestOptions& setTimeout(const std::chrono::milliseconds& v) {
-      StreamOptions::setTimeout(v);
-      return *this;
-    }
-    RequestOptions& setBufferBodyForRetry(bool v) {
-      StreamOptions::setBufferBodyForRetry(v);
-      return *this;
-    }
-    RequestOptions& setSendXff(bool v) {
-      StreamOptions::setSendXff(v);
-      return *this;
-    }
-    RequestOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
-      StreamOptions::setHashPolicy(v);
-      return *this;
-    }
-    RequestOptions& setParentContext(const ParentContext& v) {
-      StreamOptions::setParentContext(v);
-      return *this;
-    }
-    RequestOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
-      StreamOptions::setMetadata(m);
-      return *this;
-    }
-    RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
-      StreamOptions::setRetryPolicy(p);
-      return *this;
-    }
-    RequestOptions& setRetryPolicy(const Router::RetryPolicy& p) {
-      StreamOptions::setRetryPolicy(p);
-      return *this;
-    }
-    RequestOptions& setIsShadow(bool s) {
-      StreamOptions::setIsShadow(s);
-      return *this;
-    }
-    RequestOptions& setParentSpan(Tracing::Span& parent_span) {
-      parent_span_ = &parent_span;
-      return *this;
-    }
-    RequestOptions& setChildSpanName(const std::string& child_span_name) {
-      child_span_name_ = child_span_name;
-      return *this;
-    }
-    RequestOptions& setSampled(absl::optional<bool> sampled) {
-      sampled_ = sampled;
-      return *this;
-    }
-    RequestOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
-      account_ = account;
-      return *this;
-    }
-    RequestOptions& setBufferLimit(uint32_t limit) {
-      buffer_limit_ = limit;
-      return *this;
-    }
-
-    // For gmock test
-    bool operator==(const RequestOptions& src) const {
-      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
-             child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
-    }
+    bool is_shadow_suffixed_disabled{false};
+    bool discard_response_body{false};
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.
@@ -426,6 +400,11 @@ public:
     // Sampling decision for the tracing span. The span is sampled by default.
     absl::optional<bool> sampled_{true};
   };
+
+  /**
+   * A structure to hold the options for AsyncRequest object.
+   */
+  using RequestOptions = StreamOptions;
 
   /**
    * Send an HTTP request asynchronously

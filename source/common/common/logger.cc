@@ -158,6 +158,17 @@ void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; 
 
 SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
 
+void DelegatingLogSink::logWithStableName(absl::string_view stable_name, absl::string_view level,
+                                          absl::string_view component, absl::string_view message) {
+  auto tls_sink = tlsDelegate();
+  if (tls_sink != nullptr) {
+    tls_sink->logWithStableName(stable_name, level, component, message);
+    return;
+  }
+  absl::ReaderMutexLock sink_lock(&sink_mutex_);
+  sink_->logWithStableName(stable_name, level, component, message);
+}
+
 static std::atomic<Context*> current_context = nullptr;
 static_assert(std::atomic<Context*>::is_always_lock_free);
 
@@ -281,7 +292,7 @@ absl::Status Registry::setJsonLogFormat(const Protobuf::Message& log_format_stru
 #else
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
-  json_options.always_print_primitive_fields = true;
+  json_options.always_print_fields_with_no_presence = true;
 
   std::string format_as_json;
   const auto status =

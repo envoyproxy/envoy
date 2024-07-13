@@ -72,5 +72,3 @@ const envoy_data envoy_nodata = {0, NULL, envoy_noop_release, NULL};
 const envoy_headers envoy_noheaders = {0, NULL};
 
 const envoy_stats_tags envoy_stats_notags = {0, NULL};
-
-const char* envoy_event_tracker_api_name = "event_tracker_api";

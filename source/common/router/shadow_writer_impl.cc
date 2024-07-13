@@ -4,6 +4,7 @@
 #include <string>
 
 #include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 
 #include "absl/strings/str_join.h"
@@ -17,9 +18,12 @@ std::string shadowAppendedHost(absl::string_view host) {
   ASSERT(!host.empty());
   // Switch authority to add a shadow postfix. This allows upstream logging to
   // make more sense.
-  auto parts = StringUtil::splitToken(host, ":");
-  ASSERT(!parts.empty() && parts.size() <= 2);
-  return parts.size() == 2 ? absl::StrJoin(parts, "-shadow:") : absl::StrCat(host, "-shadow");
+  absl::string_view::size_type port_start = Http::HeaderUtility::getPortStart(host);
+  if (port_start == absl::string_view::npos) {
+    return absl::StrCat(host, "-shadow");
+  }
+  return absl::StrCat(host.substr(0, port_start), "-shadow",
+                      host.substr(port_start, host.length()));
 }
 
 } // namespace
@@ -58,7 +62,10 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
     return nullptr;
   }
 
-  headers.setHost(shadowAppendedHost(headers.getHostValue()));
+  // Append "-shadow" suffix if option is disabled.
+  if (!options.is_shadow_suffixed_disabled) {
+    headers.setHost(shadowAppendedHost(headers.getHostValue()));
+  }
 
   const_cast<Http::AsyncClient::RequestOptions&>(options).setIsShadow(true);
   return thread_local_cluster;

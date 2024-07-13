@@ -105,7 +105,7 @@ typed_config:
       if (!expected_grpc_request_messages.empty()) {
         Grpc::Decoder grpc_decoder;
         std::vector<Grpc::Frame> frames;
-        ASSERT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames)) << dump;
+        ASSERT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames).ok()) << dump;
         EXPECT_EQ(expected_grpc_request_messages.size(), frames.size());
 
         for (size_t i = 0; i < expected_grpc_request_messages.size(); ++i) {

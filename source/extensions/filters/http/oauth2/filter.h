@@ -113,14 +113,18 @@ struct CookieNames {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
-               Upstream::ClusterManager& cluster_manager,
+               Server::Configuration::CommonFactoryContext& context,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
+  bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
+  }
+  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+    return deny_redirect_header_matchers_;
   }
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
@@ -140,6 +144,10 @@ public:
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
+  std::chrono::seconds defaultRefreshTokenExpiresIn() const {
+    return default_refresh_token_expires_in_;
+  }
+  bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -157,12 +165,16 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
-  const bool use_refresh_token_{};
   const std::chrono::seconds default_expires_in_;
+  const std::chrono::seconds default_refresh_token_expires_in_;
+  const bool forward_bearer_token_ : 1;
+  const bool preserve_authorization_header_ : 1;
+  const bool use_refresh_token_ : 1;
+  const bool disable_id_token_set_cookie_ : 1;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -261,6 +273,8 @@ private:
   std::string id_token_;
   std::string refresh_token_;
   std::string expires_in_;
+  std::string expires_refresh_token_in_;
+  std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
@@ -274,11 +288,16 @@ private:
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
+  bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
+  std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
+                                            const std::chrono::seconds& expires_in) const;
+  std::string getExpiresTimeForIdToken(const std::string& id_token,
+                                       const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

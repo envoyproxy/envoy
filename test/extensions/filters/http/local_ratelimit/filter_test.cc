@@ -1,9 +1,12 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 
+#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -15,7 +18,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
-static const std::string config_yaml = R"(
+static constexpr absl::string_view config_yaml = R"(
 stat_prefix: test
 rate_limited_as_resource_exhausted: {}
 token_bucket:
@@ -75,8 +78,9 @@ public:
 
     envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, *stats_.rootScope(),
-                                             runtime_, per_route);
+    config_ =
+        std::make_shared<FilterConfig>(config, local_info_, dispatcher_, cm_, singleton_manager_,
+                                       *stats_.rootScope(), runtime_, per_route);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -100,23 +104,26 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  Singleton::ManagerImpl singleton_manager_;
+
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
   std::shared_ptr<Filter> filter_2_;
 };
 
 TEST_F(FilterTest, Runtime) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "false", "\"OFF\""), false, false);
+  setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\""), false, false);
   EXPECT_EQ(&runtime_, &(config_->runtime()));
 }
 
 TEST_F(FilterTest, ToErrorCode) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "false", "\"OFF\""), false, false);
+  setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\""), false, false);
   EXPECT_EQ(Http::Code::BadRequest, toErrorCode(400));
 }
 
 TEST_F(FilterTest, Disabled) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "false", "\"OFF\""), false, false);
+  setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\""), false, false);
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enabled"));
@@ -124,7 +131,7 @@ TEST_F(FilterTest, Disabled) {
 }
 
 TEST_F(FilterTest, RequestOk) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "false", "\"OFF\""));
+  setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\""));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_2_->decodeHeaders(headers, false));
@@ -135,7 +142,7 @@ TEST_F(FilterTest, RequestOk) {
 }
 
 TEST_F(FilterTest, RequestOkPerConnection) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "true", "\"OFF\""));
+  setup(fmt::format(config_yaml, "false", "1", "true", "\"OFF\""));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, false));
@@ -146,7 +153,7 @@ TEST_F(FilterTest, RequestOkPerConnection) {
 }
 
 TEST_F(FilterTest, RequestRateLimited) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "false", "\"OFF\""));
+  setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\""));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -187,7 +194,7 @@ TEST_F(FilterTest, RequestRateLimited) {
 }
 
 TEST_F(FilterTest, RequestRateLimitedResourceExhausted) {
-  setup(fmt::format(fmt::runtime(config_yaml), "true", "1", "false", "\"OFF\""));
+  setup(fmt::format(config_yaml, "true", "1", "false", "\"OFF\""));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -235,7 +242,7 @@ connection rate limiting and even though 'max_token' is set to 1, it allows 2 re
 allowed (across the process) for the same configuration.
 */
 TEST_F(FilterTest, RequestRateLimitedPerConnection) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "true", "\"OFF\""));
+  setup(fmt::format(config_yaml, "false", "1", "true", "\"OFF\""));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
       .WillOnce(Invoke([](Http::Code code, absl::string_view body,
@@ -272,7 +279,7 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
 }
 
 TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "0", "false", "\"OFF\""), true, false);
+  setup(fmt::format(config_yaml, "false", "0", "false", "\"OFF\""), true, false);
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _)).Times(0);
 
@@ -288,7 +295,7 @@ TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
 }
 
 TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
-  setup(fmt::format(fmt::runtime(config_yaml), "false", "1", "false", "DRAFT_VERSION_03"));
+  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
 
   auto request_headers = Http::TestRequestHeaderMapImpl();
   auto response_headers = Http::TestResponseHeaderMapImpl();
@@ -310,7 +317,23 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
-static const std::string descriptor_config_yaml = R"(
+TEST_F(FilterTest, RequestRateLimitedXRateLimitHeadersWithoutRunningDecodeHeaders) {
+  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
+
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-reset"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-reset"));
+}
+
+static constexpr absl::string_view descriptor_config_yaml = R"(
 stat_prefix: test
 token_bucket:
   max_tokens: {}
@@ -353,7 +376,7 @@ descriptors:
 stage: {}
   )";
 
-static const std::string consume_default_token_config_yaml = R"(
+static constexpr absl::string_view consume_default_token_config_yaml = R"(
 stat_prefix: test
 token_bucket:
   max_tokens: {}
@@ -396,7 +419,7 @@ descriptors:
 stage: {}
   )";
 
-static const std::string descriptor_vh_config_yaml = R"(
+static constexpr absl::string_view descriptor_vh_config_yaml = R"(
 stat_prefix: test
 token_bucket:
   max_tokens: {}
@@ -469,8 +492,7 @@ public:
 };
 
 TEST_F(DescriptorFilterTest, NoRouteEntry) {
-  setupPerRoute(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "0"), true,
-                true, true);
+  setupPerRoute(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"), true, true, true);
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -480,7 +502,7 @@ TEST_F(DescriptorFilterTest, NoRouteEntry) {
 }
 
 TEST_F(DescriptorFilterTest, NoCluster) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
 
@@ -492,7 +514,7 @@ TEST_F(DescriptorFilterTest, NoCluster) {
 }
 
 TEST_F(DescriptorFilterTest, DisabledInRoute) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -507,7 +529,7 @@ TEST_F(DescriptorFilterTest, DisabledInRoute) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorRequestOk) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -523,7 +545,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestOk) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimited) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "0", "\"OFF\"", "0", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -539,7 +561,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimited) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -555,7 +577,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenTrue) {
-  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "true", "1", "0"));
+  setUpTest(fmt::format(consume_default_token_config_yaml, "0", "true", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -571,7 +593,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenTrue)
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorWithConsumeDefaultTokenTrue) {
-  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "true", "1", "0"));
+  setUpTest(fmt::format(consume_default_token_config_yaml, "0", "true", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -587,7 +609,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorWithConsumeDefaultTokenTrue) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorWithConsumeDefaultTokenFalse) {
-  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "false", "1", "0"));
+  setUpTest(fmt::format(consume_default_token_config_yaml, "0", "false", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -603,7 +625,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorWithConsumeDefaultTokenFalse) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenFalse) {
-  setUpTest(fmt::format(fmt::runtime(consume_default_token_config_yaml), "0", "false", "1", "0"));
+  setUpTest(fmt::format(consume_default_token_config_yaml, "0", "false", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -620,7 +642,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFoundWithConsumeDefaultTokenFalse
 
 TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {
   // Request should also be rate limited as it should match both descriptors and global token.
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "0", "\"OFF\"", "0", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -636,7 +658,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "1"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "1"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(1));
@@ -652,7 +674,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
 }
 
 TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedXRateLimitHeaders) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "0", "DRAFT_VERSION_03", "0", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "DRAFT_VERSION_03", "0", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -675,7 +697,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedXRateLimitHeaders)
 }
 
 TEST_F(DescriptorFilterTest, NoVHRateLimitOption) {
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "1", "\"OFF\"", "1", "0"));
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -698,8 +720,7 @@ TEST_F(DescriptorFilterTest, NoVHRateLimitOption) {
 // Tests that the route rate limit is used when VhRateLimitsOptions::OVERRIDE and route rate limit
 // is set
 TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "OVERRIDE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "OVERRIDE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -722,8 +743,7 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) {
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::OVERRIDE is set and
 // route rate limit is empty
 TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "OVERRIDE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "OVERRIDE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -746,8 +766,7 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE is set and route
 // rate limit is empty
 TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "INCLUDE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "INCLUDE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -767,8 +786,7 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE and route rate
 // limit is set
 TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "INCLUDE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "INCLUDE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -791,8 +809,7 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet)
 // Tests that the route rate limit is used when VhRateLimitsOptions::IGNORE and route rate limit is
 // set
 TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "IGNORE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -814,8 +831,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
 // Tests that no rate limit is used when VhRateLimitsOptions::IGNORE is set and route rate limit
 // empty
 TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "IGNORE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
@@ -833,8 +849,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
 
 // Tests that the virtual host rate limit is used when includeVirtualHostRateLimits is used
 TEST_F(DescriptorFilterTest, IncludeVirtualHostRateLimitsSetTrue) {
-  setUpTest(
-      fmt::format(fmt::runtime(descriptor_vh_config_yaml), "1", "\"OFF\"", "1", "0", "IGNORE"));
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));

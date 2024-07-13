@@ -24,7 +24,7 @@ EXTENSIONS = {
     "envoy.retry.options.network_configuration":           "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     "envoy.transport_sockets.http_11_proxy":               "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
     "envoy.transport_sockets.raw_buffer":                  "//source/extensions/transport_sockets/raw_buffer:config",
-    "envoy.transport_sockets.tls":                         "//source/extensions/transport_sockets/tls:config",
+    "envoy.transport_sockets.tls":                         "//source/extensions/transport_sockets/tls:upstream_config",
     "envoy.http.stateful_header_formatters.preserve_case": "//source/extensions/http/header_formatters/preserve_case:config",
     "envoy_mobile.cert_validator.platform_bridge_cert_validator": "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
     "envoy.listener_manager_impl.api":                     "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",

@@ -13,8 +13,10 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
-#include "nghttp2/nghttp2.h"
 
+#ifdef ENVOY_NGHTTP2
+#include "nghttp2/nghttp2.h"
+#endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "quiche/common/structured_headers.h"
 #endif
@@ -45,7 +47,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   d.present_match: Match will succeed if the header is present.
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
+HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config,
+                                      Server::Configuration::CommonFactoryContext& factory_context)
     : name_(config.name()), invert_match_(config.invert_match()),
       treat_missing_as_empty_(config.treat_missing_header_as_empty()) {
   switch (config.header_match_specifier_case()) {
@@ -55,7 +58,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
+    regex_ = Regex::Utility::parseRegex(config.safe_regex_match(), factory_context.regexEngine());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -82,7 +85,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::StringMatch;
     string_match_ =
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config.string_match());
+            config.string_match(), factory_context);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -200,11 +203,20 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
                                                              http2::adapter::ObsTextOption::kAllow);
 }
 
-bool HeaderUtility::headerNameIsValid(const absl::string_view header_key) {
+bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   if (!header_key.empty() && header_key[0] == ':') {
-    // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
-    return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
-                                     header_key.size()) != 0;
+#ifdef ENVOY_NGHTTP2
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.sanitize_http2_headers_without_nghttp2")) {
+      // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
+      return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
+                                       header_key.size()) != 0;
+    }
+#endif
+    header_key.remove_prefix(1);
+    if (header_key.empty()) {
+      return false;
+    }
   }
   // For all other header use HTTP/1 semantics. The only difference from HTTP/2 is that
   // uppercase characters are allowed. This allows HTTP filters to add header with mixed
@@ -224,16 +236,21 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  if (Runtime::runtimeFeatureEnabled(
+#ifdef ENVOY_NGHTTP2
+  if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_validate_authority_with_quiche")) {
-    return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
-  } else {
     return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
                                    header_value.size()) != 0;
   }
+#endif
+  return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_104") &&
+      response_headers.Status()->value() == "104") {
+    return true;
+  }
   return response_headers.Status()->value() == "100" ||
          response_headers.Status()->value() == "102" || response_headers.Status()->value() == "103";
 }

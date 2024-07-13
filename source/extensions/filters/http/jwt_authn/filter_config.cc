@@ -3,6 +3,8 @@
 #include <algorithm> // std::sort
 
 #include "source/common/common/empty_string.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
 
@@ -22,6 +24,23 @@ FilterConfigImpl::FilterConfigImpl(
 
   jwks_cache_ = JwksCache::create(proto_config_, context, Common::JwksFetcher::create, stats_);
 
+  // Validate provider URIs.
+  // Note that the PGV well-known regex for URI is not implemented in C++, otherwise we could add a
+  // PGV rule instead of doing this check manually.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_authn_validate_uri")) {
+    for (const auto& provider_pair : proto_config_.providers()) {
+      const auto provider_value = std::get<1>(provider_pair);
+      if (provider_value.has_remote_jwks()) {
+        absl::string_view provider_uri = provider_value.remote_jwks().http_uri().uri();
+        Http::Utility::Url url;
+        if (!url.initialize(provider_uri, /*is_connect=*/false)) {
+          throw EnvoyException(fmt::format("Provider '{}' has an invalid URI: '{}'",
+                                           std::get<0>(provider_pair), provider_uri));
+        }
+      }
+    }
+  }
+
   std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {
     names.push_back(it.first);
@@ -36,7 +55,7 @@ FilterConfigImpl::FilterConfigImpl(
     switch (rule.requirement_type_case()) {
     case RequirementRule::RequirementTypeCase::kRequires:
       rule_pairs_.emplace_back(
-          Matcher::create(rule),
+          Matcher::create(rule, context.serverFactoryContext()),
           Verifier::create(rule.requires_(), proto_config_.providers(), *this));
       break;
     case RequirementRule::RequirementTypeCase::kRequirementName: {
@@ -46,11 +65,11 @@ FilterConfigImpl::FilterConfigImpl(
         throw EnvoyException(fmt::format("Wrong requirement_name: {}. It should be one of [{}]",
                                          rule.requirement_name(), all_requirement_names_));
       }
-      rule_pairs_.emplace_back(Matcher::create(rule),
+      rule_pairs_.emplace_back(Matcher::create(rule, context.serverFactoryContext()),
                                Verifier::create(map_it->second, proto_config_.providers(), *this));
     } break;
     case RequirementRule::RequirementTypeCase::REQUIREMENT_TYPE_NOT_SET:
-      rule_pairs_.emplace_back(Matcher::create(rule), nullptr);
+      rule_pairs_.emplace_back(Matcher::create(rule, context.serverFactoryContext()), nullptr);
       break;
     }
   }

@@ -47,7 +47,9 @@ RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilte
 RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
                                Envoy::Server::Configuration::ServerFactoryContext& context)
     : name_(route_action.name()), cluster_name_(route_action.cluster()),
-      metadata_(route_action.metadata()), typed_metadata_(metadata_) {
+      metadata_(route_action.metadata()), typed_metadata_(metadata_),
+      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route_action, timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      retry_policy_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route_action.retry_policy(), num_retries, 1)) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {
     auto route_config =
@@ -75,8 +77,8 @@ VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
   RouteActionValidationVisitor validation_visitor;
   RouteActionContext action_context{context};
 
-  Matcher::MatchTreeFactory<Request, RouteActionContext> factory(action_context, context,
-                                                                 validation_visitor);
+  Matcher::MatchTreeFactory<MatchInput, RouteActionContext> factory(action_context, context,
+                                                                    validation_visitor);
 
   matcher_ = factory.create(virtual_host_config.routes())();
 
@@ -86,8 +88,8 @@ VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
   }
 }
 
-RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const Request& request) const {
-  auto match = Matcher::evaluateMatch<Request>(*matcher_, request);
+RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const MatchInput& request) const {
+  auto match = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
 
   if (match.result_) {
     auto action = match.result_();
@@ -189,8 +191,8 @@ const VirtualHostImpl* RouteMatcherImpl::findWildcardVirtualHost(
   return nullptr;
 }
 
-const VirtualHostImpl* RouteMatcherImpl::findVirtualHost(const Request& request) const {
-  absl::string_view host = request.host();
+const VirtualHostImpl* RouteMatcherImpl::findVirtualHost(const MatchInput& request) const {
+  absl::string_view host = request.requestHeader().host();
 
   // Fast path the case where we only have a default virtual host or host property is provided.
   if (host.empty() || (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
@@ -223,7 +225,7 @@ const VirtualHostImpl* RouteMatcherImpl::findVirtualHost(const Request& request)
   return default_virtual_host_.get();
 }
 
-RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const Request& request) const {
+RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const MatchInput& request) const {
   const auto* virtual_host = findVirtualHost(request);
   if (virtual_host != nullptr) {
     return virtual_host->routeEntry(request);
