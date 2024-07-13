@@ -70,7 +70,7 @@ envoy_cc_library(
     name = "sidestream_watermark_lib",
     hdrs = ["sidestream_watermark.h"],
     deps = [
-        "//envoy/http:filter_interface",
+        "//envoy/http:async_client_interface",
     ],
 )
 
