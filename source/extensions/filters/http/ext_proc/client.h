@@ -9,7 +9,7 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "source/common/http/async_client_utility.h"
+#include "source/common/http/sidestream_watermark.h"
 
 namespace Envoy {
 namespace Extensions {

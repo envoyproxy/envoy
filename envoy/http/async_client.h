@@ -24,27 +24,6 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 } // namespace Router
 namespace Http {
 
-class SidestreamWatermarkCallbacks {
-public:
-  virtual ~SidestreamWatermarkCallbacks() = default;
-  /**
-   * Called when the sidestream connection or stream goes over its high watermark. Note that this
-   * may be called separately for both the stream going over and the connection going over. It
-   * is the responsibility of the sidestreamWatermarkCallbacks implementation to handle unwinding
-   * multiple high and low watermark calls.
-   */
-  virtual void onSidestreamAboveHighWatermark() PURE;
-
-  /**
-   * Called when the sidestream connection or stream goes from over its high watermark to under its
-   * low watermark. As with onSidestreamAboveHighWatermark above, this may be called independently
-   * when both the stream and the connection go under the low watermark limit, and the callee must
-   * ensure that the flow of data does not resume until all callers which were above their high
-   * watermarks have gone below.
-   */
-  virtual void onSidestreamBelowLowWatermark() PURE;
-};
-
 /**
  * Supports sending an HTTP request message and receiving a response asynchronously.
  */
