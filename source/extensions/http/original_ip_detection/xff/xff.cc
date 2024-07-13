@@ -20,8 +20,11 @@ XffIPDetection::XffIPDetection(
   if (config.has_xff_trusted_cidrs()) {
     xff_trusted_cidrs_.reserve(config.xff_trusted_cidrs().cidrs().size());
     for (const envoy::config::core::v3::CidrRange& entry : config.xff_trusted_cidrs().cidrs()) {
-      Network::Address::CidrRange cidr = Network::Address::CidrRange::create(entry);
-      xff_trusted_cidrs_.push_back(cidr);
+      absl::StatusOr<Network::Address::CidrRange> cidr_or_error =
+          Network::Address::CidrRange::create(entry);
+      if (cidr_or_error.ok()) {
+        xff_trusted_cidrs_.push_back(cidr_or_error.value());
+      }
     }
   }
 }

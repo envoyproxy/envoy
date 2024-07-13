@@ -545,7 +545,7 @@ TEST_F(ConnectionManagerUtilityTest, XFFTrustedHopsAppendsXFF) {
 // and that XFF is appended to.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithoutRecurse) {
   std::vector<Network::Address::CidrRange> cidrs = {
-      Network::Address::CidrRange::create("198.51.100.0", 24),
+      Network::Address::CidrRange::create("198.51.100.0", 24).value(),
   };
   detection_extensions_.clear();
   detection_extensions_.push_back(getXFFExtension(cidrs, true, false));
@@ -567,7 +567,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithoutRecurse) {
 // and that XFF is not appended.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithoutRecurseDontAppendXFF) {
   std::vector<Network::Address::CidrRange> cidrs = {
-      Network::Address::CidrRange::create("198.51.100.0", 24),
+      Network::Address::CidrRange::create("198.51.100.0", 24).value(),
   };
   detection_extensions_.clear();
   detection_extensions_.push_back(getXFFExtension(cidrs, false, false));
@@ -587,7 +587,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithoutRecurseDontAppendX
 // Verify that we use the first address in XFF and XFF is appended to.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsWithRecurse) {
   std::vector<Network::Address::CidrRange> cidrs = {
-      Network::Address::CidrRange::create("198.51.100.0", 24),
+      Network::Address::CidrRange::create("198.51.100.0", 24).value(),
   };
   detection_extensions_.clear();
   detection_extensions_.push_back(getXFFExtension(cidrs, true, true));
