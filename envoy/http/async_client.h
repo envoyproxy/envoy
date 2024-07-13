@@ -27,7 +27,6 @@ namespace Http {
 class SidestreamWatermarkCallbacks {
 public:
   virtual ~SidestreamWatermarkCallbacks() = default;
-
   /**
    * Called when the sidestream connection or stream goes over its high watermark. Note that this
    * may be called separately for both the stream going over and the connection going over. It
