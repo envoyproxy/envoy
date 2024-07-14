@@ -134,11 +134,17 @@ public:
       std::function<void(const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
                          ProtobufMessage::ValidationVisitor&)>;
 
-  Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
-      const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  Ssl::TlsCertificateSelectorFactory
+  createTlsCertificateSelectorFactory(const Protobuf::Message& config,
+                                      Server::Configuration::CommonFactoryContext& factory_context,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      absl::Status& creation_status, bool for_quic) override {
     if (selector_cb_) {
       selector_cb_(config, factory_context, validation_visitor);
+    }
+    if (for_quic) {
+      creation_status = absl::InvalidArgumentError("does not supported for quic");
+      return Ssl::TlsCertificateSelectorFactory();
     }
     return
         [&config, this](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorCallback& ctx) {

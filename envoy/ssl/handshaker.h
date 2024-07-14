@@ -258,7 +258,8 @@ public:
   virtual TlsCertificateSelectorFactory
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
                                       Server::Configuration::CommonFactoryContext& factory_context,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      absl::Status& creation_status, bool for_quic) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
 };

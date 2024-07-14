@@ -63,10 +63,9 @@ private:
 class TlsCertificateSelectorConfigFactoryImpl : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   std::string name() const override { return "envoy.tls.certificate_selectors.default"; }
-  Ssl::TlsCertificateSelectorFactory
-  createTlsCertificateSelectorFactory(const Protobuf::Message&,
-                                      Server::Configuration::CommonFactoryContext&,
-                                      ProtobufMessage::ValidationVisitor&) override {
+  Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
+      const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
+      ProtobufMessage::ValidationVisitor&, absl::Status&, bool) override {
     return [](const Ssl::ServerContextConfig& config, Ssl::TlsCertificateSelectorCallback& ctx) {
       return std::make_unique<DefaultTlsCertificateSelector>(config, ctx);
     };

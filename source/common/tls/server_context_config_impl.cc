@@ -103,10 +103,10 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES =
 
 absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context, bool for_quic) {
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(
-      new ServerContextConfigImpl(config, secret_provider_context, creation_status));
+      new ServerContextConfigImpl(config, secret_provider_context, creation_status, for_quic));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -114,7 +114,7 @@ absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status)
+    absl::Status& creation_status, bool for_quic)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context, creation_status),
       require_client_certificate_(
@@ -166,7 +166,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
             provider_config);
     tls_certificate_selector_factory_ = provider_factory->createTlsCertificateSelectorFactory(
         provider_config.typed_config(), factory_context.serverFactoryContext(),
-        factory_context.messageValidationVisitor());
+        factory_context.messageValidationVisitor(), creation_status, for_quic);
     return;
   }
 
@@ -174,7 +174,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
   const ProtobufWkt::Any any;
   tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
-      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor());
+      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
+      creation_status, for_quic);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {

@@ -196,8 +196,9 @@ public:
         getDefaultTlsCertificateSelectorConfigFactory();
     ASSERT_TRUE(factory);
     const ProtobufWkt::Any any;
+    absl::Status creation_status = absl::OkStatus();
     auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorFactory(
-        any, factory_context_, ProtobufMessage::getNullValidationVisitor());
+        any, factory_context_, ProtobufMessage::getNullValidationVisitor(), creation_status, true);
     EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
         .WillRepeatedly(Return(tls_certificate_selector_factory_cb));
 
