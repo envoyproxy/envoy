@@ -25,7 +25,7 @@ class DefaultTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                       protected Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultTlsCertificateSelector(const Ssl::ServerContextConfig& config,
-                                Ssl::TlsCertificateSelectorCallback& cb);
+                                Ssl::TlsCertificateSelectorContext& selector_ctx);
 
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
@@ -66,8 +66,9 @@ public:
   Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
       const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
       ProtobufMessage::ValidationVisitor&, absl::Status&, bool) override {
-    return [](const Ssl::ServerContextConfig& config, Ssl::TlsCertificateSelectorCallback& ctx) {
-      return std::make_unique<DefaultTlsCertificateSelector>(config, ctx);
+    return [](const Ssl::ServerContextConfig& config,
+              Ssl::TlsCertificateSelectorContext& selector_ctx) {
+      return std::make_unique<DefaultTlsCertificateSelector>(config, selector_ctx);
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

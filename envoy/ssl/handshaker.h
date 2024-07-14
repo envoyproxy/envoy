@@ -235,9 +235,9 @@ public:
 
 using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;
 
-class TlsCertificateSelectorCallback {
+class TlsCertificateSelectorContext {
 public:
-  virtual ~TlsCertificateSelectorCallback() = default;
+  virtual ~TlsCertificateSelectorContext() = default;
 
   /**
    * @return reference to the initialized Tls Contexts.
@@ -246,7 +246,7 @@ public:
 };
 
 using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
-    const ServerContextConfig&, TlsCertificateSelectorCallback&)>;
+    const ServerContextConfig&, TlsCertificateSelectorContext&)>;
 
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:

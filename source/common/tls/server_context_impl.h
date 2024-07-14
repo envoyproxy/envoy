@@ -41,7 +41,7 @@ namespace Tls {
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
-                          public Envoy::Ssl::TlsCertificateSelectorCallback {
+                          public Envoy::Ssl::TlsCertificateSelectorContext {
 public:
   static absl::StatusOr<std::unique_ptr<ServerContextImpl>>
   create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
@@ -49,8 +49,8 @@ public:
          Server::Configuration::CommonFactoryContext& factory_context,
          Ssl::ContextAdditionalInitFunc additional_init);
 
-  // Ssl::TlsCertificateSelectorCallback
-  // The returned vector has the same life-time as the Ssl::TlsCertificateSelectorCallback.
+  // Ssl::TlsCertificateSelectorContext
+  // The returned vector has the same life-time as the Ssl::TlsCertificateSelectorContext.
   const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with

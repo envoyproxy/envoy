@@ -82,8 +82,9 @@ namespace Tls {
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
   TestTlsCertificateSelector(Event::Dispatcher& dispatcher,
-                             Ssl::TlsCertificateSelectorCallback& ctx, const Protobuf::Message&)
-      : dispatcher_(dispatcher), ctx_(ctx) {}
+                             Ssl::TlsCertificateSelectorContext& selector_ctx,
+                             const Protobuf::Message&)
+      : dispatcher_(dispatcher), selector_ctx_(selector_ctx) {}
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
   }
@@ -117,14 +118,14 @@ public:
     cb_->onCertificateSelectionResult(getTlsContext(), false);
   }
 
-  const Ssl::TlsContext& getTlsContext() { return ctx_.getTlsContexts()[0]; }
+  const Ssl::TlsContext& getTlsContext() { return selector_ctx_.getTlsContexts()[0]; }
 
   // Used to create an async certificate ready event.
   Event::Dispatcher& dispatcher_;
   Ssl::SelectionResult::SelectionStatus mod_;
 
 private:
-  Ssl::TlsCertificateSelectorCallback& ctx_;
+  Ssl::TlsCertificateSelectorContext& selector_ctx_;
   Ssl::CertificateSelectionCallbackPtr cb_;
 };
 
@@ -146,13 +147,14 @@ public:
       creation_status = absl::InvalidArgumentError("does not supported for quic");
       return Ssl::TlsCertificateSelectorFactory();
     }
-    return
-        [&config, this](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorCallback& ctx) {
-          ENVOY_LOG_MISC(info, "debug: init provider");
-          auto provider = std::make_unique<TestTlsCertificateSelector>(*dispatcher_, ctx, config);
-          provider->mod_ = mod_;
-          return provider;
-        };
+    return [&config, this](const Ssl::ServerContextConfig&,
+                           Ssl::TlsCertificateSelectorContext& selector_ctx) {
+      ENVOY_LOG_MISC(info, "debug: init provider");
+      auto provider =
+          std::make_unique<TestTlsCertificateSelector>(*dispatcher_, selector_ctx, config);
+      provider->mod_ = mod_;
+      return provider;
+    };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<xds::type::v3::TypedStruct>();

@@ -8,9 +8,9 @@ namespace TransportSockets {
 namespace Tls {
 
 DefaultTlsCertificateSelector::DefaultTlsCertificateSelector(
-    const Ssl::ServerContextConfig& config, Ssl::TlsCertificateSelectorCallback& cb)
-    : server_ctx_(dynamic_cast<ServerContextImpl&>(cb)), tls_contexts_(cb.getTlsContexts()),
-      ocsp_staple_policy_(config.ocspStaplePolicy()),
+    const Ssl::ServerContextConfig& config, Ssl::TlsCertificateSelectorContext& selector_ctx)
+    : server_ctx_(dynamic_cast<ServerContextImpl&>(selector_ctx)),
+      tls_contexts_(selector_ctx.getTlsContexts()), ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
   for (auto& ctx : tls_contexts_) {
     if (ctx.cert_chain_ == nullptr) {
