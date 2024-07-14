@@ -16,6 +16,7 @@ Attribute value types are limited to:
 * ``bytes`` for byte buffers
 * ``int`` for 64-bit signed integers
 * ``uint`` for 64-bit unsigned integers
+* ``double`` for 64-bit floating point numbers
 * ``bool`` for booleans
 * ``list`` for lists of values
 * ``map`` for associative arrays with string keys
@@ -61,6 +62,7 @@ processing, which makes them suitable for RBAC policies.
    request.id, string, Request ID corresponding to ``x-request-id`` header value
    request.protocol, string, "Request protocol ('"HTTP/1.0'", '"HTTP/1.1'", '"HTTP/2'", or '"HTTP/3'")"
    request.query, string, The query portion of the URL in the format of "name1=value1&name2=value2".
+   request.random_value, uint, A random integer sourced from the Request ID if possible else generated.
 
 Header values in ``request.headers`` associative array are comma-concatenated in case of multiple values.
 
@@ -73,6 +75,14 @@ Additional attributes are available once the request completes:
    request.duration, duration, Total duration of the request
    request.size, int, Size of the request body. Content length header is used if available.
    request.total_size, int, Total size of the request including the approximate uncompressed size of the headers
+
+The Request group also provides the following instance functions:
+
+.. csv-table::
+   :header: Function, Type, Description
+   :widths: 1, 1, 4
+
+   "request.sample(p, i)", "request.(double, int) -> bool", "Deterministically returns true with a probability of p based on i"
 
 Response attributes
 -------------------
@@ -151,6 +161,25 @@ The following attributes are available once the upstream connection is establish
    upstream.sha256_peer_certificate_digest, string, SHA256 digest of the peer certificate in the upstream TLS connection if present
    upstream.local_address, string, The local address of the upstream connection
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
+
+Context attributes
+-------------------------
+
+The following attributes are provided per expression for utility purposes:
+
+.. csv-table::
+   :header: Attribute, Type, Description
+   :widths: 1, 1, 4
+
+   context.random_value, uint, A random integer generated per expression invocation
+
+The Context group also provides the following instance functions:
+
+.. csv-table::
+   :header: Function, Type, Description
+   :widths: 1, 1, 4
+
+   "context.sample(p, i)", "context.(double, int) -> bool", "Deterministically returns true with a probability of p based on i"
 
 Metadata and filter state
 -------------------------

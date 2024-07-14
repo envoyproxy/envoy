@@ -717,6 +717,34 @@ inline constexpr absl::string_view DynamicMetadataCelString = R"pb(
   }
 )pb";
 
+// context.sample(0.5, 0)
+inline constexpr char SampleCelString[] = R"pb(
+  expr: {
+    id: 2
+    call_expr: {
+      target: {
+        id: 1
+        ident_expr: {
+          name: "context"
+        }
+      }
+      function: "sample"
+      args: {
+        id: 3
+        const_expr: {
+          double_value: 0.5
+        }
+      }
+      args: {
+        id: 4
+        const_expr: {
+          int64_value: 1
+        }
+      }
+    }
+  }
+)pb";
+
 } // namespace CelMatcher
 } // namespace InputMatchers
 } // namespace Matching

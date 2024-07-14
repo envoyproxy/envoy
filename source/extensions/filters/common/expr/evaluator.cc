@@ -3,6 +3,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/crypto/utility.h"
+
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
@@ -15,8 +18,8 @@ namespace Expr {
 namespace {
 
 #define ACTIVATION_TOKENS(_f)                                                                      \
-  _f(Request) _f(Response) _f(Connection) _f(Upstream) _f(Source) _f(Destination) _f(Metadata)     \
-      _f(FilterState) _f(XDS) _f(UpstreamFilterState)
+  _f(Request) _f(Response) _f(Connection) _f(Context) _f(Upstream) _f(Source) _f(Destination)      \
+      _f(Metadata) _f(FilterState) _f(XDS) _f(UpstreamFilterState)
 
 #define _DECLARE(_t) _t,
 enum class ActivationToken { ACTIVATION_TOKENS(_DECLARE) };
@@ -49,13 +52,16 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
   const StreamInfo::StreamInfo& info = *activation_info_;
   switch (token->second) {
   case ActivationToken::Request:
-    return CelValue::CreateMap(
-        Protobuf::Arena::Create<RequestWrapper>(arena, *arena, activation_request_headers_, info));
+    return CelValue::CreateMap(Protobuf::Arena::Create<RequestWrapper>(
+        arena, *arena, activation_request_headers_, info, random_value_));
   case ActivationToken::Response:
     return CelValue::CreateMap(Protobuf::Arena::Create<ResponseWrapper>(
         arena, *arena, activation_response_headers_, activation_response_trailers_, info));
   case ActivationToken::Connection:
     return CelValue::CreateMap(Protobuf::Arena::Create<ConnectionWrapper>(arena, *arena, info));
+  case ActivationToken::Context:
+    return CelValue::CreateMap(
+        Protobuf::Arena::Create<ContextWrapper>(arena, *arena, random_value_));
   case ActivationToken::Upstream:
     return CelValue::CreateMap(Protobuf::Arena::Create<UpstreamWrapper>(arena, *arena, info));
   case ActivationToken::Source:
@@ -91,9 +97,10 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
                                const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
-                               const Http::ResponseTrailerMap* response_trailers) {
+                               const Http::ResponseTrailerMap* response_trailers,
+                               uint64_t random_value) {
   return std::make_unique<StreamActivation>(local_info, info, request_headers, response_headers,
-                                            response_trailers);
+                                            response_trailers, random_value);
 }
 
 BuilderPtr createBuilder(Protobuf::Arena* arena) {
@@ -107,12 +114,9 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   options.enable_string_conversion = false;
   options.enable_string_concat = false;
   options.enable_list_concat = false;
-
-  // Enable constant folding (performance optimization)
-  if (arena != nullptr) {
-    options.constant_folding = true;
-    options.constant_arena = arena;
-  }
+  options.constant_folding =
+      false; // disable constant folding to prevent random() function from being inlined
+  options.constant_arena = arena;
 
   auto builder = google::api::expr::runtime::CreateCelExpressionBuilder(options);
   auto register_status =
@@ -120,6 +124,16 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   if (!register_status.ok()) {
     throw CelException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
+  }
+
+  // Register custom functions
+  auto sample_register_status =
+      CelFunctionAdapter<absl::StatusOr<bool>, const CelMap*, double, int64_t>::CreateAndRegister(
+          Sample,
+          /*receiver_style=*/true, &SampleExtensionFunction, builder->GetRegistry());
+  if (!sample_register_status.ok()) {
+    throw CelException(
+        absl::StrCat("failed to register sample function: ", sample_register_status.message()));
   }
   return builder;
 }
@@ -142,14 +156,13 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
   return std::move(cel_expression_status.value());
 }
 
-absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
-                                  const LocalInfo::LocalInfo* local_info,
-                                  const StreamInfo::StreamInfo& info,
-                                  const Http::RequestHeaderMap* request_headers,
-                                  const Http::ResponseHeaderMap* response_headers,
-                                  const Http::ResponseTrailerMap* response_trailers) {
-  auto activation =
-      createActivation(local_info, info, request_headers, response_headers, response_trailers);
+absl::optional<CelValue>
+evaluate(const Expression& expr, Protobuf::Arena& arena, const LocalInfo::LocalInfo* local_info,
+         const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap* request_headers,
+         const Http::ResponseHeaderMap* response_headers,
+         const Http::ResponseTrailerMap* response_trailers, uint64_t random_value) {
+  auto activation = createActivation(local_info, info, request_headers, response_headers,
+                                     response_trailers, random_value);
   auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
@@ -159,9 +172,10 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers) {
+             const Http::RequestHeaderMap& headers, uint64_t random_value) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, nullptr, info, &headers, nullptr, nullptr);
+  auto eval_status =
+      Expr::evaluate(expr, arena, nullptr, info, &headers, nullptr, nullptr, random_value);
   if (!eval_status.has_value()) {
     return false;
   }
@@ -194,6 +208,40 @@ std::string print(CelValue value) {
   default:
     return absl::StrCat(CelValue::TypeName(value.type()), " value");
   }
+}
+
+absl::StatusOr<bool> SampleExtensionFunction(Protobuf::Arena*, const CelMap* map,
+                                             double probability, int64_t idx) {
+  // search for random value
+  absl::optional<CelValue> entry = (*map)[CelValue::CreateStringView(RandomValue)];
+  if (!entry.has_value() || !entry.value().IsUint64()) {
+    return absl::InvalidArgumentError("map missing uint random value key");
+  }
+
+  // bounds check probability
+  if (probability <= 0) {
+    return false;
+  } else if (probability >= 1) {
+    return true;
+  }
+
+  // Generate deterministic random value by generating a sha of a random value
+  // concatenated with the index. Use consistent endianness to ensure consistency
+  // between evaluations across multiple envoy hops.
+  uint64_t seed = entry.value().Uint64OrDie();
+  Buffer::OwnedImpl buffer;
+  buffer.writeLEInt<uint64_t>(seed);
+  buffer.writeLEInt<int64_t>(idx);
+  std::vector<uint8_t> digest =
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer);
+  RELEASE_ASSERT(digest.size() >= sizeof(uint64_t), "Missing enough bytes to construct uint64_t");
+  uint64_t* toCopy = reinterpret_cast<uint64_t*>(digest.data());
+  uint64_t randomUint = fromEndianness<ByteOrder::LittleEndian, uint64_t>(*toCopy);
+
+  // copied from Random::RandomGenerator. Negligibly biases high values due to floating point
+  // precision.
+  return randomUint < static_cast<uint64_t>(
+                          probability * static_cast<double>(std::numeric_limits<uint64_t>::max()));
 }
 
 } // namespace Expr

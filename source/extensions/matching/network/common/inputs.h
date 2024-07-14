@@ -21,7 +21,8 @@ public:
   std::string name() const override { return "envoy.matching.inputs." + name_; }
 
   Matcher::DataInputFactoryCb<MatchingDataType>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<InputType>(); };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -289,7 +290,8 @@ public:
 
   Matcher::DataInputFactoryCb<MatchingDataType>
   createDataInputFactoryCb(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Random::RandomGenerator&) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput&>(
         message, validation_visitor);

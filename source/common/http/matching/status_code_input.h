@@ -76,7 +76,8 @@ public:
   std::string name() const override { return name_; }
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
 
     return [] { return std::make_unique<DataInputType>(); };
   };

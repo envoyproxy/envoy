@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/headers.h"
@@ -41,11 +42,12 @@ public:
                    const StreamInfo::StreamInfo& info,
                    const ::Envoy::Http::RequestHeaderMap* request_headers,
                    const ::Envoy::Http::ResponseHeaderMap* response_headers,
-                   const ::Envoy::Http::ResponseTrailerMap* response_trailers)
+                   const ::Envoy::Http::ResponseTrailerMap* response_trailers,
+                   uint64_t random_value)
       : local_info_(local_info), activation_info_(&info),
         activation_request_headers_(request_headers),
         activation_response_headers_(response_headers),
-        activation_response_trailers_(response_trailers) {}
+        activation_response_trailers_(response_trailers), random_value_(random_value) {}
 
   StreamActivation() = default;
 
@@ -62,6 +64,7 @@ protected:
   mutable const ::Envoy::Http::RequestHeaderMap* activation_request_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseHeaderMap* activation_response_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseTrailerMap* activation_response_trailers_{nullptr};
+  uint64_t random_value_;
 };
 
 // Creates an activation providing the common context attributes.
@@ -70,7 +73,15 @@ ActivationPtr createActivation(const ::Envoy::LocalInfo::LocalInfo* local_info,
                                const StreamInfo::StreamInfo& info,
                                const ::Envoy::Http::RequestHeaderMap* request_headers,
                                const ::Envoy::Http::ResponseHeaderMap* response_headers,
-                               const ::Envoy::Http::ResponseTrailerMap* response_trailers);
+                               const ::Envoy::Http::ResponseTrailerMap* response_trailers,
+                               uint64_t random_value);
+
+// Sample CEL extension function. Given a map with a "random_value" key and a unique index,
+// returns true at the given probability. Multiple invocations of the sample function with
+// the same index within an expression are guaranteed to be equal, while invocations with
+// different indices are guaranteed to be uncorrelated to an external observer.
+absl::StatusOr<bool> SampleExtensionFunction(Protobuf::Arena*, const CelMap* map,
+                                             double probability, int64_t idx);
 
 // Shared expression builder instance.
 class BuilderInstance : public Singleton::Instance {
@@ -103,12 +114,13 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const StreamInfo::StreamInfo& info,
                                   const ::Envoy::Http::RequestHeaderMap* request_headers,
                                   const ::Envoy::Http::ResponseHeaderMap* response_headers,
-                                  const ::Envoy::Http::ResponseTrailerMap* response_trailers);
+                                  const ::Envoy::Http::ResponseTrailerMap* response_trailers,
+                                  uint64_t random_value);
 
 // Evaluates an expression and returns true if the expression evaluates to "true".
 // Returns false if the expression fails to evaluate.
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const ::Envoy::Http::RequestHeaderMap& headers);
+             const ::Envoy::Http::RequestHeaderMap& headers, uint64_t random_value);
 
 // Returns a string for a CelValue.
 std::string print(CelValue value);

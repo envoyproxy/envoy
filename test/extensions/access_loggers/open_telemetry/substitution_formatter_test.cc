@@ -900,7 +900,8 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
     Http::TestResponseHeaderMapImpl response_header{
         {"some_response_header", "SOME_RESPONSE_HEADER"}};
 
-    OpenTelemetryFormatMap expected = {{"cel_field", "SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
+    OpenTelemetryFormatMap expected = {
+        {"cel_field", "SOME_REQUEST_HEADER SOME_RESPONSE_HEADER true"}};
 
     envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig otel_config;
     TestUtility::loadFromYaml(R"EOF(
@@ -908,7 +909,10 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
         values:
           - key: "cel_field"
             value:
-              string_value: "%CEL(request.headers['some_request_header'])% %CEL(response.headers['some_response_header'])%"
+              string_value: >-
+                %CEL(request.headers['some_request_header'])%
+                %CEL(response.headers['some_response_header'])%
+                %CEL(context.sample(0.5, 1))%
       formatters:
         - name: envoy.formatter.cel
           typed_config:
@@ -920,6 +924,7 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
 
     OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);
 
+    EXPECT_CALL(context.server_factory_context_.api_.random_, random()).WillRepeatedly(Return(42));
     verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
                               expected);
   }

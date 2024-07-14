@@ -1808,6 +1808,31 @@ typed_config:
   logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, CelExtensionFilterRandom) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: cel_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+      expression: "context.sample(0.5, 1)"
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(*file_, write(_));
+  logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
 TEST_F(AccessLogImplTest, CelExtensionFilterExpressionError) {
   const std::string yaml = R"EOF(
 name: accesslog

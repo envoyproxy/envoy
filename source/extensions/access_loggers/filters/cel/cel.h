@@ -21,7 +21,7 @@ class CELAccessLogExtensionFilter : public AccessLog::Filter {
 public:
   CELAccessLogExtensionFilter(const ::Envoy::LocalInfo::LocalInfo& local_info,
                               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
-                              const google::api::expr::v1alpha1::Expr&);
+                              const google::api::expr::v1alpha1::Expr&, Random::RandomGenerator&);
 
   bool evaluate(const Formatter::HttpFormatterContext& log_context,
                 const StreamInfo::StreamInfo& stream_info) const override;
@@ -31,6 +31,7 @@ private:
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
   const google::api::expr::v1alpha1::Expr parsed_expr_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  Random::RandomGenerator& random_;
 };
 
 } // namespace CEL

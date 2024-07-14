@@ -265,6 +265,8 @@ public:
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
   }
 
+  Random::RandomGenerator& random() const { return random_; }
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
@@ -301,6 +303,8 @@ private:
 
   const ImmediateMutationChecker immediate_mutation_checker_;
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
+
+  Random::RandomGenerator& random_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

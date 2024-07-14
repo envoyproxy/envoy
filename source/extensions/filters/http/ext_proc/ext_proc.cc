@@ -209,7 +209,8 @@ FilterConfig::FilterConfig(
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
-      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
+      random_(context.api().randomGenerator()) {
   if (config.disable_clear_route_cache() &&
       (route_cache_action_ !=
        envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
@@ -996,7 +997,8 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   auto activation_ptr = Filters::Common::Expr::createActivation(
       &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
       state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
-      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
+      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()),
+      config_->random().random());
   auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
 
   state.setSentAttributes(true);

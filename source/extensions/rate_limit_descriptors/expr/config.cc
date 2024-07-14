@@ -24,9 +24,9 @@ public:
   ExpressionDescriptor(
       const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr& builder,
-      const google::api::expr::v1alpha1::Expr& input_expr)
+      const google::api::expr::v1alpha1::Expr& input_expr, Random::RandomGenerator& random)
       : builder_(builder), input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
-        skip_if_error_(config.skip_if_error()) {
+        skip_if_error_(config.skip_if_error()), random_(random) {
     compiled_expr_ =
         Extensions::Filters::Common::Expr::createExpression(builder_->builder(), input_expr_);
   }
@@ -36,8 +36,8 @@ public:
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
     ProtobufWkt::Arena arena;
-    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, nullptr, info,
-                                                        &headers, nullptr, nullptr);
+    const auto result = Filters::Common::Expr::evaluate(
+        *compiled_expr_.get(), arena, nullptr, info, &headers, nullptr, nullptr, random_.random());
     if (!result.has_value() || result.value().IsError()) {
       // If result is an error and if skip_if_error is true skip this descriptor,
       // while calling rate limiting service. If skip_if_error is false, do not call rate limiting
@@ -54,6 +54,7 @@ private:
   const std::string descriptor_key_;
   const bool skip_if_error_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  Random::RandomGenerator& random_;
 };
 
 } // namespace
@@ -78,11 +79,13 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
       throw EnvoyException("Unable to parse descriptor expression: " +
                            parse_status.status().ToString());
     }
-    return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr());
+    return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr(),
+                                                  context.api().randomGenerator());
   }
 #endif
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
-    return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed());
+    return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed(),
+                                                  context.api().randomGenerator());
   default:
     return nullptr;
   }

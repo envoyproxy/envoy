@@ -230,7 +230,8 @@ public:
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
-        principals_(policy.principals(), context), condition_(policy.condition()) {
+        principals_(policy.principals(), context), condition_(policy.condition()),
+        random_(context.api().randomGenerator()) {
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
     }
@@ -244,6 +245,7 @@ private:
   const OrMatcher principals_;
   const google::api::expr::v1alpha1::Expr condition_;
   Expr::ExpressionPtr expr_;
+  Random::RandomGenerator& random_;
 };
 
 class MetadataMatcher : public Matcher {

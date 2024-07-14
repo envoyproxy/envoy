@@ -493,6 +493,27 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExpr) {
   EXPECT_EQ(result.on_match_, absl::nullopt);
 }
 
+TEST_F(CelMatcherTest, CelMatcherRandomMatched) {
+  auto matcher_tree = buildMatcherTree(SampleCelString);
+
+  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(testing::Return(42));
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(CelMatcherTest, CelMatcherRandomNotMatched) {
+  auto matcher_tree = buildMatcherTree(SampleCelString);
+
+  EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(testing::Return(43));
+  const auto result = matcher_tree->match(data_);
+  // The match was completed, no match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
 TEST_F(CelMatcherTest, NoCelExpression) {
   EXPECT_DEATH(buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression),
                ".*panic: unset oneof.*");

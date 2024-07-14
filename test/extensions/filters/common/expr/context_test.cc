@@ -65,14 +65,18 @@ TEST(Context, InvalidRequestLegacy) {
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
+  StreamInfo::StreamIdProviderSharedPtr provider =
+      std::make_shared<StreamInfo::StreamIdProviderImpl>("000000ff-0000-0000-0000-000000000000");
+  EXPECT_CALL(info, getStreamIdProvider())
+      .WillRepeatedly(Return(OptRef<const StreamInfo::StreamIdProvider>(*provider)));
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},           {":scheme", "http"},      {":path", "/meow?yes=1"},
       {":authority", "kittens.com"}, {"referer", "dogs.com"},  {"user-agent", "envoy-mobile"},
       {"content-length", "10"},      {"x-request-id", "blah"}, {"double-header", "foo"},
       {"double-header", "bar"}};
   Protobuf::Arena arena;
-  RequestWrapper request(arena, &header_map, info);
-  RequestWrapper empty_request(arena, nullptr, empty_info);
+  RequestWrapper request(arena, &header_map, info, 42);
+  RequestWrapper empty_request(arena, nullptr, empty_info, 42);
 
   EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
   // "2018-04-03T23:06:09.123Z".
@@ -234,6 +238,20 @@ TEST(Context, RequestAttributes) {
     auto value = empty_request[CelValue::CreateStringView(Protocol)];
     EXPECT_FALSE(value.has_value());
   }
+
+  {
+    auto value = request[CelValue::CreateStringView(RandomValue)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(255, value.value().Uint64OrDie());
+  }
+
+  {
+    auto value = empty_request[CelValue::CreateStringView(RandomValue)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(42, value.value().Uint64OrDie());
+  }
 }
 
 TEST(Context, RequestFallbackAttributes) {
@@ -244,7 +262,7 @@ TEST(Context, RequestFallbackAttributes) {
       {":path", "/meow"},
   };
   Protobuf::Arena arena;
-  RequestWrapper request(arena, &header_map, info);
+  RequestWrapper request(arena, &header_map, info, 42);
 
   EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
 
@@ -278,7 +296,7 @@ TEST(Context, RequestPathFragment) {
       {":path", "/meow?page=1&item=3#heading"},
   };
   Protobuf::Arena arena;
-  RequestWrapper request(arena, &header_map, info);
+  RequestWrapper request(arena, &header_map, info, 42);
   {
     auto value = request[CelValue::CreateStringView(Query)];
     EXPECT_TRUE(value.has_value());
@@ -762,6 +780,18 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+}
+
+TEST(Context, ContextAttributes) {
+  ProtobufWkt::Arena arena;
+  ContextWrapper wrapper(arena, 42);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(RandomValue)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(42, value.value().Uint64OrDie());
   }
 }
 

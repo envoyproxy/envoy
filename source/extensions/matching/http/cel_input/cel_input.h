@@ -33,7 +33,7 @@ public:
 
 class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
 public:
-  HttpCelDataInput() = default;
+  HttpCelDataInput(Random::RandomGenerator& random) : random_(random) {}
   Matcher::DataInputGetResult get(const Envoy::Http::HttpMatchingData& data) const override {
     RequestHeaderMapOptConstRef maybe_request_headers = data.requestHeaders();
     ResponseHeaderMapOptConstRef maybe_response_headers = data.responseHeaders();
@@ -45,13 +45,16 @@ public:
         Extensions::Filters::Common::Expr::createActivation(
             nullptr, // TODO: pass local_info to CEL activation.
             data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
-            maybe_response_trailers.ptr());
+            maybe_response_trailers.ptr(), random_.random());
 
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::make_unique<CelMatchData>(std::move(activation))};
   }
 
   absl::string_view dataInputType() const override { return "cel_data_input"; }
+
+private:
+  Random::RandomGenerator& random_;
 };
 
 class HttpCelDataInputFactory : public Matcher::DataInputFactory<Envoy::Http::HttpMatchingData> {
@@ -60,8 +63,9 @@ public:
   std::string name() const override { return "envoy.matching.inputs.cel_data_input"; }
 
   Matcher::DataInputFactoryCb<Envoy::Http::HttpMatchingData>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
-    return [] { return std::make_unique<HttpCelDataInput>(); };
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator& random) override {
+    return [&random] { return std::make_unique<HttpCelDataInput>(random); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
