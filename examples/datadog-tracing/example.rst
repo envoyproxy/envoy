@@ -7,20 +7,22 @@ Datadog tracing
 
    .. include:: _include/docker-env-setup-link.rst
 
+.. note:: Before proceeding, please ensure you have a Datadog account set up. If you don't already have one, you can `sign up for Datadog here <https://app.datadoghq.eu/signup>`_. 
+   
    :ref:`curl <start_sandboxes_setup_curl>`
-        Used to make ``HTTP`` requests.
+        Used to make HTTP requests.
 
 The Datadog tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Datadog <https://datadoghq.com/>`_ as the tracing provider.
 
-This example includes a Datadog Agent which will forward to Datadog's backend traces sent from Envoy and the upstream `http` service.
+This example includes a Datadog Agent which will forward to Datadog's backend traces sent from Envoy and the upstream HTTP service.
 
 The ``envoy`` service is exposed on port ``10000`` and the request flow is as follow:
 
     User -> ``envoy`` -> ``http``
 
 The Envoy proxy is configured (:download:`envoy.yaml <_include/datadog-tracing/envoy.yaml>`) to generate and propagate tracing context to upstream services and also to
-report tracing data to the Datadog Agent through an Envoy cluster nammed ``datadog_agent``.
+report tracing data to the Datadog Agent through an Envoy cluster named ``datadog_agent``.
 
 Each span records the latency of upstream API calls as well as information needed to correlate the span with other related spans (e.g., the trace ID).
 
@@ -49,7 +51,7 @@ To build this sandbox example, and start the example services run the following 
 Step 2: Make a request to ``http``
 **********************************
 
-Now send a request to the ``http`` service, by calling http://localhost:10000.
+Now send a request to the HTTP service, by calling http://localhost:10000.
 
 .. code-block:: console
 
@@ -98,8 +100,8 @@ You can also explore the map graph to view relationships between nodes and the p
    :ref:`Request tracing <arch_overview_tracing>`
       Learn more about using Envoy's request tracing.
 
-   `Datadog <https://datadoghq.com/>`
+   `Datadog <https://datadoghq.com/>`_
       Datadog website.
 
-   `OpenTelemetry tracing <https://opentelemetry.io/>`
+   `OpenTelemetry tracing <https://opentelemetry.io/>`_
       OpenTelemetry tracing sandbox.
