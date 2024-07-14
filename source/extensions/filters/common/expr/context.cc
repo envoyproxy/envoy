@@ -108,6 +108,13 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else {
       return {};
     }
+  } else if (value == RandomValue) {
+    if (info_.getStreamIdProvider().has_value() &&
+        info_.getStreamIdProvider()->toInteger().has_value()) {
+      return CelValue::CreateUint64(info_.getStreamIdProvider()->toInteger().value());
+    } else {
+      return CelValue::CreateUint64(random_value_);
+    }
   }
 
   if (headers_.value_ != nullptr) {
@@ -225,6 +232,18 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   return {};
 }
 
+absl::optional<CelValue> ContextWrapper::operator[](CelValue key) const {
+  if (!key.IsString()) {
+    return {};
+  }
+  auto value = key.StringOrDie().value();
+  if (value == RandomValue) {
+    return CelValue::CreateUint64(random_value_);
+  }
+
+  return {};
+}
+
 absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
   if (!key.IsString() || !info_.upstreamInfo().has_value()) {
     return {};
@@ -289,7 +308,7 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   return {};
 }
 
-class FilterStateObjectWrapper : public google::api::expr::runtime::CelMap {
+class FilterStateObjectWrapper : public CelMap {
 public:
   FilterStateObjectWrapper(const StreamInfo::FilterState::ObjectReflection* reflection)
       : reflection_(reflection) {}
@@ -304,9 +323,7 @@ public:
   int size() const override { return 0; }
   bool empty() const override { return true; }
   using CelMap::ListKeys;
-  absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
-    return &WrapperFields::get().Empty;
-  }
+  absl::StatusOr<const CelList*> ListKeys() const override { return &WrapperFields::get().Empty; }
 
 private:
   struct Visitor {

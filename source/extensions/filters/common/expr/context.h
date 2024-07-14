@@ -9,9 +9,22 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
+// CEL-CPP does not enforce unused parameter checks consistently, so we relax it here.
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
+#include "eval/public/cel_function.h"
+#include "eval/public/cel_function_adapter.h"
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -19,8 +32,14 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-using CelValue = google::api::expr::runtime::CelValue;
-using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
+using ::google::api::expr::runtime::CelFunction;
+template <typename ReturnType, typename... Arguments>
+using CelFunctionAdapter = ::google::api::expr::runtime::FunctionAdapter<ReturnType, Arguments...>;
+using CelKind = ::cel::Kind;
+using ::google::api::expr::runtime::CelList;
+using ::google::api::expr::runtime::CelMap;
+using ::google::api::expr::runtime::CelProtoWrapper;
+using ::google::api::expr::runtime::CelValue;
 
 // Symbols for traversing the request properties
 constexpr absl::string_view Request = "request";
@@ -70,6 +89,9 @@ constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
 constexpr absl::string_view DownstreamTransportFailureReason = "transport_failure_reason";
 
+// Context properties
+constexpr absl::string_view Context = "context";
+
 // Source properties
 constexpr absl::string_view Source = "source";
 constexpr absl::string_view Address = "address";
@@ -95,6 +117,10 @@ constexpr absl::string_view ListenerMetadata = "listener_metadata";
 constexpr absl::string_view ListenerDirection = "listener_direction";
 constexpr absl::string_view Node = "node";
 
+// sample function
+constexpr absl::string_view Sample = "sample";
+constexpr absl::string_view RandomValue = "random_value";
+
 class WrapperFieldValues {
 public:
   using ContainerBackedListImpl = google::api::expr::runtime::ContainerBackedListImpl;
@@ -110,7 +136,7 @@ absl::optional<CelValue>
 convertHeaderEntry(Protobuf::Arena& arena,
                    ::Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
-template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
+template <class T> class HeadersWrapper : public CelMap {
 public:
   HeadersWrapper(Protobuf::Arena& arena, const T* value) : arena_(arena), value_(value) {}
   absl::optional<CelValue> operator[](CelValue key) const override {
@@ -164,7 +190,7 @@ private:
 // Wrapper for accessing properties from internal data structures.
 // Note that CEL assumes no ownership of the underlying data, so temporary
 // data must be arena-allocated.
-class BaseWrapper : public google::api::expr::runtime::CelMap {
+class BaseWrapper : public CelMap {
 public:
   BaseWrapper(Protobuf::Arena& arena) : arena_(arena) {}
   int size() const override { return 0; }
@@ -180,13 +206,14 @@ protected:
 class RequestWrapper : public BaseWrapper {
 public:
   RequestWrapper(Protobuf::Arena& arena, const ::Envoy::Http::RequestHeaderMap* headers,
-                 const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
+                 const StreamInfo::StreamInfo& info, uint64_t random_value)
+      : BaseWrapper(arena), headers_(arena, headers), info_(info), random_value_(random_value) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const HeadersWrapper<::Envoy::Http::RequestHeaderMap> headers_;
   const StreamInfo::StreamInfo& info_;
+  const uint64_t random_value_;
 };
 
 class ResponseWrapper : public BaseWrapper {
@@ -211,6 +238,16 @@ public:
 
 private:
   const StreamInfo::StreamInfo& info_;
+};
+
+class ContextWrapper : public BaseWrapper {
+public:
+  ContextWrapper(Protobuf::Arena& arena, uint64_t random_value)
+      : BaseWrapper(arena), random_value_(random_value) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const uint64_t random_value_;
 };
 
 class UpstreamWrapper : public BaseWrapper {

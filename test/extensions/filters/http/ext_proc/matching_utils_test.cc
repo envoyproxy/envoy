@@ -50,7 +50,7 @@ TEST_F(ExpressionManagerTest, DuplicateAttributesIgnored) {
   request_headers_.setPath("/foo");
   const auto activation_ptr = Filters::Common::Expr::createActivation(
       &expr_mgr.localInfo(), stream_info_, &request_headers_, &response_headers_,
-      &response_trailers_);
+      &response_trailers_, 42);
 
   auto result = expr_mgr.evaluateRequestAttributes(*activation_ptr);
   EXPECT_EQ(2, result.fields_size());
@@ -74,7 +74,7 @@ TEST_F(ExpressionManagerTest, EmptyExpressionReturnsEmptyStruct) {
   request_headers_.setPath("/foo");
   const auto activation_ptr = Filters::Common::Expr::createActivation(
       &expr_mgr.localInfo(), stream_info_, &request_headers_, &response_headers_,
-      &response_trailers_);
+      &response_trailers_, 42);
 
   EXPECT_EQ(0, expr_mgr.evaluateRequestAttributes(*activation_ptr).fields_size());
 }

@@ -66,8 +66,9 @@ public:
   TestDataInputStringFactory(absl::string_view data)
       : TestDataInputStringFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
-  DataInputFactoryCb<TestData>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  DataInputFactoryCb<TestData> createDataInputFactoryCb(const Protobuf::Message&,
+                                                        ProtobufMessage::ValidationVisitor&,
+                                                        Random::RandomGenerator&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
   }
 
@@ -88,8 +89,9 @@ public:
   TestDataInputBoolFactory(absl::string_view data)
       : TestDataInputBoolFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
-  DataInputFactoryCb<TestData>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  DataInputFactoryCb<TestData> createDataInputFactoryCb(const Protobuf::Message&,
+                                                        ProtobufMessage::ValidationVisitor&,
+                                                        Random::RandomGenerator&) override {
     // Note, here is using `TestInput` same as `TestDataInputStringFactory`.
     return [&]() { return std::make_unique<TestInput>(result_); };
   }
@@ -110,8 +112,9 @@ public:
   TestDataInputFloatFactory(float)
       : TestDataInputFloatFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}) {}
-  DataInputFactoryCb<TestData>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  DataInputFactoryCb<TestData> createDataInputFactoryCb(const Protobuf::Message&,
+                                                        ProtobufMessage::ValidationVisitor&,
+                                                        Random::RandomGenerator&) override {
     return [&]() { return std::make_unique<TestFloatInput>(result_); };
   }
 

@@ -16,6 +16,7 @@ envoy_cc_library(
         "abseil_hash",
     ],
     deps = [
+        "//envoy/common:random_generator_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",

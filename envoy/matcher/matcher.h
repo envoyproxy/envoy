@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
@@ -285,7 +286,8 @@ public:
    */
   virtual DataInputFactoryCb<DataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Random::RandomGenerator& random) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

@@ -1,5 +1,8 @@
+#include "test/extensions/filters/common/expr/evaluator_test.h"
+
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -49,9 +52,29 @@ TEST(Evaluator, Activation) {
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   info.upstreamInfo()->setUpstreamFilterState(filter_state);
   ProtobufWkt::Arena arena;
-  const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
+  const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr, 42);
   EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
   EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());
+}
+
+TEST(Evaluator, SampleFunction) {
+  Protobuf::Arena arena;
+  auto builder = createBuilder(&arena);
+
+  google::api::expr::v1alpha1::CheckedExpr checked;
+  Protobuf::TextFormat::ParseFromString(SampleCelString, &checked);
+  auto expr = createExpression(*builder, checked.expr());
+
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto value = evaluate(*expr, arena, nullptr, info, nullptr, nullptr, nullptr, 42);
+  EXPECT_TRUE(value.has_value());
+  EXPECT_TRUE(value.value().IsBool());
+  EXPECT_EQ(true, value.value().BoolOrDie());
+
+  value = evaluate(*expr, arena, nullptr, info, nullptr, nullptr, nullptr, 43);
+  EXPECT_TRUE(value.has_value());
+  EXPECT_TRUE(value.value().IsBool());
+  EXPECT_EQ(false, value.value().BoolOrDie());
 }
 
 } // namespace
