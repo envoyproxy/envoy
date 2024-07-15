@@ -180,30 +180,6 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-// Test the client when a gRPC status code unknown is received from the authorization server.
-TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
-  initialize();
-
-  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
-  auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
-  auto authz_response = Response{};
-  authz_response.status = CheckStatus::Denied;
-
-  envoy::service::auth::v3::CheckRequest request;
-  expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
-
-  Http::TestRequestHeaderMapImpl headers;
-  client_->onCreateInitialMetadata(headers);
-  EXPECT_EQ(nullptr, headers.RequestId());
-  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
-  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
-                                      AuthzResponseNoAttributes(authz_response))));
-
-  client_->onSuccess(std::move(check_response), span_);
-}
-
 // Test the client when a denied response with additional HTTP attributes is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   initialize();
@@ -437,12 +413,9 @@ ok_response:
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
                      span_);
 }
+
 // Test the client when an error code response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationReturnsErrorOnBadGrpcCode) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.process_ext_authz_grpc_error_codes_as_errors", "true"}});
-
   initialize();
 
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
@@ -475,6 +448,35 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationReturnsErrorOnBadGrpcCode) {
 
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when an error code response is received and
+// process_ext_authz_grpc_error_codes_as_errors is false.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationReturnsDeniedOnUnknownGrpcCodeWhenFeatureFlagDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.process_ext_authz_grpc_error_codes_as_errors", "false"}});
+
+  initialize();
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = check_response->mutable_status();
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Denied;
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
+
   client_->onSuccess(std::move(check_response), span_);
 }
 

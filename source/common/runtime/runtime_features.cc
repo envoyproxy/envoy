@@ -73,6 +73,8 @@ RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_host_for_preresolve_dfp_dns);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_use_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
+// Fixes fail-open behaviour of failure_mode_allow for external authz grpc servers.
+RUNTIME_GUARD(envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
 RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
@@ -158,8 +160,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
-// Fixes fail-open behaviour of failure_mode_allow for external authz grpc servers.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

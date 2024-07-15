@@ -248,7 +248,9 @@ bug_fixes:
     Bumped the version of datadog to resolve a crashing bug in earlier versions of the library.
 - area: ext_authz
   change: |
-    Fixed fail-open behaviour of the failure_mode_allow config option when a grpc external authz server is used.
+    Fixed fail-open behaviour of the failure_mode_allow config option
+    https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/ext_authz/v3/ext_authz.proto
+    when a grpc external authz server is used.
     The behaviour can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
 
 removed_config_or_runtime:
