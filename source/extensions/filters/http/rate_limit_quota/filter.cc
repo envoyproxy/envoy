@@ -47,7 +47,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return sendImmediateReport(bucket_id, match_action);
   } else {
     // Found the cached bucket entry.
-    return processCachedBucket(bucket_id);
+    return processCachedBucket(bucket_id, match_action);
   }
 }
 
@@ -128,6 +128,9 @@ void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
 
   // Set up the bucket id.
   new_bucket->bucket_id = bucket_id;
+  // Set up the first time assignment time.
+  new_bucket->first_assignment_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        time_source_.monotonicTime().time_since_epoch());
   // Set up the quota usage.
   QuotaUsage quota_usage;
   quota_usage.last_report = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -211,8 +214,40 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   }
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(size_t bucket_id) {
-  // First, get the quota assignment (if exists) from the cached bucket action.
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::processCachedBucket(size_t bucket_id,
+                                          const RateLimitOnMatchAction& match_action) {
+  // First, Check if assignment has expired nor not.
+  auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      time_source_.monotonicTime().time_since_epoch());
+  auto assignment_time_elapsed = Protobuf::util::TimeUtil::NanosecondsToDuration(
+      (now - quota_buckets_[bucket_id]->first_assignment_time).count());
+
+  if (assignment_time_elapsed > quota_buckets_[bucket_id]
+                                    ->bucket_action.quota_assignment_action()
+                                    .assignment_time_to_live()) {
+    // If expired, remove the cache entry.
+    quota_buckets_.erase(bucket_id);
+
+    // Default strategy is fail-Open (i.e., allow_all).
+    auto ret_status = Envoy::Http::FilterHeadersStatus::Continue;
+    // Check the expired assignment behavior if configured.
+    // Note, only fail-open and fail-close is supported, more advanced expired assignment can be
+    // supported as needed.
+    if (match_action.bucketSettings().has_expired_assignment_behavior()) {
+      if (match_action.bucketSettings()
+              .expired_assignment_behavior()
+              .fallback_rate_limit()
+              .blanket_rule() == envoy::type::v3::RateLimitStrategy::DENY_ALL) {
+        sendDenyResponse();
+        ret_status = Envoy::Http::FilterHeadersStatus::StopIteration;
+      }
+    }
+
+    return ret_status;
+  }
+
+  // Second, get the quota assignment (if exists) from the cached bucket action.
   if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
     auto rate_limit_strategy =
         quota_buckets_[bucket_id]->bucket_action.quota_assignment_action().rate_limit_strategy();

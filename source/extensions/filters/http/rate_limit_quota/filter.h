@@ -30,6 +30,8 @@ namespace RateLimitQuota {
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;
+using DenyResponseSettings = ::envoy::extensions::filters::http::rate_limit_quota::v3::
+    RateLimitQuotaBucketSettings::DenyResponseSettings;
 
 /**
  * Possible async results for a limit call.
@@ -93,7 +95,7 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
-  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
+  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id, const RateLimitOnMatchAction& match_action);
   // TODO(tyxia) Build the customized response based on `DenyResponseSettings`.
   void sendDenyResponse() {
     callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt, "");
