@@ -217,7 +217,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
 Http::FilterHeadersStatus
 RateLimitQuotaFilter::processCachedBucket(size_t bucket_id,
                                           const RateLimitOnMatchAction& match_action) {
-  // First, Check if assignment has expired nor not.
+  // First, check if assignment has expired nor not.
   auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
       time_source_.monotonicTime().time_since_epoch());
   auto assignment_time_elapsed = Protobuf::util::TimeUtil::NanosecondsToDuration(
@@ -232,7 +232,7 @@ RateLimitQuotaFilter::processCachedBucket(size_t bucket_id,
     // Default strategy is fail-Open (i.e., allow_all).
     auto ret_status = Envoy::Http::FilterHeadersStatus::Continue;
     // Check the expired assignment behavior if configured.
-    // Note, only fail-open and fail-close is supported, more advanced expired assignment can be
+    // Note, only fail-open and fail-close are supported, more advanced expired assignment can be
     // supported as needed.
     if (match_action.bucketSettings().has_expired_assignment_behavior()) {
       if (match_action.bucketSettings()

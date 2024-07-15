@@ -30,8 +30,6 @@ namespace RateLimitQuota {
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;
-using DenyResponseSettings = ::envoy::extensions::filters::http::rate_limit_quota::v3::
-    RateLimitQuotaBucketSettings::DenyResponseSettings;
 
 /**
  * Possible async results for a limit call.
