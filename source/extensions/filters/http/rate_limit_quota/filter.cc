@@ -130,9 +130,6 @@ void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
   new_bucket->bucket_id = bucket_id;
   // Set up the first time assignment time.
   new_bucket->first_assignment_time = time_source_.monotonicTime();
-
-  std::chrono::duration_cast<std::chrono::nanoseconds>(
-      time_source_.monotonicTime().time_since_epoch());
   // Set up the quota usage.
   QuotaUsage quota_usage;
   quota_usage.last_report = std::chrono::duration_cast<std::chrono::nanoseconds>(
