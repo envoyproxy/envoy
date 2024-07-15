@@ -8,8 +8,6 @@
 #include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/stats.h"
 
-#include "openssl/ssl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {

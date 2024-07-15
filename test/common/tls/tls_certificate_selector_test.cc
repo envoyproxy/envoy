@@ -359,6 +359,42 @@ TEST_P(TlsCertificateSelectorFactoryTest, Pending) {
   testUtil(Ssl::SelectionResult::SelectionStatus::Pending);
 }
 
+TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        value:
+          foo: bar
+)EOF";
+
+  Event::SimulatedTimeSystem time_system;
+  Stats::TestUtil::TestStore server_stats_store;
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context;
+  ON_CALL(transport_socket_factory_context.server_context_, api())
+      .WillByDefault(ReturnRef(*server_api));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  // provider factory callback will be Called here.
+  auto server_cfg =
+      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, true);
+
+  EXPECT_FALSE(server_cfg.ok());
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
