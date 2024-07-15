@@ -79,12 +79,12 @@ public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
 
-  MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
+  MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
                OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
-  MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
+  MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
@@ -156,10 +156,6 @@ public:
               (const Protobuf::Message& config_source_proto,
                Server::Configuration::ServerFactoryContext& factory_context,
                Init::Manager& init_manager, const std::string& stat_prefix,
-               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
-  MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
-              (const Protobuf::Message& config_proto,
-               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,

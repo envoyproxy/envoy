@@ -221,6 +221,7 @@ struct StreamInfoImpl : public StreamInfo {
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
+    // Callers should sanitize with StringUtil::replaceAllEmptySpace if necessary.
     ASSERT(!StringUtil::hasEmptySpace(rc_details));
     response_code_details_.emplace(rc_details);
   }
@@ -431,6 +432,12 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_transport_failure_reason_;
   }
 
+  bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
+
+  void setShouldSchemeMatchUpstream(bool should_match_upstream) override {
+    should_scheme_match_upstream_ = should_match_upstream;
+  }
+
   bool shouldDrainConnectionUponCompletion() const override { return should_drain_connection_; }
 
   void setShouldDrainConnectionUponCompletion(bool should_drain) override {
@@ -483,6 +490,7 @@ private:
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
 };
 

@@ -753,7 +753,7 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      setFailureReason(absl::StrCat("delayed connect error: ", error));
+      setFailureReason(absl::StrCat("delayed connect error: ", errorDetails(error)));
       ENVOY_CONN_LOG_EVENT(debug, "connection_error", "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;
@@ -1037,7 +1037,9 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
+    setFailureReason(absl::StrCat(
+        "immediate connect error: ", errorDetails(result.errno_),
+        "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

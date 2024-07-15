@@ -26,11 +26,18 @@ class Fetch {
 public:
   Fetch();
 
-  void fetch(const std::vector<absl::string_view>& urls);
+  /**
+   * Sends requests to the specified URLs. When QUIC hints are not empty, HTTP/3 will be enabled.
+   * The `protocols` output parameter will be updated upon successful fetch.
+   */
+  envoy_status_t fetch(const std::vector<absl::string_view>& urls,
+                       const std::vector<absl::string_view>& quic_hints,
+                       std::vector<Http::Protocol>& protocols);
 
 private:
-  void runEngine(absl::Notification& engine_running);
-  void sendRequest(absl::string_view url);
+  void runEngine(absl::Notification& engine_running,
+                 const std::vector<absl::string_view>& quic_hints);
+  envoy_status_t sendRequest(absl::string_view url, std::vector<Http::Protocol>& protocols);
 
   Thread::MutexBasicLockable lock_;
   Logger::Context logging_context_;

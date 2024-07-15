@@ -8,8 +8,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
-#include "nghttp2/nghttp2.h"
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -59,13 +57,6 @@ private:
   struct HpackDecoderContext;
 
   /**
-   * Decodes METADATA payload using nghttp2.
-   * @param end_metadata indicates is END_METADATA is true.
-   * @return if decoding succeeds.
-   */
-  bool decodeMetadataPayloadUsingNghttp2(bool end_metadata);
-
-  /**
    * Decodes METADATA payload using QUICHE.
    * @param end_metadata indicates is END_METADATA is true.
    * @return if decoding succeeds.
@@ -87,11 +78,6 @@ private:
   const uint64_t max_payload_size_bound_ = 1024 * 1024;
 
   uint64_t total_payload_size_ = 0;
-
-  // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
-  // inflater failure on one stream can impact other streams.
-  using Inflater = CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del>;
-  Inflater inflater_;
 
   std::unique_ptr<HpackDecoderContext> decoder_context_;
 };

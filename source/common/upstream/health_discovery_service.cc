@@ -374,8 +374,9 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
       THROW_IF_STATUS_NOT_OK(address_or_error, throw);
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
-          info_, "", std::move(address_or_error.value()), nullptr, 1, locality_endpoints.locality(),
-          host.endpoint().health_check_config(), 0, envoy::config::core::v3::UNKNOWN, time_source_);
+          info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+          locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
+          envoy::config::core::v3::UNKNOWN, time_source_);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
@@ -488,7 +489,7 @@ void HdsCluster::updateHosts(
             Network::Address::resolveProtoAddress(endpoint.endpoint().address());
         THROW_IF_STATUS_NOT_OK(address_or_error, throw);
         host = std::make_shared<HostImpl>(info_, "", std::move(address_or_error.value()), nullptr,
-                                          1, endpoints.locality(),
+                                          nullptr, 1, endpoints.locality(),
                                           endpoint.endpoint().health_check_config(), 0,
                                           envoy::config::core::v3::UNKNOWN, time_source_);
 
@@ -541,10 +542,13 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
       params.server_context_.clusterManager(), params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
-  Network::UpstreamTransportSocketFactoryPtr socket_factory =
-      Upstream::createTransportSocketFactory(params.cluster_, factory_context);
-  auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
-      params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
+  Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(
+      Upstream::createTransportSocketFactory(params.cluster_, factory_context),
+      Network::UpstreamTransportSocketFactoryPtr);
+  auto socket_matcher = THROW_OR_RETURN_VALUE(
+      TransportSocketMatcherImpl::create(params.cluster_.transport_socket_matches(),
+                                         factory_context, socket_factory, *scope),
+      std::unique_ptr<TransportSocketMatcherImpl>);
 
   return std::make_unique<ClusterInfoImpl>(
       params.server_context_.initManager(), params.server_context_, params.cluster_,

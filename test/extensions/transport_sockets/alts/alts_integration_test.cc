@@ -390,7 +390,7 @@ public:
     TestUtility::jsonConvert(alts_config, *config);
     ENVOY_LOG_MISC(info, "{}", config->DebugString());
 
-    client_alts_ = factory.createTransportSocketFactory(*config, mock_factory_ctx);
+    client_alts_ = factory.createTransportSocketFactory(*config, mock_factory_ctx).value();
   }
 
   void TearDown() override {
@@ -429,7 +429,7 @@ public:
                                                       int port) {
     std::string url =
         "tcp://" + Network::Test::getLoopbackAddressUrlString(version) + ":" + std::to_string(port);
-    return Network::Utility::resolveUrl(url);
+    return *Network::Utility::resolveUrl(url);
   }
 
   bool tsiPeerIdentitySet() {

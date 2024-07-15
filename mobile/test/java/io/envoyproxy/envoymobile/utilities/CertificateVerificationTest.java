@@ -3,14 +3,14 @@ package io.envoyproxy.envoymobile.utilities;
 import static org.junit.Assert.assertEquals;
 
 import android.content.Context;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+
 import io.envoyproxy.envoymobile.engine.JniLibrary;
-import io.envoyproxy.envoymobile.utilities.ContextUtils;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.nio.charset.StandardCharsets;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -23,22 +23,22 @@ import org.robolectric.RobolectricTestRunner;
  */
 @RunWith(RobolectricTestRunner.class)
 public final class CertificateVerificationTest {
-  static {
-    AndroidJniLibrary.loadTestLibrary();
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-    if (ContextUtils.getApplicationContext() == null) {
-      ContextUtils.initApplicationContext(context.getApplicationContext());
-    }
-    AndroidJniLibrary.load(context.getApplicationContext());
-  }
-
   private static final byte[] host =
       FakeX509Util.getExpectedHost().getBytes(StandardCharsets.UTF_8);
   private static final byte[] authType =
       FakeX509Util.expectedAuthType.getBytes(StandardCharsets.UTF_8);
 
+  @BeforeClass
+  public static void beforeClass() {
+    JniLibrary.loadTestLibrary();
+  }
+
   @Before
   public void setUp() throws Exception {
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    if (ContextUtils.getApplicationContext() == null) {
+      ContextUtils.initApplicationContext(context.getApplicationContext());
+    }
     AndroidNetworkLibrary.setFakeCertificateVerificationForTesting(true);
   }
 

@@ -55,8 +55,10 @@ protected:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
+    absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<LogicalDnsCluster>(
-        new LogicalDnsCluster(cluster_config, factory_context, dns_resolver_));
+        new LogicalDnsCluster(cluster_config, factory_context, dns_resolver_, creation_status));
+    THROW_IF_NOT_OK(creation_status);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) {
           membership_updated_.ready();
@@ -97,7 +99,7 @@ protected:
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -117,7 +119,7 @@ protected:
 
     EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
-                    PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
+                    PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
     logical_host->outlierDetector().putHttpResponseCode(200);
@@ -127,7 +129,7 @@ protected:
 
     // Should not cause any changes.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
@@ -137,7 +139,7 @@ protected:
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
-                    PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
+                    PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     Host::CreateConnectionData data =
         logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
@@ -165,7 +167,7 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
@@ -175,7 +177,7 @@ protected:
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
-                    PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
+                    PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
@@ -185,24 +187,24 @@ protected:
     // Failure should not cause any change.
     ON_CALL(random_, random()).WillByDefault(Return(6000));
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "", {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
-                    PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
+                    PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
     // Empty Success should not cause any change.
     ON_CALL(random_, random()).WillByDefault(Return(6000));
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, {});
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "", {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
-                    PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
+                    PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
@@ -299,7 +301,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-        cb(Network::DnsResolver::ResolutionStatus::Success,
+        cb(Network::DnsResolver::ResolutionStatus::Success, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
@@ -343,12 +345,12 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   ON_CALL(random_, random()).WillByDefault(Return(8000));
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(1000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "", {});
 
   // Successful call should reset the failure backoff strategy.
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -357,7 +359,7 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   // Therefore, a subsequent failure should get a [0,base * 1] refresh.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(1000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "", {});
 }
 
 TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
@@ -388,17 +390,17 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(5000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(5)));
 
   // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 
   // On failure, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
@@ -601,7 +603,7 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 }
 

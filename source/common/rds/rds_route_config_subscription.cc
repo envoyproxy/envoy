@@ -31,10 +31,11 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       manager_identifier_(manager_identifier), config_update_info_(std::move(config_update)),
       resource_decoder_(std::move(resource_decoder)) {
   const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
-  subscription_ =
+  subscription_ = THROW_OR_RETURN_VALUE(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
-          resource_decoder_, {});
+          resource_decoder_, {}),
+      Envoy::Config::SubscriptionPtr);
   local_init_manager_.add(local_init_target_);
 }
 

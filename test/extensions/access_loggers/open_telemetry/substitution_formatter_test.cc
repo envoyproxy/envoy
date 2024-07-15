@@ -5,11 +5,14 @@
 #include "envoy/common/exception.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/utility.h"
@@ -127,7 +130,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
           string_value: "plain_string_value"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -162,7 +165,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
               - string_value: "%PROTOCOL%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   KeyValueList expected;
   TestUtility::loadFromYaml(R"EOF(
@@ -298,7 +301,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
                           - string_value: "%PROTOCOL%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
   KeyValueList expected;
   TestUtility::loadFromYaml(R"EOF(
     values:
@@ -416,7 +419,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
           string_value: "%PROTOCOL%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -437,7 +440,7 @@ TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
           string_value: ""
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -469,7 +472,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
         string_value: "%RESP(some_response_header)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -508,7 +511,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
           string_value: "%RESP(response_present_header?response_absent_header)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -546,7 +549,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
           string_value: "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(
       formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
@@ -591,7 +594,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
             string_value: "%CLUSTER_METADATA(com.test:test_obj:non_existing_key)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(
       formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
@@ -614,7 +617,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
           string_value: "%CLUSTER_METADATA(com.test:test_key)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   // Empty optional (absl::nullopt)
   {
@@ -656,7 +659,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
         string_value: "%FILTER_STATE(test_obj)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -696,7 +699,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
         string_value: "%UPSTREAM_FILTER_STATE(test_obj)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -726,7 +729,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
           string_value: "%FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -762,7 +765,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpecife
           string_value: "%UPSTREAM_FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -787,7 +790,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
           string_value: "%FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping, {}), EnvoyException,
                             "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
 }
 
@@ -818,7 +821,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSp
           string_value: "%UPSTREAM_FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping, {}), EnvoyException,
                             "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
 }
 
@@ -855,7 +858,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterStartTimeTest) {
           string_value: "%START_TIME(%f.%1f.%2f.%3f)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
@@ -878,7 +881,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
             string_value: "%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%"
     )EOF",
                               key_mapping);
-    OpenTelemetryFormatter formatter(key_mapping);
+    OpenTelemetryFormatter formatter(key_mapping, {});
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -887,6 +890,41 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
                               expected);
   }
 }
+
+#ifdef USE_CEL_PARSER
+TEST(SubstitutionFormatterTest, CELFormatterTest) {
+  {
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    StreamInfo::MockStreamInfo stream_info;
+    Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
+    Http::TestResponseHeaderMapImpl response_header{
+        {"some_response_header", "SOME_RESPONSE_HEADER"}};
+
+    OpenTelemetryFormatMap expected = {{"cel_field", "SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
+
+    envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig otel_config;
+    TestUtility::loadFromYaml(R"EOF(
+      resource_attributes:
+        values:
+          - key: "cel_field"
+            value:
+              string_value: "%CEL(request.headers['some_request_header'])% %CEL(response.headers['some_response_header'])%"
+      formatters:
+        - name: envoy.formatter.cel
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+    )EOF",
+                              otel_config);
+    auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+        otel_config.formatters(), context);
+
+    OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);
+
+    verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
+                              expected);
+  }
+}
+#endif
 
 } // namespace
 } // namespace OpenTelemetry

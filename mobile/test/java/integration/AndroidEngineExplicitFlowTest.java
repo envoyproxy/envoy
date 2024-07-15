@@ -11,7 +11,7 @@ import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
 import io.envoyproxy.envoymobile.engine.testing.RequestScenario;
 import io.envoyproxy.envoymobile.engine.testing.Response;
 
@@ -32,7 +32,6 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -45,7 +44,7 @@ public class AndroidEngineExplicitFlowTest {
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.loadTestLibrary();
   }
 
   @Before
@@ -343,7 +342,6 @@ public class AndroidEngineExplicitFlowTest {
   // This was supposed to be a simple post, but because the stream is not properly closed, it
   // actually ends up testing sending a post, getting a response, and Envoy resetting the
   // "incomplete" request stream.
-  @Ignore("https://github.com/envoyproxy/envoy/issues/34288")
   @Test
   public void post_simple() throws Exception {
     mockWebServer.setDispatcher(new Dispatcher() {

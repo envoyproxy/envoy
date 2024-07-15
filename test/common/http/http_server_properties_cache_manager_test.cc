@@ -30,7 +30,7 @@ public:
     manager_ = factory_->get();
   }
 
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Http::HttpServerPropertiesCacheManagerFactoryImpl> factory_;

@@ -1,6 +1,8 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.test_kv_store.Filter.TestKeyValueStore
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.KeyValueStore
 import io.envoyproxy.envoymobile.LogLevel
@@ -15,10 +17,13 @@ import org.junit.After
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val TEST_KEY = "foo"
 private const val TEST_VALUE = "bar"
 
+@RunWith(RobolectricTestRunner::class)
 class KeyValueStoreTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -54,6 +59,20 @@ class KeyValueStoreTest {
         }
       }
 
+    val configProto =
+      TestKeyValueStore.newBuilder()
+        .setKvStoreName("envoy.key_value.platform_test")
+        .setTestKey(TEST_KEY)
+        .setTestValue(TEST_VALUE)
+        .build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore"
+        )
+        .setValue(configProto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
@@ -62,7 +81,7 @@ class KeyValueStoreTest {
         .addKeyValueStore("envoy.key_value.platform_test", testKeyValueStore)
         .addNativeFilter(
           "envoy.filters.http.test_kv_store",
-          "[type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore] { kv_store_name: 'envoy.key_value.platform_test', test_key: '$TEST_KEY', test_value: '$TEST_VALUE'}"
+          anyProto.toByteArray().toString(Charsets.UTF_8)
         )
         .build()
     val client = engine.streamClient()

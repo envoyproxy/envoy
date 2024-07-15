@@ -11,27 +11,6 @@
 namespace Envoy {
 namespace JNI {
 
-static jobject static_class_loader = nullptr;
-
-void setClassLoader(jobject class_loader) { static_class_loader = class_loader; }
-
-jobject getClassLoader() {
-  RELEASE_ASSERT(static_class_loader,
-                 "findClass() is used before calling AndroidJniLibrary.load()");
-  return static_class_loader;
-}
-
-LocalRefUniquePtr<jclass> findClass(const char* class_name) {
-  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
-  jclass class_loader = jni_helper.findClass("java/lang/ClassLoader");
-  jmethodID find_class_method =
-      jni_helper.getMethodId(class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-  LocalRefUniquePtr<jstring> str_class_name = jni_helper.newStringUtf(class_name);
-  LocalRefUniquePtr<jclass> clazz = jni_helper.callObjectMethod<jclass>(
-      getClassLoader(), find_class_method, str_class_name.get());
-  return clazz;
-}
-
 void jniDeleteGlobalRef(void* context) {
   JNIEnv* env = JniHelper::getThreadLocalEnv();
   jobject ref = static_cast<jobject>(context);
@@ -326,8 +305,7 @@ MatcherData::Type StringToType(std::string type_as_string) {
   return MatcherData::EXACT;
 }
 
-void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
-                          Envoy::Protobuf::MessageLite* dest) {
+void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source, Protobuf::Message* dest) {
   ArrayElementsUniquePtr<jbyteArray, jbyte> bytes =
       jni_helper.getByteArrayElements(source, /* is_copy= */ nullptr);
   jsize size = jni_helper.getArrayLength(source);
@@ -336,7 +314,7 @@ void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
 }
 
 LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
-                                                   const Envoy::Protobuf::MessageLite& source) {
+                                                   const Envoy::Protobuf::Message& source) {
   size_t size = source.ByteSizeLong();
   LocalRefUniquePtr<jbyteArray> byte_array = jni_helper.newByteArray(size);
   auto bytes = jni_helper.getByteArrayElements(byte_array.get(), nullptr);

@@ -19,7 +19,6 @@ import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -48,8 +47,7 @@ public class Http2TestServerTest {
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
-    JniLibrary.load();
+    JniLibrary.loadTestLibrary();
   }
 
   @Before

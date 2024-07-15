@@ -131,52 +131,53 @@ bool PosixThread::getNameFromOS(std::string& name) {
 }
 #endif
 
-class PosixThreadFactoryImpl : public PosixThreadFactory {
-public:
-  ThreadPtr createThread(std::function<void()> thread_routine,
-                         OptionsOptConstRef options) override {
-    return createThread(thread_routine, options, /* crash_on_failure= */ true);
-  };
+ThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_routine,
+                                           OptionsOptConstRef options) {
+  return createThread(thread_routine, options, /* crash_on_failure= */ true);
+};
 
-  PosixThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options,
-                              bool crash_on_failure) override {
-    auto thread_handle = new ThreadHandle(thread_routine);
-    const int rc = pthread_create(
-        &thread_handle->handle(), nullptr,
-        [](void* arg) -> void* {
-          static_cast<ThreadHandle*>(arg)->routine()();
-          return nullptr;
-        },
-        reinterpret_cast<void*>(thread_handle));
-    if (rc != 0) {
-      delete thread_handle;
-      if (crash_on_failure) {
-        RELEASE_ASSERT(false, fmt::format("Unable to create a thread with return code: {}", rc));
-      } else {
-        IS_ENVOY_BUG(fmt::format("Unable to create a thread with return code: {}", rc));
-      }
-      return nullptr;
+int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
+  return pthread_create(
+      &thread_handle->handle(), nullptr,
+      [](void* arg) -> void* {
+        static_cast<ThreadHandle*>(arg)->routine()();
+        return nullptr;
+      },
+      reinterpret_cast<void*>(thread_handle));
+}
+
+PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_routine,
+                                                OptionsOptConstRef options, bool crash_on_failure) {
+  auto thread_handle = new ThreadHandle(thread_routine);
+  const int rc = createPthread(thread_handle);
+  if (rc != 0) {
+    delete thread_handle;
+    if (crash_on_failure) {
+      RELEASE_ASSERT(false, fmt::format("Unable to create a thread with return code: {}", rc));
+    } else {
+      IS_ENVOY_BUG(fmt::format("Unable to create a thread with return code: {}", rc));
     }
-    return std::make_unique<PosixThread>(thread_handle, options);
-  };
+    return nullptr;
+  }
+  return std::make_unique<PosixThread>(thread_handle, options);
+};
 
-  ThreadId currentThreadId() override { return ThreadId(getCurrentThreadId()); };
+ThreadId PosixThreadFactory::currentThreadId() { return ThreadId(getCurrentThreadId()); };
 
-  ThreadId currentPthreadId() override {
+ThreadId PosixThreadFactory::currentPthreadId() {
 #if defined(__linux__)
-    return static_cast<ThreadId>(static_cast<int64_t>(pthread_self()));
+  return static_cast<ThreadId>(static_cast<int64_t>(pthread_self()));
 #elif defined(__APPLE__)
-    uint64_t tid;
-    pthread_threadid_np(pthread_self(), &tid);
-    return ThreadId(tid);
+  uint64_t tid;
+  pthread_threadid_np(pthread_self(), &tid);
+  return ThreadId(tid);
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
-  }
-};
+}
 
 PosixThreadFactoryPtr PosixThreadFactory::create() {
-  return std::make_unique<PosixThreadFactoryImpl>();
+  return std::make_unique<PosixThreadFactory>();
 }
 
 } // namespace Thread

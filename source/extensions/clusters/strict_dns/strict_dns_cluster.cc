@@ -8,10 +8,24 @@
 namespace Envoy {
 namespace Upstream {
 
+absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
+StrictDnsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
+                             ClusterFactoryContext& context,
+                             Network::DnsResolverSharedPtr dns_resolver) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<StrictDnsClusterImpl>(
+      new StrictDnsClusterImpl(cluster, context, dns_resolver, creation_status));
+
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                            ClusterFactoryContext& context,
-                                           Network::DnsResolverSharedPtr dns_resolver)
-    : BaseDynamicClusterImpl(cluster, context), load_assignment_(cluster.load_assignment()),
+                                           Network::DnsResolverSharedPtr dns_resolver,
+                                           absl::Status& creation_status)
+    : BaseDynamicClusterImpl(cluster, context, creation_status),
+      load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -106,10 +120,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
-        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+        ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
@@ -135,6 +149,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 parent_.info_, hostname_, address,
                 // TODO(zyfjeff): Created through metadata shared pool
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+                std::make_shared<const envoy::config::core::v3::Metadata>(
+                    locality_lb_endpoints_.metadata()),
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
@@ -196,10 +212,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                            ClusterFactoryContext& context) {
-  auto selected_dns_resolver = selectDnsResolver(cluster, context);
+  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
+  RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
-  return std::make_pair(
-      std::make_shared<StrictDnsClusterImpl>(cluster, context, selected_dns_resolver), nullptr);
+  auto cluster_or_error =
+      StrictDnsClusterImpl::create(cluster, context, std::move(dns_resolver_or_error.value()));
+  RETURN_IF_NOT_OK(cluster_or_error.status());
+  return std::make_pair(std::shared_ptr<StrictDnsClusterImpl>(std::move(*cluster_or_error)),
+                        nullptr);
 }
 
 /**

@@ -124,7 +124,17 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
+                                      bool upstream_ssl, bool use_upstream) {
+  if (use_upstream) {
+    if (upstream_ssl) {
+      headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
+    } else {
+      headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
+    }
+    return;
+  }
+
   if (Http::Utility::schemeIsValid(headers.getSchemeValue())) {
     return;
   }
@@ -137,7 +147,7 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     return;
   }
 
-  if (downstream_secure) {
+  if (downstream_ssl) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -713,7 +723,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
-      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr);
+      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
+      host->transportSocketFactory().sslCtx() != nullptr,
+      callbacks_->streamInfo().shouldSchemeMatchUpstream());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -777,7 +789,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setBufferAccount(callbacks_->account())
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
+              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
+              .setDiscardResponseBody(true);
       options.setFilterConfig(config_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
@@ -823,8 +836,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
+    if (Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
       upstream_protocol = UpstreamProtocol::UDP;
     } else if (method == Http::Headers::get().MethodValues.Connect ||
                (route_entry_->connectConfig()->allow_post() &&
@@ -1317,6 +1329,14 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                           ? RetryState::Http3Used::Yes
                           : RetryState::Http3Used::No;
   }
+
+  // If the current request in this router has sent data to the upstream, we consider the request
+  // started.
+  upstream_request_started_ |= upstream_request.streamInfo()
+                                   .upstreamInfo()
+                                   ->upstreamTiming()
+                                   .first_upstream_tx_byte_sent_.has_value();
+
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_http3,
       [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
@@ -1326,7 +1346,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
         // the original request is retried with the same can_send_early_data setting, it will not be
         // sent as early data by the underlying connection pool grid.
         doRetry(can_send_early_data, disable_http3 ? false : can_use_http3, is_timeout_retry);
-      });
+      },
+      upstream_request_started_);
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
@@ -1402,7 +1423,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
   const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
+      transport_failure_reason.empty() ? "" : absl::StrCat("|", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 

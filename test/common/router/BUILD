@@ -114,6 +114,7 @@ envoy_cc_test(
     srcs = ["rds_impl_test.cc"],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/http:rds_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/admin:admin_lib",
@@ -160,6 +161,7 @@ envoy_cc_test(
         "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
+        "//source/common/http:rds_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/server/admin:admin_lib",
@@ -488,6 +490,7 @@ envoy_cc_test(
     deps = [
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
         "//test/test_common:test_runtime_lib",

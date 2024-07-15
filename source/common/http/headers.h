@@ -267,6 +267,7 @@ public:
     const std::string Json{"application/json"};
     const std::string Protobuf{"application/x-protobuf"};
     const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
+    const std::string Thrift{"application/x-thrift"};
   } ContentTypeValues;
 
   struct {
@@ -299,6 +300,7 @@ public:
     const std::string RetriableStatusCodes{"retriable-status-codes"};
     const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
+    const std::string ResetBeforeRequest{"reset-before-request"};
     const std::string Http3PostConnectFailure{"http3-post-connect-failure"};
   } EnvoyRetryOnValues;
 

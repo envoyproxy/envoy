@@ -137,8 +137,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
-  auto config = std::make_unique<Router::ConfigImpl>(
-      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
+  auto config = *Router::ConfigImpl::create(route_config, *factory_context,
+                                            ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
@@ -216,7 +216,7 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {

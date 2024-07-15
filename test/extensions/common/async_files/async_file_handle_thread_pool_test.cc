@@ -64,7 +64,7 @@ public:
 class AsyncFileHandleTest : public testing::Test, public AsyncFileHandleHelpers {
 public:
   void SetUp() override {
-    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);
@@ -77,7 +77,7 @@ public:
   void SetUp() override {
     EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
         .WillRepeatedly(Return(true));
-    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);

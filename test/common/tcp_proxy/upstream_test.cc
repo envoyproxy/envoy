@@ -3,6 +3,7 @@
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
@@ -192,7 +193,7 @@ TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   this->setupUpstream();
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   this->upstream_->responseDecoder().dumpState(ostream, 1);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
@@ -609,10 +610,8 @@ TEST_F(CombinedUpstreamTest, InvalidUpgradeWithNon200) {
 
 TEST_F(CombinedUpstreamTest, ReadDisable) {
   this->setup();
-  EXPECT_CALL(*this->mock_router_upstream_request_, onAboveWriteBufferHighWatermark());
   EXPECT_TRUE(this->upstream_->readDisable(true));
 
-  EXPECT_CALL(*this->mock_router_upstream_request_, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder.
@@ -628,25 +627,8 @@ TEST_F(CombinedUpstreamTest, AddBytesSentCallbackForCoverage) {
 
 TEST_F(CombinedUpstreamTest, DownstreamDisconnect) {
   this->setup();
-  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   EXPECT_CALL(this->callbacks_, onEvent(_)).Times(0);
   EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
-}
-
-TEST_F(CombinedUpstreamTest, UpstreamReset) {
-  this->setup();
-  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
-  EXPECT_CALL(this->callbacks_, onEvent(_));
-  this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
-}
-
-TEST_F(CombinedUpstreamTest, UpstreamWatermarks) {
-  this->setup();
-  EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
-  this->upstream_->onAboveWriteBufferHighWatermark();
-
-  EXPECT_CALL(this->callbacks_, onBelowWriteBufferLowWatermark());
-  this->upstream_->onBelowWriteBufferLowWatermark();
 }
 
 TEST_F(CombinedUpstreamTest, OnSuccessCalledOnValidResponse) {
@@ -676,14 +658,13 @@ TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   this->setup();
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   this->upstream_->responseDecoder().dumpState(ostream, 1);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
   EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
 }
 TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->setup();
-  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
@@ -695,7 +676,6 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatu
       {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
         "false"}});
   this->setup();
-  EXPECT_CALL(*this->mock_router_upstream_request_, resetStream());
   upstream_->doneWriting();
   EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};

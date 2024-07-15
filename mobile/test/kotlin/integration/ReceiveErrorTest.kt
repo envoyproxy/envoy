@@ -2,6 +2,8 @@ package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -20,11 +22,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 private const val LOCAL_ERROR_FILTER_TYPE =
   "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 private const val FILTER_NAME = "error_validation_filter"
 
+@RunWith(RobolectricTestRunner::class)
 class ReceiveErrorTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -82,6 +87,9 @@ class ReceiveErrorTest {
         )
         .build()
 
+    var anyProto =
+      Any.newBuilder().setTypeUrl(LOCAL_ERROR_FILTER_TYPE).setValue(ByteString.empty()).build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
@@ -90,7 +98,10 @@ class ReceiveErrorTest {
           name = FILTER_NAME,
           factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
         )
-        .addNativeFilter("envoy.filters.http.local_error", "[$LOCAL_ERROR_FILTER_TYPE]{}")
+        .addNativeFilter(
+          "envoy.filters.http.local_error",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     var errorCode: Int? = null

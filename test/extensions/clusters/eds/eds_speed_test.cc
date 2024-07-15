@@ -54,6 +54,7 @@ public:
         Config::SubscriptionFactory::RetryMaxDelayMs, random_);
     Config::GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
         /*dispatcher_=*/server_context_.dispatcher_,
         /*service_method_=*/
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -100,7 +101,7 @@ public:
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
+    cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(

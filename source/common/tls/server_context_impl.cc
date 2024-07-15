@@ -76,17 +76,33 @@ int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned ch
   }
 }
 
+absl::StatusOr<std::unique_ptr<ServerContextImpl>>
+ServerContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+                          const std::vector<std::string>& server_names,
+                          Server::Configuration::CommonFactoryContext& factory_context,
+                          Ssl::ContextAdditionalInitFunc additional_init) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<ServerContextImpl>(new ServerContextImpl(
+      scope, config, server_names, factory_context, additional_init, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      Server::Configuration::CommonFactoryContext& factory_context,
-                                     Ssl::ContextAdditionalInitFunc additional_init)
-    : ContextImpl(scope, config, factory_context, additional_init),
+                                     Ssl::ContextAdditionalInitFunc additional_init,
+                                     absl::Status& creation_status)
+    : ContextImpl(scope, config, factory_context, additional_init, creation_status),
       session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()),
       full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
+  if (!creation_status.ok()) {
+    return;
+  }
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
-    throw EnvoyException("Server TlsCertificates must have a certificate specified");
+    throwEnvoyExceptionOrPanic("Server TlsCertificates must have a certificate specified");
   }
 
   for (auto& ctx : tls_contexts_) {
@@ -172,17 +188,17 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
     if (ocsp_resp_bytes.empty()) {
       if (ctx.is_must_staple_) {
-        throw EnvoyException("OCSP response is required for must-staple certificate");
+        throwEnvoyExceptionOrPanic("OCSP response is required for must-staple certificate");
       }
       if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
-        throw EnvoyException("Required OCSP response is missing from TLS context");
+        throwEnvoyExceptionOrPanic("Required OCSP response is missing from TLS context");
       }
     } else {
       auto response_or_error =
-          Ocsp::OcspResponseWrapper::create(ocsp_resp_bytes, factory_context_.timeSource());
+          Ocsp::OcspResponseWrapperImpl::create(ocsp_resp_bytes, factory_context_.timeSource());
       THROW_IF_STATUS_NOT_OK(response_or_error, throw);
       if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
-        throw EnvoyException("OCSP response does not match its TLS certificate");
+        throwEnvoyExceptionOrPanic("OCSP response does not match its TLS certificate");
       }
       ctx.ocsp_response_ = std::move(response_or_error.value());
     }
@@ -275,7 +291,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
 
         ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
         if (ASN1_STRING_length(cn_asn1) <= 0) {
-          throw EnvoyException("Invalid TLS context has an empty subject CN");
+          throwEnvoyExceptionOrPanic("Invalid TLS context has an empty subject CN");
         }
 
         rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
@@ -313,7 +329,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
       // It's possible that the certificate doesn't have a subject, but
       // does have SANs. Make sure that we have one or the other.
       if (cn_index < 0 && san_count == 0) {
-        throw EnvoyException("Invalid TLS context has neither subject CN nor SAN names");
+        throwEnvoyExceptionOrPanic("Invalid TLS context has neither subject CN nor SAN names");
       }
 
       rc = X509_NAME_digest(X509_get_issuer_name(cert), EVP_sha256(), hash_buffer, &hash_length);
@@ -675,6 +691,17 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   }
 
   return ssl_select_cert_success;
+}
+
+Ssl::ServerContextSharedPtr ServerContextFactoryImpl::createServerContext(
+    Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+    const std::vector<std::string>& server_names,
+    Server::Configuration::CommonFactoryContext& factory_context,
+    Ssl::ContextAdditionalInitFunc additional_init) {
+  auto factory_or_error = ServerContextImpl::create(scope, config, server_names, factory_context,
+                                                    std::move(additional_init));
+  THROW_IF_NOT_OK(factory_or_error.status());
+  return std::move(factory_or_error.value());
 }
 
 REGISTER_FACTORY(ServerContextFactoryImpl, ServerContextFactory);

@@ -155,12 +155,12 @@ public:
   template <class Proto> static absl::Status checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-    if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
+    if (transport_api_version != envoy::config::core::v3::ApiVersion::AUTO &&
+        transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
       const std::string& warning = fmt::format(
-          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "V2 xDS transport protocol version is deprecated in {}. "
           "The v2 xDS major version has been removed and is no longer supported. "
-          "You may be missing explicit V3 configuration of the transport API version, "
-          "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
+          "See the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
       return absl::InvalidArgumentError(warning);
@@ -299,9 +299,9 @@ public:
    * @param typed_config for the extension config.
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string& typed_struct_type =
+    static const std::string typed_struct_type =
         xds::type::v3::TypedStruct::default_instance().GetTypeName();
-    static const std::string& legacy_typed_struct_type =
+    static const std::string legacy_typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
@@ -391,12 +391,15 @@ public:
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
-   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
+   * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
+   *                         in the given index, a nullptr factory will be returned.
+   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
+   * grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope, bool skip_cluster_check);
+                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx);
 
   /**
    * Translate opaque config from google.protobuf.Any to defined proto message.

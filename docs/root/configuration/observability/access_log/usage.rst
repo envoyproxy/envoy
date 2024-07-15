@@ -542,6 +542,7 @@ HTTP only
   **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
+  **DownstreamRemoteReset**, **DR**, The response details are ``http2.remote_reset`` or ``http2.remote_refuse``.
 
 UDP
   Not implemented ("-").
@@ -1182,6 +1183,42 @@ UDP
   UPSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
+%UPSTREAM_PEER_URI_SAN%
+  HTTP/TCP/THRIFT
+    The URIs present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_PEER_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the peer certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_URI_SAN%
+  HTTP/TCP/THRIFT
+    The URIs present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_DNS_SAN%
+  HTTP/TCP/THRIFT
+    The DNS names present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%UPSTREAM_LOCAL_IP_SAN%
+  HTTP/TCP/THRIFT
+    The ip addresses present in the SAN of the local certificate used to establish the upstream TLS connection.
+  UDP
+    Not implemented ("-").
+
 %HOSTNAME%
   The system hostname.
 
@@ -1212,6 +1249,9 @@ UDP
                                  Note: It is only relevant for UDP tunneling over HTTP.
   * UdpPeriodic - On any UDP Proxy filter periodic log record.
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
+
+%UNIQUE_ID%
+   A unique identifier (UUID) that is generated dynamically.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

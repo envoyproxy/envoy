@@ -269,6 +269,129 @@ TEST_F(AsyncClientImplTest, Basic) {
                      .value());
 }
 
+TEST_F(AsyncClientImplTest, NoResponseBodyBuffering) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+
+  auto* request = client_.send(std::move(message_), callbacks_,
+                               AsyncClient::RequestOptions().setDiscardResponseBody(true));
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks_, onSuccess_(_, _))
+      .WillOnce(Invoke([](const AsyncClient::Request&, ResponseMessage* response) -> void {
+        // Verify that there is zero response body.
+        EXPECT_EQ(response->body().length(), 0);
+      }));
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+}
+
+TEST_F(AsyncClientImplTest, LargeResponseBody) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          getInteger(AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse))
+      .WillByDefault(Return(100));
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks_, onFailure(_, AsyncClient::FailureReason::ExceedResponseBufferLimit));
+
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(std::string(100 + 1, 'a'))};
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(*large_body, true);
+  EXPECT_EQ(large_body->length(), 0);
+}
+
+TEST_F(AsyncClientImplTest, LargeResponseBodyMultipleRead) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          getInteger(AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse))
+      .WillByDefault(Return(100));
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
+  EXPECT_CALL(callbacks_, onFailure(_, AsyncClient::FailureReason::ExceedResponseBufferLimit));
+
+  Buffer::InstancePtr large_body{new Buffer::OwnedImpl(std::string(50, 'a'))};
+  Buffer::InstancePtr large_body_second{new Buffer::OwnedImpl(std::string(50, 'a'))};
+  Buffer::InstancePtr large_body_third{new Buffer::OwnedImpl(std::string(2, 'a'))};
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(*large_body, false);
+  response_decoder_->decodeData(*large_body_second, false);
+  response_decoder_->decodeData(*large_body_third, true);
+}
+
 TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
@@ -2094,8 +2217,9 @@ public:
   std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
   Regex::GoogleReEngine regex_engine_;
   std::unique_ptr<NullRouteImpl> route_impl_;
-  std::unique_ptr<Http::AsyncStreamImpl> stream_{
-      new Http::AsyncStreamImpl(client_, stream_callbacks_, AsyncClient::StreamOptions())};
+  std::unique_ptr<Http::AsyncStreamImpl> stream_ = std::move(
+      Http::AsyncStreamImpl::create(client_, stream_callbacks_, AsyncClient::StreamOptions())
+          .value());
   NullVirtualHost vhost_;
   NullCommonConfig config_;
 
@@ -2104,8 +2228,10 @@ public:
 
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
-    stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
+    stream_ = std::move(
+        Http::AsyncStreamImpl::create(client_, stream_callbacks_,
+                                      AsyncClient::StreamOptions().setRetryPolicy(retry_policy))
+            .value());
   }
 
   void setRetryPolicy(const std::string& yaml_config) {
@@ -2121,8 +2247,10 @@ public:
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
-    stream_ = std::make_unique<Http::AsyncStreamImpl>(
-        client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_));
+    stream_ = std::move(
+        Http::AsyncStreamImpl::create(client_, stream_callbacks_,
+                                      AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_))
+            .value());
   }
 
   const Router::RouteEntry& getRouteFromStream() { return *(stream_->route_->routeEntry()); }
@@ -2187,7 +2315,7 @@ TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {
   const std::string yaml = R"EOF(
 per_try_timeout: 30s
 num_retries: 10
-retry_on: 5xx,gateway-error,connect-failure,reset
+retry_on: 5xx,gateway-error,connect-failure,reset,reset-before-request
 retry_back_off:
   base_interval: 0.01s
   max_interval: 30s
@@ -2199,7 +2327,8 @@ retry_back_off:
   EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
   EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
   EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
-                Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET,
+                Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET |
+                Router::RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST,
             route_entry.retryPolicy().retryOn());
 
   EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));

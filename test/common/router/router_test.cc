@@ -399,7 +399,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(
       callbacks_.details(),
-      "upstream_reset_before_response_started{remote_connection_failure,tls_version_mismatch}");
+      "upstream_reset_before_response_started{remote_connection_failure|tls_version_mismatch}");
 }
 
 TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
@@ -431,7 +431,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{connection_timeout,connect_timeout}");
+            "upstream_reset_before_response_started{connection_timeout|connect_timeout}");
 }
 
 TEST_F(RouterTest, Http1Upstream) {
@@ -1310,7 +1310,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
@@ -1501,7 +1501,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   test_time_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _));
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
@@ -1584,7 +1584,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   test_time_.advanceTimeWait(std::chrono::milliseconds(240));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
@@ -1817,7 +1817,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestResponseHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(204)));
@@ -3171,7 +3171,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
 
   // We should not call shouldRetryReset() because you never retry the same
   // request twice.
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
 
   // Now trigger a 200 in response to the second request.
   Http::ResponseHeaderMapPtr response_headers(
@@ -3240,7 +3240,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         return nullptr;
       }));
   EXPECT_CALL(*router_->retry_state_,
-              shouldRetryReset(_, /*http3_used=*/RetryState::Http3Used::Unknown, _))
+              shouldRetryReset(_, /*http3_used=*/RetryState::Http3Used::Unknown, _, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   router_->retry_state_->callback_();
@@ -3315,9 +3315,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
+  EXPECT_CALL(*router_->retry_state_,
+              shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
-                              RetryState::DoRetryResetCallback callback) {
+                              RetryState::DoRetryResetCallback callback, bool) {
         EXPECT_EQ(RetryState::Http3Used::No, http3_used);
         router_->retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/false); };
         return RetryStatus::Yes;
@@ -3375,9 +3376,10 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   router_->decodeData(body, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
+  EXPECT_CALL(*router_->retry_state_,
+              shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
-                              RetryState::DoRetryResetCallback callback) {
+                              RetryState::DoRetryResetCallback callback, bool) {
         EXPECT_EQ(RetryState::Http3Used::Yes, http3_used);
         router_->retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/true); };
         return RetryStatus::Yes;
@@ -3657,7 +3659,7 @@ TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
 
   // The 100-continue will result in resetting retry_state_, so when the stream
   // is reset we won't even check shouldRetryReset() (or shouldRetryHeaders()).
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   Http::ResponseHeaderMapPtr continue_headers(
@@ -4572,7 +4574,7 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
   }
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
-  return std::make_shared<ShadowPolicyImpl>(policy);
+  return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy), std::shared_ptr<ShadowPolicyImpl>);
 }
 
 } // namespace
@@ -4588,7 +4590,7 @@ public:
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
   }
 
 protected:
@@ -5806,15 +5808,28 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   TestScopedRuntime scoped_runtime;
 
-  // With no scheme and x-forwarded-proto, set scheme based on encryption level
+  // With upstream scheme, set scheme based on upstream encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, false, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With no scheme and x-forwarded-proto, set scheme based on downstream
+  // encryption level
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, false, false);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5822,7 +5837,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
@@ -5830,7 +5845,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
@@ -5839,7 +5854,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
@@ -6324,7 +6339,7 @@ TEST_F(RouterTest, RequestResponseSize) { testRequestResponse(false); }
 TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponse(true); }
 
 TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
-  auto address = Network::Utility::parseInternetAddressAndPort("127.0.0.1:20");
+  auto address = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:20");
   std::string hostname = "www.lyft.com";
   callbacks_.stream_info_.filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),
@@ -6637,6 +6652,27 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
 
   router_->onDestroy();
+}
+
+TEST_F(RouterTest, OverwriteSchemeWithUpstreamTransportProtocol) {
+  EXPECT_CALL(callbacks_.stream_info_, shouldSchemeMatchUpstream()).WillRepeatedly(Return(true));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setScheme("https");
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(headers.getSchemeValue(), "http");
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel(_));
+  router_->onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(0U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 } // namespace Router
