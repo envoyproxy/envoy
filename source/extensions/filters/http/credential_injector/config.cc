@@ -15,7 +15,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb>
 CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& context) {
 
   // Find the credential injector factory.
   auto* config_factory = Envoy::Config::Utility::getFactory<NamedCredentialInjectorConfigFactory>(
@@ -31,6 +32,7 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.credential().typed_config(), context.messageValidationVisitor(),
       *config_factory);
+
   CredentialInjectorSharedPtr credential_injector =
       config_factory->createCredentialInjectorFromProto(
           *message, stats_prefix + "credential_injector.", context);
@@ -38,7 +40,7 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
   FilterConfigSharedPtr config =
       std::make_shared<FilterConfig>(std::move(credential_injector), proto_config.overwrite(),
                                      proto_config.allow_request_without_credential(),
-                                     stats_prefix + "credential_injector.", context.scope());
+                                     stats_prefix + "credential_injector.", dual_info.scope);
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CredentialInjectorFilter>(config));
   };
@@ -46,6 +48,8 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
 
 REGISTER_FACTORY(CredentialInjectorFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamCredentialInjectorFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace CredentialInjector
 } // namespace HttpFilters

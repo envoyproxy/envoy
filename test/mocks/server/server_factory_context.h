@@ -38,6 +38,8 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
+class MockTransportSocketFactoryContext;
+
 class MockStatsConfig : public virtual StatsConfig {
 public:
   MockStatsConfig();
@@ -86,6 +88,7 @@ public:
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -112,6 +115,8 @@ public:
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
   Regex::GoogleReEngine regex_engine_;
+  std::unique_ptr<testing::NiceMock<MockTransportSocketFactoryContext>>
+      transport_socket_factory_context_;
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {
@@ -167,6 +172,7 @@ public:
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), ());
 };
 
 } // namespace Configuration

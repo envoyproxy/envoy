@@ -28,7 +28,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 Common::CredentialInjectorSharedPtr
 OAuth2CredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const OAuth2& config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
 
   switch (config.flow_type_case()) {
   case envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::FlowTypeCase::
@@ -44,26 +44,24 @@ OAuth2CredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
 Common::CredentialInjectorSharedPtr
 OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
     const OAuth2& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  auto& cluster_manager = context.serverFactoryContext().clusterManager();
+    Server::Configuration::ServerFactoryContext& server_context) {
+  auto& cluster_manager = server_context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+  auto& transport_socket_factory = server_context.getTransportSocketFactoryContext();
 
   const auto& client_secret_secret = proto_config.client_credentials().client_secret();
 
-  auto client_secret_provider = secretsProvider(client_secret_secret, secret_manager,
-                                                transport_socket_factory, context.initManager());
+  auto client_secret_provider = secretsProvider(
+      client_secret_secret, secret_manager, transport_socket_factory, server_context.initManager());
   if (client_secret_provider == nullptr) {
     throw EnvoyException("Invalid oauth2 client secret configuration");
   }
 
   auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
-      std::move(client_secret_provider), context.serverFactoryContext().threadLocal(),
-      context.serverFactoryContext().api());
+      std::move(client_secret_provider), server_context.threadLocal(), server_context.api());
   auto token_reader = std::make_shared<const TokenProvider>(
-      secret_reader, context.serverFactoryContext().threadLocal(), cluster_manager, proto_config,
-      context.serverFactoryContext().mainThreadDispatcher(), stats_prefix,
-      context.serverFactoryContext().scope());
+      secret_reader, server_context.threadLocal(), cluster_manager, proto_config,
+      server_context.mainThreadDispatcher(), stats_prefix, server_context.scope());
 
   return std::make_shared<OAuth2ClientCredentialTokenInjector>(token_reader);
 }

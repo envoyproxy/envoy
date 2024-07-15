@@ -14,14 +14,13 @@ namespace Common {
 template <class ConfigProto>
 class CredentialInjectorFactoryBase : public NamedCredentialInjectorConfigFactory {
 public:
-  CredentialInjectorSharedPtr
-  createCredentialInjectorFromProto(const Protobuf::Message& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override {
+  CredentialInjectorSharedPtr createCredentialInjectorFromProto(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context) override {
     return createCredentialInjectorFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
-                                                             context.messageValidationVisitor()),
-        stats_prefix, context);
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, server_context.messageValidationVisitor()),
+        stats_prefix, server_context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -36,7 +35,7 @@ protected:
 private:
   virtual CredentialInjectorSharedPtr
   createCredentialInjectorFromProtoTyped(const ConfigProto&, const std::string&,
-                                         Server::Configuration::FactoryContext&) PURE;
+                                         Server::Configuration::ServerFactoryContext&) PURE;
 
   const std::string name_;
 };

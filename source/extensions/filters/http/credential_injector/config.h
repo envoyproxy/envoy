@@ -11,17 +11,19 @@ namespace HttpFilters {
 namespace CredentialInjector {
 
 class CredentialInjectorFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::DualFactoryBase<
           envoy::extensions::filters::http::credential_injector::v3::CredentialInjector> {
 public:
-  CredentialInjectorFilterFactory()
-      : ExceptionFreeFactoryBase("envoy.filters.http.credential_injector") {}
+  CredentialInjectorFilterFactory() : DualFactoryBase("envoy.filters.http.credential_injector") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, DualInfo dual_info,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
+
+using UpstreamCredentialInjectorFilterFactory = CredentialInjectorFilterFactory;
 
 } // namespace CredentialInjector
 } // namespace HttpFilters

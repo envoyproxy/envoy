@@ -1,5 +1,7 @@
 #include "test/mocks/server/server_factory_context.h"
 
+#include "transport_socket_factory_context.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -9,7 +11,10 @@ using ::testing::ReturnRef;
 
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl()), http_context_(store_.symbolTable()),
-      grpc_context_(store_.symbolTable()), router_context_(store_.symbolTable()) {
+      grpc_context_(store_.symbolTable()), router_context_(store_.symbolTable()),
+      transport_socket_factory_context_(
+          std::make_unique<testing::NiceMock<MockTransportSocketFactoryContext>>()) {
+
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -35,6 +40,8 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, nullOverloadManager()).WillByDefault(ReturnRef(null_overload_manager_));
+  ON_CALL(*this, getTransportSocketFactoryContext())
+      .WillByDefault(ReturnRef(*transport_socket_factory_context_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
