@@ -608,9 +608,15 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   Api::SysCallIntResult rv;
   if (*version == Network::Address::IpVersion::v6) {
     rv = socket.getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
-  } else {
-    rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+    EXPECT_EQ(rv.return_value_, 0);
+    EXPECT_EQ(optval, 1);
+    rv = socket.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &optval, &optlen);
+    EXPECT_EQ(rv.return_value_, 0);
+    if (optval) {
+      return;
+    }
   }
+  rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
   EXPECT_EQ(rv.return_value_, 0);
   EXPECT_EQ(optval, 1);
 }
