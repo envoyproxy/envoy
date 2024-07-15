@@ -129,7 +129,9 @@ void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
   // Set up the bucket id.
   new_bucket->bucket_id = bucket_id;
   // Set up the first time assignment time.
-  new_bucket->first_assignment_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+  new_bucket->first_assignment_time = time_source_.monotonicTime();
+
+  std::chrono::duration_cast<std::chrono::nanoseconds>(
       time_source_.monotonicTime().time_since_epoch());
   // Set up the quota usage.
   QuotaUsage quota_usage;
@@ -221,8 +223,9 @@ RateLimitQuotaFilter::processCachedBucket(size_t bucket_id,
   auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
       time_source_.monotonicTime().time_since_epoch());
   auto assignment_time_elapsed = Protobuf::util::TimeUtil::NanosecondsToDuration(
-      (now - quota_buckets_[bucket_id]->first_assignment_time).count());
-
+      (now - std::chrono::duration_cast<std::chrono::nanoseconds>(
+                 quota_buckets_[bucket_id]->first_assignment_time.time_since_epoch()))
+          .count());
   if (assignment_time_elapsed > quota_buckets_[bucket_id]
                                     ->bucket_action.quota_assignment_action()
                                     .assignment_time_to_live()) {
