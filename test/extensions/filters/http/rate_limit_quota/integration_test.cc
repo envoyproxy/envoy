@@ -840,7 +840,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentDeny)
       EXPECT_EQ(response_->headers().getStatusValue(), "429");
     } else {
       // Handle the request received by upstream.
-      ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
       ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -877,19 +878,15 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
       // 1st request will start the gRPC stream.
       if (i == 0) {
         // Start the gRPC stream to RLQS server on the first request.
-        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(
-            *dispatcher_, rlqs_connection_));
-        ASSERT_TRUE(
-            rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+        ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports
-            reports;
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
         ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
         rlqs_stream_->startGrpcStream();
       } else {
         // 3rd request won't start gRPC stream again since it is kept open.
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports
-            reports;
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
         ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       }
 
