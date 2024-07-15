@@ -23,30 +23,29 @@ Network::TransportSocketOptionsConstSharedPtr
 wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            Upstream::HostConstSharedPtr host) {
   const auto& upstream_http_protocol_options = host->cluster().upstreamHttpProtocolOptions();
-  if (upstream_http_protocol_options && upstream_http_protocol_options->auto_sni_from_upstream()) {
-    const absl::string_view hostname = host->hostname();
-    if (!hostname.empty()) {
-      Network::TransportSocketOptionsConstSharedPtr options_with_decorated_server_name;
-      if (transport_socket_options) {
-        options_with_decorated_server_name =
-            std::make_shared<Network::ServerNameDecoratingTransportSocketOptions>(
-                hostname, transport_socket_options);
-      } else {
-        options_with_decorated_server_name = std::make_shared<Network::TransportSocketOptionsImpl>(
-            hostname, std::vector<std::string>{}, std::vector<std::string>{},
-            std::vector<std::string>{});
-      }
-      if (upstream_http_protocol_options->auto_san_validation()) {
-        return std::make_shared<Network::SubjectAltNamesDecoratingTransportSocketOptions>(
-            std::vector<std::string>{std::string(hostname)}, options_with_decorated_server_name);
-      } else {
-        return options_with_decorated_server_name;
-      }
-    } else {
-      return transport_socket_options;
-    }
-  } else {
+  if (!upstream_http_protocol_options ||
+      !upstream_http_protocol_options->auto_sni_from_upstream()) {
     return transport_socket_options;
+  }
+  const absl::string_view hostname = host->hostname();
+  if (hostname.empty()) {
+    return transport_socket_options;
+  }
+  Network::TransportSocketOptionsConstSharedPtr options_with_decorated_server_name;
+  if (transport_socket_options) {
+    options_with_decorated_server_name =
+        std::make_shared<Network::ServerNameDecoratingTransportSocketOptions>(
+            hostname, transport_socket_options);
+  } else {
+    options_with_decorated_server_name = std::make_shared<Network::TransportSocketOptionsImpl>(
+        hostname, std::vector<std::string>{}, std::vector<std::string>{},
+        std::vector<std::string>{});
+  }
+  if (upstream_http_protocol_options->auto_san_validation()) {
+    return std::make_shared<Network::SubjectAltNamesDecoratingTransportSocketOptions>(
+        std::vector<std::string>{std::string(hostname)}, options_with_decorated_server_name);
+  } else {
+    return options_with_decorated_server_name;
   }
 }
 
