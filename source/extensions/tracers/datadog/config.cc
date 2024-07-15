@@ -30,6 +30,18 @@ DatadogTracerFactory::makeConfig(const envoy::config::trace::v3::DatadogConfig& 
     config.service = proto_config.service_name();
   }
 
+  if (proto_config.has_remote_config()) {
+    const auto& proto_remote_config = proto_config.remote_config();
+    config.agent.remote_configuration_enabled = true;
+
+    if (proto_remote_config.has_polling_interval()) {
+      config.agent.remote_configuration_poll_interval_seconds =
+          proto_remote_config.polling_interval().seconds();
+    }
+  } else {
+    config.agent.remote_configuration_enabled = false;
+  }
+
   config.integration_name = "envoy";
   config.integration_version = Envoy::VersionInfo::version();
 

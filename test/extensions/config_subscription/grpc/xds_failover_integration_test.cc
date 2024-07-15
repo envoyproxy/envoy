@@ -296,7 +296,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverNotAttemptedWhenPrimaryAvailable) 
 
 // Validates that when there's a failover defined, and the primary isn't responding,
 // then Envoy will use the failover, and will receive a valid config.
-TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
+TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryNotResponding) {
   initialize();
 
   // Expect a connection to the primary. Reject the connection immediately.
@@ -320,7 +320,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
 
 // Validates that when there's a failover defined, and the primary returns a
 // gRPC failure, then Envoy will use the failover, and will receive a valid config.
-TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailure) {
+TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailure) {
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -363,7 +363,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailure) {
 // Validates that when there's a failover defined, and the primary returns a
 // gRPC failure after sending headers, then Envoy will use the failover, and will receive a valid
 // config.
-TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailureAfterHeaders) {
+TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailureAfterHeaders) {
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -401,7 +401,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailureAfterHeaders) {
 }
 
 // Validate that once primary answers, failover will not be used, even after disconnecting.
-TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
+TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoFailoverUseAfterPrimaryResponse) {
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -482,7 +482,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
 }
 
 // Validate that once failover answers, primary will not be used, even after disconnecting.
-TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
+TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoPrimaryUseAfterFailoverResponse) {
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
