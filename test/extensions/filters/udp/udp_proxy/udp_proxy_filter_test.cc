@@ -2026,7 +2026,7 @@ TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   pool_->onStreamSuccess(request_encoder_);
 }
 
-TEST_F(TunnelingConnectionPoolImplTest, onDownstreamEvent) {
+TEST_F(TunnelingConnectionPoolImplTest, OnDownstreamEvent) {
   setup();
   createNewStream();
 
