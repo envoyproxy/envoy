@@ -2,6 +2,7 @@ package org.chromium.net.impl;
 
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
 
+import java.nio.charset.StandardCharsets;
 import android.content.Context;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
+import com.google.protobuf.Any;
 
 /**
  * Implementation of {@link ICronetEngineBuilder} that builds native Cronvoy engine.
@@ -211,9 +213,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   @VisibleForTesting
   public CronvoyEngineBuilderImpl addUrlInterceptorsForTesting() {
-    nativeFilterChain.add(new EnvoyNativeFilterConfig(
-        "envoy.filters.http.test_read",
-        "[type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead] {}"));
+    Any anyProto =
+        Any.newBuilder()
+            .setTypeUrl(
+                "type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead")
+            .setValue(com.google.protobuf.ByteString.empty())
+            .build();
+    String config = new String(anyProto.toByteArray(), StandardCharsets.UTF_8);
+    nativeFilterChain.add(new EnvoyNativeFilterConfig("envoy.filters.http.test_read", config));
     return this;
   }
 

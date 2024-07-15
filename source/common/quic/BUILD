@@ -368,6 +368,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
+        "@com_github_google_quiche//:quic_core_packets_lib",
     ],
 )
 
@@ -508,7 +509,7 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
-        "//source/common/tls:context_config_lib",
+        "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
         "//source/common/tls:server_ssl_socket_lib",
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",

@@ -28,7 +28,8 @@ Fetch::Fetch()
 }
 
 envoy_status_t Fetch::fetch(const std::vector<absl::string_view>& urls,
-                            const std::vector<absl::string_view>& quic_hints) {
+                            const std::vector<absl::string_view>& quic_hints,
+                            std::vector<Http::Protocol>& protocols) {
   absl::Notification engine_running;
   dispatcher_ = api_->allocateDispatcher("fetch_client");
   Thread::ThreadPtr envoy_thread = api_->threadFactory().createThread(
@@ -36,7 +37,7 @@ envoy_status_t Fetch::fetch(const std::vector<absl::string_view>& urls,
   engine_running.WaitForNotification();
   envoy_status_t status = ENVOY_SUCCESS;
   for (const absl::string_view url : urls) {
-    status = sendRequest(url);
+    status = sendRequest(url, protocols);
     if (status == ENVOY_FAILURE) {
       break;
     }
@@ -50,7 +51,8 @@ envoy_status_t Fetch::fetch(const std::vector<absl::string_view>& urls,
   return status;
 }
 
-envoy_status_t Fetch::sendRequest(absl::string_view url_string) {
+envoy_status_t Fetch::sendRequest(absl::string_view url_string,
+                                  std::vector<Http::Protocol>& protocols) {
   Http::Utility::Url url;
   if (!url.initialize(url_string, /*is_connect_request=*/false)) {
     std::cerr << "Unable to parse url: '" << url_string << "'\n";
@@ -80,12 +82,13 @@ envoy_status_t Fetch::sendRequest(absl::string_view url_string) {
       std::cerr << "Received final data\n";
     }
   };
-  stream_callbacks.on_complete_ = [&request_finished](envoy_stream_intel,
-                                                      envoy_final_stream_intel final_intel) {
-    std::cerr << "Request finished after "
-              << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
-    request_finished.Notify();
-  };
+  stream_callbacks.on_complete_ =
+      [&request_finished, &protocols](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        std::cerr << "Request finished after "
+                  << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
+        protocols.push_back(static_cast<Http::Protocol>(final_intel.upstream_protocol));
+        request_finished.Notify();
+      };
   stream_callbacks.on_error_ = [&request_finished, &status](const EnvoyError& error,
                                                             envoy_stream_intel,
                                                             envoy_final_stream_intel final_intel) {
@@ -117,7 +120,8 @@ envoy_status_t Fetch::sendRequest(absl::string_view url_string) {
 void Fetch::runEngine(absl::Notification& engine_running,
                       const std::vector<absl::string_view>& quic_hints) {
   Platform::EngineBuilder engine_builder;
-  engine_builder.setLogLevel(Logger::Logger::debug);
+  engine_builder.setLogLevel(Logger::Logger::trace);
+  engine_builder.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   engine_builder.setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
   if (!quic_hints.empty()) {
     engine_builder.enableHttp3(true);

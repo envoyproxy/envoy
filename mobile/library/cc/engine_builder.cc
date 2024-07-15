@@ -14,6 +14,8 @@
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
+#else
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #endif
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
@@ -29,6 +31,7 @@
 #include "fmt/core.h"
 #include "library/common/internal_engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
+#include "library/common/extensions/filters/http/platform_bridge/filter.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
@@ -281,10 +284,23 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
 }
 
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
+#ifdef ENVOY_ENABLE_FULL_PROTOS
   return absl::StrCat("[type.googleapis.com/"
                       "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
                       "platform_filter_name: \"",
                       name, "\" }");
+#else
+  envoymobile::extensions::filters::http::platform_bridge::PlatformBridge proto_config;
+  proto_config.set_platform_filter_name(name);
+  std::string ret;
+  proto_config.SerializeToString(&ret);
+  ProtobufWkt::Any any_config;
+  any_config.set_type_url(
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge");
+  any_config.set_value(ret);
+  any_config.SerializeToString(&ret);
+  return ret;
+#endif
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
@@ -300,6 +316,11 @@ EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
   respect_system_proxy_settings_ = value;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setIosNetworkServiceType(int ios_network_service_type) {
+  ios_network_service_type_ = ios_network_service_type;
   return *this;
 }
 #endif
@@ -357,7 +378,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
                    "Failed to parse: " + (*filter).typed_config_);
 #else
-    IS_ENVOY_BUG("Native filter support not implemented for this build");
+    RELEASE_ASSERT(native_filter->mutable_typed_config()->ParseFromString((*filter).typed_config_),
+                   "Failed to parse binary proto: " + (*filter).typed_config_);
 #endif // !ENVOY_ENABLE_FULL_PROTOS
   }
 
@@ -458,19 +480,24 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
   dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
       "envoy.network.dns_resolver.apple");
-#else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
-  if (use_cares_) {
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.cares");
-  } else {
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.getaddrinfo");
-  }
-#endif
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
+#else
+  if (use_cares_) {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.cares");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
+  } else {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
+  }
+#endif
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
@@ -700,12 +727,25 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
     // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
     // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
-    envoy::config::core::v3::SocketOption* sock_opt =
+    envoy::config::core::v3::SocketOption* rcv_buf_sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
-    sock_opt->set_name(SO_RCVBUF);
-    sock_opt->set_level(SOL_SOCKET);
-    sock_opt->set_int_value(socket_receive_buffer_size_);
-    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
+    rcv_buf_sock_opt->set_name(SO_RCVBUF);
+    rcv_buf_sock_opt->set_level(SOL_SOCKET);
+    rcv_buf_sock_opt->set_int_value(socket_receive_buffer_size_);
+    rcv_buf_sock_opt->set_description(
+        absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
+    // Set the network service type on iOS, if supplied.
+#if defined(__APPLE__)
+    if (ios_network_service_type_ > 0) {
+      envoy::config::core::v3::SocketOption* net_svc_sock_opt =
+          base_cluster->mutable_upstream_bind_config()->add_socket_options();
+      net_svc_sock_opt->set_name(SO_NET_SERVICE_TYPE);
+      net_svc_sock_opt->set_level(SOL_SOCKET);
+      net_svc_sock_opt->set_int_value(ios_network_service_type_);
+      net_svc_sock_opt->set_description(
+          absl::StrCat("SO_NET_SERVICE_TYPE = ", ios_network_service_type_));
+    }
+#endif
   }
 
   // Set up stats.

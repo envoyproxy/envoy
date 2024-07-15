@@ -5,7 +5,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/integration/http_integration.h"

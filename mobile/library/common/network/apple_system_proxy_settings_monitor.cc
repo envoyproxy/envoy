@@ -81,14 +81,20 @@ AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
   if (is_http_proxy_enabled) {
     CFStringRef cf_hostname =
         static_cast<CFStringRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPProxy));
+    std::string hostname = Apple::toString(cf_hostname);
     CFNumberRef cf_port =
         static_cast<CFNumberRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPPort));
-    settings = absl::make_optional<SystemProxySettings>(Apple::toString(cf_hostname),
-                                                        Apple::toInt(cf_port));
+    int port = Apple::toInt(cf_port);
+    if (!hostname.empty() && port > 0) {
+      settings = absl::make_optional<SystemProxySettings>(std::move(hostname), port);
+    }
   } else if (is_auto_config_proxy_enabled) {
     CFStringRef cf_pac_file_url_string = static_cast<CFStringRef>(
         CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigURLString));
-    settings = absl::make_optional<SystemProxySettings>(Apple::toString(cf_pac_file_url_string));
+    std::string pac_file_url_str = Apple::toString(cf_pac_file_url_string);
+    if (!pac_file_url_str.empty()) {
+      settings = absl::make_optional<SystemProxySettings>(std::move(pac_file_url_str));
+    }
   }
 
   CFRelease(proxy_settings);
