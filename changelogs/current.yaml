@@ -70,6 +70,9 @@ minor_behavior_changes:
 - area: quic
   change: |
     When a quic connection socket is created, the socket's detected transport protocol will be set to "quic".
+- area: hashing
+  change: |
+    Change murmurHash2 hashing on big endian platforms to generate the same values as little endian platforms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
