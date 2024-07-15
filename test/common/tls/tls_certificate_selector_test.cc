@@ -81,10 +81,9 @@ namespace Tls {
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
-  TestTlsCertificateSelector(Event::Dispatcher& dispatcher,
-                             Ssl::TlsCertificateSelectorContext& selector_ctx,
+  TestTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx,
                              const Protobuf::Message&)
-      : dispatcher_(dispatcher), selector_ctx_(selector_ctx) {}
+      : selector_ctx_(selector_ctx) {}
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
   }
@@ -100,7 +99,7 @@ public:
     case Ssl::SelectionResult::SelectionStatus::Pending:
       ENVOY_LOG_MISC(info, "debug: select cert async");
       cb_ = std::move(cb);
-      dispatcher_.post([this] { selectTlsContextAsync(); });
+      cb_->dispatcher().post([this] { selectTlsContextAsync(); });
       break;
     default:
       break;
@@ -120,8 +119,6 @@ public:
 
   const Ssl::TlsContext& getTlsContext() { return selector_ctx_.getTlsContexts()[0]; }
 
-  // Used to create an async certificate ready event.
-  Event::Dispatcher& dispatcher_;
   Ssl::SelectionResult::SelectionStatus mod_;
 
 private:
@@ -150,8 +147,7 @@ public:
     return [&config, this](const Ssl::ServerContextConfig&,
                            Ssl::TlsCertificateSelectorContext& selector_ctx) {
       ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider =
-          std::make_unique<TestTlsCertificateSelector>(*dispatcher_, selector_ctx, config);
+      auto provider = std::make_unique<TestTlsCertificateSelector>(selector_ctx, config);
       provider->mod_ = mod_;
       return provider;
     };
@@ -162,7 +158,6 @@ public:
   std::string name() const override { return "test-tls-context-provider"; };
 
   CreateProviderHook selector_cb_;
-  Event::Dispatcher* dispatcher_;
   Ssl::SelectionResult::SelectionStatus mod_;
 };
 
@@ -242,7 +237,6 @@ protected:
 
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     provider_factory_.mod_ = mod;
-    provider_factory_.dispatcher_ = dispatcher.get();
 
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
