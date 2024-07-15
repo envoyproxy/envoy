@@ -15,15 +15,11 @@ public:
     // Sidestream push back downstream, if callback is configured.
     if (decode_callback_ != nullptr) {
       decode_callback_->onDecoderFilterAboveWriteBufferHighWatermark();
-    } else {
-      // TODO(tyxia) Log
     }
 
     // Sidestream push back upstream, if callback is configured.
     if (encode_callback_ != nullptr) {
       encode_callback_->onEncoderFilterAboveWriteBufferHighWatermark();
-    } else {
-      // TODO(tyxia) Log
     }
   }
 
@@ -34,7 +30,6 @@ public:
 
     if (encode_callback_ != nullptr) {
       encode_callback_->onEncoderFilterBelowWriteBufferLowWatermark();
-    } else {
     }
   }
 
@@ -44,11 +39,6 @@ public:
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks* encode_callback) {
     encode_callback_ = encode_callback;
-  }
-
-  void resetFilterCallbacks() {
-    decode_callback_ = nullptr;
-    encode_callback_ = nullptr;
   }
 
 private:

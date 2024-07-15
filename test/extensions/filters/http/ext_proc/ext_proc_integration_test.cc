@@ -4584,16 +4584,16 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
     processResponseBodyMessage(
         *grpc_upstreams_[0], count == 0 ? true : false,
         [&end_stream, &body_str](const HttpBody& body, BodyResponse& body_resp) {
-          // EXPECT_TRUE(body.end_of_stream());
           end_stream = body.end_of_stream();
           auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
           body_mut->set_body(body_str);
-          // check the request to sidestream server
           return true;
         });
     count++;
   }
 
+  // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
+  // to be triggered in sidestream cluster.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
                                  "paused_reading_total",
                                  1);

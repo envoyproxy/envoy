@@ -493,7 +493,6 @@ private:
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
   Http::StreamFilterCallbacks* filter_callbacks_;
-  // TODO(tyxia) Lifetime
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 };
 
