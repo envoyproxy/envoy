@@ -245,6 +245,11 @@ EngineBuilder& EngineBuilder::setSocketReceiveBufferSize(int32_t size) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setUdpSocketSendBufferSize(int32_t size) {
+  udp_socket_send_buffer_size_ = size;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
   enable_drain_post_dns_refresh_ = drain_post_dns_refresh_on;
   return *this;
@@ -734,6 +739,15 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     rcv_buf_sock_opt->set_int_value(socket_receive_buffer_size_);
     rcv_buf_sock_opt->set_description(
         absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
+
+    envoy::config::core::v3::SocketOption* udp_snd_buf_sock_opt =
+        base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    udp_snd_buf_sock_opt->set_name(SO_SNDBUF);
+    udp_snd_buf_sock_opt->set_level(SOL_SOCKET);
+    udp_snd_buf_sock_opt->set_int_value(udp_socket_send_buffer_size_);
+    udp_snd_buf_sock_opt->mutable_type()->mutable_datagram();
+    udp_snd_buf_sock_opt->set_description(
+        absl::StrCat("UDP SO_SNDBUF = ", udp_socket_send_buffer_size_, " bytes"));
     // Set the network service type on iOS, if supplied.
 #if defined(__APPLE__)
     if (ios_network_service_type_ > 0) {
