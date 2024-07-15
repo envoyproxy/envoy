@@ -25,9 +25,8 @@ namespace Config {
  * resulting config implementations (i.e., the ConfigProvider::Config); this enables linear memory
  * scaling based on the size of the configuration set, regardless of the number of threads/workers.
  *
- * Use config() to obtain a shared_ptr to the implementation of the config, and configProtoInfo() to
- * obtain a reference to the underlying config proto and version (applicable only to dynamic config
- * providers).
+ * Use config() to obtain a shared_ptr to the implementation of the config, and
+ * ConfigProtoInfoVector() to obtain a reference to the underlying config protos.
  */
 class ConfigProvider {
 public:
@@ -59,25 +58,12 @@ public:
     Delta
   };
 
-  /**
-   * Stores the config proto as well as the associated version.
-   */
-  template <typename P> struct ConfigProtoInfo {
-    const P& config_proto_;
-
-    // Only populated by dynamic config providers.
-    std::string version_;
-  };
-
   using ConfigProtoVector = std::vector<const Protobuf::Message*>;
   /**
    * Stores the config protos associated with a "Delta" API.
    */
   template <typename P> struct ConfigProtoInfoVector {
     const std::vector<const P*> config_protos_;
-
-    // Only populated by dynamic config providers.
-    std::string version_;
   };
 
   virtual ~ConfigProvider() = default;
@@ -86,22 +72,6 @@ public:
    * The type of API.
    */
   virtual ApiType apiType() const PURE;
-
-  /**
-   * Returns a ConfigProtoInfo associated with a ApiType::Full provider.
-   * @return absl::optional<ConfigProtoInfo<P>> an optional ConfigProtoInfo; the value is set when a
-   * config is available.
-   */
-  template <typename P> absl::optional<ConfigProtoInfo<P>> configProtoInfo() const {
-    static_assert(std::is_base_of<Protobuf::Message, P>::value,
-                  "Proto type must derive from Protobuf::Message");
-
-    const auto* config_proto = dynamic_cast<const P*>(getConfigProto());
-    if (config_proto == nullptr) {
-      return absl::nullopt;
-    }
-    return ConfigProtoInfo<P>{*config_proto, getConfigVersion()};
-  }
 
   /**
    * Returns a ConfigProtoInfoVector associated with a ApiType::Delta provider.
@@ -121,7 +91,7 @@ public:
     for (const auto* elem : config_protos) {
       ret_protos.push_back(static_cast<const P*>(elem));
     }
-    return ConfigProtoInfoVector<P>{std::move(ret_protos), getConfigVersion()};
+    return ConfigProtoInfoVector<P>{std::move(ret_protos)};
   }
 
   /**
@@ -143,24 +113,11 @@ public:
 
 protected:
   /**
-   * Returns the config proto associated with the provider.
-   * @return Protobuf::Message* the config proto corresponding to the Config instantiated by the
-   *         provider.
-   */
-  virtual const Protobuf::Message* getConfigProto() const { return nullptr; }
-
-  /**
    * Returns the config protos associated with the provider.
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
   virtual ConfigProtoVector getConfigProtos() const { PANIC("not implemented"); }
-
-  /**
-   * Returns the config version associated with the provider.
-   * @return std::string the config version.
-   */
-  virtual std::string getConfigVersion() const { return ""; }
 
   /**
    * Returns the config implementation associated with the provider.
