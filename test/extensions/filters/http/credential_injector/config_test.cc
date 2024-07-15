@@ -29,7 +29,7 @@ TEST(Factory, UnregisteredExtension) {
   envoy::extensions::filters::http::credential_injector::v3::CredentialInjector proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CredentialInjectorFilterFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT(
       factory.createFilterFactoryFromProto(proto_config, "stats", context).status().message(),
       testing::HasSubstr("Didn't find a registered implementation for 'undefined_credential' with "
