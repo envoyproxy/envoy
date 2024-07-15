@@ -747,8 +747,8 @@ google-reauth==0.1.1 \
     # via
     #   gcs-oauth2-boto-plugin
     #   gsutil
-gsutil==5.29 \
-    --hash=sha256:0ba61c0ca97a592a2ed9d6eeb74b20434831bc6ceba380138103b24d2d53b921
+gsutil==5.30 \
+    --hash=sha256:ef29d47764d2a3c2436ce50c4e1827626725ba8dbfd3127b42a18641710e7d38
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \
