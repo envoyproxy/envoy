@@ -75,16 +75,9 @@ private:
   const ExtResultType type_;
 };
 
-// Types derived from TypedExtResult are used to report the result of transaction to
-// an outlier detection monitor.
-template <ExtResultType E> class TypedExtResult : public ExtResult {
-protected:
-  TypedExtResult() : ExtResult(E) {}
-};
-
-class HttpCode : public TypedExtResult<ExtResultType::HTTP_CODE> {
+class HttpCode : public ExtResult {
 public:
-  HttpCode(uint32_t code) : code_(code) {}
+  HttpCode(uint32_t code) : ExtResult(ExtResultType::HTTP_CODE), code_(code) {}
   HttpCode() = delete;
   virtual ~HttpCode() {}
   uint32_t code() const { return code_; }
@@ -95,9 +88,9 @@ private:
 
 // LocalOriginEvent is used to report errors like resets, timeouts but also
 // successful connection attempts.
-class LocalOriginEvent : public TypedExtResult<ExtResultType::LOCAL_ORIGIN> {
+class LocalOriginEvent : public ExtResult {
 public:
-  LocalOriginEvent(Result result) : result_(result) {}
+  LocalOriginEvent(Result result) : ExtResult(ExtResultType::LOCAL_ORIGIN), result_(result) {}
   LocalOriginEvent() = delete;
   Result result() const { return result_; }
 

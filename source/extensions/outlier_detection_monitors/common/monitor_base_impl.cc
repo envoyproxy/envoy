@@ -4,16 +4,14 @@ namespace Envoy {
 namespace Extensions {
 namespace Outlier {
 
-bool HTTPCodesBucket::matches(
-    const TypedExtResult<Upstream::Outlier::ExtResultType::HTTP_CODE>& result) const {
+bool HTTPCodesBucket::match(const ExtResult& result) const {
   // We should not get here with errors other then HTTP codes.
   ASSERT(result.type() == ExtResultType::HTTP_CODE);
   const HttpCode& http_code = dynamic_cast<const HttpCode&>(result);
   return ((http_code.code() >= start_) && (http_code.code() <= end_));
 }
 
-bool LocalOriginEventsBucket::matches(
-    const TypedExtResult<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN>& event) const {
+bool LocalOriginEventsBucket::match(const ExtResult& event) const {
   // We should not get here with errors other then Local Origin events.
   ASSERT(event.type() == ExtResultType::LOCAL_ORIGIN);
   const LocalOriginEvent& local_origin_event = dynamic_cast<const LocalOriginEvent&>(event);

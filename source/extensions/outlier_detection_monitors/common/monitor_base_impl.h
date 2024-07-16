@@ -19,7 +19,7 @@ using namespace Envoy::Upstream::Outlier;
 class ErrorsBucket {
 public:
   virtual bool matchType(const ExtResult&) PURE;
-  virtual bool match(const ExtResult&) PURE;
+  virtual bool match(const ExtResult&) const PURE;
   virtual ~ErrorsBucket() {}
 };
 
@@ -27,14 +27,7 @@ template <Upstream::Outlier::ExtResultType E> class TypedErrorsBucket : public E
 public:
   bool matchType(const ExtResult& result) override { return (result.type() == E); }
 
-  bool match(const ExtResult& result) override {
-    return matches(static_cast<const TypedExtResult<E>&>(result));
-  }
-
   virtual ~TypedErrorsBucket() {}
-
-private:
-  virtual bool matches(const TypedExtResult<E>&) const PURE;
 };
 
 using ErrorsBucketPtr = std::unique_ptr<ErrorsBucket>;
@@ -44,7 +37,7 @@ class HTTPCodesBucket : public TypedErrorsBucket<Upstream::Outlier::ExtResultTyp
 public:
   HTTPCodesBucket() = delete;
   HTTPCodesBucket(uint64_t start, uint64_t end) : start_(start), end_(end) {}
-  bool matches(const TypedExtResult<Upstream::Outlier::ExtResultType::HTTP_CODE>&) const override;
+  bool match(const ExtResult&) const override;
 
   virtual ~HTTPCodesBucket() {}
 
@@ -57,8 +50,7 @@ class LocalOriginEventsBucket
     : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN> {
 public:
   LocalOriginEventsBucket() = default;
-  bool
-  matches(const TypedExtResult<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN>&) const override;
+  bool match(const ExtResult&) const override;
 };
 
 class ExtMonitorBase : public ExtMonitor {
