@@ -264,15 +264,13 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       if (common_response.has_body_mutation() && common_response.body_mutation().more_chunks()) {
-        more_chunk_count_++;
         ENVOY_LOG(debug,
-                  "Streamed mode body response has more_chunks set to true. more_chunk_count_ {}, "
-                  "maxMoreChunks {}",
-                  more_chunk_count_, filter_.config().maxMoreChunks());
-        // more_chunks will only be supported if the ext_proc filter has max_more_chunks
-        // configured to be none zero.
-        if (filter_.config().maxMoreChunks() == 0 ||
-            more_chunk_count_ > filter_.config().maxMoreChunks()) {
+                  "Streamed mode body response has more_chunks set to true. "
+                  "enableMoreChunks {}",
+                  filter_.config().enableMoreChunks());
+        // more_chunks will only be supported if the ext_proc filter has enable_more_chunks set to
+        // true.
+        if (!filter_.config().enableMoreChunks()) {
           return absl::FailedPreconditionError("spurious message");
         }
 
@@ -392,7 +390,6 @@ void ProcessorState::continueIfNecessary() {
 }
 
 bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& common_response) {
-  more_chunk_count_ = 0;
   Buffer::OwnedImpl chunk_data;
   auto chunk = dequeueStreamingChunk(chunk_data);
   ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");

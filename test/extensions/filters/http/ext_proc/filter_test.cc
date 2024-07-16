@@ -3977,10 +3977,10 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
       cluster_name: "ext_proc_server"
   processing_mode:
     response_body_mode: "STREAMED"
-  max_more_chunks: 100
+  enable_more_chunks: true
   )EOF");
 
-  EXPECT_EQ(config_->maxMoreChunks(), 100);
+  EXPECT_EQ(config_->enableMoreChunks(), true);
 
   // Create synthetic HTTP request
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -4052,7 +4052,7 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
-  // Now sends a few normal requests and responses.
+  // Now do 1:1 streaming.
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
@@ -4144,7 +4144,7 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
     response_body_mode: "STREAMED"
   )EOF");
 
-  EXPECT_EQ(config_->maxMoreChunks(), 0);
+  EXPECT_EQ(config_->enableMoreChunks(), false);
 
   // Create synthetic HTTP request
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -4175,74 +4175,6 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body(" AAAAA ");
-        body_mut->set_more_chunks(true);
-      },
-      false);
-  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
-  filter_->onDestroy();
-}
-
-// M:N error test case: the response more_chunks count N exceeds the filter config.
-TEST_F(HttpFilterTest, SendMoreChunksOverConfigLimit) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    response_body_mode: "STREAMED"
-  max_more_chunks: 2
-  )EOF");
-
-  EXPECT_EQ(config_->maxMoreChunks(), 2);
-
-  // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-
-  bool encoding_watermarked = false;
-  setUpEncodingWatermarking(encoding_watermarked);
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
-
-  for (int i = 0; i < 5; i++) {
-    Buffer::OwnedImpl resp_chunk;
-    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-  }
-
-  for (int i = 0; i < 4; i++) {
-    processResponseBody(
-        [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_clear_body(true);
-        },
-        false);
-  }
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body(" AAAAA ");
-        body_mut->set_more_chunks(true);
-      },
-      false);
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body(" BBBB ");
-        body_mut->set_more_chunks(true);
-      },
-      false);
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body(" CCC ");
         body_mut->set_more_chunks(true);
       },
       false);

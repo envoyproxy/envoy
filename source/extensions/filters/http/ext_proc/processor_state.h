@@ -276,7 +276,6 @@ private:
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void handleMultipleChunksInBodyResponse(
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
-  uint32_t more_chunk_count_ = 0;
 };
 
 class DecodingProcessorState : public ProcessorState {
