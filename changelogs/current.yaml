@@ -160,7 +160,10 @@ minor_behavior_changes:
     A change in QUICHE has renamed all flags formerly of the form ``quic_reloadable_flag_...`` to ``quiche_reloadable_flag_...``.
     Likewise, for ``quic_restart_flag_...``, now ``quiche_restart_flag_...``. Consequently, all Envoy flags of those forms with an
     ``envoy_quic_...`` prefix have been similarly renamed to ``envoy_quiche_...``.
-
+- area: gcp_authn
+  change: |
+    Use the fixed URL format instead of one from the configuration. This behavior can be disabled by setting runtime flag
+    ``envoy.reloadable_features.gcp_authn_use_fixed_url`` to false.
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: admission control

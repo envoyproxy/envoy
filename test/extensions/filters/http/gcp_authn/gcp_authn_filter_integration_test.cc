@@ -7,6 +7,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -232,6 +233,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 
 TEST_P(GcpAuthnFilterIntegrationTest, DEPRECATED_FEATURE_TEST(Basicflow)) {
   use_new_config_ = false;
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.gcp_authn_use_fixed_url", "false"}});
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
   int num = 2;
