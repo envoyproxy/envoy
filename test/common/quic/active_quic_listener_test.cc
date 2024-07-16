@@ -616,6 +616,7 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
       return;
     }
   }
+  // Check the IPv4 version of the sockopt if it's v4 or dual-stack.
   rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
   EXPECT_EQ(rv.return_value_, 0);
   EXPECT_EQ(optval, 1);
