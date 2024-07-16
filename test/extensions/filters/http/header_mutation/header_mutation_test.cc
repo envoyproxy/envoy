@@ -86,7 +86,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         action: APPEND_IF_EXISTS_OR_ADD
         entry:
           key: route-param
-          value: route-value
+          value: cm91dGUtdmFsdWU= # 'route-value' b64-encoded
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -105,7 +105,7 @@ TEST(HeaderMutationFilterTest, HeaderMutationFilterTest) {
         action: APPEND_IF_EXISTS_OR_ADD
         entry:
           key: global-param
-          value: global-value
+          value: Z2xvYmFsLXZhbHVl # 'global-value' b64-encoded
   )EOF";
 
   PerRouteProtoConfig per_route_proto_config;
