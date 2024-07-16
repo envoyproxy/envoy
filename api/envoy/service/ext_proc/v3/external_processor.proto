@@ -394,10 +394,11 @@ message BodyMutation {
   // After the external processor receives the (M)-th request, it can send back N responses in total corresponding to that M requests.
   // During the process of sending the N responses, the external processor set the ``more_chunks`` of each response to true for the 1st to the (N-1)-th response.
   // And set ``more_chunks`` to false for the Nth response.
-  // This is only enabled if
+  // This feature is only supported if
   // :ref:`enable_more_chunks <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.enable_more_chunks>`
-  // is set to true.
-  // ``more_chunks`` is only meaningful when Envoy ext_proc filter is working in STREAMED mode:
+  // is set to true. If ``enable_more_chunks`` is false, and response with ``more_chunks`` is received,
+  // such response message will be marked as spurious and the external processing will be shut down.
+  // ``more_chunks`` is only meaningful when Envoy ext_proc filter is working in the STREAMED mode:
   // Please check https://github.com/envoyproxy/envoy/issues/32090 for more details on this.
   bool more_chunks = 3;
 }
