@@ -50,6 +50,12 @@ behavior_changes:
   change: |
     Datadog: Disabled remote configuration by default.
     To enable this feature, use the :ref:`remote_config <envoy_v3_api_field_config.trace.v3.DatadogConfig.remote_config>` field.
+- area: local_ratelimit
+  change: |
+    Updated the token bucket implementation to use non-timer based token bucket. The tokens will be refilled when
+    the token bucket is accessed and no dependency on the timer.
+    This behavior can be temporarily reverted by setting the runtime guard
+    ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
