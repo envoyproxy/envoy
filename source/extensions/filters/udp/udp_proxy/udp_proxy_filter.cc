@@ -840,6 +840,8 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
                                                 absl::string_view failure_reason,
                                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
+  // Writing to downstream_info_ before calling onStreamFailure, as the session could be potentially
+  // removed by onStreamFailure, which will cause downstream_info_ to be freed.
   downstream_info_.upstreamInfo()->setUpstreamHost(host);
   downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
   callbacks_->onStreamFailure(reason, failure_reason, host);
