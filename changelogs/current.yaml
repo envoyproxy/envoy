@@ -524,6 +524,11 @@ new_features:
     QUIC stream reset error code will be added to transport failure reason.
     This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.report_stream_reset_error_code``
     to false.
+- area: conn pool
+  change: |
+    Added :ref:`auto_sni_from_upstream <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni_from_upstream>`
+    to use value of :ref:`hostnames <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` of
+    upstream cluster's endpoints as the value for SNI.
 
 deprecated:
 - area: tracing
