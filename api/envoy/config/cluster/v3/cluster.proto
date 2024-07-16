@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -1150,6 +1150,22 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.v3.ConfigSource lrs_server = 42;
+
+  // [#not-implemented-hide:]
+  // A list of metric names from ORCA load reports to propagate to LRS.
+  //
+  // For map fields in the ORCA proto, the string will be of the form ``<map_field_name>.<map_key>``.
+  // For example, the string ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA
+  // ``named_metrics`` field.
+  //
+  // The special map key ``*`` means to report all entries in the map (e.g., ``named_metrics.*`` means to
+  // report all entries in the ORCA named_metrics field). Note that this should be used only with trusted
+  // backends.
+  //
+  // The metric names in LRS will follow the same semantics as this field. In other words, if this field
+  // contains ``named_metrics.foo``, then the LRS load report will include the data with that same string
+  // as the key.
+  repeated string lrs_report_endpoint_metric = 57;
 
   // If track_timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
