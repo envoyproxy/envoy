@@ -34,7 +34,7 @@ TEST(StaticConfigResourceDetectorTest, EmptyAttributesMap) {
   EXPECT_TRUE(resource.attributes_.empty());
 }
 
-// Test detector with valid values in attributes config
+// Test detector with invalid values in attributes config
 TEST(StaticConfigResourceDetectorTest, EmptyAttributesAreIgnored) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 
