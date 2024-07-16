@@ -1,7 +1,7 @@
-FROM node:22.4-bookworm-slim@sha256:14e3e539464a5a77bb5fd8f613cbd54d1842a900e7f4ce06f47e42f6a89a83e4 as node-base
+FROM node:22.4-bookworm-slim@sha256:14e3e539464a5a77bb5fd8f613cbd54d1842a900e7f4ce06f47e42f6a89a83e4 AS node-base
 
 
-FROM node-base as node-http-auth
+FROM node-base AS node-http-auth
 ARG NODE_APP=.
 ARG NODE_APP_NAME=http-service/server
 # Add an env to save ARG
@@ -11,7 +11,7 @@ COPY "$NODE_APP" /app
 CMD node $NODE_APP_PATH
 
 
-FROM node-base as yarn
+FROM node-base AS yarn
 ARG SERVICE_PORT=3000
 ENV DEBIAN_FRONTEND=noninteractive \
     SERVICE_PORT=$SERVICE_PORT
@@ -31,5 +31,5 @@ HEALTHCHECK \
     CMD nc -zv localhost "$SERVICE_PORT"
 
 
-FROM yarn as yarn-routed
+FROM yarn AS yarn-routed
 COPY --chmod=755 ./scripts/build-routed.sh /usr/local/bin/build.sh
