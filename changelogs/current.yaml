@@ -50,6 +50,15 @@ behavior_changes:
   change: |
     Datadog: Disabled remote configuration by default.
     To enable this feature, use the :ref:`remote_config <envoy_v3_api_field_config.trace.v3.DatadogConfig.remote_config>` field.
+- area: http
+  change: |
+    Added HTTP1-safe option for :ref:`max_connection_duration
+    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` in
+    HttpConnectionManager. When enabled, ``max_connection_duration`` will only drain downstream
+    HTTP1 connections by adding the Connection:close response header; it will never cause the
+    HttpConnectionManager to close the connection itself.  Defaults to off ("unsafe" -- check
+    \#34356) and is configurable via :ref:`http1_safe_max_connection_duration
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.http1_safe_max_connection_duration>`.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

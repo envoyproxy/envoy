@@ -723,7 +723,14 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
                       StreamInfo::CoreResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
-    startDrainSequence();
+    if (config_->http1SafeMaxConnectionDuration() && codec_->protocol() < Protocol::Http2) {
+      ENVOY_CONN_LOG(debug,
+                     "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
+                     read_callbacks_->connection());
+      soft_drain_http1_ = true;
+    } else {
+      startDrainSequence();
+    }
   }
 }
 
@@ -1780,7 +1787,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // point, the cached route should never be updated or refreshed.
   blockRouteCache();
 
-  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
+  if ((connection_manager_.drain_state_ != DrainState::NotDraining ||
+       connection_manager_.soft_drain_http1_) &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the

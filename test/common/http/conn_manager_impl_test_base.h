@@ -29,6 +29,13 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Http {
 
+struct SetupOpts {
+  bool ssl = false;
+  std::string server_name = "envoy-server-test";
+  bool tracing = true;
+  bool use_srds = false;
+  bool http1_safe_max_connection_duration = false;
+};
 // Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
 // common/http as well as test/extensions/filters/http/ext_proc/, to reuse the many mocks/default
 // impls of ConnectionManagerConfig that we need to provide to HttpConnectionManagerImpl.
@@ -37,7 +44,7 @@ public:
   HttpConnectionManagerImplMixin();
   ~HttpConnectionManagerImplMixin() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
-  void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false);
+  void setup(const SetupOpts& opts = {});
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
   void setUpBufferLimits();
 
@@ -85,6 +92,9 @@ public:
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
+  }
+  bool http1SafeMaxConnectionDuration() const override {
+    return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -248,6 +258,7 @@ public:
   uint64_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  bool http1_safe_max_connection_duration_{true};
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds request_headers_timeout_{};

@@ -291,6 +291,12 @@ public:
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
+   * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection
+   *         (rather than Envoy closing the connection itself when there are no active streams).
+   */
+  virtual bool http1SafeMaxConnectionDuration() const PURE;
+
+  /**
    * @return maximum request headers size the connection manager will accept.
    */
   virtual uint32_t maxRequestHeadersKb() const PURE;
