@@ -138,7 +138,7 @@ void FilterChainManagerImpl::addFilterChains(
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format(
+      throwEnvoyExceptionOrPanic(fmt::format(
           "error adding listener '{}': filter chain '{}' contains "
           "unimplemented fields",
           absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
@@ -157,7 +157,7 @@ void FilterChainManagerImpl::addFilterChains(
                          MessageUtil::getJsonStringFromMessageOrError(filter_chain_match, false));
 #endif
 
-        throw EnvoyException(error_msg);
+        throwEnvoyExceptionOrPanic(error_msg);
       }
       filter_chains.insert({filter_chain_match, filter_chain->name()});
     }
@@ -175,14 +175,14 @@ void FilterChainManagerImpl::addFilterChains(
     // If using the matcher, require usage of "name" field and skip building the index.
     if (filter_chain_matcher) {
       if (filter_chain->name().empty()) {
-        throw EnvoyException(fmt::format(
+        throwEnvoyExceptionOrPanic(fmt::format(
             "error adding listener '{}': \"name\" field is required when using a listener matcher",
             absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
       }
       auto [_, inserted] =
           filter_chains_by_name.try_emplace(filter_chain->name(), filter_chain_impl);
       if (!inserted) {
-        throw EnvoyException(fmt::format(
+        throwEnvoyExceptionOrPanic(fmt::format(
             "error adding listener '{}': \"name\" field is duplicated with value '{}'",
             absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
       }
@@ -213,7 +213,7 @@ void FilterChainManagerImpl::addFilterChains(
       // Reject partial wildcards, we don't match on them.
       for (const auto& server_name : filter_chain_match.server_names()) {
         if (absl::StrContains(server_name, '*') && !isWildcardServerName(server_name)) {
-          throw EnvoyException(
+          throwEnvoyExceptionOrPanic(
               fmt::format("error adding listener '{}': partial wildcards are not supported in "
                           "\"server_names\"",
                           absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
@@ -442,7 +442,7 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
-    throw EnvoyException(
+    throwEnvoyExceptionOrPanic(
         fmt::format("error adding listener '{}': multiple filter chains with "
                     "overlapping matching rules are defined",
                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));

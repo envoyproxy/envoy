@@ -17,6 +17,9 @@ def api_dependencies():
         name = "bazel_skylib",
     )
     external_http_archive(
+        name = "rules_jvm_external",
+    )
+    external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
         patch_args = ["-p1"],
         patches = ["@envoy_api//bazel:pgv.patch"],

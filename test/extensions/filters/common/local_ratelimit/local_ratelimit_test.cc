@@ -19,6 +19,17 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
+class WrapperedProvider {
+public:
+  WrapperedProvider(ShareProviderSharedPtr provider) : provider_(provider) {}
+
+  uint32_t tokensPerFill(uint32_t origin_tokens_per_fill) const {
+    return std::ceil(origin_tokens_per_fill * provider_->getTokensShareFactor());
+  }
+
+  ShareProviderSharedPtr provider_;
+};
+
 TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
   NiceMock<Upstream::MockClusterManager> cm;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -40,8 +51,8 @@ TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
       ShareProviderManager::singleton(dispatcher, cm, manager);
   EXPECT_NE(share_provider_manager, nullptr);
 
-  auto provider = share_provider_manager->getShareProvider(ProtoLocalClusterRateLimit());
-  EXPECT_NE(provider, nullptr);
+  auto provider = std::make_shared<WrapperedProvider>(
+      share_provider_manager->getShareProvider(ProtoLocalClusterRateLimit()));
 
   EXPECT_EQ(1, provider->tokensPerFill(1)); // At least 1 token per fill.
   EXPECT_EQ(1, provider->tokensPerFill(2));
@@ -96,7 +107,7 @@ TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
 class MockShareProvider : public ShareProvider {
 public:
   MockShareProvider() = default;
-  MOCK_METHOD(uint32_t, tokensPerFill, (uint32_t origin_tokens_per_fill), (const));
+  MOCK_METHOD(double, getTokensShareFactor, (), (const));
 };
 
 class LocalRateLimiterImplTest : public testing::Test {
@@ -153,15 +164,15 @@ TEST_F(LocalRateLimiterImplTest, CasEdgeCases) {
     synchronizer().barrierOn("on_fill_timer_pre_cas");
 
     // This should succeed.
-    EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+    EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
     // Now signal the thread to continue which should cause a CAS failure and the loop to repeat.
     synchronizer().signal("on_fill_timer_pre_cas");
     t1.join();
 
     // 1 -> 0 tokens
-    EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-    EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+    EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+    EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
   }
 
   // This tests the case in which two allowed checks race.
@@ -172,12 +183,13 @@ TEST_F(LocalRateLimiterImplTest, CasEdgeCases) {
 
     // Start a thread and see if we are under limit. This will wait pre-CAS.
     synchronizer().waitOn("allowed_pre_cas");
-    std::thread t1([&] { EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_)); });
+    std::thread t1(
+        [&] { EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed); });
     // Wait until the thread is actually waiting.
     synchronizer().barrierOn("allowed_pre_cas");
 
     // Consume a token on this thread, which should cause the CAS to fail on the other thread.
-    EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+    EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
     synchronizer().signal("allowed_pre_cas");
     t1.join();
   }
@@ -188,17 +200,17 @@ TEST_F(LocalRateLimiterImplTest, TokenBucket) {
   initialize(std::chrono::milliseconds(200), 1, 1);
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // 0 -> 1 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // 0 -> 1 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
@@ -209,8 +221,8 @@ TEST_F(LocalRateLimiterImplTest, TokenBucket) {
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 }
 
 // Verify token bucket functionality with max tokens and tokens per fill > 1.
@@ -218,33 +230,33 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFill) {
   initialize(std::chrono::milliseconds(200), 2, 2);
 
   // 2 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // 0 -> 2 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
   fill_timer_->invokeCallback();
 
   // 2 -> 1 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // 1 -> 2 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
   fill_timer_->invokeCallback();
 
   // 2 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 }
 
 // Verify token bucket functionality with max tokens and tokens per fill > 1 and
 // share provider is used.
 TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFillWithShareProvider) {
   auto share_provider = std::make_shared<MockShareProvider>();
-  EXPECT_CALL(*share_provider, tokensPerFill(_))
-      .WillRepeatedly(testing::Invoke([](uint32_t tokens) { return tokens / 2; }));
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.5; }));
 
   // Final tokens per fill is 2/2 = 1.
   initialize(std::chrono::milliseconds(200), 2, 2, share_provider);
@@ -252,9 +264,9 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFillWithShareProvid
   // The limiter will be initialized with max tokens and it will not be shared.
   // So, the initial tokens is 2.
   // 2 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // The tokens per fill will be handled by the share provider and it will be 1.
   // 0 -> 1 tokens
@@ -262,15 +274,15 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMultipleTokensPerFillWithShareProvid
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // 0 -> 1 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 }
 
 // Verify token bucket functionality with max tokens > tokens per fill.
@@ -278,17 +290,17 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketMaxTokensGreaterThanTokensPerFill) {
   initialize(std::chrono::milliseconds(200), 2, 1);
 
   // 2 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 
   // 0 -> 1 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 }
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
@@ -297,34 +309,42 @@ TEST_F(LocalRateLimiterImplTest, TokenBucketStatus) {
 
   // 2 -> 1 tokens
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(3000), nullptr));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 1);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 3);
+  auto rate_limit_result = rate_limiter_->requestAllowed(route_descriptors_);
+  EXPECT_TRUE(rate_limit_result.allowed);
+
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3.0);
 
   // 1 -> 0 tokens
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
-  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 0);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 2);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 2.0);
 
   // 0 -> 0 tokens
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
-  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_));
-  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 0);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 1);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 1.0);
 
   // 0 -> 2 tokens
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
   fill_timer_->invokeCallback();
-  EXPECT_EQ(rate_limiter_->maxTokens(route_descriptors_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(route_descriptors_), 2);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(route_descriptors_), 3);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3.0);
 }
 
 class LocalRateLimiterDescriptorImplTest : public LocalRateLimiterImplTest {
@@ -356,7 +376,7 @@ public:
   token_bucket:
     max_tokens: 1
     tokens_per_fill: 1
-    fill_interval: 0.05s
+    fill_interval: 1s
   )";
 
   // Default token bucket
@@ -418,15 +438,15 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
     synchronizer().barrierOn("on_fill_timer_pre_cas");
 
     // This should succeed.
-    EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+    EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
     // Now signal the thread to continue which should cause a CAS failure and the loop to repeat.
     synchronizer().signal("on_fill_timer_pre_cas");
     t1.join();
 
     // 1 -> 0 tokens
-    EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-    EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+    EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+    EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
   }
 
   // This tests the case in which two allowed checks race.
@@ -437,12 +457,12 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
 
     // Start a thread and see if we are under limit. This will wait pre-CAS.
     synchronizer().waitOn("allowed_pre_cas");
-    std::thread t1([&] { EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_)); });
+    std::thread t1([&] { EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed); });
     // Wait until the thread is actually waiting.
     synchronizer().barrierOn("allowed_pre_cas");
 
     // Consume a token on this thread, which should cause the CAS to fail on the other thread.
-    EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+    EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
     synchronizer().signal("allowed_pre_cas");
     t1.join();
   }
@@ -453,9 +473,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor2) {
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(100), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
 }
@@ -467,8 +487,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
   initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
   // 0 -> 1 tokens
   for (int i = 0; i < 2; i++) {
@@ -479,8 +499,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
   }
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
   // 0 -> 1 tokens
   for (int i = 0; i < 2; i++) {
@@ -499,8 +519,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
   }
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 }
 
 // Verify token bucket functionality with request per unit > 1.
@@ -510,9 +530,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   initializeWithDescriptor(std::chrono::milliseconds(50), 2, 2);
 
   // 2 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
   // 0 -> 2 tokens
   for (int i = 0; i < 2; i++) {
@@ -523,7 +543,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   }
 
   // 2 -> 1 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
   // 1 -> 2 tokens
   for (int i = 0; i < 2; i++) {
@@ -534,34 +554,34 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
   }
 
   // 2 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 }
 
 // Verify token bucket functionality with multiple descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDifferentRateLimits) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "1000s"),
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "2s"),
                             *descriptors_.Add());
-  initializeWithDescriptor(std::chrono::milliseconds(50), 3, 1);
+  initializeWithDescriptor(std::chrono::milliseconds(1000), 3, 1);
 
   // 1 -> 0 tokens for descriptor_ and descriptor2_
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
   // 0 -> 1 tokens for descriptor2_
-  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
-  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(1000), nullptr));
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens for descriptor2_ and 0 only for descriptor_
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 }
 
 // Verify token bucket functionality with multiple descriptors sorted.
@@ -575,10 +595,10 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
                                                       {{{"foo2", "bar2"}}}};
 
   // Descriptors are sorted as descriptor2 < descriptor < global
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors));
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
   // Request limited by descriptor2 will not consume tokens from descriptor.
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
 }
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
@@ -588,10 +608,14 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
   initializeWithDescriptor(std::chrono::milliseconds(1000), 2, 2);
 
   // 2 -> 1 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+  auto rate_limit_result = rate_limiter_->requestAllowed(descriptor_);
+
+  EXPECT_TRUE(rate_limit_result.allowed);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3.0);
 
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
@@ -599,10 +623,11 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
   fill_timer_->invokeCallback();
 
   // 1 -> 0 tokens
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 2);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 2.0);
 
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
@@ -610,10 +635,11 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
   fill_timer_->invokeCallback();
 
   // 0 -> 0 tokens
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 1);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 1.0);
 
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
@@ -621,9 +647,10 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
   fill_timer_->invokeCallback();
 
   // 0 -> 2 tokens
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3.0);
 }
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval with
@@ -632,47 +659,55 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
                             *descriptors_.Add());
-  initializeWithDescriptor(std::chrono::milliseconds(50), 2, 1);
+  initializeWithDescriptor(std::chrono::milliseconds(1000), 20, 20);
 
   // 2 -> 1 tokens for descriptor_
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 1);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+  auto rate_limit_result = rate_limiter_->requestAllowed(descriptor_);
 
-  // 1 -> 0 tokens for descriptor_ and descriptor2_
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 0);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
+  EXPECT_TRUE(rate_limit_result.allowed);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3);
+
+  // 1 -> 0 tokens for descriptor_
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3);
+
+  // 1 -> 0 tokens for descriptor2_
+  auto rate_limit_result2 = rate_limiter_->requestAllowed(descriptor2_);
+  EXPECT_TRUE(rate_limit_result2.allowed);
+
+  EXPECT_EQ(rate_limit_result2.token_bucket_context->maxTokens(), 1);
+  EXPECT_EQ(rate_limit_result2.token_bucket_context->remainingTokens(), 0);
+  EXPECT_EQ(rate_limit_result2.token_bucket_context->remainingFillInterval().value(), 1);
 
   // 0 -> 0 tokens for descriptor_ and descriptor2_
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 0);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
 
   // 0 -> 1 tokens for descriptor2_
-  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+  dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
-  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(1000), nullptr));
   fill_timer_->invokeCallback();
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 1);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
+
+  EXPECT_EQ(rate_limit_result2.token_bucket_context->maxTokens(), 1);
+  EXPECT_EQ(rate_limit_result2.token_bucket_context->remainingTokens(), 1);
+  EXPECT_EQ(rate_limit_result2.token_bucket_context->remainingFillInterval().value(), 1);
 
   // 0 -> 2 tokens for descriptor_
-  for (int i = 0; i < 60; i++) {
-    dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
+  for (int i = 0; i < 2; i++) {
+    dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                      Envoy::Event::Dispatcher::RunType::NonBlock);
-    EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
+    EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(1000), nullptr));
     fill_timer_->invokeCallback();
   }
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 2);
-  EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 3);
+
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3.0);
 }
 
 } // Namespace LocalRateLimit

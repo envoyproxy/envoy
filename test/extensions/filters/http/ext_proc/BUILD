@@ -104,9 +104,32 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/ext_proc:client_lib",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "matching_utils_test",
+    size = "small",
+    srcs = ["matching_utils_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:matching_utils_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -165,6 +188,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@ocp//ocpdiag/core/testing:status_matchers",
     ],

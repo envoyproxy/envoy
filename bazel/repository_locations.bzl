@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "25.3"
+PROTOBUF_VERSION = "26.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "25.3"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "9eae1f20f70cccc912d1c318c3929b86aebf5afd4b0f32c196ef682c222ed5ae",
-    linux_x86_64 = "f853e691868d0557425ea290bf7ba6384eef2fa9b04c323afab49a770ba9da80",
-    osx_aarch_64 = "d0fcd6d3b3ef6f22f1c47cc30a80c06727e1eccdddcaf0f4a3be47c070ffd3fe",
-    osx_x86_64 = "247e003b8e115405172eacc50bd19825209d85940728e766f0848eee7c80e2a1",
-    win64 = "d6b336b852726364313330631656b7f395dde5b1141b169f5c4b8d43cdf01482",
+    linux_aarch_64 = "64a3b3b5f7dac0c8f9cf1cb85b2b1a237eb628644f6bcb0fb8f23db6e0d66181",
+    linux_x86_64 = "a7be2928c0454f132c599e25b79b7ad1b57663f2337d7f7e468a1d59b98ec1b0",
+    osx_aarch_64 = "26a29befa8891ecc48809958c909d284f2b9539a2eb47f22cadc631fe6abe8fd",
+    osx_x86_64 = "febd8821c3a2a23f72f4641471e0ab6486f4fb07b68111490a27a31681465b3c",
+    win64 = "9090d135a1159042b13b4e51b210e40cb820d85a5032a6eca5f9b3ca3bdfb539",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -620,13 +620,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Datadog C++ Tracing Library",
         project_desc = "Datadog distributed tracing for C++",
         project_url = "https://github.com/DataDog/dd-trace-cpp",
-        version = "0.2.1",
-        sha256 = "1d3dd5dc139fca43e902c756f3eb5ca0b64a6f50a09c06215084a9fb632c0da7",
+        version = "0.2.2",
+        sha256 = "ee524a9b70d39dcfd815b90d9d6fc5599db7989dff072980bff90bae81c4daf7",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.datadog"],
-        release_date = "2024-05-28",
+        release_date = "2024-06-21",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md",
@@ -933,11 +933,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "d19643d265b978383352b3143f04c0641eea75a75235c111cc01a1350173180e",
+        sha256 = "4fc5ff1b2c339fb86cd3a25f0b5311478ab081e65ad258c6789359cd84d421f8",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-02-15",
+        release_date = "2024-03-27",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1191,12 +1191,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "134dcbea61d892245bb2000553eb88650a0c0541",
-        sha256 = "89444d8dbe3b8a5b9164c5291fd46aba1c047ed9df5f7a08bed5fece857f5aaf",
+        version = "7880417d1eec571527443008ac7bad4735232a62",
+        sha256 = "e6b658d0c109b561c580ec66768ffdda737e6332bb195150bf1622ce6415dbf5",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-06-17",
+        release_date = "2024-07-11",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1569,7 +1569,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2024-02-15",
+            release_date = "2024-03-27",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",

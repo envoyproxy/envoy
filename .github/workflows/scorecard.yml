@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: "Checkout code"
-      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
       with:
         persist-credentials: false
 
@@ -40,6 +40,6 @@ jobs:
         retention-days: 5
 
     - name: "Upload to code-scanning"
-      uses: github/codeql-action/upload-sarif@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # v3.25.8
+      uses: github/codeql-action/upload-sarif@4fa2a7953630fd2f3fb380f21be14ede0169dd4f  # v3.25.12
       with:
         sarif_file: results.sarif
