@@ -338,8 +338,6 @@ TEST_P(AdminInstanceTest, Overrides) {
   ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
-  peer.scopedRouteConfigProvider().getConfigProto();
-  peer.scopedRouteConfigProvider().getConfigVersion();
   peer.scopedRouteConfigProvider().getConfig();
   peer.scopedRouteConfigProvider().apiType();
   peer.scopedRouteConfigProvider().getConfigProtos();

@@ -1,4 +1,5 @@
 #include <memory>
+#include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -18,18 +19,22 @@ class AutoSniIntegrationTest : public testing::TestWithParam<Network::Address::I
 public:
   AutoSniIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void setup(const std::string& override_auto_sni_header = "") {
+  void setup(
+      const std::function<void(envoy::config::core::v3::UpstreamHttpProtocolOptions*)>
+          upstream_http_protocol_options_modifier =
+              [](__attribute__((unused))
+                 envoy::config::core::v3::UpstreamHttpProtocolOptions* options) {},
+      const std::string& upstream_endpoint_hostname = "endpoint-hostname.lyft.com") {
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     config_helper_.addConfigModifier(
-        [override_auto_sni_header](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        [upstream_http_protocol_options_modifier,
+         upstream_endpoint_hostname](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
           ConfigHelper::HttpProtocolOptions protocol_options;
           protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-          if (!override_auto_sni_header.empty()) {
-            protocol_options.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
-                override_auto_sni_header);
-          }
+          upstream_http_protocol_options_modifier(
+              protocol_options.mutable_upstream_http_protocol_options());
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
 
@@ -40,6 +45,13 @@ public:
               TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
           cluster_config.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
           cluster_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+          cluster_config.mutable_load_assignment()
+              ->mutable_endpoints()
+              ->at(0)
+              .mutable_lb_endpoints()
+              ->at(0)
+              .mutable_endpoint()
+              ->set_hostname(upstream_endpoint_hostname);
         });
 
     HttpIntegrationTest::initialize();
@@ -90,8 +102,92 @@ TEST_P(AutoSniIntegrationTest, BasicAutoSniTest) {
   EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
+TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamTest) {
+  setup([](envoy::config::core::v3::UpstreamHttpProtocolOptions* options) {
+    options->set_auto_sni(false);
+    options->set_auto_sni_from_upstream(true);
+  });
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("endpoint-hostname.lyft.com",
+               SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamPrecedenceTest) {
+  setup([](envoy::config::core::v3::UpstreamHttpProtocolOptions* options) {
+    options->set_auto_sni(true);
+    options->set_auto_sni_from_upstream(true);
+  });
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("endpoint-hostname.lyft.com",
+               SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamAndAutoSanValidationFailureTest) {
+  setup(
+      [](envoy::config::core::v3::UpstreamHttpProtocolOptions* options) {
+        options->set_auto_sni(false);
+        options->set_auto_sni_from_upstream(true);
+        options->set_auto_san_validation(true);
+      },
+      "not-a-san");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamAndAutoSanValidationTest) {
+  setup([](envoy::config::core::v3::UpstreamHttpProtocolOptions* options) {
+    options->set_auto_sni(false);
+    options->set_auto_sni_from_upstream(true);
+    options->set_auto_san_validation(true);
+  });
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("endpoint-hostname.lyft.com",
+               SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
 TEST_P(AutoSniIntegrationTest, AutoSniWithAltHeaderNameTest) {
-  setup("x-host");
+  setup([](envoy::config::core::v3::UpstreamHttpProtocolOptions* options) {
+    options->set_override_auto_sni_header("x-host");
+  });
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ =
       sendRequestAndWaitForResponse(Http::TestRequestHeaderMapImpl{{":method", "GET"},

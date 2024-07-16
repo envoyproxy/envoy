@@ -21,7 +21,7 @@ FilterConfig::FilterConfig(
           Protobuf::RepeatedPtrField<
               envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>()) {}
 
-bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}); }
+bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}).allowed; }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = "listener_local_ratelimit." + prefix;

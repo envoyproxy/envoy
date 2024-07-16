@@ -46,6 +46,10 @@ behavior_changes:
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
+- area: tracing
+  change: |
+    Datadog: Disabled remote configuration by default.
+    To enable this feature, use the :ref:`remote_config <envoy_v3_api_field_config.trace.v3.DatadogConfig.remote_config>` field.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -147,10 +151,22 @@ minor_behavior_changes:
     config. Previously, the config only removes JWT if set in headers. With this addition, the config can also be
     used to remove JWT set in query parameters. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` to false.
+- area: custom response filter
+  change: |
+    Prevent the redirect policy from sending 100 as the overridden response code as the custom response must
+    be complete.
 - area: http
   change: |
     Reject messages with chunked transfer encoding with chunk extension containing CR not followed by LF. This can be temporarily reverted
     by setting runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension`` to ``false``.
+- area: quic
+  change: |
+    A change in QUICHE has renamed all flags formerly of the form ``quic_reloadable_flag_...`` to ``quiche_reloadable_flag_...``.
+    Likewise, for ``quic_restart_flag_...``, now ``quiche_restart_flag_...``. Consequently, all Envoy flags of those forms with an
+    ``envoy_quic_...`` prefix have been similarly renamed to ``envoy_quiche_...``.
+- area: hashing
+  change: |
+    Change murmurHash2 hashing on big endian platforms to generate the same values as little endian platforms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -329,8 +345,14 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.enable_connect_udp_support`` runtime flag and legacy code paths.
+- area: oauth2
+  change: |
+    Removed ``envoy.reloadable_features.oauth_use_url_encoding`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for all Bloom 1.0.0 commands.
 - area: redis
   change: |
     Added support for xack, xadd, xautoclaim, xclaim, xdel, xlen, xpending, xrange, xrevrange, xtrim.
@@ -459,6 +481,12 @@ new_features:
     Added :ref:`strip_failure_response
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.strip_failure_response>`
     to allow stripping the failure response details from the JWT authentication filter.
+- area: formatter
+  change: |
+    added formatters for :ref:`METADATA(VIRTUAL_HOST)<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>`.
+- area: quic
+  change: |
+    Added new interface to QuicListenerFilter that is called on receiving the first packet.
 - area: quic
   change: |
     Added :ref:`DataSourceServerPreferredAddressConfig
@@ -470,6 +498,9 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`.
     An additional field ``oid`` is added to :ref:`SubjectAltNameMatcher
     <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>` to support this change.
+- area: retry
+  change: |
+    Added :ref:`reset-before-request retry policy <config_http_filters_router_x-envoy-retry-on>`.
 - area: ext_proc
   change: |
     Added support for observability mode which deprecates ``async_mode``. If enabled, each part of the HTTP request or response
@@ -488,6 +519,16 @@ new_features:
     Added support for wildcard resolution in :ref:`inline_dns_table
     <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ServerContextConfig.inline_dns_table>`
     when DNS filter is working in server mode.
+- area: quic
+  change: |
+    QUIC stream reset error code will be added to transport failure reason.
+    This behavior can be reverted by setting the runtime flag ``envoy.reloadable_features.report_stream_reset_error_code``
+    to false.
+- area: conn pool
+  change: |
+    Added :ref:`auto_sni_from_upstream <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni_from_upstream>`
+    to use value of :ref:`hostnames <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` of
+    upstream cluster's endpoints as the value for SNI.
 - area: outlier detection
   change: |
     Added :ref:`extensions framework<envoy_v3_api_field_config.cluster.v3.OutlierDetection.monitors>` and implementation of

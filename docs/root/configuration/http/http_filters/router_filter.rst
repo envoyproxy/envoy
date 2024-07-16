@@ -89,6 +89,10 @@ gateway-error
 reset
   Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)
 
+reset-before-request
+  Equivalent to *reset* but will only retry requests that have not been sent to the upstream server
+  (i.e. the headers have not been sent).
+
 connect-failure
   Envoy will attempt a retry if a request is failed because of a connection failure to the upstream
   server (connect timeout, etc.). (Included in *5xx*)
