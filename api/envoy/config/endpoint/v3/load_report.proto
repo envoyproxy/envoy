@@ -75,11 +75,20 @@ message UpstreamLocalityStats {
   // [#not-implemented-hide:]
   uint64 total_fail_connections = 11 [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // Stats for multi-dimensional load balancing.
-  // These typically come from endpoint metrics reported via ORCA.
+  // CPU utilization stats for multi-dimensional load balancing.
+  // This typically comes from endpoint metrics reported via ORCA.
   UnnamedEndpointLoadMetricStats cpu_utilization = 12;
+
+  // Memory utilization for multi-dimensional load balancing.
+  // This typically comes from endpoint metrics reported via ORCA.
   UnnamedEndpointLoadMetricStats mem_utilization = 13;
+
+  // Blended application-defined utilization for multi-dimensional load balancing.
+  // This typically comes from endpoint metrics reported via ORCA.
   UnnamedEndpointLoadMetricStats application_utilization = 14;
+
+  // Named stats for multi-dimensional load balancing.
+  // These typically come from endpoint metrics reported via ORCA.
   repeated EndpointLoadMetricStats load_metric_stats = 5;
 
   // Endpoint granularity stats information for this locality. This information
