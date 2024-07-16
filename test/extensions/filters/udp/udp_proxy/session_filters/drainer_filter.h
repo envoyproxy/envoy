@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
@@ -35,7 +36,7 @@ public:
   void onSessionCompleteInternal() override {
     read_callbacks_->streamInfo().filterState()->setData(
         "test.udp_session.drainer.on_session_complete",
-        std::make_shared<Envoy::Router::StringAccessorImpl>("session_complete"),
+        std::make_shared<Router::StringAccessorImpl>("session_complete"),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   }
