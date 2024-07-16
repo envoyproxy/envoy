@@ -46,6 +46,10 @@ behavior_changes:
   change: |
     Move ``Continue``, ``SendLocalReply`` and ``RecoverPanic` from ``FilterCallbackHandler`` to ``DecoderFilterCallbacks`` and
     ``EncoderFilterCallbacks``, to support full-duplex processing.
+- area: tracing
+  change: |
+    Datadog: Disabled remote configuration by default.
+    To enable this feature, use the :ref:`remote_config <envoy_v3_api_field_config.trace.v3.DatadogConfig.remote_config>` field.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -160,10 +164,14 @@ minor_behavior_changes:
     A change in QUICHE has renamed all flags formerly of the form ``quic_reloadable_flag_...`` to ``quiche_reloadable_flag_...``.
     Likewise, for ``quic_restart_flag_...``, now ``quiche_restart_flag_...``. Consequently, all Envoy flags of those forms with an
     ``envoy_quic_...`` prefix have been similarly renamed to ``envoy_quiche_...``.
+- area: hashing
+  change: |
+    Change murmurHash2 hashing on big endian platforms to generate the same values as little endian platforms.
 - area: gcp_authn
   change: |
     Use the fixed URL format instead of one from the configuration. This behavior can be disabled by setting runtime flag
     ``envoy.reloadable_features.gcp_authn_use_fixed_url`` to false.
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: admission control

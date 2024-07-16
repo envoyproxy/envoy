@@ -91,7 +91,6 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
                 response->ShortDebugString());
     } else {
       quota_buckets_[bucket_id]->bucket_action = action;
-      // TODO(tyxia) Handle expired assignment via `assignment_time_to_live`.
       if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
         auto rate_limit_strategy = quota_buckets_[bucket_id]
                                        ->bucket_action.quota_assignment_action()
