@@ -922,9 +922,9 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
     cluster_.cluster_.info()->trafficStats()->upstream_rq_retry_.inc();
   }
 
-  conn_pool_ = conn_pool_factory_->createConnPool(
-      cluster_.cluster_, load_balancer_context_.get(), *cluster_.filter_.config_->tunnelingConfig(),
-      *this, udp_session_info_);
+  conn_pool_ = conn_pool_factory_->createConnPool(cluster_.cluster_, load_balancer_context_.get(),
+                                                  *cluster_.filter_.config_->tunnelingConfig(),
+                                                  *this, udp_session_info_);
 
   if (conn_pool_) {
     connecting_ = true;
