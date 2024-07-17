@@ -164,6 +164,9 @@ minor_behavior_changes:
     A change in QUICHE has renamed all flags formerly of the form ``quic_reloadable_flag_...`` to ``quiche_reloadable_flag_...``.
     Likewise, for ``quic_restart_flag_...``, now ``quiche_restart_flag_...``. Consequently, all Envoy flags of those forms with an
     ``envoy_quic_...`` prefix have been similarly renamed to ``envoy_quiche_...``.
+- area: hashing
+  change: |
+    Change murmurHash2 hashing on big endian platforms to generate the same values as little endian platforms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
