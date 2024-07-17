@@ -22,6 +22,7 @@ envoy_entry_point(
 envoy_entry_point(
     name = "verify",
     pkg = "envoy.distribution.verify",
+    deps = [requirement("typing-extensions")],
 )
 
 envoy_pytool_binary(
