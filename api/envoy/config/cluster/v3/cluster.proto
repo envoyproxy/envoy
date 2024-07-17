@@ -754,13 +754,13 @@ message Cluster {
 
   reserved "hosts", "tls_context", "extension_protocol_options";
 
-  // Configuration to use different transport sockets for different endpoints.  The entry of
+  // Configuration to use different transport sockets for different endpoints. The entry of
   // ``envoy.transport_socket_match`` in the :ref:`LbEndpoint.Metadata
   // <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` is used to match against the
   // transport sockets as they appear in the list. If a match is not found, the search continues in
   // :ref:`LocalityLbEndpoints.Metadata
-  // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`.  The first :ref:`match
-  // <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>` is used.  For example, with
+  // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`. The first :ref:`match
+  // <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>` is used. For example, with
   // the following match
   //
   // .. code-block:: yaml

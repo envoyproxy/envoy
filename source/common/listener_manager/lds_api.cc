@@ -110,9 +110,7 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       }
     }
     END_TRY
-    catch (const EnvoyException& e) {
-      onError(e.what());
-    }
+    CATCH(EnvoyException & e, { onError(e.what()); })
   }
   listener_manager_.endListenerUpdate(std::move(failure_state));
 

@@ -42,6 +42,77 @@ private:
   const TransportSocketOptionsConstSharedPtr inner_options_;
 };
 
+class ServerNameDecoratingTransportSocketOptions : public TransportSocketOptions {
+public:
+  ServerNameDecoratingTransportSocketOptions(absl::string_view server_name_override,
+                                             TransportSocketOptionsConstSharedPtr inner_options)
+      : server_name_override_(server_name_override.empty()
+                                  ? absl::nullopt
+                                  : absl::optional<std::string>(server_name_override)),
+        inner_options_(std::move(inner_options)) {}
+
+  const absl::optional<std::string>& serverNameOverride() const override {
+    return server_name_override_;
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return inner_options_->verifySubjectAltNameListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override {
+    return inner_options_->applicationProtocolListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return inner_options_->applicationProtocolFallback();
+  }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_->proxyProtocolOptions();
+  }
+  OptRef<const Http11ProxyInfo> http11ProxyInfo() const override {
+    return inner_options_->http11ProxyInfo();
+  }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_->downstreamSharedFilterStateObjects();
+  }
+
+private:
+  const absl::optional<std::string> server_name_override_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
+};
+
+class SubjectAltNamesDecoratingTransportSocketOptions : public TransportSocketOptions {
+public:
+  SubjectAltNamesDecoratingTransportSocketOptions(
+      std::vector<std::string>&& verify_subject_alt_name_list_override,
+      TransportSocketOptionsConstSharedPtr inner_options)
+      : verify_subject_alt_name_list_override_(std::move(verify_subject_alt_name_list_override)),
+        inner_options_(std::move(inner_options)) {}
+
+  const absl::optional<std::string>& serverNameOverride() const override {
+    return inner_options_->serverNameOverride();
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return verify_subject_alt_name_list_override_;
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override {
+    return inner_options_->applicationProtocolListOverride();
+  }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return inner_options_->applicationProtocolFallback();
+  }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_->proxyProtocolOptions();
+  }
+  OptRef<const Http11ProxyInfo> http11ProxyInfo() const override {
+    return inner_options_->http11ProxyInfo();
+  }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_->downstreamSharedFilterStateObjects();
+  }
+
+private:
+  const std::vector<std::string> verify_subject_alt_name_list_override_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
+};
+
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
   TransportSocketOptionsImpl(

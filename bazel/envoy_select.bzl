@@ -87,6 +87,13 @@ def envoy_select_disable_exceptions(xs, repository = ""):
         "//conditions:default": [],
     })
 
+# Selects the given values if exceptions are enabled in the current build.
+def envoy_select_enable_exceptions(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_exceptions": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if HTTP datagram support is enabled in the current build.
 def envoy_select_enable_http_datagrams(xs, repository = ""):
     return select({
@@ -98,6 +105,13 @@ def envoy_select_enable_http_datagrams(xs, repository = ""):
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if hot restart is enabled in the current build.
+def envoy_select_nghttp2(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_nghttp2": [],
         "//conditions:default": xs,
     })
 

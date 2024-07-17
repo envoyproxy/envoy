@@ -302,7 +302,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
 
       if (additional_init != nullptr) {
-        additional_init(ctx, tls_certificate);
+        absl::Status init_status = additional_init(ctx, tls_certificate);
+        SET_AND_RETURN_IF_NOT_OK(creation_status, init_status);
       }
     }
   }

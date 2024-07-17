@@ -28,6 +28,7 @@ enum class BlanketRule {
 struct ConfigOption {
   bool valid_rlqs_server = true;
   BlanketRule no_assignment_blanket_rule = BlanketRule::NOT_SPECIFIED;
+  BlanketRule expired_assignment_blanket_rule = BlanketRule::NOT_SPECIFIED;
 };
 
 // These tests exercise the rate limit quota filter through Envoy's integration test
@@ -82,19 +83,19 @@ protected:
       xds::type::matcher::v3::Matcher matcher;
       TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
 
+      auto* mutable_config = matcher.mutable_matcher_list()
+                                 ->mutable_matchers(0)
+                                 ->mutable_on_match()
+                                 ->mutable_action()
+                                 ->mutable_typed_config();
+      ASSERT_TRUE(mutable_config->Is<::envoy::extensions::filters::http::rate_limit_quota::v3::
+                                         RateLimitQuotaBucketSettings>());
+
+      auto mutable_bucket_settings = MessageUtil::anyConvert<
+          ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
+          *mutable_config);
       // Configure the no_assignment behavior.
       if (config_option.no_assignment_blanket_rule != BlanketRule::NOT_SPECIFIED) {
-        auto* mutable_config = matcher.mutable_matcher_list()
-                                   ->mutable_matchers(0)
-                                   ->mutable_on_match()
-                                   ->mutable_action()
-                                   ->mutable_typed_config();
-        ASSERT_TRUE(mutable_config->Is<::envoy::extensions::filters::http::rate_limit_quota::v3::
-                                           RateLimitQuotaBucketSettings>());
-
-        auto mutable_bucket_settings = MessageUtil::anyConvert<
-            ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
-            *mutable_config);
         if (config_option.no_assignment_blanket_rule == BlanketRule::ALLOW_ALL) {
           mutable_bucket_settings.mutable_no_assignment_behavior()
               ->mutable_fallback_rate_limit()
@@ -104,9 +105,21 @@ protected:
               ->mutable_fallback_rate_limit()
               ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
         }
-        mutable_config->PackFrom(mutable_bucket_settings);
       }
 
+      if (config_option.expired_assignment_blanket_rule != BlanketRule::NOT_SPECIFIED) {
+        if (config_option.expired_assignment_blanket_rule == BlanketRule::ALLOW_ALL) {
+          mutable_bucket_settings.mutable_expired_assignment_behavior()
+              ->mutable_fallback_rate_limit()
+              ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
+        } else if (config_option.expired_assignment_blanket_rule == BlanketRule::DENY_ALL) {
+          mutable_bucket_settings.mutable_expired_assignment_behavior()
+              ->mutable_fallback_rate_limit()
+              ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
+        }
+      }
+
+      mutable_config->PackFrom(mutable_bucket_settings);
       proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
 
       // Construct a configuration proto for our filter and then re-write it
@@ -772,6 +785,145 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucket) {
     }
 
     cleanUp();
+  }
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentDeny) {
+  ConfigOption option;
+  option.expired_assignment_blanket_rule = BlanketRule::DENY_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  for (int i = 0; i < 2; ++i) {
+    // Advance the time to make cached assignment expired.
+    if (i == 1) {
+      simTime().advanceTimeWait(std::chrono::milliseconds(12 * 1000));
+    }
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers);
+
+    // 2nd downstream client request will not trigger the reports to RLQS server since it is
+    // same as first request, which will find the entry in the cache.
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      rlqs_stream_->startGrpcStream();
+
+      // Build the response.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+      absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
+      custom_headers_cpy.insert({"name", "prod"});
+      auto* bucket_action = rlqs_response.add_bucket_action();
+
+      for (const auto& [key, value] : custom_headers_cpy) {
+        (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
+        quota_assignment->mutable_assignment_time_to_live()->set_seconds(10);
+        auto* strategy = quota_assignment->mutable_rate_limit_strategy();
+        strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
+      }
+
+      // Send the response from RLQS server.
+      rlqs_stream_->sendGrpcMessage(rlqs_response);
+    }
+
+    // 2nd request is throttled because the assignment has expired and
+    // expired assignment behavior is DENY_ALL.
+    if (i == 1) {
+      ASSERT_TRUE(response_->waitForEndStream());
+      EXPECT_TRUE(response_->complete());
+      EXPECT_EQ(response_->headers().getStatusValue(), "429");
+    } else {
+      // Handle the request received by upstream.
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      upstream_request_->encodeData(100, true);
+
+      // Verify the response to downstream.
+      ASSERT_TRUE(response_->waitForEndStream());
+      EXPECT_TRUE(response_->complete());
+      EXPECT_EQ(response_->headers().getStatusValue(), "200");
+    }
+
+    cleanUp();
+  }
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow) {
+  ConfigOption option;
+  option.expired_assignment_blanket_rule = BlanketRule::ALLOW_ALL;
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+  for (int i = 0; i < 3; ++i) {
+    // Advance the time to make cached assignment expired.
+    if (i == 1) {
+      simTime().advanceTimeWait(std::chrono::milliseconds(3 * 1000));
+    }
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers);
+
+    // 2nd downstream client request will not trigger the reports to RLQS server since it is
+    // same as first request, which will find the entry in the cache.
+    if (i != 1) {
+      // 1st request will start the gRPC stream.
+      if (i == 0) {
+        // Start the gRPC stream to RLQS server on the first request.
+        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+        ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+        rlqs_stream_->startGrpcStream();
+      } else {
+        // 3rd request won't start gRPC stream again since it is kept open.
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+      }
+
+      // Build the response.
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+      absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
+      custom_headers_cpy.insert({"name", "prod"});
+      auto* bucket_action = rlqs_response.add_bucket_action();
+
+      for (const auto& [key, value] : custom_headers_cpy) {
+        (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
+        quota_assignment->mutable_assignment_time_to_live()->set_seconds(2);
+        auto* strategy = quota_assignment->mutable_rate_limit_strategy();
+        strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
+      }
+
+      // Send the response from RLQS server.
+      rlqs_stream_->sendGrpcMessage(rlqs_response);
+    }
+
+    // Even though assignment was expired on 2nd request, the request is still allowed because the
+    // expired assignment behavior is ALLOW_ALL.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
   }
 }
 

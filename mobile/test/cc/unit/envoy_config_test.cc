@@ -47,15 +47,15 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   return cluster_config;
 }
 
-template <typename ProtoType>
-bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                           const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+bool socketAddressesEqual(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>& lhs,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>& rhs) {
   if (lhs.size() != rhs.size()) {
     return false;
   }
 
   for (int i = 0; i < lhs.size(); ++i) {
-    if (!Protobuf::util::MessageDifferencer::Equals(lhs[i], rhs[i])) {
+    if ((lhs[i].address() != rhs[i].address()) || lhs[i].port_value() != rhs[i].port_value()) {
       return false;
     }
   }
@@ -291,7 +291,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr2 = *expected_dns_preresolve_hostnames.Add();
   host_addr2.set_address("lyft.com");
   host_addr2.set_port_value(443);
-  EXPECT_TRUE(repeatedPtrFieldEqual(
+  EXPECT_TRUE(socketAddressesEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 
@@ -302,7 +302,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr3 = *expected_dns_preresolve_hostnames.Add();
   host_addr3.set_address("google.com");
   host_addr3.set_port_value(443);
-  EXPECT_TRUE(repeatedPtrFieldEqual(
+  EXPECT_TRUE(socketAddressesEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 }
