@@ -39,6 +39,7 @@ void AsyncTlsCertificateSelector::selectTlsContextAsync() {
   // choose the first one.
   auto& tls_context = selector_ctx_.getTlsContexts()[0];
   cb_->onCertificateSelectionResult(tls_context, false);
+  selection_timer_.reset();
 }
 
 REGISTER_FACTORY(AsyncTlsCertificateSelectorFactory, Ssl::TlsCertificateSelectorConfigFactory);
