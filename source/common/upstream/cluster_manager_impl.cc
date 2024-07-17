@@ -1045,8 +1045,10 @@ void ClusterManagerImpl::updateClusterCounts() {
 }
 
 ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view cluster) {
+  if(!tls_.get()) {
+    return nullptr;
+  }
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
-
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
   if (entry != cluster_manager.thread_local_clusters_.end()) {
     return entry->second.get();
