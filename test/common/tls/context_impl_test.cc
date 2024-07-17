@@ -859,7 +859,7 @@ public:
         "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"));
 
     auto server_context_config =
-        THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(cfg, factory_context_),
+        THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(cfg, factory_context_, false),
                               std::unique_ptr<ServerContextConfigImpl>);
     loadConfig(*server_context_config);
   }
@@ -2064,22 +2064,14 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
             test_value: 100
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-<<<<<<< HEAD
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, false);
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Failed to get BoringSSL private key method from provider");
-=======
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
   EXPECT_EQ(manager
                 .createSslServerContext(*store.rootScope(), *server_context_config,
                                         std::vector<std::string>{}, nullptr)
                 .status()
                 .message(),
             "Failed to get BoringSSL private key method from provider");
->>>>>>> main
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
