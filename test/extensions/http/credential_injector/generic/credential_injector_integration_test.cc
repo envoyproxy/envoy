@@ -20,7 +20,8 @@ resources:
       secret:
         inline_string: "Basic base64EncodedUsernamePassword")EOF",
                                               false);
-    config_helper_.prependFilter(TestEnvironment::substitute(filter_config), testing_downstream_filter_);
+    config_helper_.prependFilter(TestEnvironment::substitute(filter_config),
+                                 testing_downstream_filter_);
     initialize();
   }
 };
@@ -77,7 +78,9 @@ typed_config:
   if (testing_downstream_filter_) {
     EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
   } else {
-    EXPECT_EQ(1UL, test_server_->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")->value());
+    EXPECT_EQ(1UL, test_server_
+                       ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")
+                       ->value());
   }
 }
 
@@ -120,7 +123,9 @@ typed_config:
   if (testing_downstream_filter_) {
     EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
   } else {
-    EXPECT_EQ(1UL, test_server_->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")->value());
+    EXPECT_EQ(1UL, test_server_
+                       ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")
+                       ->value());
   }
 }
 
@@ -163,9 +168,13 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   if (testing_downstream_filter_) {
-    EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.already_exists")->value());
+    EXPECT_EQ(
+        1UL, test_server_->counter("http.config_test.credential_injector.already_exists")->value());
   } else {
-    EXPECT_EQ(1UL, test_server_->counter("cluster.cluster_0.cluster.cluster_0credential_injector.already_exists")->value());
+    EXPECT_EQ(1UL,
+              test_server_
+                  ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.already_exists")
+                  ->value());
   }
 }
 
@@ -210,7 +219,9 @@ typed_config:
   if (testing_downstream_filter_) {
     EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
   } else {
-    EXPECT_EQ(1UL, test_server_->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")->value());
+    EXPECT_EQ(1UL, test_server_
+                       ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")
+                       ->value());
   }
 }
 
