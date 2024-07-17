@@ -46,19 +46,6 @@ class SslIntegrationTest : public testing::TestWithParam<Network::Address::IpVer
 public:
   SslIntegrationTest() : SslIntegrationTestBase(GetParam()) {}
   void TearDown() override { SslIntegrationTestBase::TearDown(); };
-
-  // wait for the specified time
-  void waitForTime(std::chrono::milliseconds time) {
-    Event::TimerPtr timer(dispatcher_->createTimer([time]() -> void {
-      // do nothing
-      ENVOY_LOG_MISC(debug, "debug: timer fired after {} ms", time.count());
-    }));
-    timer->enableTimer(time);
-    ENVOY_LOG_MISC(debug, "debug: waiting for {} ms", time.count());
-    while (timer->enabled()) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
@@ -1189,6 +1176,7 @@ typed_config:
   };
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
   checkStats();
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sync")->value(), 1);
 }
 
 TEST_P(SslIntegrationTest, AsyncCertSelectorSucceeds) {
@@ -1203,6 +1191,10 @@ typed_config:
   };
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
   checkStats();
+
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_async")->value(), 1);
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_async_finished")->value(),
+            1);
 }
 
 TEST_P(SslIntegrationTest, AsyncSleepCertSelectorSucceeds) {
@@ -1217,6 +1209,10 @@ typed_config:
   };
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
   checkStats();
+
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sleep")->value(), 1);
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sleep_finished")->value(),
+            1);
 }
 
 TEST_P(SslIntegrationTest, AsyncSleepCertSelectionAfterTearDown) {
@@ -1235,15 +1231,19 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  // wait for 200ms, let the server tls handshake into sleep state.
-  waitForTime(std::chrono::milliseconds(200));
-  // connection still open after 200ms
+
+  // wait for the server tls handshake into sleep state.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   ENVOY_LOG_MISC(debug, "debug: closing connection");
   connection->close(Network::ConnectionCloseType::NoFlush);
   connection.reset();
-  // wait 1200ms to make sure the timer in cert selector is triggered.
-  waitForTime(std::chrono::milliseconds(1200));
+
+  // wait the sleep timer in cert selector is triggered.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
 }
 
 TEST_P(SslIntegrationTest, AsyncCertSelectionAfterSslShutdown) {
@@ -1262,20 +1262,18 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() == Ssl::SocketState::PreHandshake) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+
+  // wait for the server tls handshake into sleep state.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
-  auto timer = dispatcher_->createTimer([] {
-    // do nothing
-    ENVOY_LOG_MISC(debug, "debug: test time trigger");
-  });
-  timer->enableTimer(std::chrono::milliseconds(1100));
-  // make sure the timer in cert selector is triggered.
-  while (timer->enabled()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+
+  // wait the sleep timer in cert selector is triggered.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
   connection.reset();
 }
 

@@ -6,6 +6,7 @@
 
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_impl.h"
+#include "stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +16,9 @@ namespace Tls {
 class AsyncTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                     protected Logger::Loggable<Logger::Id::connection> {
 public:
-  AsyncTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx, std::string mode)
-      : selector_ctx_(selector_ctx), mode_(mode) {}
+  AsyncTlsCertificateSelector(Stats::Scope& store, Ssl::TlsCertificateSelectorContext& selector_ctx,
+                              std::string mode)
+      : stats_(generateCertSelectionStats(store)), selector_ctx_(selector_ctx), mode_(mode) {}
 
   ~AsyncTlsCertificateSelector() override {
     ENVOY_LOG(info, "debug: ~AsyncTlsCertificateSelector");
@@ -34,6 +36,7 @@ public:
   void selectTlsContextAsync();
 
 private:
+  CertSelectionStats stats_;
   Ssl::TlsCertificateSelectorContext& selector_ctx_;
   Ssl::CertificateSelectionCallbackPtr cb_;
   std::string mode_;
@@ -43,7 +46,7 @@ private:
 class AsyncTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
-      const Protobuf::Message& config, Server::Configuration::CommonFactoryContext&,
+      const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& factory_context,
       ProtobufMessage::ValidationVisitor&, absl::Status& creation_status, bool for_quic) override {
     if (for_quic) {
       creation_status = absl::InvalidArgumentError("does not support for quic");
@@ -63,10 +66,12 @@ public:
       return Ssl::TlsCertificateSelectorFactory();
     }
 
-    return
-        [mode](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorContext& selector_ctx) {
-          return std::make_unique<AsyncTlsCertificateSelector>(selector_ctx, mode);
-        };
+    auto& scope = factory_context.scope();
+
+    return [mode, &scope](const Ssl::ServerContextConfig&,
+                          Ssl::TlsCertificateSelectorContext& selector_ctx) {
+      return std::make_unique<AsyncTlsCertificateSelector>(scope, selector_ctx, mode);
+    };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
