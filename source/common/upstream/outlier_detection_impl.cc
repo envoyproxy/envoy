@@ -309,8 +309,7 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
   // After checking the validity of each config, the factory returns callback function
   // which is stored and executed later on, when outlier extensions are created for
   // each host in the cluster.
-  std::shared_ptr<ExtMonitorFactoryContext> context =
-      std::make_shared<ExtMonitorFactoryContext>(validation_visitor);
+  ExtMonitorFactoryContext context(validation_visitor);
   for (const auto& monitor_config : config.monitors()) {
     auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
     auto config =

@@ -53,7 +53,6 @@ enum class Result {
 // Each type may have a different syntax and content.
 // TODO (cpakulski) - maybe use enums from protobufs.
 enum class ExtResultType {
-  TEST, // Used in unit tests.
   HTTP_CODE,
   LOCAL_ORIGIN,
 };
@@ -295,7 +294,9 @@ class ExtMonitorFactoryContext {
 public:
   ExtMonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
       : validation_visitor_(validation_visitor) {}
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() { return validation_visitor_; }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const {
+    return validation_visitor_;
+  }
 
 private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -307,7 +308,7 @@ public:
 
   virtual ExtMonitorCreateFn createMonitor(const std::string& name,
                                            ProtobufTypes::MessagePtr&& config,
-                                           std::shared_ptr<ExtMonitorFactoryContext> context) PURE;
+                                           const ExtMonitorFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.outlier_detection_monitors"; }
 };

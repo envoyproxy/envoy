@@ -19,6 +19,7 @@ envoy_cc_extension(
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib_header",
+        #"//envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/outlier_detection_monitors/common/v3:pkg_cc_proto",
     ],
 )

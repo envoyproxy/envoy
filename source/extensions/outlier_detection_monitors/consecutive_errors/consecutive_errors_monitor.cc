@@ -36,10 +36,11 @@ public:
       : ExtMonitorFactoryBase("envoy.outlier_detection_monitors.consecutive_errors") {}
 
 private:
-  ExtMonitorPtr createMonitorFromProtoTyped(const std::string& monitor_name,
-                                            const envoy::extensions::outlier_detection_monitors::
-                                                consecutive_errors::v3::ConsecutiveErrors& config,
-                                            Upstream::Outlier::ExtMonitorFactoryContext&) override {
+  ExtMonitorPtr
+  createMonitorFromProtoTyped(const std::string& monitor_name,
+                              const envoy::extensions::outlier_detection_monitors::
+                                  consecutive_errors::v3::ConsecutiveErrors& config,
+                              const Upstream::Outlier::ExtMonitorFactoryContext&) override {
     auto monitor = std::make_unique<ConsecutiveErrorsMonitor>(
         monitor_name, config.enforcing().value(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, threshold, 3));

@@ -74,6 +74,7 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/protobuf:message_validator_interface",
+        #        "//envoy/server:factory_context_interface",
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

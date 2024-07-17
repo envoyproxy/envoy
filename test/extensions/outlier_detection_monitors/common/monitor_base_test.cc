@@ -12,7 +12,7 @@ namespace Outlier {
 using namespace testing;
 
 // Outlier detection result used only for tests.
-class ResultForTest : public TypedExtResult<Upstream::Outlier::ExtResultType::TEST> {};
+// class ResultForTest : public TypedExtResult<Upstream::Outlier::ExtResultType::TEST> {};
 
 // HTTP codes
 TEST(MonitorBaseTest, HTTPCodeError) {
@@ -33,7 +33,7 @@ TEST(MonitorBaseTest, HTTPCodeErrorBucket) {
   ASSERT_TRUE(bucket.match(HttpCode(404)));
 
   // Http-codes bucket should not "catch" other types.
-  ASSERT_FALSE(bucket.matchType(ResultForTest()));
+  ASSERT_FALSE(bucket.matchType(LocalOriginEvent(Result::LocalOriginTimeout)));
 }
 
 // Locally originated events.
@@ -58,7 +58,7 @@ TEST(MonitorBaseTest, LocalOriginErrorBucket) {
   ASSERT_TRUE(bucket.match(LocalOriginEvent(Result::ExtOriginRequestFailed)));
 
   // The bucket should not match other error types.
-  ASSERT_FALSE(bucket.matchType(ResultForTest()));
+  ASSERT_FALSE(bucket.matchType(HttpCode(200)));
 }
 
 // Test monitor's logic of matching error types and calling appropriate methods.
@@ -70,7 +70,7 @@ public:
   MOCK_METHOD(void, onReset, ());
 };
 
-class TestBucket : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::TEST> {
+class TestBucket : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::HTTP_CODE> {
 public:
   TestBucket() = default;
 };
@@ -78,8 +78,7 @@ public:
 class MockBucket : public TestBucket {
 public:
   MockBucket() = default;
-  MOCK_METHOD(bool, matches, (const TypedExtResult<Upstream::Outlier::ExtResultType::TEST>&),
-              (const));
+  MOCK_METHOD(bool, match, (const ExtResult&), (const));
 };
 
 class MonitorTest : public testing::Test {
@@ -109,7 +108,7 @@ protected:
   std::unique_ptr<MockMonitor> monitor_;
 };
 
-TEST_F(MonitorTest, NoBuckets) { monitor_->reportResult(ResultForTest()); }
+TEST_F(MonitorTest, NoBuckets) { monitor_->reportResult(HttpCode(200)); }
 
 TEST_F(MonitorTest, SingleBucketNotMatchingType) {
   addBucket1();
@@ -138,10 +137,10 @@ TEST_F(MonitorTest, SingleBucketNotMatchingResult) {
   monitor_->setCallback([&callback_called](uint32_t, std::string, absl::optional<std::string>) {
     callback_called = true;
   });
-  EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(false));
+  EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*monitor_, onSuccess);
 
-  monitor_->reportResult(ResultForTest());
+  monitor_->reportResult(HttpCode(200));
 
   ASSERT_FALSE(callback_called);
 }
@@ -157,11 +156,11 @@ TEST_F(MonitorTest, SingleBucketMatchingResultNotTripped) {
   monitor_->setCallback([&callback_called](uint32_t, std::string, absl::optional<std::string>) {
     callback_called = true;
   });
-  EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(true));
+  EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has not been tripped.
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
 
-  monitor_->reportResult(ResultForTest());
+  monitor_->reportResult(HttpCode(200));
 
   // Callback has not been called, because onError returned false,
   // meaning that monitor has not tripped yet.
@@ -182,13 +181,13 @@ TEST_F(MonitorTest, SingleBucketMatchingResultTripped) {
         ASSERT_EQ(name, monitor_name_);
         ASSERT_EQ(enforcing, enforcing_);
       });
-  EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(true));
+  EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has been tripped.
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(true));
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
-  monitor_->reportResult(ResultForTest());
+  monitor_->reportResult(HttpCode(200));
 
   // Callback has been called, because onError returned true,
   // meaning that monitor has tripped.
@@ -199,23 +198,23 @@ TEST_F(MonitorTest, TwoBucketsNotMatching) {
   addBucket1();
   addBucket2();
 
-  EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(false));
-  EXPECT_CALL(*bucket2_, matches(_)).WillOnce(Return(false));
+  EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
+  EXPECT_CALL(*bucket2_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*monitor_, onSuccess);
 
-  monitor_->reportResult(ResultForTest());
+  monitor_->reportResult(HttpCode(200));
 }
 
 TEST_F(MonitorTest, TwoBucketsFirstMatching) {
   addBucket1();
   addBucket2();
 
-  EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(true));
+  EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Matching the second bucket should be skipped.
-  EXPECT_CALL(*bucket2_, matches(_)).Times(0);
+  EXPECT_CALL(*bucket2_, match(_)).Times(0);
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
 
-  monitor_->reportResult(ResultForTest());
+  monitor_->reportResult(HttpCode(200));
 }
 
 TEST_F(MonitorTest, TwoBucketsSecondMatching) {
@@ -229,13 +228,13 @@ TEST_F(MonitorTest, TwoBucketsSecondMatching) {
         ASSERT_EQ(name, monitor_name_);
         ASSERT_EQ(enforcing, enforcing_);
       });
-  EXPECT_CALL(*bucket1_, matches(_)).WillOnce(Return(false));
-  EXPECT_CALL(*bucket2_, matches(_)).WillOnce(Return(true));
+  EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
+  EXPECT_CALL(*bucket2_, match(_)).WillOnce(Return(true));
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(true));
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
-  monitor_->reportResult(ResultForTest());
+  monitor_->reportResult(HttpCode(200));
 
   // Callback has been called, because onError returned true,
   // meaning that monitor has tripped.
