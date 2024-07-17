@@ -23,7 +23,7 @@ namespace Ssl {
 struct TlsContext;
 
 using ContextAdditionalInitFunc =
-    std::function<void(Ssl::TlsContext& context, const Ssl::TlsCertificateConfig& cert)>;
+    std::function<absl::Status(Ssl::TlsContext& context, const Ssl::TlsCertificateConfig& cert)>;
 
 /**
  * Manages all of the SSL contexts in the process

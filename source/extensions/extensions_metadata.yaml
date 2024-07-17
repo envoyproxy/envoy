@@ -526,7 +526,7 @@ envoy.filters.http.rbac:
 envoy.filters.http.router:
   categories:
   - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.http.router.v3.Router
@@ -1014,6 +1014,13 @@ envoy.quic.server_preferred_address.fixed:
   status: alpha
   type_urls:
   - envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
+envoy.quic.server_preferred_address.datasource:
+  categories:
+  - envoy.quic.server_preferred_address
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig
 envoy.udp_packet_writer.default:
   categories:
   - envoy.udp_packet_writer

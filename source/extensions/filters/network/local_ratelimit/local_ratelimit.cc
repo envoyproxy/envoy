@@ -94,7 +94,7 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
+bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}).allowed; }
 
 Network::FilterStatus Filter::onNewConnection() {
   if (!config_->enabled()) {

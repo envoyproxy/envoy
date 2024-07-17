@@ -19,6 +19,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineStartUpTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
@@ -38,6 +39,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineFlowTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
@@ -58,6 +60,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineExplicitFlowTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
@@ -78,6 +81,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineSocketTagTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",

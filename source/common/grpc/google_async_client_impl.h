@@ -237,6 +237,10 @@ public:
   }
   const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
 
+  // Google-gRPC code doesn't use Envoy watermark buffers, so the functions below are not used.
+  void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks&) override {}
+  void removeWatermarkCallbacks() override {}
+
 protected:
   bool callFailed() const { return call_failed_; }
 

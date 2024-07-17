@@ -8,10 +8,11 @@ namespace Envoy {
 namespace Upstream {
 
 StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                     ClusterFactoryContext& context)
-    : ClusterImplBase(cluster, context),
-      priority_state_manager_(new PriorityStateManager(
-          *this, context.serverFactoryContext().localInfo(), nullptr, random_)) {
+                                     ClusterFactoryContext& context, absl::Status& creation_status)
+    : ClusterImplBase(cluster, context, creation_status) {
+  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+  priority_state_manager_.reset(new PriorityStateManager(
+      *this, context.serverFactoryContext().localInfo(), nullptr, random_));
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -68,8 +69,12 @@ StaticClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
                       cluster.name()));
     }
   }
-  return std::make_pair(std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context)),
-                        nullptr);
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::make_pair(
+      std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context, creation_status)),
+      nullptr);
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 /**

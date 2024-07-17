@@ -76,12 +76,24 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTimeout:
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
+  case Http::StreamResetReason::ConnectError:
+    return quic::QUIC_STREAM_CONNECT_ERROR;
   case Http::StreamResetReason::LocalReset:
+    return quic::QUIC_STREAM_REQUEST_REJECTED;
   case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
-  default:
-    return quic::QUIC_BAD_APPLICATION_PAYLOAD;
+  case Http::StreamResetReason::ProtocolError:
+    return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
+  case Http::StreamResetReason::Overflow:
+    IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
+    break;
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::RemoteReset:
+    IS_ENVOY_BUG("Remote reset shouldn't be initiated by self.");
   }
+
+  ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
+  return quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE;
 }
 
 Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamErrorCode rst_err) {
@@ -90,10 +102,15 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::LocalConnectionFailure;
-  case quic::QUIC_BAD_APPLICATION_PAYLOAD:
-    return Http::StreamResetReason::ProtocolError;
-  default:
+  case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_EXCESSIVE_LOAD:
+  case quic::QUIC_HEADERS_TOO_LARGE:
+  case quic::QUIC_STREAM_REQUEST_REJECTED:
     return Http::StreamResetReason::LocalReset;
+  case quic::QUIC_STREAM_CANCELLED:
+    return Http::StreamResetReason::OverloadManager;
+  default:
+    return Http::StreamResetReason::ProtocolError;
   }
 }
 
@@ -102,9 +119,20 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::RemoteRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectionTermination;
+  case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
-  default:
+  case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_REQUEST_REJECTED:
+  case quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE:
+  case quic::QUIC_STREAM_EXCESSIVE_LOAD:
+  case quic::QUIC_HEADERS_TOO_LARGE:
     return Http::StreamResetReason::RemoteReset;
+  case quic::QUIC_STREAM_CANCELLED:
+    return Http::StreamResetReason::OverloadManager;
+  case quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR:
+  default:
+    return Http::StreamResetReason::ProtocolError;
   }
 }
 

@@ -14,13 +14,27 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
+absl::StatusOr<std::unique_ptr<RedisCluster>> RedisCluster::create(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+    Upstream::ClusterFactoryContext& context,
+    NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+    Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr factory) {
+  absl::Status creation_status = absl::OkStatus();
+  std::unique_ptr<RedisCluster> ret = absl::WrapUnique(new RedisCluster(
+      cluster, redis_cluster, context, client_factory, dns_resolver, factory, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 RedisCluster::RedisCluster(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
     Upstream::ClusterFactoryContext& context,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
-    Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr lb_factory)
-    : Upstream::BaseDynamicClusterImpl(cluster, context),
+    Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr lb_factory,
+    absl::Status& creation_status)
+    : Upstream::BaseDynamicClusterImpl(cluster, context, creation_status),
       cluster_manager_(context.clusterManager()),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
@@ -585,19 +599,24 @@ RedisClusterFactory::createClusterWithConfig(
       THROW_OR_RETURN_VALUE(selectDnsResolver(cluster, context), Network::DnsResolverSharedPtr);
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future
+  absl::Status creation_status = absl::OkStatus();
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-    return std::make_pair(std::make_shared<RedisCluster>(
-                              cluster, proto_config, context,
-                              NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-                              resolver, nullptr),
-                          nullptr);
+    auto ret =
+        std::make_pair(std::shared_ptr<RedisCluster>(new RedisCluster(
+                           cluster, proto_config, context,
+                           NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
+                           resolver, nullptr, creation_status)),
+                       nullptr);
+    RETURN_IF_NOT_OK(creation_status);
+    return ret;
   }
   auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(
       context.serverFactoryContext().api().randomGenerator());
-  return std::make_pair(std::make_shared<RedisCluster>(
-                            cluster, proto_config, context,
-                            NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-                            resolver, lb_factory),
+  absl::StatusOr<std::unique_ptr<RedisCluster>> cluster_or_error = RedisCluster::create(
+      cluster, proto_config, context,
+      NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, resolver, lb_factory);
+  RETURN_IF_NOT_OK(cluster_or_error.status());
+  return std::make_pair(std::shared_ptr<RedisCluster>(std::move(*cluster_or_error)),
                         std::make_unique<RedisClusterThreadAwareLoadBalancer>(lb_factory));
 }
 

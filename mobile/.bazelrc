@@ -29,8 +29,11 @@ build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
-build --define=envoy_mobile_xds=disabled
+build --define=nghttp2=disabled
 build --define=envoy_yaml=disabled
+build --define=envoy_full_protos=disabled
+build --define envoy_exceptions=disabled
+build: --copt=-fno-exceptions
 
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO
 # This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
@@ -65,6 +68,7 @@ build:mobile-dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
 build:ios --test_timeout=390,750,1500,5700
+build:ios --define=envoy_full_protos=enabled
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
@@ -79,9 +83,6 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
-# enabled for //test/kotlin/integration:xds_test and
-# //test/java/io/envoyproxy/envoymobile/engine:envoy_configuration_test
-build:mobile-test-android --define=envoy_mobile_xds=enabled
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -114,9 +115,6 @@ build:mobile-remote-release-clang-android-publish --config=mobile-remote-release
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
 build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
-
-build:mobile-remote-release-clang-android-publish-xds --config=mobile-remote-release-clang-android-publish
-build:mobile-remote-release-clang-android-publish-xds --define=envoy_mobile_xds=enabled
 
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
@@ -182,7 +180,6 @@ build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
 build:mobile-remote-ci-linux-asan --config=mobile-clang-asan
 build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-asan --config=remote-ci
-build:mobile-remote-ci-linux-asan --define=envoy_full_protos=disabled
 build:mobile-remote-ci-linux-asan --build_tests_only
 test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
@@ -192,7 +189,6 @@ test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:mobile-remote-ci-linux-tsan --config=clang-tsan
 build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-tsan --config=remote-ci
-build:mobile-remote-ci-linux-tsan --define=envoy_full_protos=disabled
 build:mobile-remote-ci-linux-tsan --build_tests_only
 test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
@@ -207,7 +203,6 @@ build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-co
 build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llm/bin/llvm-cov
 build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-build:mobile-ci-linux-coverage --define=envoy_full_protos=disabled
 build:mobile-ci-linux-coverage --build_tests_only
 
 #############################################################################
@@ -236,6 +231,7 @@ build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:mobile-remote-ci-macos --remote_download_toplevel
 build:mobile-remote-ci-macos --config=ci
 build:mobile-remote-ci-macos --config=remote
+build:mobile-remote-ci-macos --define=envoy_full_protos=disabled
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
@@ -247,30 +243,20 @@ test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --config=mobile-test-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
-build:mobile-remote-ci-cc --define=envoy_full_protos=disabled
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
+# TODO(alyssar) remove in a follow-up PR
 build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
 build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
 build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
 
-build:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-xds-enabled --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-xds-enabled --define=envoy_mobile_xds=enabled
-
 build:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
 test:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-full-protos-enabled --define=envoy_full_protos=enabled
 
 build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
 
-build:mobile-remote-ci-macos-swift --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-swift --config=mobile-test-ios
-build:mobile-remote-ci-macos-swift --@envoy//bazel:http3=False
-
 build:mobile-remote-ci-core --config=mobile-remote-ci
-build:mobile-remote-ci-core --define=envoy_full_protos=disabled
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
