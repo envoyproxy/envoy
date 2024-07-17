@@ -146,17 +146,15 @@ private:
 };
 
 class ThreadLocalStreamManager;
-// Default value is 5000 milliseconds (5 seconds)
-inline constexpr uint32_t DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS = 5000;
+// TODO(tyxia) Make it configurable.
+inline constexpr uint32_t DEFAULT_CLOSE_TIMEOUT_MS = 1000;
 
 // Deferred deletable stream wrapper.
 struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
   explicit DeferredDeletableStream(ExternalProcessorStreamPtr stream,
                                    ThreadLocalStreamManager& stream_manager,
-                                   const ExtProcFilterStats& stat,
-                                   const std::chrono::milliseconds& timeout)
-      : stream_(std::move(stream)), parent(stream_manager), stats(stat),
-        deferred_close_timeout(timeout) {}
+                                   const ExtProcFilterStats& stat)
+      : stream_(std::move(stream)), parent(stream_manager), stats(stat) {}
 
   void deferredClose(Envoy::Event::Dispatcher& dispatcher, uint64_t stream_id);
 
@@ -165,7 +163,6 @@ struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
   ThreadLocalStreamManager& parent;
   ExtProcFilterStats stats;
   Event::TimerPtr derferred_close_timer;
-  const std::chrono::milliseconds deferred_close_timeout;
 };
 
 using DeferredDeletableStreamPtr = std::unique_ptr<DeferredDeletableStream>;
@@ -175,10 +172,9 @@ public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
   ExternalProcessorStream* store(uint64_t stream_id, ExternalProcessorStreamPtr stream,
-                                 const ExtProcFilterStats& stat,
-                                 const std::chrono::milliseconds& timeout) {
+                                 const ExtProcFilterStats& stat) {
     stream_manager_[stream_id] =
-        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat, timeout);
+        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat);
     return stream_manager_[stream_id]->stream_.get();
   }
 
@@ -211,7 +207,6 @@ public:
 
   bool observabilityMode() const { return observability_mode_; }
 
-  const std::chrono::milliseconds& deferredCloseTimeout() const { return deferred_close_timeout_; }
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
@@ -275,7 +270,6 @@ private:
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
       route_cache_action_;
-  const std::chrono::milliseconds deferred_close_timeout_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
