@@ -87,7 +87,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       enable_dynamic_metadata_ingestion_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
-      filter_metadata_(config.filter_metadata()),
+      filter_metadata_(
+          config.has_filter_metadata() ? absl::optional(config.filter_metadata()) : absl::nullopt),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -379,9 +380,10 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+  if (config_->filterMetadata().has_value() &&
+      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
     filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                          std::make_shared<ExtAuthzLoggingInfo>(*config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::ReadOnly,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
   }

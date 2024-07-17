@@ -2964,6 +2964,7 @@ TEST_F(HttpFilterTest, LoggingInfoOK) {
   EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
 }
 
+// Test that if no filter metadata is configured, filter state is not added to stream info.
 TEST_F(HttpFilterTest, LoggingInfoEmpty) {
   InSequence s;
 
@@ -2990,10 +2991,7 @@ TEST_F(HttpFilterTest, LoggingInfoEmpty) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
-
-  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-  EXPECT_TRUE(logging_info->filterMetadata().fields().empty());
+  EXPECT_FALSE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 }
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP

@@ -150,7 +150,7 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
-  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
@@ -202,7 +202,7 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
-  const ProtobufWkt::Struct filter_metadata_;
+  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
