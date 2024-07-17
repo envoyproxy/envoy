@@ -15,7 +15,7 @@ public:
   static absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
          Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-         bool for_quic = false);
+         bool for_quic);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }

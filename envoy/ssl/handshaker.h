@@ -253,6 +253,8 @@ using TlsCertificateSelectorFactory = std::function<TlsCertificateSelectorPtr(
 class TlsCertificateSelectorConfigFactory : public Config::TypedFactory {
 public:
   /**
+   * @param for_quic true when in quic context, which does not support selecting certificate
+   * asynchronously.
    * @returns a factory to create a TlsCertificateSelector. Accepts the |config| and
    * |validation_visitor| for early validation. This virtual base doesn't
    * perform MessageUtil::downcastAndValidate, but an implementation should.
