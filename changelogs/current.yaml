@@ -134,6 +134,10 @@ minor_behavior_changes:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.refresh_rtt_after_request`` and legacy code path.
+- area: tcp
+  change: |
+    Added support for :ref:`connection_pool_per_downstream_connection
+    <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
 - area: http
   change: |
     Changing HTTP/2 semi-colon prefixed headers to being sanitized by Envoy code rather than nghttp2. Should be a functional no-op but
