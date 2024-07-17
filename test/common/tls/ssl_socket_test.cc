@@ -1700,7 +1700,6 @@ TEST_P(SslSocketTest, MultiCertWithFullScanDisabledOnSniMismatch) {
 // On SNI mismatch, full scan will be executed if it is enabled, validate that ECDSA cert is
 // preferred over RSA cert.
 TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
-  TestScopedRuntime scoped_runtime;
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     sni: "nomatch.example.com"
     common_tls_context:
