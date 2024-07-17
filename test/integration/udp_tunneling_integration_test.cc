@@ -8,6 +8,8 @@
 
 #include "source/common/stream_info/utility.h"
 
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 
@@ -356,6 +358,7 @@ public:
     std::string access_log_options_ = "";
     bool propagate_response_headers_ = false;
     bool propagate_response_trailers_ = false;
+    std::string session_filters_ = "";
   };
 
   void setup(const TestConfig& config) {
@@ -374,7 +377,7 @@ typed_config:
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
           cluster: cluster_0
-  session_filters:
+  session_filters:{}
   - name: http_capsule
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig
@@ -387,9 +390,9 @@ typed_config:
     propagate_response_headers: {}
     propagate_response_trailers: {}
 )EOF",
-                    config.proxy_host_, config.target_host_, config.default_target_port_,
-                    config.max_connect_attempts_, config.propagate_response_headers_,
-                    config.propagate_response_trailers_);
+                    config.session_filters_, config.proxy_host_, config.target_host_,
+                    config.default_target_port_, config.max_connect_attempts_,
+                    config.propagate_response_headers_, config.propagate_response_trailers_);
 
     if (config.buffer_options_.has_value()) {
       filter_config += fmt::format(R"EOF(
@@ -572,7 +575,7 @@ TEST_P(UdpTunnelingIntegrationTest, TwoConsecutiveDownstreamSessions) {
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
-TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
+TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutWithUpstreamConnectionAndResponseHeaders) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
@@ -608,6 +611,104 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeout) {
   test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
   ASSERT_TRUE(upstream_request_->waitForReset());
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  EXPECT_THAT(waitForAccessLog(access_log_filename),
+              testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
+}
+
+TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutWithUpstreamConnectionNoResponseHeaders) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          "0.5s",
+                          session_access_log_config};
+
+  setup(config);
+
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+
+  EXPECT_THAT(waitForAccessLog(access_log_filename),
+              testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
+}
+
+TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const std::string session_filters = R"EOF(
+  - name: drainer
+    typed_config:
+      '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionReadFilterConfig
+      downstream_bytes_to_drain: 0
+      stop_iteration_on_new_session: true
+      stop_iteration_on_first_read: true
+      continue_filter_chain: false
+)EOF";
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          "0.5s",
+                          session_access_log_config,
+                          "",
+                          false,
+                          false,
+                          session_filters};
+
+  setup(config);
+
+  // Drainer filter will stop the iteration until the session idle timeout, so no connection to
+  // upstream will be created.
+  client_->write("hello", *listener_address_);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+  test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
 
   EXPECT_THAT(waitForAccessLog(access_log_filename),
               testing::HasSubstr(StreamInfo::ResponseFlagUtils::STREAM_IDLE_TIMEOUT));
