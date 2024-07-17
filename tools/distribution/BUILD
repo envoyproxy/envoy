@@ -21,6 +21,7 @@ envoy_entry_point(
 
 envoy_entry_point(
     name = "verify",
+    deps = [requirement("typing-extensions")],
     pkg = "envoy.distribution.verify",
 )
 
