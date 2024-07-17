@@ -16,7 +16,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/clusters/common/logical_host.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -57,7 +56,7 @@ private:
     ResolveList& parent_; // TODO: probably don't need this
     Network::DnsResolverSharedPtr dns_resolver_;
     Network::DnsLookupFamily dns_lookup_family_;
-    const std::string dns_address_; // ResolveTarget needs to store its own copy
+    const std::string srv_record_hostname_; // ResolveTarget needs to store its own copy
     const uint32_t dns_port_;
     std::list<Network::Address::InstanceConstSharedPtr> resolved_targets_;
     Network::DnsResolver::ResolutionStatus resolve_status_;
@@ -96,14 +95,7 @@ private:
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   const bool respect_dns_ttl_;
   Event::TimerPtr resolve_timer_;
-  Event::Dispatcher& event_dispatcher_;
-  std::string dns_address_;
-  uint32_t dns_port_;
-  Network::Address::InstanceConstSharedPtr current_resolved_address_;
-  std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
-  LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
-  // const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoints_;
   envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig dns_srv_cluster_;
