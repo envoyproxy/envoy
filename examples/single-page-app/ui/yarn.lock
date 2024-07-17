@@ -1444,10 +1444,10 @@
   resolved "https://registry.yarnpkg.com/@popperjs/core/-/core-2.11.8.tgz#6b79032e760a0899cd4204710beede972a3a185f"
   integrity sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==
 
-"@remix-run/router@1.17.1":
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/@remix-run/router/-/router-1.17.1.tgz#bf93997beb81863fde042ebd05013a2618471362"
-  integrity sha512-mCOMec4BKd6BRGBZeSnGiIgwsbLGp3yhVqAD8H+PxiRNEHgDpZb8J1TnrSDlg97t0ySKMQJTHCWBCmBpSmkF6Q==
+"@remix-run/router@1.18.0":
+  version "1.18.0"
+  resolved "https://registry.yarnpkg.com/@remix-run/router/-/router-1.18.0.tgz#20b033d1f542a100c1d57cfd18ecf442d1784732"
+  integrity sha512-L3jkqmqoSVBVKHfpGZmLrex0lxR5SucGA0sUfFzGctehw+S/ggL9L/0NnC5mw6P8HUWpFZ3nQw3cRApjjWx9Sw==
 
 "@rollup/rollup-android-arm-eabi@4.13.1":
   version "4.13.1"
@@ -2734,10 +2734,10 @@ for-each@^0.3.3:
   dependencies:
     is-callable "^1.1.3"
 
-framer-motion@^11.3.2:
-  version "11.3.2"
-  resolved "https://registry.yarnpkg.com/framer-motion/-/framer-motion-11.3.2.tgz#e55ed51af37f0f561ab8e4a2c9e8e7eee6fb5abc"
-  integrity sha512-RgjSzrNFZmedWcvmW4MMc84A7UcoY37jocadE3Mbg3o+UMofodfyeNnYD/HR15UhP22/bb5KOebNhYOj4mYkpQ==
+framer-motion@^11.3.4:
+  version "11.3.4"
+  resolved "https://registry.yarnpkg.com/framer-motion/-/framer-motion-11.3.4.tgz#f32c30610a4b45fe69ac99feb79b46ac8ca320bc"
+  integrity sha512-LC+luwNmz4zEg0AU0rol3yLUFKSJ9GDmIyvigXBAwEbUBG59EWmcRQ2Xh+0py7IkmvWxFUH0TN42v1Dda8xgUg==
   dependencies:
     tslib "^2.4.0"
 
@@ -3692,20 +3692,20 @@ react-remove-scroll@^2.5.6:
     use-callback-ref "^1.3.0"
     use-sidecar "^1.1.2"
 
-react-router-dom@^6.24.1:
-  version "6.24.1"
-  resolved "https://registry.yarnpkg.com/react-router-dom/-/react-router-dom-6.24.1.tgz#b1a22f7d6c5a1bfce30732bd370713f991ab4de4"
-  integrity sha512-U19KtXqooqw967Vw0Qcn5cOvrX5Ejo9ORmOtJMzYWtCT4/WOfFLIZGGsVLxcd9UkBO0mSTZtXqhZBsWlHr7+Sg==
+react-router-dom@^6.25.0:
+  version "6.25.0"
+  resolved "https://registry.yarnpkg.com/react-router-dom/-/react-router-dom-6.25.0.tgz#f46f98553e1b4b3bcd2e4bb1021e9144b02671bf"
+  integrity sha512-BhcczgDWWgvGZxjDDGuGHrA8HrsSudilqTaRSBYLWDayvo1ClchNIDVt5rldqp6e7Dro5dEFx9Mzc+r292lN0w==
   dependencies:
-    "@remix-run/router" "1.17.1"
-    react-router "6.24.1"
+    "@remix-run/router" "1.18.0"
+    react-router "6.25.0"
 
-react-router@6.24.1:
-  version "6.24.1"
-  resolved "https://registry.yarnpkg.com/react-router/-/react-router-6.24.1.tgz#5a3bbba0000afba68d42915456ca4c806f37a7de"
-  integrity sha512-PTXFXGK2pyXpHzVo3rR9H7ip4lSPZZc0bHG5CARmj65fTT6qG7sTngmb6lcYu1gf3y/8KxORoy9yn59pGpCnpg==
+react-router@6.25.0:
+  version "6.25.0"
+  resolved "https://registry.yarnpkg.com/react-router/-/react-router-6.25.0.tgz#24f72cdf3bcc9be0f60b95af6cd88950c3d246e4"
+  integrity sha512-bziKjCcDbcxgWS9WlWFcQIVZ2vJHnCP6DGpQDT0l+0PFDasfJKgzf9CM22eTyhFsZkjk8ApCdKjJwKtzqH80jQ==
   dependencies:
-    "@remix-run/router" "1.17.1"
+    "@remix-run/router" "1.18.0"
 
 react-style-singleton@^2.2.1:
   version "2.2.1"
@@ -4288,10 +4288,10 @@ use-sidecar@^1.1.2:
     detect-node-es "^1.1.0"
     tslib "^2.0.0"
 
-vite@^5.3.3:
-  version "5.3.3"
-  resolved "https://registry.yarnpkg.com/vite/-/vite-5.3.3.tgz#5265b1f0a825b3b6564c2d07524777c83e3c04c2"
-  integrity sha512-NPQdeCU0Dv2z5fu+ULotpuq5yfCS1BzKUIPhNbP3YBfAMGJXbt2nS+sbTFu+qchaqWTD+H3JK++nRwr6XIcp6A==
+vite@^5.3.4:
+  version "5.3.4"
+  resolved "https://registry.yarnpkg.com/vite/-/vite-5.3.4.tgz#b36ebd47c8a5e3a8727046375d5f10bf9fdf8715"
+  integrity sha512-Cw+7zL3ZG9/NZBB8C+8QbQZmR54GwqIz+WMI4b3JgdYJvX+ny9AjJXqkGQlDXSXRP9rP0B4tbciRMOVEKulVOA==
   dependencies:
     esbuild "^0.21.3"
     postcss "^8.4.39"

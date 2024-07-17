@@ -14,11 +14,11 @@
     "@chakra-ui/react": "^2.8.2",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
-    "framer-motion": "^11.3.2",
+    "framer-motion": "^11.3.4",
     "mdi-react": "^9.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.24.1"
+    "react-router-dom": "^6.25.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
@@ -35,6 +35,6 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.8",
     "typescript": "*",
-    "vite": "^5.3.3"
+    "vite": "^5.3.4"
   }
 }

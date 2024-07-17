@@ -217,6 +217,11 @@ public:
   virtual void onStreamFailure(ConnectionPool::PoolFailureReason reason,
                                absl::string_view failure_reason,
                                Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Called to reset the idle timer.
+   */
+  virtual void resetIdleTimer() PURE;
 };
 
 /**
@@ -378,6 +383,12 @@ public:
    * @param callbacks callbacks to communicate stream failure or creation on.
    */
   virtual void newStream(HttpStreamCallbacks& callbacks) PURE;
+
+  /**
+   * Called when an event is received on the downstream session.
+   * @param event supplies the event which occurred.
+   */
+  virtual void onDownstreamEvent(Network::ConnectionEvent event) PURE;
 };
 
 using TunnelingConnectionPoolPtr = std::unique_ptr<TunnelingConnectionPool>;
@@ -397,6 +408,12 @@ public:
   ~TunnelingConnectionPoolImpl() override = default;
 
   bool valid() const { return conn_pool_data_.has_value(); }
+
+  void onDownstreamEvent(Network::ConnectionEvent event) override {
+    if (upstream_) {
+      upstream_->onDownstreamEvent(event);
+    }
+  }
 
   // TunnelingConnectionPool
   void newStream(HttpStreamCallbacks& callbacks) override;
@@ -699,6 +716,8 @@ private:
 
     void onStreamFailure(ConnectionPool::PoolFailureReason, absl::string_view,
                          Upstream::HostDescriptionConstSharedPtr) override;
+
+    void resetIdleTimer() override { ActiveSession::resetIdleTimer(); }
 
   private:
     using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;

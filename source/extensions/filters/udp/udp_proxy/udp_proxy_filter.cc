@@ -795,14 +795,14 @@ void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_down
 
   request_encoder_ = nullptr;
 
-  // If we did not receive a valid CONNECT response yet we treat this as a pool
-  // failure, otherwise we forward the event downstream.
-  if (tunnel_creation_callbacks_.has_value()) {
-    tunnel_creation_callbacks_.value().get().onStreamFailure();
-    return;
-  }
-
   if (!by_downstream) {
+    // If we did not receive a valid CONNECT response yet we treat this as a pool
+    // failure, otherwise we forward the event downstream.
+    if (tunnel_creation_callbacks_.has_value()) {
+      tunnel_creation_callbacks_.value().get().onStreamFailure();
+      return;
+    }
+
     upstream_callbacks_.onUpstreamEvent(event);
   }
 }
@@ -840,9 +840,11 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
                                                 absl::string_view failure_reason,
                                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  callbacks_->onStreamFailure(reason, failure_reason, host);
+  // Writing to downstream_info_ before calling onStreamFailure, as the session could be potentially
+  // removed by onStreamFailure, which will cause downstream_info_ to be freed.
   downstream_info_.upstreamInfo()->setUpstreamHost(host);
   downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
+  callbacks_->onStreamFailure(reason, failure_reason, host);
 }
 
 void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -861,6 +863,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
+  callbacks_->resetIdleTimer();
 
   if (flush_access_log_on_tunnel_connected_) {
     const Formatter::HttpFormatterContext log_context{
@@ -1084,7 +1087,13 @@ void UdpProxyFilter::TunnelingActiveSession::onIdleTimer() {
             addresses_.local_->asStringView());
   udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   cluster_.filter_.config_->stats().idle_timeout_.inc();
-  upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+
+  if (upstream_) {
+    upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+  } else if (conn_pool_) {
+    conn_pool_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+  }
+
   cluster_.removeSession(this);
 }
 

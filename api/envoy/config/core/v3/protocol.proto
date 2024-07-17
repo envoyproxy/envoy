@@ -125,10 +125,10 @@ message UpstreamHttpProtocolOptions {
   bool auto_sni = 1;
 
   // Automatic validate upstream presented certificate for new upstream connections based on the
-  // server name derived via one of the auto SNI mechanisms.
-  // This field is intended to be set with one of ``auto_sni`` or ``auto_sni_from_upstream`` fields.
-  // Does nothing if a filter before the http router filter sets the corresponding metadata and if server name
-  // is derived from a downstream header (when only ``auto_sni`` field is set).
+  // downstream HTTP host/authority header or any other arbitrary header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
+  // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
+  // This field is intended to be set with ``auto_sni`` field.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
   bool auto_san_validation = 2;
 
   // An optional alternative to the host/authority header to be used for setting the SNI value.
@@ -141,10 +141,6 @@ message UpstreamHttpProtocolOptions {
   // Does nothing if a filter before the http router filter sets the corresponding metadata.
   string override_auto_sni_header = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
-
-  // Alternative mechanism for derivation of the SNI value. It uses endpoint's :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` as the value, if ``hostname`` is set.
-  // If set, takes precedence over ``auto_sni``.
-  bool auto_sni_from_upstream = 4;
 }
 
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
