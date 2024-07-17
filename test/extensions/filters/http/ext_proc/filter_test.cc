@@ -4264,7 +4264,9 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
     envoy_grpc:
       cluster_name: "ext_proc_server"
   )EOF");
-  HttpConnectionManagerImplMixin::setup(false, "fake-server");
+  Envoy::Http::SetupOpts setup_opts;
+  setup_opts.server_name = "fake-server";
+  HttpConnectionManagerImplMixin::setup(setup_opts);
   HttpConnectionManagerImplMixin::initial_buffer_limit_ = 10;
   HttpConnectionManagerImplMixin::setUpBufferLimits();
 
@@ -4355,7 +4357,9 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
     response_trailer_mode: "SKIP"
 
   )EOF");
-  HttpConnectionManagerImplMixin::setup(false, "fake-server");
+  Envoy::Http::SetupOpts setup_opts;
+  setup_opts.server_name = "fake-server";
+  HttpConnectionManagerImplMixin::setup(setup_opts);
   HttpConnectionManagerImplMixin::initial_buffer_limit_ = 10;
   HttpConnectionManagerImplMixin::setUpBufferLimits();
 
