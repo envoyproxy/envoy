@@ -417,8 +417,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name,
-                                            DnsLookupFamily dns_lookup_family,
-                                            ResolveCb callback) {
+                                            DnsLookupFamily dns_lookup_family, ResolveCb callback) {
 
   std::unique_ptr<PendingSrvResolution> pending_srv_res(new PendingSrvResolution(
       callback, dispatcher_, channel_, dns_name, dns_lookup_family, *this));
@@ -587,8 +586,7 @@ void DnsResolverImpl::PendingSrvResolution::startResolution() {
       this);
 }
 
-void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status,
-                                                                   int timeouts,
+void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, int timeouts,
                                                                    unsigned char* buf, int len) {
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);

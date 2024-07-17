@@ -38,8 +38,7 @@ DnsSrvCluster::DnsSrvCluster(
       respect_dns_ttl_(cluster.respect_dns_ttl()), // TODO: use me
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
-      local_info_(context.serverFactoryContext().localInfo()),
-      dns_srv_cluster_(dns_srv_cluster) {
+      local_info_(context.serverFactoryContext().localInfo()), dns_srv_cluster_(dns_srv_cluster) {
 
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
@@ -73,8 +72,7 @@ void DnsSrvCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolveSrv(
       dns_srv_cluster_.srv_names()[0].srv_name(), dns_lookup_family_,
-      [this](Network::DnsResolver::ResolutionStatus status,
-             absl::string_view details,
+      [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
 
@@ -155,7 +153,8 @@ void DnsSrvCluster::allTargetsResolved() {
     HostVector hosts_removed;
     HostVector hosts_;
 
-    if (updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, all_hosts_, all_new_hosts)) {
+    if (updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, all_hosts_,
+                              all_new_hosts)) {
       // Update host map for current resolve target.
       for (const auto& host : hosts_removed) {
         all_hosts_.erase(host->address()->asString());
@@ -170,9 +169,9 @@ void DnsSrvCluster::allTargetsResolved() {
           load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
       priority_state_manager.updateClusterPrioritySet(
-          current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
-          hosts_added, hosts_removed, absl::nullopt, weighted_priority_health_,
-          overprovisioning_factor_);
+          current_priority,
+          std::move(priority_state_manager.priorityState()[current_priority].first), hosts_added,
+          hosts_removed, absl::nullopt, weighted_priority_health_, overprovisioning_factor_);
     } else {
       info_->configUpdateStats().update_no_rebuild_.inc();
     }
@@ -244,8 +243,8 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
       srv_record_hostname_, dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
-        ENVOY_LOG(debug, "Resolved target '{}', details: {}, status: {}", srv_record_hostname_, details,
-                  static_cast<int>(status));
+        ENVOY_LOG(debug, "Resolved target '{}', details: {}, status: {}", srv_record_hostname_,
+                  details, static_cast<int>(status));
 
         active_dns_query_ = nullptr;
 
