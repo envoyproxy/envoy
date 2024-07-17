@@ -179,10 +179,7 @@ public:
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
 
-  const std::unique_ptr<ExtMonitorsSet>& getExtensionMonitors() const { return monitors_set_; }
-  void setExtensionsMonitors(std::unique_ptr<ExtMonitorsSet>&& monitors_set) {
-    monitors_set_ = std::move(monitors_set);
-  }
+  ExtMonitorsSet& getExtensionMonitors() { return monitors_set_; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -219,7 +216,7 @@ private:
       put_result_func_;
 
   // Set of extension monitors.
-  std::unique_ptr<ExtMonitorsSet> monitors_set_;
+  ExtMonitorsSet monitors_set_;
   // The following fields are reported when extension monitor is "tripped" and
   // reports that a host where the extension monitor was attached should be
   // ejected.
@@ -340,7 +337,8 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
-  std::unique_ptr<ExtMonitorsSet> createMonitorExtensions(
+  void createMonitorExtensions(
+      ExtMonitorsSet& ext_set,
       std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback);
 
 private:
@@ -393,7 +391,7 @@ private:
 
   // Set of functions creating extensions. They are called when a new host is created and needs
   // outlier detection monitors. Monitors configs are validated when this set is created.
-  absl::InlinedVector<ExtMonitorCreateFn, 3> monitors_create_fn;
+  absl::InlinedVector<ExtMonitorCreateFn, 3> monitor_create_fns_;
 };
 
 /**

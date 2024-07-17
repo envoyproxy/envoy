@@ -94,13 +94,14 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_gateway_failure_ = 0;
   }
 
-  if (getExtensionMonitors() == nullptr) {
+  if (monitors_set_.empty()) {
     return;
   }
   // Wrap reported HTTP code into outlier detection extension's wrapper and forward
   // it to configured extensions.
-  getExtensionMonitors()->for_each(
-      [response_code](ExtMonitorPtr& monitor) { monitor->reportResult(HttpCode(response_code)); });
+  monitors_set_.forEach([response_code](const ExtMonitorPtr& monitor) {
+    monitor->reportResult(HttpCode(response_code));
+  });
 }
 std::function<void(uint32_t, std::string, absl::optional<std::string>)>
 DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
@@ -205,15 +206,15 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   put_result_func_(this, result, code);
 
   // Call extensions
-  if (getExtensionMonitors() == nullptr) {
+  if (monitors_set_.empty()) {
     return;
   }
 
   // Pass the local origin event to all registered extension monitors.
   // Only monitors "interested" in local origin event will process the result.
   // Those not "interested" will ignore the call.
-  getExtensionMonitors()->for_each(
-      [result](ExtMonitorPtr& monitor) { monitor->reportResult(LocalOriginEvent(result)); });
+  monitors_set_.forEach(
+      [result](const ExtMonitorPtr& monitor) { monitor->reportResult(LocalOriginEvent(result)); });
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
@@ -316,23 +317,22 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
         Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor, factory);
     auto extension_create_fn =
         factory.createMonitor(monitor_config.name(), std::move(config), context);
-    monitors_create_fn.push_back(extension_create_fn);
+    monitor_create_fns_.push_back(extension_create_fn);
   }
 }
 
-std::unique_ptr<ExtMonitorsSet> DetectorConfig::createMonitorExtensions(
+void DetectorConfig::createMonitorExtensions(
+    ExtMonitorsSet& ext_set,
     std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
-  auto monitors_set = std::make_unique<ExtMonitorsSet>();
 
   // Create each extension by calling a callback function created by factory when the
   // config was evaluated.
-  for (const auto& create_fn : monitors_create_fn) {
+  for (const auto& create_fn : monitor_create_fns_) {
     auto extension = create_fn();
+    ASSERT(extension != nullptr);
     extension->setCallback(callback);
-    monitors_set->addMonitor(std::move(extension));
+    ext_set.addMonitor(std::move(extension));
   }
-
-  return monitors_set;
 }
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
@@ -422,8 +422,8 @@ void DetectorImpl::addHostMonitor(HostSharedPtr host) {
   ASSERT(host_monitors_.count(host) == 0);
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
 
-  monitor->setExtensionsMonitors(
-      config_.createMonitorExtensions(monitor->getOnFailedExtensioMonitorCallback()));
+  config_.createMonitorExtensions(monitor->getExtensionMonitors(),
+                                  monitor->getOnFailedExtensioMonitorCallback());
 
   host_monitors_[host] = monitor;
   host->setOutlierDetector(DetectorHostMonitorPtr{monitor});
@@ -462,10 +462,8 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   host_monitors_[host]->resetConsecutiveLocalOriginFailure();
   host_monitors_[host]->uneject(time_source_.monotonicTime());
 
-  if (host_monitors_[host]->getExtensionMonitors() != nullptr) {
-    host_monitors_[host]->getExtensionMonitors()->for_each(
-        [](ExtMonitorPtr& monitor) { monitor->reset(); });
-  }
+  host_monitors_[host]->getExtensionMonitors().forEach(
+      [](const ExtMonitorPtr& monitor) { monitor->reset(); });
 
   runCallbacks(host);
 

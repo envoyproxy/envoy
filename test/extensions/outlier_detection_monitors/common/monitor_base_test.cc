@@ -11,9 +11,6 @@ namespace Outlier {
 
 using namespace testing;
 
-// Outlier detection result used only for tests.
-// class ResultForTest : public TypedExtResult<Upstream::Outlier::ExtResultType::TEST> {};
-
 // HTTP codes
 TEST(MonitorBaseTest, HTTPCodeError) {
   HttpCode http(200);

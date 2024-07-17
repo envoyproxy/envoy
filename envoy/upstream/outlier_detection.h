@@ -130,11 +130,12 @@ using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
 class ExtMonitorsSet {
 public:
   void addMonitor(ExtMonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
-  void for_each(std::function<void(ExtMonitorPtr&)> f) {
+  template <class CALLABLE> void forEach(const CALLABLE& f) const {
     for (auto& monitor : monitors_) {
       f(monitor);
     }
   }
+  bool empty() const { return monitors_.empty(); }
 
 private:
   absl::InlinedVector<ExtMonitorPtr, 3> monitors_;
@@ -203,19 +204,20 @@ public:
    */
   virtual double successRate(SuccessRateMonitorType type) const PURE;
 
-  /* Returns name of failed extension monitor.
-     Returns empty string if failure was not in extensions.
+  /**
+     @return name of failed extension monitor or empty string if failure was not in extensions.
   */
   virtual std::string getFailedExtensionMonitorName() const PURE;
 
-  /* Returns extra info which extension monitor wants to add to
-     event logger.
-     Returns empty string if failure was not in extensions.
+  /**
+     @return extra info which extension monitor wants to add to event logger
+             or empty string if failure was not in extensions.
   */
   virtual std::string getFailedExtensionMonitorExtraInfo() const PURE;
 
-  /* Returns ejection enforcing parameter configured in extension
-     monitor which failed.
+  /**
+     @return ejection enforcing parameter configured in extension
+              monitor which failed.
   */
   virtual uint32_t getFailedExtensionMonitorEnforce() const PURE;
 };
