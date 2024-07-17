@@ -55,17 +55,17 @@ public:
 
 class ExtMonitorBase : public ExtMonitor {
 public:
-  ExtMonitorBase(const std::string& name, uint32_t enforce) : ExtMonitor(name, enforce) {}
+  ExtMonitorBase(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() {}
   void reportResult(const ExtResult&) override;
 
-  void
-  setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
+  void setCallback(
+      std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) override {
     callback_ = callback;
   }
 
-  void reset() { onReset(); }
+  void reset() override { onReset(); }
   std::string name() const { return name_; }
 
   void processBucketsConfig(
@@ -73,6 +73,14 @@ public:
   void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
 protected:
+  virtual bool onError() PURE;
+  virtual void onSuccess() PURE;
+  virtual void onReset() PURE;
+  virtual std::string getFailedExtraInfo() { return ""; }
+
+  std::string name_;
+  uint32_t enforce_{100};
+  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
   std::vector<ErrorsBucketPtr> buckets_;
 };
 

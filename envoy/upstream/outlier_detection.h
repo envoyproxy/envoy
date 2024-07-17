@@ -97,32 +97,17 @@ private:
   Result result_;
 };
 
-// Base class for various types of monitors.
+// Base class defining api for various types of monitors.
 // Each monitor may implement different health detection algorithm.
 class ExtMonitor {
 public:
-  ExtMonitor(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
-  ExtMonitor() = delete;
   virtual ~ExtMonitor() {}
+
+  // Method to report a result to extensions.
   virtual void reportResult(const ExtResult&) PURE;
-
-  void
-  setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
-    callback_ = callback;
-  }
-
-  void reset() { onReset(); }
-  std::string name() const { return name_; }
-
-protected:
-  virtual bool onError() PURE;
-  virtual void onSuccess() PURE;
-  virtual void onReset() PURE;
-  virtual std::string getFailedExtraInfo() { return ""; }
-
-  std::string name_;
-  uint32_t enforce_{100};
-  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
+  virtual void
+      setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)>) PURE;
+  virtual void reset() PURE;
 };
 
 using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
