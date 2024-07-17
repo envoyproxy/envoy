@@ -2044,8 +2044,8 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   EXPECT_FALSE(valid_pool == nullptr);
 
   EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  auto invalid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_,
-                                             stream_info_);
+  auto invalid_pool =
+      factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
 }
 
