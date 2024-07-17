@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510a9d74bb5ec535b33 as websocket-base
+FROM debian:bookworm-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510a9d74bb5ec535b33 AS websocket-base
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -10,7 +10,7 @@ RUN wget -qO /usr/local/bin/websocat https://github.com/vi/websocat/releases/dow
 ENTRYPOINT ["websocat"]
 
 
-FROM websocket-base as websocket-client
+FROM websocket-base AS websocket-client
 ENV DEBIAN_FRONTEND=noninteractive
 ADD interact.sh /interact.sh
 RUN chmod +x /interact.sh
