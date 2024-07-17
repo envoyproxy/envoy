@@ -38,7 +38,7 @@ pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7,<7.4
+sphinx>=7,<7.5
 sphinxcontrib-applehelp>=1.0.8
 sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics
