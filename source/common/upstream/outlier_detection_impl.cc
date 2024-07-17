@@ -100,7 +100,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   // Wrap reported HTTP code into outlier detection extension's wrapper and forward
   // it to configured extensions.
   monitors_set_.forEach([response_code](const ExtMonitorPtr& monitor) {
-    monitor->reportResult(HttpCode(response_code));
+    monitor->putResult(HttpCode(response_code));
   });
 }
 std::function<void(uint32_t, std::string, absl::optional<std::string>)>
@@ -214,7 +214,7 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   // Only monitors "interested" in local origin event will process the result.
   // Those not "interested" will ignore the call.
   monitors_set_.forEach(
-      [result](const ExtMonitorPtr& monitor) { monitor->reportResult(LocalOriginEvent(result)); });
+      [result](const ExtMonitorPtr& monitor) { monitor->putResult(LocalOriginEvent(result)); });
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
@@ -330,7 +330,7 @@ void DetectorConfig::createMonitorExtensions(
   for (const auto& create_fn : monitor_create_fns_) {
     auto extension = create_fn();
     ASSERT(extension != nullptr);
-    extension->setCallback(callback);
+    extension->setExtMonitorCallback(callback);
     ext_set.addMonitor(std::move(extension));
   }
 }

@@ -58,9 +58,9 @@ public:
   ExtMonitorBase(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() {}
-  void reportResult(const ExtResult&) override;
+  void putResult(const ExtResult&) override;
 
-  void setCallback(
+  void setExtMonitorCallback(
       std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) override {
     callback_ = callback;
   }

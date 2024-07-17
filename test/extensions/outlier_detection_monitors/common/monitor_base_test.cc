@@ -105,7 +105,7 @@ protected:
   std::unique_ptr<MockMonitor> monitor_;
 };
 
-TEST_F(MonitorTest, NoBuckets) { monitor_->reportResult(HttpCode(200)); }
+TEST_F(MonitorTest, NoBuckets) { monitor_->putResult(HttpCode(200)); }
 
 TEST_F(MonitorTest, SingleBucketNotMatchingType) {
   addBucket1();
@@ -117,7 +117,7 @@ TEST_F(MonitorTest, SingleBucketNotMatchingType) {
 
   // Monitor is interested only in Results of ExtResultType::TEST
   // type and here ExtResultType::LOCAL_ORIGIN is sent.
-  monitor_->reportResult(LocalOriginEvent(Result::ExtOriginRequestSuccess));
+  monitor_->putResult(LocalOriginEvent(Result::ExtOriginRequestSuccess));
 }
 
 // Type of the reported "result" matches the type of the
@@ -131,13 +131,14 @@ TEST_F(MonitorTest, SingleBucketNotMatchingResult) {
   // implementation of the monitor, it may decrease or reset internal
   // monitor's counters.
   bool callback_called = false;
-  monitor_->setCallback([&callback_called](uint32_t, std::string, absl::optional<std::string>) {
-    callback_called = true;
-  });
+  monitor_->setExtMonitorCallback(
+      [&callback_called](uint32_t, std::string, absl::optional<std::string>) {
+        callback_called = true;
+      });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*monitor_, onSuccess);
 
-  monitor_->reportResult(HttpCode(200));
+  monitor_->putResult(HttpCode(200));
 
   ASSERT_FALSE(callback_called);
 }
@@ -150,14 +151,15 @@ TEST_F(MonitorTest, SingleBucketMatchingResultNotTripped) {
   // implementation of the monitor, it may increase internal
   // monitor's counters and "trip" the monitor.
   bool callback_called = false;
-  monitor_->setCallback([&callback_called](uint32_t, std::string, absl::optional<std::string>) {
-    callback_called = true;
-  });
+  monitor_->setExtMonitorCallback(
+      [&callback_called](uint32_t, std::string, absl::optional<std::string>) {
+        callback_called = true;
+      });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has not been tripped.
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
 
-  monitor_->reportResult(HttpCode(200));
+  monitor_->putResult(HttpCode(200));
 
   // Callback has not been called, because onError returned false,
   // meaning that monitor has not tripped yet.
@@ -172,7 +174,7 @@ TEST_F(MonitorTest, SingleBucketMatchingResultTripped) {
   // implementation of the monitor, it may increase internal
   // monitor's counters and "trip" the monitor.
   bool callback_called = false;
-  monitor_->setCallback(
+  monitor_->setExtMonitorCallback(
       [&callback_called](uint32_t enforcing, std::string name, absl::optional<std::string>) {
         callback_called = true;
         ASSERT_EQ(name, monitor_name_);
@@ -184,7 +186,7 @@ TEST_F(MonitorTest, SingleBucketMatchingResultTripped) {
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
-  monitor_->reportResult(HttpCode(200));
+  monitor_->putResult(HttpCode(200));
 
   // Callback has been called, because onError returned true,
   // meaning that monitor has tripped.
@@ -199,7 +201,7 @@ TEST_F(MonitorTest, TwoBucketsNotMatching) {
   EXPECT_CALL(*bucket2_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*monitor_, onSuccess);
 
-  monitor_->reportResult(HttpCode(200));
+  monitor_->putResult(HttpCode(200));
 }
 
 TEST_F(MonitorTest, TwoBucketsFirstMatching) {
@@ -211,7 +213,7 @@ TEST_F(MonitorTest, TwoBucketsFirstMatching) {
   EXPECT_CALL(*bucket2_, match(_)).Times(0);
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
 
-  monitor_->reportResult(HttpCode(200));
+  monitor_->putResult(HttpCode(200));
 }
 
 TEST_F(MonitorTest, TwoBucketsSecondMatching) {
@@ -219,7 +221,7 @@ TEST_F(MonitorTest, TwoBucketsSecondMatching) {
   addBucket2();
 
   bool callback_called = false;
-  monitor_->setCallback(
+  monitor_->setExtMonitorCallback(
       [&callback_called](uint32_t enforcing, std::string name, absl::optional<std::string>) {
         callback_called = true;
         ASSERT_EQ(name, monitor_name_);
@@ -231,7 +233,7 @@ TEST_F(MonitorTest, TwoBucketsSecondMatching) {
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
-  monitor_->reportResult(HttpCode(200));
+  monitor_->putResult(HttpCode(200));
 
   // Callback has been called, because onError returned true,
   // meaning that monitor has tripped.

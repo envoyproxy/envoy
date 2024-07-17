@@ -104,9 +104,9 @@ public:
   virtual ~ExtMonitor() {}
 
   // Method to report a result to extensions.
-  virtual void reportResult(const ExtResult&) PURE;
-  virtual void
-      setCallback(std::function<void(uint32_t, std::string, absl::optional<std::string>)>) PURE;
+  virtual void putResult(const ExtResult&) PURE;
+  virtual void setExtMonitorCallback(
+      std::function<void(uint32_t, std::string, absl::optional<std::string>)>) PURE;
   virtual void reset() PURE;
 };
 
