@@ -79,7 +79,8 @@ private:
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
 
-  SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
+  absl::StatusOr<SessionContextID>
+  generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
@@ -89,7 +90,7 @@ private:
 class ServerContextFactoryImpl : public ServerContextFactory {
 public:
   std::string name() const override { return "envoy.ssl.server_context_factory.default"; }
-  Ssl::ServerContextSharedPtr
+  absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                       const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,

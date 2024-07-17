@@ -15,7 +15,7 @@ envoy_cc_test(
     ],
     deps = [
         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
-        "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
+        "//contrib/generic_proxy/filters/network/test/mocks:codec_mocks",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
