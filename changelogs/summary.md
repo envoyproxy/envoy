@@ -1,7 +1,7 @@
 **Summary of changes**:
 
 * Added new `access_log` command operators to retrieve upstream connection information.
-* Enhanced ext_authz to be configured to to ignore dynamic metadata in ext_authz responses.
+* Enhanced ext_authz to be configured to ignore dynamic metadata in ext_authz responses.
 * Ext_authz: added a block list for headers that should never be send to the external auth service.
 * Ext_authz: added the ability to configure what decoder header mutations are allowed from the ext_authz with the option to fail if disallowed mutations are requested.
 * Ext_proc support for observability mode which is "Send and Go" mode that can be used by external processor to observe Envoy data and status.
