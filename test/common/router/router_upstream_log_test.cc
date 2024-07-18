@@ -88,10 +88,11 @@ public:
             bool enable_periodic_upstream_log = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
+    static const std::string observability_name = "cluster-0";
 
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
-    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
+    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(observability_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
     callbacks_.stream_info_.downstream_bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
@@ -432,6 +433,27 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  run();
+
+  EXPECT_EQ(output_.size(), 1U);
+  EXPECT_EQ(output_.front(), "cluster-0");
+}
+
+// Test RAW_UPSTREAM_CLUSTER log formatter.
+TEST_F(RouterUpstreamLogTest, RawUpstreamCluster) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%RAW_UPSTREAM_CLUSTER%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
   init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run();
 
