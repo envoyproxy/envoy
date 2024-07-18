@@ -89,3 +89,7 @@ email to acknowledge your report, and we'll send an additional email when we've 
 positively or negatively.
 
 For further details please see our complete [security release process](SECURITY.md).
+
+## Releases
+
+For further details please see our [release process](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md).
