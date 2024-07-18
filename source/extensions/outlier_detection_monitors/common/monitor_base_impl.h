@@ -18,14 +18,16 @@ using namespace Envoy::Upstream::Outlier;
 // "catch" reported Error (TypedError);
 class ErrorsBucket {
 public:
-  virtual bool matchType(const ExtResult&) PURE;
+  virtual bool matchType(const ExtResult&) const PURE;
   virtual bool match(const ExtResult&) const PURE;
   virtual ~ErrorsBucket() {}
 };
 
-template <Upstream::Outlier::ExtResultType E> class TypedErrorsBucket : public ErrorsBucket {
+template <class E> class TypedErrorsBucket : public ErrorsBucket {
 public:
-  bool matchType(const ExtResult& result) override { return (result.type() == E); }
+  bool matchType(const ExtResult& result) const override {
+    return absl::holds_alternative<E>(result);
+  }
 
   virtual ~TypedErrorsBucket() {}
 };
@@ -33,7 +35,7 @@ public:
 using ErrorsBucketPtr = std::unique_ptr<ErrorsBucket>;
 
 // Class defines a range of consecutive HTTP codes.
-class HTTPCodesBucket : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::HTTP_CODE> {
+class HTTPCodesBucket : public TypedErrorsBucket<Upstream::Outlier::HttpCode> {
 public:
   HTTPCodesBucket() = delete;
   HTTPCodesBucket(uint64_t start, uint64_t end) : start_(start), end_(end) {}
@@ -46,8 +48,7 @@ private:
 };
 
 // Class defines a "bucket" which catches LocalOriginEvent.
-class LocalOriginEventsBucket
-    : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::LOCAL_ORIGIN> {
+class LocalOriginEventsBucket : public TypedErrorsBucket<Upstream::Outlier::LocalOriginEvent> {
 public:
   LocalOriginEventsBucket() = default;
   bool match(const ExtResult&) const override;

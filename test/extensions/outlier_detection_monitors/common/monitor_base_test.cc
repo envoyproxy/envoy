@@ -16,7 +16,6 @@ TEST(MonitorBaseTest, HTTPCodeError) {
   HttpCode http(200);
 
   ASSERT_EQ(200, http.code());
-  ASSERT_EQ(Upstream::Outlier::ExtResultType::HTTP_CODE, http.type());
 }
 
 TEST(MonitorBaseTest, HTTPCodeErrorBucket) {
@@ -37,7 +36,6 @@ TEST(MonitorBaseTest, HTTPCodeErrorBucket) {
 TEST(MonitorBaseTest, LocalOriginError) {
   LocalOriginEvent local_origin_event(Result::ExtOriginRequestSuccess);
   ASSERT_EQ(local_origin_event.result(), Result::ExtOriginRequestSuccess);
-  ASSERT_EQ(Upstream::Outlier::ExtResultType::LOCAL_ORIGIN, local_origin_event.type());
 }
 
 TEST(MonitorBaseTest, LocalOriginErrorBucket) {
@@ -67,7 +65,7 @@ public:
   MOCK_METHOD(void, onReset, ());
 };
 
-class TestBucket : public TypedErrorsBucket<Upstream::Outlier::ExtResultType::HTTP_CODE> {
+class TestBucket : public TypedErrorsBucket<Upstream::Outlier::HttpCode> {
 public:
   TestBucket() = default;
 };

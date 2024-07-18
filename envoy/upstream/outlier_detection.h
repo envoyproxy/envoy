@@ -12,6 +12,7 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -49,34 +50,9 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
-// Types of errors reported to outlier detectors.
-// Each type may have a different syntax and content.
-// TODO (cpakulski) - maybe use enums from protobufs.
-enum class ExtResultType {
-  HTTP_CODE,
-  LOCAL_ORIGIN,
-};
-
-/*
- * Class carries result of a transaction with upstream entity
- * or generated internally by Envoy.
- * Different categories of results will be derived from that base class.
- * Those categories of results are fed only into Outlier Detection extensions.
- */
-class ExtResult {
+class HttpCode {
 public:
-  ExtResult() = delete;
-  ExtResult(ExtResultType type) : type_(type) {}
-  virtual ExtResultType type() const { return type_; };
-  virtual ~ExtResult() = default;
-
-private:
-  const ExtResultType type_;
-};
-
-class HttpCode : public ExtResult {
-public:
-  HttpCode(uint32_t code) : ExtResult(ExtResultType::HTTP_CODE), code_(code) {}
+  HttpCode(uint32_t code) : code_(code) {}
   HttpCode() = delete;
   virtual ~HttpCode() {}
   uint32_t code() const { return code_; }
@@ -87,15 +63,21 @@ private:
 
 // LocalOriginEvent is used to report errors like resets, timeouts but also
 // successful connection attempts.
-class LocalOriginEvent : public ExtResult {
+class LocalOriginEvent {
 public:
-  LocalOriginEvent(Result result) : ExtResult(ExtResultType::LOCAL_ORIGIN), result_(result) {}
+  LocalOriginEvent(Result result) : result_(result) {}
   LocalOriginEvent() = delete;
   Result result() const { return result_; }
 
 private:
   Result result_;
 };
+
+/*
+ * Class carries result of a transaction with upstream entity
+ * or generated internally by Envoy.
+ */
+using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
 
 // Base class defining api for various types of monitors.
 // Each monitor may implement different health detection algorithm.
