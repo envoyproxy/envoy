@@ -4052,7 +4052,7 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
-  // Now do 1:1 streaming.
+  // Now do 1:1 streaming for a few chunks.
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
@@ -4162,15 +4162,14 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
-  // Test 4x3 streaming.
   for (int i = 0; i < 4; i++) {
-    // 7 request chunks are sent to the ext_proc server.
+    // 4 request chunks are sent to the ext_proc server.
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  // Then the ext_proc server sent back 3 mutated data chunks for the 7th request chunk.
+  // Then the ext_proc server sends back a response with more_chunks set to true.
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
@@ -4178,6 +4177,8 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
         body_mut->set_more_chunks(true);
       },
       false);
+
+  // Verify spurious message is received.
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
   filter_->onDestroy();
 }
