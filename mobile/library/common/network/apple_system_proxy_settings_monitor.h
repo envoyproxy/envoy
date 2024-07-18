@@ -42,7 +42,7 @@ private:
 
   dispatch_source_t source_;
   dispatch_queue_t queue_;
-  bool started_;
+  bool started_ = false;
   SystemProxySettingsReadCallback proxy_settings_read_callback_;
 };
 
