@@ -33,14 +33,17 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
       proto_config.credential().typed_config(), context.messageValidationVisitor(),
       *config_factory);
 
+  // In upstream filter call, prefix has cluster.cluster_0 without '.', needs to be added
+  std::string tmp_prefix = dual_info.is_upstream ? stats_prefix + "." : stats_prefix;
   CredentialInjectorSharedPtr credential_injector =
       config_factory->createCredentialInjectorFromProto(
-          *message, stats_prefix + "credential_injector.", context);
+          *message, tmp_prefix + "credential_injector.", context);
 
-  FilterConfigSharedPtr config =
-      std::make_shared<FilterConfig>(std::move(credential_injector), proto_config.overwrite(),
-                                     proto_config.allow_request_without_credential(),
-                                     stats_prefix + "credential_injector.", dual_info.scope);
+  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
+      std::move(credential_injector), proto_config.overwrite(),
+      proto_config.allow_request_without_credential(),
+      dual_info.is_upstream ? "credential_injector." : stats_prefix + "credential_injector.",
+      dual_info.scope);
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CredentialInjectorFilter>(config));
   };

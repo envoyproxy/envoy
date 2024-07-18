@@ -24,6 +24,11 @@ resources:
                                  testing_downstream_filter_);
     initialize();
   }
+  std::string getStatName(const std::string& key) {
+    return (testing_downstream_filter_ ? "http.config_test.credential_injector."
+                                       : "cluster.cluster_0.credential_injector.") +
+           key;
+  }
 };
 
 // CredentialInjector integration tests that should run with all protocols
@@ -75,13 +80,7 @@ typed_config:
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  if (testing_downstream_filter_) {
-    EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
-  } else {
-    EXPECT_EQ(1UL, test_server_
-                       ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")
-                       ->value());
-  }
+  EXPECT_EQ(1UL, test_server_->counter(getStatName("injected"))->value());
 }
 
 // Inject credential to a request without credential
@@ -120,13 +119,7 @@ typed_config:
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  if (testing_downstream_filter_) {
-    EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
-  } else {
-    EXPECT_EQ(1UL, test_server_
-                       ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")
-                       ->value());
-  }
+  EXPECT_EQ(1UL, test_server_->counter(getStatName("injected"))->value());
 }
 
 // Inject credential to a request with credential, overwrite is false
@@ -167,15 +160,7 @@ typed_config:
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  if (testing_downstream_filter_) {
-    EXPECT_EQ(
-        1UL, test_server_->counter("http.config_test.credential_injector.already_exists")->value());
-  } else {
-    EXPECT_EQ(1UL,
-              test_server_
-                  ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.already_exists")
-                  ->value());
-  }
+  EXPECT_EQ(1UL, test_server_->counter(getStatName("already_exists"))->value());
 }
 
 // Inject credential to a request with credential, overwrite is true
@@ -216,13 +201,7 @@ typed_config:
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  if (testing_downstream_filter_) {
-    EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
-  } else {
-    EXPECT_EQ(1UL, test_server_
-                       ->counter("cluster.cluster_0.cluster.cluster_0credential_injector.injected")
-                       ->value());
-  }
+  EXPECT_EQ(1UL, test_server_->counter(getStatName("injected"))->value());
 }
 
 } // namespace
