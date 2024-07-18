@@ -93,13 +93,13 @@ ADD --chown=0:0 --chmod=755 configs/google-vrp/supervisor.conf /etc/supervisor.c
 
 
 # STAGE: envoy-google-vrp
-FROM envoy-google-vrp-base as envoy-google-vrp
+FROM envoy-google-vrp-base AS envoy-google-vrp
 COPY  --from=binary --chown=0:0 --chmod=755 \
     /usr/local/bin/envoy /usr/local/bin/envoy
 
 
 # STAGE: envoy-google-vrp-custom
-FROM envoy-google-vrp-base as envoy-google-vrp-custom
+FROM envoy-google-vrp-base AS envoy-google-vrp-custom
 ARG ENVOY_CTX_BINARY_PATH
 ADD "${ENVOY_CTX_BINARY_PATH}" /usr/local/bin/envoy
 
