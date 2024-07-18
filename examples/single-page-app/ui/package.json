@@ -14,11 +14,11 @@
     "@chakra-ui/react": "^2.8.2",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
-    "framer-motion": "^11.3.4",
+    "framer-motion": "^11.3.6",
     "mdi-react": "^9.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.25.0"
+    "react-router-dom": "^6.25.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

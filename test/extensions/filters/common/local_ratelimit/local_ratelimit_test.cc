@@ -4,6 +4,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -120,9 +121,20 @@ public:
 
   void initialize(const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
                   const uint32_t tokens_per_fill, ShareProviderSharedPtr share_provider = nullptr) {
+    TestScopedRuntime runtime;
+    runtime.mergeValues(
+        {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"}});
 
     initializeTimer();
 
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, share_provider);
+  }
+
+  void initializeWithAtomicTokenBucket(const std::chrono::milliseconds fill_interval,
+                                       const uint32_t max_tokens, const uint32_t tokens_per_fill,
+                                       ShareProviderSharedPtr share_provider = nullptr) {
     rate_limiter_ =
         std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
                                                dispatcher_, descriptors_, true, share_provider);
@@ -352,11 +364,23 @@ public:
   void initializeWithDescriptor(const std::chrono::milliseconds fill_interval,
                                 const uint32_t max_tokens, const uint32_t tokens_per_fill) {
 
+    TestScopedRuntime runtime;
+    runtime.mergeValues(
+        {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"}});
+
     initializeTimer();
 
     rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
         fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
   }
+
+  void initializeWithAtomicTokenBucketDescriptor(const std::chrono::milliseconds fill_interval,
+                                                 const uint32_t max_tokens,
+                                                 const uint32_t tokens_per_fill) {
+    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
+        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
+  }
+
   static constexpr absl::string_view single_descriptor_config_yaml = R"(
   entries:
   - key: foo2
@@ -708,6 +732,294 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
   EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
   EXPECT_EQ(rate_limit_result.token_bucket_context->remainingFillInterval().value(), 3.0);
+}
+
+// Verify token bucket functionality with a single token.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucket) {
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 1, 1);
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 1 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+// Verify token bucket functionality with max tokens and tokens per fill > 1.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFill) {
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2);
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 1 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+// Verify token bucket functionality with max tokens and tokens per fill > 1 and
+// share provider is used.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShareProvider) {
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.5; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2, share_provider);
+
+  // Every request will consume 1 / factor = 2 tokens.
+
+  // The limiter will be initialized with max tokens and will be consumed at once.
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+// Verify token bucket functionality with max tokens > tokens per fill.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMaxTokensGreaterThanTokensPerFill) {
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 1);
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+// Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketStatus) {
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(3000), 2, 2);
+
+  // 2 -> 1 tokens
+  auto rate_limit_result = rate_limiter_->requestAllowed(route_descriptors_);
+  EXPECT_TRUE(rate_limit_result.allowed);
+
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1500));
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(3000));
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
+}
+
+TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorBase) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
+
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptor) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+
+  // 0 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+
+  // 0 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // 1 -> 1 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+// Verify token bucket functionality with request per unit > 1.
+TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketMultipleTokensPerFillDescriptor) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 2, 2);
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+
+  // 0 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+
+  // 1 -> 2 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(50));
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+// Verify token bucket functionality with multiple descriptors.
+TEST_F(LocalRateLimiterDescriptorImplTest,
+       AtomicTokenBucketDifferentDescriptorDifferentRateLimits) {
+  TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "2s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 3, 3);
+
+  // 1 -> 0 tokens for descriptor_ and descriptor2_
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+
+  // 0 -> 1 tokens for descriptor2_
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  // 1 -> 0 tokens for descriptor2_ and 0 only for descriptor_
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+// Verify token bucket functionality with multiple descriptors sorted.
+TEST_F(LocalRateLimiterDescriptorImplTest,
+       AtomicTokenBucketDifferentDescriptorDifferentRateLimitsSorted) {
+  TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 3, 3);
+
+  std::vector<RateLimit::LocalDescriptor> descriptors{{{{"hello", "world"}, {"foo", "bar"}}},
+                                                      {{{"foo2", "bar2"}}}};
+
+  // Descriptors are sorted as descriptor2 < descriptor < global
+  // Descriptor2 from 1 -> 0 tokens
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Request limited by descriptor2 and won't consume tokens from descriptor.
+  // Descriptor2 from 0 -> 0 tokens
+  // Descriptor from 1 -> 1 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+// Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
+TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorStatus) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 2, 2);
+
+  // 2 -> 1 tokens
+  auto rate_limit_result = rate_limiter_->requestAllowed(descriptor_);
+
+  EXPECT_TRUE(rate_limit_result.allowed);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+
+  // 0 -> 1 tokens. 1500ms passed and 1 token will be added.
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  // 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 0);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(3000));
+
+  // 0 -> 2 tokens
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
 }
 
 } // Namespace LocalRateLimit
