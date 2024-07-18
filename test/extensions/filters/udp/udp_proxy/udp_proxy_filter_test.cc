@@ -1949,9 +1949,8 @@ public:
     header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add).value();
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     stream_info_.downstream_connection_info_provider_->setConnectionID(0);
-    session_access_logs_ = std::make_unique<std::vector<AccessLog::InstanceSharedPtr>>();
-    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(
-        cluster_, &context_, *config_, callbacks_, stream_info_, false, *session_access_logs_);
+    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(cluster_, &context_, *config_, callbacks_,
+                                                          stream_info_);
   }
 
   void createNewStream() { pool_->newStream(stream_callbacks_); }
@@ -1962,7 +1961,6 @@ public:
   std::unique_ptr<NiceMock<MockUdpTunnelingConfig>> config_;
   NiceMock<MockUpstreamTunnelCallbacks> callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  std::unique_ptr<std::vector<AccessLog::InstanceSharedPtr>> session_access_logs_;
   NiceMock<MockHttpStreamCallbacks> stream_callbacks_;
   NiceMock<Http::MockRequestEncoder> request_encoder_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
@@ -2042,13 +2040,12 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   setup();
 
   TunnelingConnectionPoolFactory factory;
-  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_,
-                                           false, *session_access_logs_);
+  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
 
   EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  auto invalid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_,
-                                             stream_info_, false, *session_access_logs_);
+  auto invalid_pool =
+      factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
 }
 

@@ -179,7 +179,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   // We can never assume the decodeHeaders() was called before encodeHeaders().
-  if (token_bucket_context_.has_value()) {
+  if (used_config_->enableXRateLimitHeaders() && token_bucket_context_.has_value()) {
     headers.addReferenceKey(
         HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
         token_bucket_context_->maxTokens());

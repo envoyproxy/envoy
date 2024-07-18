@@ -1014,18 +1014,18 @@ ply==3.11 \
     --hash=sha256:00c7c1aaa88358b9c765b6d3000c6eec0ba42abca5351b095321aef446081da3 \
     --hash=sha256:096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce
     # via -r requirements.in
-protobuf==4.25.3 \
-    --hash=sha256:19b270aeaa0099f16d3ca02628546b8baefe2955bbe23224aaf856134eccf1e4 \
-    --hash=sha256:209ba4cc916bab46f64e56b85b090607a676f66b473e6b762e6f1d9d591eb2e8 \
-    --hash=sha256:25b5d0b42fd000320bd7830b349e3b696435f3b329810427a6bcce6a5492cc5c \
-    --hash=sha256:7c8daa26095f82482307bc717364e7c13f4f1c99659be82890dcfc215194554d \
-    --hash=sha256:c053062984e61144385022e53678fbded7aea14ebb3e0305ae3592fb219ccfa4 \
-    --hash=sha256:d4198877797a83cbfe9bffa3803602bbe1625dc30d8a097365dbc762e5790faa \
-    --hash=sha256:e3c97a1555fd6388f857770ff8b9703083de6bf1f9274a002a332d65fbb56c8c \
-    --hash=sha256:e7cb0ae90dd83727f0c0718634ed56837bfeeee29a5f82a7514c03ee1364c019 \
-    --hash=sha256:f0700d54bcf45424477e46a9f0944155b46fb0639d69728739c0e47bab83f2b9 \
-    --hash=sha256:f1279ab38ecbfae7e456a108c5c0681e4956d5b1090027c1de0f934dfdb4b35c \
-    --hash=sha256:f4f118245c4a087776e0a8408be33cf09f6c547442c00395fbfb116fac2f8ac2
+protobuf==5.27.2 \
+    --hash=sha256:0e341109c609749d501986b835f667c6e1e24531096cff9d34ae411595e26505 \
+    --hash=sha256:176c12b1f1c880bf7a76d9f7c75822b6a2bc3db2d28baa4d300e8ce4cde7409b \
+    --hash=sha256:354d84fac2b0d76062e9b3221f4abbbacdfd2a4d8af36bab0474f3a0bb30ab38 \
+    --hash=sha256:4fadd8d83e1992eed0248bc50a4a6361dc31bcccc84388c54c86e530b7f58863 \
+    --hash=sha256:54330f07e4949d09614707c48b06d1a22f8ffb5763c159efd5c0928326a91470 \
+    --hash=sha256:610e700f02469c4a997e58e328cac6f305f649826853813177e6290416e846c6 \
+    --hash=sha256:7fc3add9e6003e026da5fc9e59b131b8f22b428b991ccd53e2af8071687b4fce \
+    --hash=sha256:9e8f199bf7f97bd7ecebffcae45ebf9527603549b2b562df0fbc6d4d688f14ca \
+    --hash=sha256:a109916aaac42bff84702fb5187f3edadbc7c97fc2c99c5ff81dd15dcce0d1e5 \
+    --hash=sha256:b848dbe1d57ed7c191dfc4ea64b8b004a3f9ece4bf4d0d80a367b76df20bf36e \
+    --hash=sha256:f3ecdef226b9af856075f28227ff2c90ce3a594d092c39bee5513573f25e2714
     # via
     #   -r requirements.in
     #   envoy-base-utils
@@ -1666,7 +1666,7 @@ zstandard==0.23.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==70.3.0 \
-    --hash=sha256:f171bab1dfbc86b132997f26a119f6056a57950d058587841a0082e8830f9dc5 \
-    --hash=sha256:fe384da74336c398e0d956d1cae0669bc02eed936cdb1d49b57de1990dc11ffc
+setuptools==71.0.1 \
+    --hash=sha256:1eb8ef012efae7f6acbc53ec0abde4bc6746c43087fd215ee09e1df48998711f \
+    --hash=sha256:c51d7fd29843aa18dad362d4b4ecd917022131425438251f4e3d766c964dd1ad
     # via -r requirements.in
