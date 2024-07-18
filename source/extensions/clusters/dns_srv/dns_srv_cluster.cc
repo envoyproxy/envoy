@@ -76,7 +76,8 @@ void DnsSrvCluster::startResolve() {
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
 
-        ENVOY_LOG(debug, "Got DNS response, details: {}", details);
+        ENVOY_LOG(debug, "Got DNS response, details: {}, status: {}", details,
+                  static_cast<int>(status));
 
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           for (const auto& dns : response) {
@@ -275,6 +276,10 @@ DnsSrvClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
   THROW_IF_NOT_OK(dns_resolver_or_error.status());
+
+  if (proto_config.srv_names_size() > 1) {
+    return absl::InvalidArgumentError("SRV DNS Cluster can only contain one DNS record (so far)");
+  }
 
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::make_pair(std::shared_ptr<DnsSrvCluster>(new DnsSrvCluster(

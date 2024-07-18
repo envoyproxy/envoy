@@ -588,6 +588,10 @@ void DnsResolverImpl::PendingSrvResolution::startResolution() {
 
 void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, int timeouts,
                                                                    unsigned char* buf, int len) {
+
+  ENVOY_LOG(debug, "onAresSrvStartCallback: status={}, timeouts={}, buf len={}", status, timeouts,
+            len);
+
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
@@ -613,8 +617,13 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     }
 
     ares_free_data(srv_reply);
-
+    pending_response_.status_ = ResolutionStatus::Success;
+    pending_response_.details_ = "srv resolve: cares_success";
     onAresSrvFinishCallback(std::move(srv_records));
+  } else {
+    // resolve failed
+    pending_response_.status_ = ResolutionStatus::Failure;
+    finishResolve();
   }
 
   if (timeouts > 0) {
