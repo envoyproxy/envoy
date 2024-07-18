@@ -526,7 +526,7 @@ new_features:
     to false.
 - area: filters
   change: |
-    Update ``credential_inection`` filter to support use as an upstream filter.
+    Update ``credential_injector`` filter to support use as an upstream filter.
 
 deprecated:
 - area: tracing
