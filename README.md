@@ -92,4 +92,4 @@ For further details please see our complete [security release process](SECURITY.
 
 ## Releases
 
-For furth details please see our [release process](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md).
+For further details please see our [release process](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md).
