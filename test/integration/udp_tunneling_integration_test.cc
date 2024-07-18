@@ -1144,6 +1144,61 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogOnTunnelConnected) {
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
+TEST_P(UdpTunnelingIntegrationTest, DontFlushTunnelConnectedAccessLogWithInvalidResponseHeaders) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%ACCESS_LOG_TYPE%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const std::string access_log_options = R"EOF(
+  access_log_options:
+    flush_access_log_on_tunnel_connected: true
+)EOF";
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          access_log_options};
+  setup(config);
+
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_connect_attempts_exceeded", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_failure", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 0);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  // Verify that UdpTunnelUpstreamConnected access log wasn't flushed.
+  const std::string access_log = waitForAccessLog(access_log_filename);
+  EXPECT_THAT(access_log,
+              testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd)));
+  EXPECT_THAT(access_log, testing::Not(testing::HasSubstr(AccessLogType_Name(
+                              AccessLog::AccessLogType::UdpTunnelUpstreamConnected))));
+}
+
 TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogPeriodically) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
