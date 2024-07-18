@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth2.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
@@ -161,6 +162,9 @@ message OAuth2Config {
   // will still process incoming ID Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the IdToken cookie header.
   bool disable_id_token_set_cookie = 17;
+
+  // Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 18;
 }
 
 // Filter config.
