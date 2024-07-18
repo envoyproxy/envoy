@@ -480,7 +480,7 @@ private:
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
-  bool http1_safe_max_connection_duration_;
+  bool http1_safe_max_connection_duration_{false};
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
