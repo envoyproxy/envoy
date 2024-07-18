@@ -4409,7 +4409,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
+// Upstream filter chain is in alpha mode and it is not actively used in ext_proc at the moment.
+TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
   ConfigOptions config_option = {};

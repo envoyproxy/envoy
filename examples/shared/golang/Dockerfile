@@ -1,12 +1,12 @@
-FROM debian:bookworm-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510a9d74bb5ec535b33 as os-base
+FROM debian:bookworm-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510a9d74bb5ec535b33 AS os-base
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
     && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | tee /etc/apt/apt.conf.d/keep-cache
 
 
-FROM golang:1.22.5-bookworm@sha256:6c2780255bb7b881e904e303be0d7a079054160b2ce1efde446693c0850a39ad as golang-base
+FROM golang:1.22.5-bookworm@sha256:6c2780255bb7b881e904e303be0d7a079054160b2ce1efde446693c0850a39ad AS golang-base
 
 
-FROM golang-base as golang-control-plane-builder
+FROM golang-base AS golang-control-plane-builder
 ARG GO_RESOURCE=resource.go
 RUN git clone https://github.com/envoyproxy/go-control-plane && cd go-control-plane && git checkout b4adc3bb5fe5288bff01cd452dad418ef98c676e
 ADD "$GO_RESOURCE" /go/go-control-plane/internal/example/resource.go
@@ -14,7 +14,7 @@ RUN cd go-control-plane && make bin/example
 WORKDIR /go/go-control-plane
 
 
-FROM os-base as golang-control-plane
+FROM os-base AS golang-control-plane
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -23,23 +23,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY --from=golang-control-plane-builder /go/go-control-plane/bin/example /usr/local/bin/example
 
 
-FROM golang-base as golang-base-builder
+FROM golang-base AS golang-base-builder
 ARG GO_APP=.
 ARG GO_APP_NAME=grpc-service
 RUN echo "COPY $GO_APP -> ${GO_APP_NAME} ..."
 COPY "$GO_APP" /app
 
 
-FROM golang-base-builder as golang-grpc-auth-builder
+FROM golang-base-builder AS golang-grpc-auth-builder
 RUN make -C "/app/${GO_APP_NAME}"
 
 
-FROM os-base as golang-grpc-auth
+FROM os-base AS golang-grpc-auth
 COPY --from=golang-grpc-auth-builder /app/grpc-service/server /app/server
 CMD ["/app/server", "-users", "/etc/users.json"]
 
 
-FROM golang-base as golang-grpc-server-builder
+FROM golang-base AS golang-grpc-server-builder
 WORKDIR /build
 # Resolve and build Go dependencies as Docker cache
 COPY go.mod /build/go.mod
@@ -55,14 +55,14 @@ ENV CGO_ENABLED=0
 RUN go build -o server
 
 
-FROM os-base as golang-grpc-server
+FROM os-base AS golang-grpc-server
 WORKDIR /root/
 # Copy the linux amd64 binary
 COPY --from=golang-grpc-server-builder /build/server /bin/
 ENTRYPOINT /bin/server
 
 
-FROM golang-base as golang-lrs-builder
+FROM golang-base AS golang-lrs-builder
 COPY ./server /go/src/github.com/envoyproxy/envoy/example/load-reporting-service/server
 COPY *.go /go/src/github.com/envoyproxy/envoy/example/load-reporting-service/
 COPY go.sum /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
@@ -72,6 +72,6 @@ RUN go mod download \
     && go install /go/src/github.com/envoyproxy/envoy/example/load-reporting-service
 
 
-FROM os-base as golang-lrs
+FROM os-base AS golang-lrs
 COPY --from=golang-lrs-builder /go/bin/load-reporting-service /usr/local/bin/load-reporting-service
 CMD ["load-reporting-service"]
