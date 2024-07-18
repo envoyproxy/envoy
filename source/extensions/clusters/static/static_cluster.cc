@@ -27,10 +27,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       std::vector<Network::Address::InstanceConstSharedPtr> address_list;
       if (!lb_endpoint.endpoint().additional_addresses().empty()) {
-        const auto address =
+        address_list.emplace_back(
             THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
-                                  const Network::Address::InstanceConstSharedPtr);
-        address_list.push_back(address);
+                                  const Network::Address::InstanceConstSharedPtr));
         for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
           address_list.emplace_back(
               THROW_OR_RETURN_VALUE(resolveProtoAddress(additional_address.address()),

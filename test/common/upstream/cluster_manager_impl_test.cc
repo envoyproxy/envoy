@@ -6354,6 +6354,7 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
                   port_value: 11001
   )EOF";
   create(parseBootstrapFromV3Yaml(bootstrap));
+  // Verify address list for static cluster in bootstrap.
   auto cluster = cluster_manager_->getThreadLocalCluster("cluster_0");
   auto hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_NE(hosts[0]->addressListOrNull(), nullptr);
@@ -6394,11 +6395,12 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
                 address: 127.0.0.1
                 port_value: 11001
   )EOF";
+  // Add static cluster via api and check that addresses list is empty.
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
   cluster = cluster_manager_->getThreadLocalCluster("added_via_api");
   hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_EQ(hosts[0]->addressListOrNull(), nullptr);
-  // Update cluster to have two address
+  // Update cluster to have additional addresses and check that address list is not empty anymore.
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api_update), "v2"));
   cluster = cluster_manager_->getThreadLocalCluster("added_via_api");

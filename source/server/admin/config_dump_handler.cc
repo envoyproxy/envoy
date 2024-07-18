@@ -386,6 +386,7 @@ void ConfigDumpHandler::addLbEndpoint(
   if (host->addressListOrNull() != nullptr) {
     const auto& address_list = *host->addressListOrNull();
     if (address_list.size() > 1) {
+      // skip first address of the list as the default address is not an additional one.
       for (auto it = std::next(address_list.begin()); it != address_list.end(); ++it) {
         auto& new_address = *endpoint.mutable_additional_addresses()->Add();
         Network::Utility::addressToProtobufAddress(**it, *new_address.mutable_address());
