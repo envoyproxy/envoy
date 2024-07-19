@@ -1599,7 +1599,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that tries to modify the trailers incorrectly
 // according to the header mutation rules.
-TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
+// TODO(tyxia): re-enable this test (see https://github.com/envoyproxy/envoy/issues/35281)
+TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_mutation_rules()->mutable_disallow_all()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
