@@ -603,7 +603,7 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
   absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
   EXPECT_TRUE(version.has_value());
-  int optval;
+  int optval = 0;
   socklen_t optlen = sizeof(optval);
   Api::SysCallIntResult rv;
   if (*version == Network::Address::IpVersion::v6) {
@@ -616,7 +616,9 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
       return;
     }
   }
-  // Check the IPv4 version of the sockopt if it's v4 or dual-stack.
+  // Check the IPv4 version of the sockopt if the socket is v4 or dual-stack.
+  // Platform/ APIs for ECN reporting are poorly documented, but this test
+  // should uncover any issues.
   rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
   EXPECT_EQ(rv.return_value_, 0);
   EXPECT_EQ(optval, 1);
