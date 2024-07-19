@@ -118,7 +118,8 @@ public:
   bool createFilterChain(Http::FilterChainManager& manager, bool,
                          const Http::FilterChainOptions&) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&) const override {
+                                Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
     return false;
   }
 
