@@ -86,7 +86,8 @@ private:
   bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
   OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
 
-  SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
+  absl::StatusOr<SessionContextID>
+  generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
@@ -98,7 +99,7 @@ private:
 class ServerContextFactoryImpl : public ServerContextFactory {
 public:
   std::string name() const override { return "envoy.ssl.server_context_factory.default"; }
-  Ssl::ServerContextSharedPtr
+  absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                       const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,

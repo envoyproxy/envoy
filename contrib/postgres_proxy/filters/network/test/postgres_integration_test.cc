@@ -1,6 +1,6 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 

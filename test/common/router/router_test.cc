@@ -1310,7 +1310,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
@@ -1501,7 +1501,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   test_time_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _));
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
@@ -1584,7 +1584,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   test_time_.advanceTimeWait(std::chrono::milliseconds(240));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
@@ -1817,7 +1817,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   Http::TestResponseHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(204)));
@@ -3171,7 +3171,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
 
   // We should not call shouldRetryReset() because you never retry the same
   // request twice.
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
 
   // Now trigger a 200 in response to the second request.
   Http::ResponseHeaderMapPtr response_headers(
@@ -3240,7 +3240,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         return nullptr;
       }));
   EXPECT_CALL(*router_->retry_state_,
-              shouldRetryReset(_, /*http3_used=*/RetryState::Http3Used::Unknown, _))
+              shouldRetryReset(_, /*http3_used=*/RetryState::Http3Used::Unknown, _, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
   router_->retry_state_->callback_();
@@ -3315,9 +3315,10 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
+  EXPECT_CALL(*router_->retry_state_,
+              shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
-                              RetryState::DoRetryResetCallback callback) {
+                              RetryState::DoRetryResetCallback callback, bool) {
         EXPECT_EQ(RetryState::Http3Used::No, http3_used);
         router_->retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/false); };
         return RetryStatus::Yes;
@@ -3375,9 +3376,10 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   router_->decodeData(body, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _))
+  EXPECT_CALL(*router_->retry_state_,
+              shouldRetryReset(Http::StreamResetReason::RemoteReset, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used http3_used,
-                              RetryState::DoRetryResetCallback callback) {
+                              RetryState::DoRetryResetCallback callback, bool) {
         EXPECT_EQ(RetryState::Http3Used::Yes, http3_used);
         router_->retry_state_->callback_ = [callback]() { callback(/*disable_http3=*/true); };
         return RetryStatus::Yes;
@@ -3657,7 +3659,7 @@ TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
 
   // The 100-continue will result in resetting retry_state_, so when the stream
   // is reset we won't even check shouldRetryReset() (or shouldRetryHeaders()).
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   Http::ResponseHeaderMapPtr continue_headers(

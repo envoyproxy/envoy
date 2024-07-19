@@ -2315,7 +2315,7 @@ TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {
   const std::string yaml = R"EOF(
 per_try_timeout: 30s
 num_retries: 10
-retry_on: 5xx,gateway-error,connect-failure,reset
+retry_on: 5xx,gateway-error,connect-failure,reset,reset-before-request
 retry_back_off:
   base_interval: 0.01s
   max_interval: 30s
@@ -2327,7 +2327,8 @@ retry_back_off:
   EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
   EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
   EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
-                Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET,
+                Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET |
+                Router::RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST,
             route_entry.retryPolicy().retryOn());
 
   EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
