@@ -58,7 +58,7 @@ struct TlsContext {
 
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
   bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
-  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
+  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() const {
     return private_key_method_provider_;
   }
   absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);

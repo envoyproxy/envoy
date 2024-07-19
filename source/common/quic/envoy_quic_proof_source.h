@@ -26,6 +26,15 @@ public:
 
   void updateFilterChainManager(Network::FilterChainManager& filter_chain_manager);
 
+  struct TransportSocketFactoryWithFilterChain {
+    const QuicServerTransportSocketFactory& transport_socket_factory_;
+    const Network::FilterChain& filter_chain_;
+  };
+
+  absl::optional<TransportSocketFactoryWithFilterChain>
+  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname);
 protected:
   // quic::ProofSource
   void signPayload(const quic::QuicSocketAddress& server_address,
@@ -34,11 +43,6 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  struct TransportSocketFactoryWithFilterChain {
-    const QuicServerTransportSocketFactory& transport_socket_factory_;
-    const Network::FilterChain& filter_chain_;
-  };
-
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
   legacyGetCertChain(const TransportSocketFactoryWithFilterChain& data);
   void legacySignPayload(const TransportSocketFactoryWithFilterChain& data,
@@ -61,11 +65,6 @@ private:
 
   LegacyCertConfigWithFilterChain
   legacyGetTlsCertConfigAndFilterChain(const TransportSocketFactoryWithFilterChain& data);
-
-  absl::optional<TransportSocketFactoryWithFilterChain>
-  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                   const quic::QuicSocketAddress& client_address,
-                                   const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};

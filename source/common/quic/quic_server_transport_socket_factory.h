@@ -34,6 +34,8 @@ public:
   std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
             std::shared_ptr<quic::CertificatePrivateKey>>
   getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const;
+  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
+  getPrivateKeyMethodProvider(absl::string_view sni) const;
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
@@ -61,6 +63,7 @@ protected:
 
 private:
   absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> createSslServerContext() const;
+  OptRef<const Ssl::TlsContext> getTlsContext(absl::string_view sni, bool* cert_matched_sni) const;
 
   const bool handle_certs_with_shared_tls_code_;
   Envoy::Ssl::ContextManager& manager_;

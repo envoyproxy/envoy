@@ -156,6 +156,28 @@ std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
           std::shared_ptr<quic::CertificatePrivateKey>>
 QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
                                                           bool* cert_matched_sni) const {
+  auto tls_context = getTlsContext(sni, cert_matched_sni);
+
+  if (tls_context == absl::nullopt) {
+    return {};
+  }
+  // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
+  // Both of these members are themselves reference counted, so it is safe to use them after
+  // ``ssl_ctx`` goes out of scope after the function returns.
+  return {tls_context->quic_cert_, tls_context->quic_private_key_};
+}
+
+Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
+    QuicServerTransportSocketFactory::getPrivateKeyMethodProvider(absl::string_view sni) const {
+  bool cert_matched_sni = false;
+  auto tls_context = getTlsContext(sni, &cert_matched_sni);
+  if (tls_context == absl::nullopt) {
+    return nullptr;
+  }
+  return tls_context->getPrivateKeyMethodProvider();
+}
+
+OptRef<const Ssl::TlsContext> QuicServerTransportSocketFactory::getTlsContext(absl::string_view sni, bool* cert_matched_sni) const {
   // onSecretUpdated() could be invoked in the middle of checking the existence of , and using,
   // ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and use the same ssl_ctx.
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
@@ -167,17 +189,13 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
     ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
     stats_.downstream_context_secrets_not_ready_.inc();
     *cert_matched_sni = false;
-    return {};
+    return absl::nullopt;
   }
   auto ctx =
       std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
   auto [tls_context, ocsp_staple_action] = ctx->findTlsContext(
       sni, true /* TODO: ecdsa_capable */, false /* TODO: ocsp_capable */, cert_matched_sni);
-
-  // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
-  // Both of these members are themselves reference counted, so it is safe to use them after
-  // ``ssl_ctx`` goes out of scope after the function returns.
-  return {tls_context.quic_cert_, tls_context.quic_private_key_};
+  return tls_context;
 }
 
 absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
