@@ -2711,7 +2711,8 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time, false),
+              cert_start_format.format(stream_info));
   }
   // Custom format string
   {
@@ -2755,7 +2756,8 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time, false),
+              cert_end_format.format(stream_info));
   }
   // Custom format string
   {
@@ -2806,7 +2808,8 @@ TEST(SubstitutionFormatterTest, UpstreamPeerCertVStartFormatter) {
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_start_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time, false),
+              cert_start_format.format(stream_info));
   }
   // Custom format string
   {
@@ -2858,7 +2861,8 @@ TEST(SubstitutionFormatterTest, UpstreamPeerCertVEndFormatter) {
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), cert_end_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time, false),
+              cert_end_format.format(stream_info));
   }
   // Custom format string
   {
@@ -2894,9 +2898,10 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
     StartTimeFormatter start_time_format("");
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time), start_time_format.format(stream_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time, false),
+              start_time_format.format(stream_info));
     EXPECT_THAT(start_time_format.formatValue(stream_info),
-                ProtoEq(ValueUtil::stringValue(AccessLogDateTimeFormatter::fromTime(time))));
+                ProtoEq(ValueUtil::stringValue(AccessLogDateTimeFormatter::fromTime(time, false))));
   }
 }
 
@@ -4143,16 +4148,21 @@ TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
   absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
       {"test_time", fmt::format("{}", expected_time_in_epoch)},
+      {"test_time_local", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
       {"default", "2018-03-28T23:35:58.000Z"},
+      {"default_local",
+       absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time), absl::LocalTimeZone())},
       {"all_zeroes", "000000000.0.00.000"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     simple_date: '%START_TIME(%Y/%m/%d)%'
     test_time: '%START_TIME(%s)%'
+    test_time_local: '%START_TIME_LOCAL(%s)%'
     bad_format: '%START_TIME(bad_format)%'
     default: '%START_TIME%'
+    default_local: '%START_TIME_LOCAL%'
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);

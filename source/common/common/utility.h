@@ -44,12 +44,15 @@ const std::string errorDetails(int error_code);
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : raw_format_string_(format_string) {
+  DateFormatter(const std::string& format_string) : DateFormatter(format_string, false) {}
+  DateFormatter(const std::string& format_string, bool local_time)
+      : raw_format_string_(format_string), local_time_(local_time) {
     parse(format_string);
   }
 
   /**
-   * @return std::string representing the GMT/UTC time based on the input time.
+   * @return std::string representing the GMT/UTC time based on the input time,
+   * or local zone time when local_time is true.
    */
   std::string fromTime(const SystemTime& time) const;
 
@@ -104,6 +107,9 @@ private:
 
   // This is the format string as supplied in configuration, e.g. "foo %3f bar".
   const std::string raw_format_string_;
+
+  // If use local time zone.
+  const bool local_time_;
 };
 
 /**
@@ -111,7 +117,7 @@ private:
  */
 class AccessLogDateTimeFormatter {
 public:
-  static std::string fromTime(const SystemTime& time);
+  static std::string fromTime(const SystemTime& time, bool local_time);
 };
 
 /**

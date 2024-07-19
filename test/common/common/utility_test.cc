@@ -594,13 +594,13 @@ TEST(StringUtil, removeCharacters) {
 
 TEST(AccessLogDateTimeFormatter, fromTime) {
   SystemTime time1(std::chrono::seconds(1522796769));
-  EXPECT_EQ("2018-04-03T23:06:09.000Z", AccessLogDateTimeFormatter::fromTime(time1));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z", AccessLogDateTimeFormatter::fromTime(time1, false));
   SystemTime time2(std::chrono::milliseconds(1522796769123));
-  EXPECT_EQ("2018-04-03T23:06:09.123Z", AccessLogDateTimeFormatter::fromTime(time2));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", AccessLogDateTimeFormatter::fromTime(time2, false));
   SystemTime time3(std::chrono::milliseconds(1522796769999));
-  EXPECT_EQ("2018-04-03T23:06:09.999Z", AccessLogDateTimeFormatter::fromTime(time3));
+  EXPECT_EQ("2018-04-03T23:06:09.999Z", AccessLogDateTimeFormatter::fromTime(time3, false));
   SystemTime time4(std::chrono::milliseconds(1522796768999));
-  EXPECT_EQ("2018-04-03T23:06:08.999Z", AccessLogDateTimeFormatter::fromTime(time4));
+  EXPECT_EQ("2018-04-03T23:06:08.999Z", AccessLogDateTimeFormatter::fromTime(time4, false));
 }
 
 TEST(Primes, isPrime) {
