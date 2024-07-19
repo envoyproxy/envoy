@@ -98,12 +98,19 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
                 socket_option.DebugString());
       continue;
     }
+
+    absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
+    if (socket_option.type() == envoy::config::core::v3::SocketOption::STREAM) {
+      socket_type = Network::Socket::Type::Stream;
+    } else if (socket_option.type() == envoy::config::core::v3::SocketOption::DATAGRAM) {
+      socket_type = Network::Socket::Type::Datagram;
+    }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
         Network::SocketOptionName(
             socket_option.level(), socket_option.name(),
             fmt::format("{}/{}", socket_option.level(), socket_option.name())),
-        buf));
+        buf, socket_type));
   }
   return options;
 }

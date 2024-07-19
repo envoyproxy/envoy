@@ -13,5 +13,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: sockets
+  change: |
+    Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
+    <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied irrespective
+    of the socket type.
 
 deprecated:
