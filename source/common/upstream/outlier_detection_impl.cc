@@ -103,8 +103,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     monitor->putResult(HttpCode(response_code));
   });
 }
-std::function<void(uint32_t, std::string, absl::optional<std::string>)>
-DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
+ExtMonitor::ExtMonitorCallback DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
   return [this](uint32_t enforce, std::string failed_monitor_name,
                 absl::optional<std::string> extra_info) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
@@ -321,9 +320,8 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
   }
 }
 
-void DetectorConfig::createMonitorExtensions(
-    ExtMonitorsSet& ext_set,
-    std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) {
+void DetectorConfig::createMonitorExtensions(ExtMonitorsSet& ext_set,
+                                             ExtMonitor::ExtMonitorCallback callback) {
 
   // Create each extension by calling a callback function created by factory when the
   // config was evaluated.

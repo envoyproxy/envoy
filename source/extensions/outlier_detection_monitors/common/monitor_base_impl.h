@@ -61,10 +61,7 @@ public:
   virtual ~ExtMonitorBase() {}
   void putResult(const ExtResult&) override;
 
-  void setExtMonitorCallback(
-      std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback) override {
-    callback_ = callback;
-  }
+  void setExtMonitorCallback(ExtMonitorCallback callback) override { callback_ = callback; }
 
   void reset() override { onReset(); }
   std::string name() const { return name_; }
@@ -81,7 +78,7 @@ protected:
 
   std::string name_;
   uint32_t enforce_{100};
-  std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback_;
+  ExtMonitor::ExtMonitorCallback callback_;
   std::vector<ErrorsBucketPtr> buckets_;
 };
 

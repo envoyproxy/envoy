@@ -54,7 +54,6 @@ class HttpCode {
 public:
   HttpCode(uint32_t code) : code_(code) {}
   HttpCode() = delete;
-  virtual ~HttpCode() {}
   uint32_t code() const { return code_; }
 
 private:
@@ -83,12 +82,12 @@ using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
 // Each monitor may implement different health detection algorithm.
 class ExtMonitor {
 public:
+  using ExtMonitorCallback = std::function<void(uint32_t, std::string, absl::optional<std::string>)>;
   virtual ~ExtMonitor() {}
 
   // Method to report a result to extensions.
   virtual void putResult(const ExtResult&) PURE;
-  virtual void setExtMonitorCallback(
-      std::function<void(uint32_t, std::string, absl::optional<std::string>)>) PURE;
+  virtual void setExtMonitorCallback(ExtMonitorCallback) PURE;
   virtual void reset() PURE;
 };
 

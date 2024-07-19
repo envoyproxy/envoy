@@ -166,8 +166,7 @@ public:
     getSRMonitor(type).setSuccessRate(new_success_rate);
   }
 
-  std::function<void(uint32_t, std::string, absl::optional<std::string>)>
-  getOnFailedExtensioMonitorCallback();
+  ExtMonitor::ExtMonitorCallback getOnFailedExtensioMonitorCallback();
 
   // handlers for reporting local origin errors
   void localOriginFailure();
@@ -337,9 +336,7 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
-  void createMonitorExtensions(
-      ExtMonitorsSet& ext_set,
-      std::function<void(uint32_t, std::string, absl::optional<std::string>)> callback);
+  void createMonitorExtensions(ExtMonitorsSet& ext_set, ExtMonitor::ExtMonitorCallback callback);
 
 private:
   const uint64_t interval_ms_;
