@@ -200,7 +200,13 @@ public:
         rule.match().path_match_policy().typed_config(),
         ProtobufMessage::getStrictValidationVisitor(), factory);
 
-    uri_template_matcher_ = factory.createPathMatcher(*config).value();
+    absl::StatusOr<Router::PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
+
+    if (!matcher.ok()) {
+      throw EnvoyException(std::string(matcher.status().message()));
+    }
+
+    uri_template_matcher_ = matcher.value();
   }
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
