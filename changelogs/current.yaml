@@ -1,7 +1,6 @@
-date: Pending
+date: July 19, 2024
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: thread_local
   change: |
     Changes the behavior of the ``SlotImpl`` class destructor. With this change the destructor can be called on any thread.
@@ -58,7 +57,6 @@ behavior_changes:
     ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` to ``false``.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: ext_proc
   change: |
     Timeout errors in external processor now returns ``504 Gateway Timeout`` to downstream clients.
@@ -180,7 +178,6 @@ minor_behavior_changes:
     ``envoy.reloadable_features.gcp_authn_use_fixed_url`` to false.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: admission control
   change: |
     Fixed the thread-local controller's average RPS calculation to be calculated over the full
@@ -286,7 +283,6 @@ bug_fixes:
     Fixed a bug where the user data will reference a dangling pointer to the Lua state and cause a crash.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: tls
   change: |
     Removed ``envoy.reloadable_features.enable_intermediate_ca`` runtime flag and lagacy code paths.
