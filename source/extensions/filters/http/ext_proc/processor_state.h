@@ -272,6 +272,10 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
+  bool handleSingleChunkInBodyResponse(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void handleMultipleChunksInBodyResponse(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
 };
 
 class DecodingProcessorState : public ProcessorState {

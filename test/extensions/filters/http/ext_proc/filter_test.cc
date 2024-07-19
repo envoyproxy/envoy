@@ -3969,6 +3969,220 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
   filter_->onDestroy();
 }
 
+// External processing M:N test
+TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "STREAMED"
+  enable_more_chunks: true
+  )EOF");
+
+  EXPECT_EQ(config_->enableMoreChunks(), true);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  // Test 7x3 streaming.
+  for (int i = 0; i < 7; i++) {
+    // 7 request chunks are sent to the ext_proc server.
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  for (int i = 0; i < 6; i++) {
+    // clear_body response is sent back for the 1st~6th request chunk.
+    processResponseBody(
+        [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_clear_body(true);
+          body_mut->set_more_chunks(false);
+        },
+        false);
+  }
+  // Then the ext_proc server sent back 3 mutated data chunks for the 7th request chunk.
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(" AAAAA ");
+        body_mut->set_more_chunks(true);
+        want_response_body.add(" AAAAA ");
+      },
+      false);
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(" BBBB ");
+        body_mut->set_more_chunks(true);
+        want_response_body.add(" BBBB ");
+      },
+      false);
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(" CCC ");
+        body_mut->set_more_chunks(false);
+        want_response_body.add(" CCC ");
+      },
+      false);
+
+  // The two buffers should match.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  // Now do 1:1 streaming for a few chunks.
+  for (int i = 0; i < 3; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    processResponseBody(
+        [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(body.body());
+          want_response_body.add(body.body());
+        },
+        false);
+  }
+
+  // The two buffers should match.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  // Now do another 3x4 streaming.
+  for (int i = 0; i < 3; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 10);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+
+    if (i < 2) {
+      // clear_body response is sent back for the 1st~2th request chunk.
+      processResponseBody(
+          [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_clear_body(true);
+            body_mut->set_more_chunks(false);
+          },
+          false);
+    } else {
+      // The ext_proc server sent back 4 mutated data chunks for the 3th request chunk.
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" EEEEEEE ");
+            body_mut->set_more_chunks(true);
+            want_response_body.add(" EEEEEEE ");
+          },
+          false);
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" F ");
+            body_mut->set_more_chunks(true);
+            want_response_body.add(" F ");
+          },
+          false);
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" GGGGGGGGG ");
+            body_mut->set_more_chunks(true);
+            want_response_body.add(" GGGGGGGGG ");
+          },
+          false);
+      processResponseBody(
+          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+            body_mut->set_body(" HH ");
+            body_mut->set_more_chunks(false);
+            want_response_body.add(" HH ");
+          },
+          false);
+    }
+  }
+
+  // Send the last empty request chunk.
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
+  // The two buffers should match.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  filter_->onDestroy();
+}
+
+// M:N error test case: sending back more_chunks but the feature is not enabled.
+TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "STREAMED"
+  )EOF");
+
+  EXPECT_EQ(config_->enableMoreChunks(), false);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  for (int i = 0; i < 4; i++) {
+    // 4 request chunks are sent to the ext_proc server.
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  // Then the ext_proc server sends back a response with more_chunks set to true.
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(" AAAAA ");
+        body_mut->set_more_chunks(true);
+      },
+      false);
+
+  // Verify spurious message is received.
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
+  filter_->onDestroy();
+}
+
 // Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
 // sends back response with clear_route_cache set to true, it is ignored.
 TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
