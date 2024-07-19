@@ -83,6 +83,7 @@ namespace Http {
   GAUGE(downstream_cx_ssl_active, Accumulate)                                                      \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_upgrades_active, Accumulate)                                                 \
+  GAUGE(downstream_cx_http1_soft_drain, Accumulate)                                                          \
   GAUGE(downstream_rq_active, Accumulate)                                                          \
   HISTOGRAM(downstream_cx_length_ms, Milliseconds)                                                 \
   HISTOGRAM(downstream_rq_time, Milliseconds)

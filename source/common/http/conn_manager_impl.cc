@@ -213,6 +213,10 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     }
   }
 
+  if (soft_drain_http1_) {
+    stats_.named_.downstream_cx_http1_soft_drain_.dec();
+  }
+
   conn_length_->complete();
   user_agent_.completeConnectionLength(*conn_length_);
 }
@@ -727,6 +731,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
       ENVOY_CONN_LOG(debug,
                      "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
                      read_callbacks_->connection());
+      connection_manager_.stats_.named_.downstream_cx_http1_soft_drain_.inc();
       soft_drain_http1_ = true;
     } else {
       startDrainSequence();
