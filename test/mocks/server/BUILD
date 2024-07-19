@@ -198,8 +198,14 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "server_factory_context_mocks",
-    srcs = ["server_factory_context.cc"],
-    hdrs = ["server_factory_context.h"],
+    srcs = [
+        "server_factory_context.cc",
+        "transport_socket_factory_context.cc",
+    ],
+    hdrs = [
+        "server_factory_context.h",
+        "transport_socket_factory_context.h",
+    ],
     deps = [
         ":admin_mocks",
         ":drain_manager_mocks",
@@ -248,7 +254,7 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "transport_socket_factory_context_mocks",
-    srcs = ["transport_socket_factory_context.cc"],
+    srcs = [],
     hdrs = ["transport_socket_factory_context.h"],
     deps = [
         ":server_factory_context_mocks",

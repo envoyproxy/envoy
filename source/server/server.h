@@ -205,6 +205,7 @@ public:
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
+  TransportSocketFactoryContext& getTransportSocketFactoryContext() override { return *this; }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }

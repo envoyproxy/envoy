@@ -150,6 +150,12 @@ public:
     return ret;
   }
 
+  static std::vector<std::tuple<HttpProtocolTestParams, bool>> getTestParamsWithoutHTTP3() {
+    return getDefaultTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
+  }
+
   void SetUp() override {
     setDownstreamProtocol(std::get<0>(GetParam()).downstream_protocol);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);

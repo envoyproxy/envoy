@@ -182,6 +182,11 @@ public:
   virtual Init::Manager& initManager() PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() PURE;
+
+  /**
    * @return DrainManager& the server-wide drain manager.
    */
   virtual Envoy::Server::DrainManager& drainManager() PURE;

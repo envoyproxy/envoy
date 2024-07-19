@@ -16,7 +16,7 @@ TEST(Config, OAuth2FlowTypeUnset) {
   envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;
   proto_config.mutable_token_fetch_retry_interval()->set_seconds(1);
   OAuth2CredentialInjectorFactory factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(
       factory.createCredentialInjectorFromProtoTyped(proto_config, "stats", context),
@@ -38,7 +38,7 @@ TEST(Config, NullClientSecret) {
   envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2 proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   OAuth2CredentialInjectorFactory factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(
       factory.createOauth2ClientCredentialInjector(proto_config, "stats", context), EnvoyException,

@@ -71,6 +71,22 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
 
+class UpstreamDownstreamGrpcClientIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType, bool>> {
+public:
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType, bool>>&
+          p) {
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) ? "DownstreamFilter" : "UpstreamFilter");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
+  bool isDownstreamFilter() const { return std::get<2>(GetParam()); }
+};
+
 // TODO(kbaichoo): Revert to using GrpcClientIntegrationParamTest for all
 // derived classes when deferred processing is enabled by default. It's
 // parameterized by deferred processing now to avoid bit rot since the feature
@@ -168,6 +184,9 @@ public:
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()))
+#define DOWNSTREAM_UPSTREAM_GRPC_CLIENT_INTEGRATION_PARAMS                                         \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()), testing::Bool())
 #define GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS                                         \
   testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool())
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \

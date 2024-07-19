@@ -22,10 +22,10 @@ public:
       : CredentialInjectorFactoryBase("envoy.http.injected_credentials.oauth2") {}
   Common::CredentialInjectorSharedPtr
   createOauth2ClientCredentialInjector(const OAuth2& proto_config, const std::string& stats_prefix,
-                                       Server::Configuration::FactoryContext& context);
-  Common::CredentialInjectorSharedPtr
-  createCredentialInjectorFromProtoTyped(const OAuth2& config, const std::string& stats_prefix,
-                                         Server::Configuration::FactoryContext& context) override;
+                                       Server::Configuration::ServerFactoryContext& context);
+  Common::CredentialInjectorSharedPtr createCredentialInjectorFromProtoTyped(
+      const OAuth2& config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(OAuth2CredentialInjectorFactory);
