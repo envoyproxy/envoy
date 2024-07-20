@@ -42,6 +42,9 @@ public:
   }
 
 private:
+  // Non owning pointers; `removeWatermarkCallbacks()` needs to be called to unregister watermark
+  // callbacks (if any) before filter callbacks are destroyed. Typically when stream is being closed
+  // or filter is being destroyed.
   Http::StreamDecoderFilterCallbacks* decode_callback_ = nullptr;
   Http::StreamEncoderFilterCallbacks* encode_callback_ = nullptr;
 };
