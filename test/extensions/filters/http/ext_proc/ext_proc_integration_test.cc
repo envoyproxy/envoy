@@ -1619,6 +1619,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
       });
 
   if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
+    // Advance time by `DefaultTimeout` which is default timeout used in waitForReset() below.
     timeSystem().advanceTimeWait(TestUtility::DefaultTimeout);
     // We get a reset since we've received some of the response already.
     ASSERT_TRUE(response->waitForReset());
