@@ -134,7 +134,6 @@ ContextConfigImpl::ContextConfigImpl(
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), default_curves)),
       signature_algorithms_(RepeatedPtrUtil::join(config.tls_params().signature_algorithms(), ":")),
-      prefer_client_ciphers_(config.tls_params().prefer_client_ciphers()),
       tls_certificate_providers_(
           getTlsCertificateConfigProviders(config, factory_context, creation_status)),
       certificate_validation_context_provider_(getCertificateValidationContextConfigProvider(

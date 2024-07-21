@@ -175,8 +175,7 @@ TEST_F(SslContextImplTest, TestPreferClientCiphers) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
-    tls_params:
-      prefer_client_ciphers: true
+  prefer_client_ciphers: true
   )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;

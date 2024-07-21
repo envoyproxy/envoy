@@ -49,11 +49,6 @@ public:
   virtual const std::string& signatureAlgorithms() const PURE;
 
   /**
-   * @return true if the client cipher preference is enabled, false otherwise.
-   */
-  virtual bool preferClientCiphers() const PURE;
-
-  /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
    * certificate configs.
    */
@@ -204,6 +199,11 @@ public:
    * downstream TLS handshake, false otherwise.
    */
   virtual bool fullScanCertsOnSNIMismatch() const PURE;
+
+  /**
+   * @return true if the client cipher preference is enabled, false otherwise.
+   */
+  virtual bool preferClientCiphers() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
