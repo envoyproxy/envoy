@@ -647,7 +647,7 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
-  void testSidestreamPushbackDownstream(bool check_downstream_flow_control) {
+  void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control) {
     config_helper_.setBufferLimits(1024, 1024);
 
     proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
@@ -656,7 +656,7 @@ protected:
     initializeConfig();
     HttpIntegrationTest::initialize();
 
-    std::string body_str = std::string(1030, 'a');
+    std::string body_str = std::string(body_size, 'a');
     auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
 
     bool end_stream = false;
@@ -4536,7 +4536,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
     return;
   }
 
-  testSidestreamPushbackDownstream(true);
+  testSidestreamPushbackDownstream(16 * 1024, true);
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
@@ -4545,7 +4545,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
   }
 
   proto_config_.set_observability_mode(true);
-  testSidestreamPushbackDownstream(true);
+  testSidestreamPushbackDownstream(16 * 1024, true);
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
@@ -4556,7 +4556,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.grpc_side_stream_flow_control", "false"}});
 
-  testSidestreamPushbackDownstream(false);
+  testSidestreamPushbackDownstream(1030, false);
 }
 
 } // namespace Envoy
