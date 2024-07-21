@@ -16,7 +16,7 @@ new_features:
 - area: tls
   change: |
     Added :ref:`prefer_client_ciphers
-    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.prefer_client_ciphers>`
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.prefer_client_ciphers>`
     to support enabling client cipher preference instead of server's for TLS handshakes.
 
 deprecated:
