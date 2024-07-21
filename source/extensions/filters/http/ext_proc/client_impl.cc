@@ -62,8 +62,9 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
 bool ExternalProcessorStreamImpl::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
-    if (grpc_side_stream_flow_control_) {
+    if (grpc_side_stream_flow_control_ && !watermark_callbacks_removed_) {
       stream_.removeWatermarkCallbacks();
+      watermark_callbacks_removed_ = true;
     }
     stream_.closeStream();
     stream_closed_ = true;

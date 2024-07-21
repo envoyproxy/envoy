@@ -647,6 +647,35 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
+  void testSidestreamPushbackDownstream(bool check_downstream_flow_control) {
+    config_helper_.setBufferLimits(1024, 1024);
+
+    proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+    proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+    initializeConfig();
+    HttpIntegrationTest::initialize();
+
+    std::string body_str = std::string(1030, 'a');
+    auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+    bool end_stream = false;
+    int count = 0;
+    while (!end_stream) {
+      processRequestBodyMessage(
+          *grpc_upstreams_[0], count == 0 ? true : false,
+          [&end_stream](const HttpBody& body, BodyResponse&) {
+            end_stream = body.end_of_stream();
+            return true;
+          },
+          check_downstream_flow_control);
+      count++;
+    }
+    handleUpstreamRequest();
+
+    verifyDownstreamResponse(*response, 200);
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
@@ -4507,32 +4536,16 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
     return;
   }
 
-  config_helper_.setBufferLimits(1024, 1024);
+  testSidestreamPushbackDownstream(true);
+}
 
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-
-  std::string body_str = std::string(16 * 1024, 'a');
-  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
-
-  bool end_stream = false;
-  int count = 0;
-  while (!end_stream) {
-    processRequestBodyMessage(
-        *grpc_upstreams_[0], count == 0 ? true : false,
-        [&end_stream](const HttpBody& body, BodyResponse&) {
-          end_stream = body.end_of_stream();
-          return true;
-        },
-        /*check_downstream_flow_control=*/true);
-    count++;
+TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
+  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+    return;
   }
-  handleUpstreamRequest();
 
-  verifyDownstreamResponse(*response, 200);
+  proto_config_.set_observability_mode(true);
+  testSidestreamPushbackDownstream(true);
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
@@ -4543,30 +4556,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.grpc_side_stream_flow_control", "false"}});
 
-  config_helper_.setBufferLimits(1024, 1024);
-
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-
-  std::string body_str = std::string(1030, 'a');
-  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
-
-  bool end_stream = false;
-  int count = 0;
-  while (!end_stream) {
-    processRequestBodyMessage(*grpc_upstreams_[0], count == 0 ? true : false,
-                              [&end_stream](const HttpBody& body, BodyResponse&) {
-                                end_stream = body.end_of_stream();
-                                return true;
-                              });
-    count++;
-  }
-  handleUpstreamRequest();
-
-  verifyDownstreamResponse(*response, 200);
+  testSidestreamPushbackDownstream(false);
 }
 
 } // namespace Envoy
