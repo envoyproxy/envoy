@@ -1,7 +1,5 @@
 package io.envoyproxy.envoymobile.engine
 
-import com.google.protobuf.Struct
-import com.google.protobuf.Value
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification

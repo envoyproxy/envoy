@@ -1329,6 +1329,14 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                           ? RetryState::Http3Used::Yes
                           : RetryState::Http3Used::No;
   }
+
+  // If the current request in this router has sent data to the upstream, we consider the request
+  // started.
+  upstream_request_started_ |= upstream_request.streamInfo()
+                                   .upstreamInfo()
+                                   ->upstreamTiming()
+                                   .first_upstream_tx_byte_sent_.has_value();
+
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_http3,
       [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
@@ -1338,7 +1346,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
         // the original request is retried with the same can_send_early_data setting, it will not be
         // sent as early data by the underlying connection pool grid.
         doRetry(can_send_early_data, disable_http3 ? false : can_use_http3, is_timeout_retry);
-      });
+      },
+      upstream_request_started_);
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
     pending_retries_++;

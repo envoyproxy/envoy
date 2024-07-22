@@ -1173,8 +1173,8 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:quic_platform_base",
     )
     native.bind(
-        name = "quiche_spdy_hpack",
-        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
+        name = "quiche_http2_hpack",
+        actual = "@com_github_google_quiche//:http2_hpack_hpack_lib",
     )
     native.bind(
         name = "quiche_http2_hpack_decoder",
@@ -1460,13 +1460,7 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive(
-        name = "rules_foreign_cc",
-        # This patch is needed to fix build on macos with xcode 15.3.
-        # remove this when https://github.com/bazelbuild/rules_foreign_cc/issues/1186 fixed.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
-    )
+    external_http_archive(name = "rules_foreign_cc")
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

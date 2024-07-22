@@ -308,8 +308,6 @@ private:
 
     // Config::ConfigProvider
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
-    const Protobuf::Message* getConfigProto() const override { return nullptr; }
-    std::string getConfigVersion() const override { return ""; }
     ConfigConstSharedPtr getConfig() const override { return config_; }
     ApiType apiType() const override { return ApiType::Full; }
     ConfigProtoVector getConfigProtos() const override { return {}; }

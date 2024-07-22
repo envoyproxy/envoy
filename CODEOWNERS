@@ -122,7 +122,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan @alyssawilk
-/*/extensions/filters/http/grpc_stats @kyessenov @botengyao
+/*/extensions/filters/http/grpc_stats @kyessenov @botengyao @nezdolik
 /*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
@@ -210,7 +210,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
-/*/extensions/formatter/metadata @cpakulski @ravenblackx
+/*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
 /*/extensions/formatter/cel @kyessenov @zirain
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @mattklein123
@@ -281,7 +281,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
 /*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
 # original dst
-/*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai
+/*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
 # formatter
