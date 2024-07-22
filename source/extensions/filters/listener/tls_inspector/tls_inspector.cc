@@ -106,7 +106,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(trace, "tls inspector: new connection accepted");
   cb_ = &cb;
 
-  return Network::FilterStatus::StopIteration;
+  return Network::FilterStatus::StopIterationAndWaitForData;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
@@ -162,11 +162,11 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
       return Network::FilterStatus::Continue;
     case ParseState::Continue:
       // Do nothing but wait for the next event.
-      return Network::FilterStatus::StopIteration;
+      return Network::FilterStatus::StopIterationAndWaitForData;
     }
     IS_ENVOY_BUG("unexpected tcp filter parse_state");
   }
-  return Network::FilterStatus::StopIteration;
+  return Network::FilterStatus::StopIterationAndWaitForData;
 }
 
 ParseState Filter::parseClientHello(const void* data, size_t len,

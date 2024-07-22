@@ -1994,7 +1994,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
-        return Network::FilterStatus::StopIteration;
+        return Network::FilterStatus::StopIterationAndWaitForData;
       }));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::MockIoHandle io_handle;
@@ -2048,7 +2048,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   std::string data = "test";
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
-        return Network::FilterStatus::StopIteration;
+        return Network::FilterStatus::StopIterationAndWaitForData;
       }));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
@@ -2107,7 +2107,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
-        return Network::FilterStatus::StopIteration;
+        return Network::FilterStatus::StopIterationAndWaitForData;
       }));
   Network::MockIoHandle io_handle;
   EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
@@ -2168,7 +2168,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
-        return Network::FilterStatus::StopIteration;
+        return Network::FilterStatus::StopIterationAndWaitForData;
       }));
   Network::MockIoHandle io_handle;
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();

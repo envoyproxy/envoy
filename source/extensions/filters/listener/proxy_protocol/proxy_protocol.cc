@@ -176,7 +176,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   cb_ = &cb;
   // Waiting for data.
-  return Network::FilterStatus::StopIteration;
+  return Network::FilterStatus::StopIterationAndWaitForData;
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
@@ -204,7 +204,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::TryAgainLater:
-    return Network::FilterStatus::StopIteration;
+    return Network::FilterStatus::StopIterationAndWaitForData;
   case ReadOrParseState::Done:
     return Network::FilterStatus::Continue;
   }

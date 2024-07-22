@@ -436,7 +436,7 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
   // Trigger the event to copy the client hello message into buffer
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
-  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(Network::FilterStatus::StopIterationAndWaitForData, state);
 
   // Terminate early.
   filter_.reset();
@@ -464,14 +464,14 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   mockSysCallForPeek(client_hello, true);
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
-  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(Network::FilterStatus::StopIterationAndWaitForData, state);
   EXPECT_EQ(2 * initial_buffer_size, filter_->maxReadBytes());
   buffer_->resetCapacity(2 * initial_buffer_size);
 
   mockSysCallForPeek(client_hello, true);
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   state = filter_->onData(*buffer_);
-  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(Network::FilterStatus::StopIterationAndWaitForData, state);
   EXPECT_EQ(max_size, filter_->maxReadBytes());
   buffer_->resetCapacity(max_size);
 

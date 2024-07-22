@@ -37,7 +37,15 @@ enum class FilterStatus {
   // Continue to further filters.
   Continue,
   // Stop executing further filters.
-  StopIteration
+  //
+  // The filter is responsible to continue execution of listener/network filters through
+  // calling continueFilterChain(). This should be used by all StopIteration cases except for
+  // StopIterationAndWaitForData.
+  StopIteration,
+  // Stop executing further filters and wait for data on the wire to continue execution.
+  //
+  // Filter execution will be activated by on_data_cb when data is ready on the wire.
+  StopIterationAndWaitForData
 };
 
 /**

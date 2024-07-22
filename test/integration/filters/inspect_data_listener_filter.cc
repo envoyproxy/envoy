@@ -30,7 +30,7 @@ public:
     cb_ = &cb;
     if (max_read_bytes_ != 0) {
       ENVOY_LOG_MISC(debug, "in InspectDataListenerFilter::onAccept, expect more data");
-      return Network::FilterStatus::StopIteration;
+      return Network::FilterStatus::StopIterationAndWaitForData;
     }
     if (config_->close_connection_) {
       ENVOY_LOG_MISC(
@@ -64,7 +64,7 @@ public:
                          "in InspectDataListenerFilter::onData, increase max_read_bytes to {} and "
                          "wating for more data.",
                          max_read_bytes_);
-          return Network::FilterStatus::StopIteration;
+          return Network::FilterStatus::StopIterationAndWaitForData;
         }
         ENVOY_LOG_MISC(
             debug,
@@ -75,7 +75,7 @@ public:
       ENVOY_LOG_MISC(
           debug,
           "in InspectDataListenerFilter::onData, waiting for more data and stop the iteration.");
-      return Network::FilterStatus::StopIteration;
+      return Network::FilterStatus::StopIterationAndWaitForData;
     }
   }
 

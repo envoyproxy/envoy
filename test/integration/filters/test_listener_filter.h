@@ -45,7 +45,7 @@ public:
   TestTcpListenerFilter(const uint32_t drain_bytes) : drain_bytes_(drain_bytes) {}
 
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks&) override {
-    return Network::FilterStatus::StopIteration;
+    return Network::FilterStatus::StopIterationAndWaitForData;
   }
 
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {

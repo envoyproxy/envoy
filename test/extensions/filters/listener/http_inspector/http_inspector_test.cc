@@ -115,7 +115,7 @@ public:
     bool got_continue = false;
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     auto accepted = filter_->onAccept(cb_);
-    EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+    EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
     while (!got_continue) {
       ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
       auto status = filter_->onData(*buffer_);
@@ -192,7 +192,7 @@ public:
     bool got_continue = false;
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
     auto accepted = filter_->onAccept(cb_);
-    EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+    EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
     while (!got_continue) {
       ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
       auto status = filter_->onData(*buffer_);
@@ -257,7 +257,7 @@ public:
 
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
     auto accepted = filter_->onAccept(cb_);
-    EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+    EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
     ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
     EXPECT_EQ(status, Network::FilterStatus::Continue);
@@ -316,7 +316,7 @@ public:
 #endif
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     auto accepted = filter_->onAccept(cb_);
-    EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+    EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
     ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
     EXPECT_EQ(status, Network::FilterStatus::Continue);
@@ -466,10 +466,10 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
 #endif
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   auto accepted = filter_->onAccept(cb_);
-  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
   ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto status = filter_->onData(*buffer_);
-  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(status, Network::FilterStatus::StopIterationAndWaitForData);
   EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
 }
 
@@ -570,7 +570,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   auto accepted = filter_->onAccept(cb_);
-  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
   while (!got_continue) {
     ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);
@@ -624,7 +624,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   auto accepted = filter_->onAccept(cb_);
-  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIterationAndWaitForData);
   while (!got_continue) {
     ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
     auto status = filter_->onData(*buffer_);

@@ -44,7 +44,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     done(true);
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
-    return Network::FilterStatus::StopIteration;
+    return Network::FilterStatus::StopIterationAndWaitForData;
   }
   PANIC_DUE_TO_CORRUPT_ENUM
 }
@@ -62,7 +62,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   }
 
   cb_ = &cb;
-  return Network::FilterStatus::StopIteration;
+  return Network::FilterStatus::StopIterationAndWaitForData;
 }
 
 ParseState Filter::parseHttpHeader(absl::string_view data) {

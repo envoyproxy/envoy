@@ -85,7 +85,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
       [this](Network::ListenerFilterBufferImpl& filter_buffer) {
         ASSERT((*iter_)->maxReadBytes() != 0);
         Network::FilterStatus status = (*iter_)->onData(filter_buffer);
-        if (status == Network::FilterStatus::StopIteration) {
+        if (status == Network::FilterStatus::StopIterationAndWaitForData) {
           if (socket_->ioHandle().isOpen()) {
             // The listener filter should not wait for more data when it has already received
             // all the data it requested.
@@ -120,16 +120,17 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
 
     for (; iter_ != accept_filters_.end(); iter_++) {
       Network::FilterStatus status = (*iter_)->onAccept(*this);
-      if (status == Network::FilterStatus::StopIteration) {
+      if (status == Network::FilterStatus::StopIteration || status == Network::FilterStatus::StopIterationAndWaitForData) {
         // The filter is responsible for calling us again at a later time to continue the filter
         // chain from the next filter.
         if (!socket().ioHandle().isOpen()) {
           // Break the loop but should not create new connection.
           no_error = false;
           break;
-        } else {
+        }
+        if (status == Network::FilterStatus::StopIterationAndWaitForData) {
           // If the listener maxReadBytes() is 0, then it shouldn't return
-          // `FilterStatus::StopIteration` from `onAccept` to wait for more data.
+          // `FilterStatus::StopIterationAndWaitForData` from `onAccept` to wait for more data.
           ASSERT((*iter_)->maxReadBytes() != 0);
           if (listener_filter_buffer_ == nullptr) {
             if ((*iter_)->maxReadBytes() > 0) {
@@ -151,6 +152,12 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
             listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
           }
           // Waiting for more data.
+          return;
+        } else {
+          // The listener filter maxReadBytes() must be 0, and it should return
+          // `FilterStatus::StopIteration` from `onAccept` and needs to actively call
+          // continueFilterChain() to recover execution.
+          ASSERT((*iter_)->maxReadBytes() == 0);
           return;
         }
       }
