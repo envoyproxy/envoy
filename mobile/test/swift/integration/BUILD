@@ -10,9 +10,13 @@ envoy_mobile_swift_test(
     srcs = [
         "EndToEndNetworkingTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -26,9 +30,13 @@ envoy_mobile_swift_test(
     srcs = [
         "CancelStreamTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -42,9 +50,13 @@ envoy_mobile_swift_test(
     srcs = [
         "EngineApiTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -57,9 +69,13 @@ envoy_mobile_swift_test(
     srcs = [
         "FilterResetIdleTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -73,9 +89,13 @@ envoy_mobile_swift_test(
     srcs = [
         "GRPCReceiveErrorTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -89,9 +109,13 @@ envoy_mobile_swift_test(
     srcs = [
         "IdleTimeoutTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -105,9 +129,13 @@ envoy_mobile_swift_test(
     srcs = [
         "KeyValueStoreTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -121,9 +149,13 @@ envoy_mobile_swift_test(
     srcs = [
         "ReceiveDataTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -137,9 +169,13 @@ envoy_mobile_swift_test(
     srcs = [
         "ReceiveErrorTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -152,9 +188,13 @@ envoy_mobile_swift_test(
     srcs = [
         "ResetConnectivityStateTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -168,9 +208,13 @@ envoy_mobile_swift_test(
     srcs = [
         "SendDataTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -184,9 +228,13 @@ envoy_mobile_swift_test(
     srcs = [
         "SendHeadersTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -200,9 +248,13 @@ envoy_mobile_swift_test(
     srcs = [
         "SendTrailersTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -216,9 +268,13 @@ envoy_mobile_swift_test(
     srcs = [
         "SetEventTrackerTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -232,9 +288,13 @@ envoy_mobile_swift_test(
     srcs = [
         "SetEventTrackerTestNoTracker.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -248,9 +308,13 @@ envoy_mobile_swift_test(
     srcs = [
         "SetLoggerTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
@@ -264,9 +328,13 @@ envoy_mobile_swift_test(
     srcs = [
         "CancelGRPCStreamTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":test_extensions",
