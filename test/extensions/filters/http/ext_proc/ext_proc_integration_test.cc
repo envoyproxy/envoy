@@ -5,6 +5,7 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -44,7 +45,7 @@ using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
-using Extensions::HttpFilters::ExternalProcessing::DEFAULT_CLOSE_TIMEOUT_MS;
+using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
@@ -1598,7 +1599,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that tries to modify the trailers incorrectly
 // according to the header mutation rules.
-TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
+// TODO(tyxia): re-enable this test (see https://github.com/envoyproxy/envoy/issues/35281)
+TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_mutation_rules()->mutable_disallow_all()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
@@ -3929,7 +3931,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* upstream_codec = old_protocol_options.add_http_filters();
+      upstream_codec->set_name("envoy.filters.http.upstream_codec");
+      upstream_codec->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
@@ -4157,7 +4162,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
@@ -4200,7 +4205,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
@@ -4218,7 +4223,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithWrongBodyMode) {
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
@@ -4250,11 +4255,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
   verifyDownstreamResponse(*response, 200);
   EXPECT_THAT(*(response->trailers()), HasNoHeader("x-modified-trailers"));
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 1000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
@@ -4272,11 +4279,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequest) {
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 1000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
@@ -4294,7 +4303,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
 
   verifyDownstreamResponse(*response, 200);
 
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
@@ -4351,7 +4360,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* http_filter = old_protocol_options.add_http_filters();
+      http_filter->set_name("envoy.filters.http.upstream_codec");
+      http_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
@@ -4386,9 +4398,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-new-header", "new"));
-
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
@@ -4401,7 +4410,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
+// Upstream filter chain is in alpha mode and it is not actively used in ext_proc at the moment.
+TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
   ConfigOptions config_option = {};
@@ -4422,7 +4432,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityModeWithLogg
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* http_filter = old_protocol_options.add_http_filters();
+      http_filter->set_name("envoy.filters.http.upstream_codec");
+      http_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
@@ -4486,7 +4499,7 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
   handleUpstreamRequest();
   EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
                                                          std::chrono::milliseconds(25000)));
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {

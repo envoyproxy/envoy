@@ -1015,7 +1015,7 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
     ASSERT_TRUE(
         waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
     ASSERT_TRUE(waitForCounterGe(
-        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED", 1));
+        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED", 1));
   }
 }
 

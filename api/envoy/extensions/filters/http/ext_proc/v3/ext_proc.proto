@@ -257,7 +257,6 @@ message ExternalProcessor {
   RouteCacheAction route_cache_action = 18
       [(udpa.annotations.field_migrate).oneof_promotion = "clear_route_cache_type"];
 
-  // [#not-implemented-hide:]
   // Specifies the deferred closure timeout for gRPC stream that connects to external processor. Currently, the deferred stream closure
   // is only used in :ref:`observability_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.observability_mode>`.
   // In observability mode, gRPC streams may be held open to the external processor longer than the lifetime of the regular client to

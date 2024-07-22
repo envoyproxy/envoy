@@ -381,7 +381,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   Buffer::OwnedImpl data("1234567890123");
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   // This will result in retry_state_ being deleted.
   router_->decodeData(data, false);
   EXPECT_EQ(1U,
@@ -900,7 +900,7 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
@@ -953,7 +953,7 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _)).Times(0);
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
