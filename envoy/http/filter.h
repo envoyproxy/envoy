@@ -857,7 +857,7 @@ public:
    * onDestroy() invoked. Filters that cross-register as access log handlers receive log() before
    * onDestroy().
    */
-  virtual void onDestroy() PURE;
+  virtual void onDestroy() {}
 
   /**
    * Called when a match result occurs that isn't handled by the filter manager.
@@ -901,7 +901,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -1117,7 +1117,7 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public StreamFilterBase {
+class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with supported 1xx headers.
