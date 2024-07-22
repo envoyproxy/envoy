@@ -1298,9 +1298,9 @@ sphinxcontrib-jsmath==1.0.1 \
     --hash=sha256:2ec2eaebfb78f3f2078e73666b1415417a116cc848b72e5172e596c871103178 \
     --hash=sha256:a9925e4a4587247ed2191a22df5f6970656cb8ca2bd6284309578f2153e0c4b8
     # via sphinx
-sphinxcontrib-qthelp==1.0.7 \
-    --hash=sha256:053dedc38823a80a7209a80860b16b722e9e0209e32fea98c90e4e6624588ed6 \
-    --hash=sha256:e2ae3b5c492d58fcbd73281fbd27e34b8393ec34a073c792642cd8e529288182
+sphinxcontrib-qthelp==1.0.8 \
+    --hash=sha256:323d6acc4189af76dfe94edd2a27d458902319b60fcca2aeef3b2180c106a75f \
+    --hash=sha256:db3f8fa10789c7a8e76d173c23364bdf0ebcd9449969a9e6a3dd31b8b7469f03
     # via
     #   -r requirements.in
     #   sphinx
