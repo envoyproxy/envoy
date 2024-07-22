@@ -82,7 +82,8 @@ using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
 // Each monitor may implement different health detection algorithm.
 class ExtMonitor {
 public:
-  using ExtMonitorCallback = std::function<void(uint32_t, std::string, absl::optional<std::string>)>;
+  using ExtMonitorCallback =
+      std::function<void(uint32_t, std::string, absl::optional<std::string>)>;
   virtual ~ExtMonitor() {}
 
   // Method to report a result to extensions.
