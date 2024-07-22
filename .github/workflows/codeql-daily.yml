@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
 
     - name: Free disk space
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.30
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.31
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
