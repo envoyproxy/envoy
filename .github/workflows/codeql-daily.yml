@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633  # v4.1.2
 
     - name: Free disk space
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.30
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.31
       with:
         to_remove: |
           /usr/local/lib/android
