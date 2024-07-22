@@ -120,7 +120,8 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
 
     for (; iter_ != accept_filters_.end(); iter_++) {
       Network::FilterStatus status = (*iter_)->onAccept(*this);
-      if (status == Network::FilterStatus::StopIteration || status == Network::FilterStatus::StopIterationAndWaitForData) {
+      if (status == Network::FilterStatus::StopIteration ||
+          status == Network::FilterStatus::StopIterationAndWaitForData) {
         // The filter is responsible for calling us again at a later time to continue the filter
         // chain from the next filter.
         if (!socket().ioHandle().isOpen()) {
