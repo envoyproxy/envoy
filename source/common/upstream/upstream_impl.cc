@@ -1298,15 +1298,21 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
     has_configured_http_filters_ = !http_filters.empty();
+    static const std::string upstream_codec_type_url =
+        envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
+            .GetTypeName();
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    }
-    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("The codec filter is the only valid terminal upstream HTTP filter"));
+      codec_filter->mutable_typed_config()->set_type_url(upstream_codec_type_url);
+    } else {
+      const auto last_type_url =
+          Config::Utility::getFactoryType(http_filters[http_filters.size() - 1].typed_config());
+      if (last_type_url != upstream_codec_type_url) {
+        throwEnvoyExceptionOrPanic(fmt::format(
+            "The codec filter is the only valid terminal upstream HTTP filter, use '{}'",
+            upstream_codec_type_url));
+      }
     }
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());

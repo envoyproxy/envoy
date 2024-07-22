@@ -175,7 +175,7 @@ using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 class ServerContextFactory : public Envoy::Config::UntypedFactory {
 public:
   std::string category() const override { return "envoy.ssl.server_context_factory"; }
-  virtual Ssl::ServerContextSharedPtr
+  virtual absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                       const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,
