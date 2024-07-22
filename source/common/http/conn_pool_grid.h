@@ -172,6 +172,8 @@ public:
     bool tcp_attempt_succeeded_{};
     // Latch the passed-in stream options.
     const Instance::StreamOptions stream_options_{};
+    absl::optional<ConnectionPool::PoolFailureReason> prev_tcp_pool_failure_reason_;
+    std::string prev_tcp_pool_transport_failure_reason_;
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
