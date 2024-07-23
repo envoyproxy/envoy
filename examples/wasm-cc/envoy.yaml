@@ -103,7 +103,7 @@ static_resources:
         upstream_http_protocol_options:
           auto_sni: false
           auto_san_validation: false
-        auto_config:
+        explicit_http_config:
           http2_protocol_options: {}
         http_filters:
         - name: envoy.filters.http.wasm

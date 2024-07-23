@@ -4805,6 +4805,37 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
                     .ok());
   }
 }
+
+TEST(SubstitutionFormatterTest, UniqueIdFormatterTest) {
+  StreamInfo::MockStreamInfo stream_info;
+
+  // Simulate initial parsing of configuration
+  auto providers1 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  ASSERT_EQ(providers1.size(), 1);
+
+  // Generate first unique ID with the initial configuration
+  auto id1 = providers1[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id1.has_value());
+
+  // Generate second unique ID with the same initial configuration
+  auto id2 = providers1[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id2.has_value());
+
+  // Check the two generated IDs are unique
+  EXPECT_NE(id1, id2);
+
+  // Simulate configuration reload
+  auto providers2 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  ASSERT_EQ(providers2.size(), 1);
+
+  // Generate another unique ID after the simulated reload
+  auto id3 = providers2[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id3.has_value());
+
+  // Check the new ID is also unique compared to the previous ones
+  EXPECT_NE(id1, id3);
+  EXPECT_NE(id2, id3);
+}
 } // namespace
 } // namespace Formatter
 } // namespace Envoy

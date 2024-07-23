@@ -6330,6 +6330,85 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
                                                          Http::Protocol::Http11, &lb_context)));
 }
 
+TEST_F(ClusterManagerImplTest, CheckAddressesList) {
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  socketAddress:
+                    address: ::1
+                    portValue: 11001
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap));
+  // Verify address list for static cluster in bootstrap.
+  auto cluster = cluster_manager_->getThreadLocalCluster("cluster_0");
+  auto hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_NE(hosts[0]->addressListOrNull(), nullptr);
+  ASSERT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+
+  const std::string cluster_api = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  const std::string cluster_api_update = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            additionalAddresses:
+              - address:
+                  socketAddress:
+                    address: ::1
+                    portValue: 11001
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  // Add static cluster via api and check that addresses list is empty.
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
+  cluster = cluster_manager_->getThreadLocalCluster("added_via_api");
+  hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(hosts[0]->addressListOrNull(), nullptr);
+  // Update cluster to have additional addresses and check that address list is not empty anymore.
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api_update), "v2"));
+  cluster = cluster_manager_->getThreadLocalCluster("added_via_api");
+  hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_NE(hosts[0]->addressListOrNull(), nullptr);
+  ASSERT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+}
+
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
   const std::string yaml = R"EOF(
   static_resources:

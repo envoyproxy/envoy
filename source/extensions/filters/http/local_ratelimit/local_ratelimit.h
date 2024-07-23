@@ -85,11 +85,8 @@ public:
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  int64_t
-  remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
@@ -183,17 +180,15 @@ private:
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
-  bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
   FilterConfigSharedPtr config_;
   // Actual config used for the current request. Is config_ by default, but can be overridden by
   // per-route config.
   const FilterConfig* used_config_{};
+  OptRef<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
 
-  absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
   VhRateLimitOptions vh_rate_limits_;
 };
 

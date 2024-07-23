@@ -31,6 +31,7 @@ envoy_cc_extension(
         "//library/common/types:c_types_lib",
         "@envoy//envoy/http:codes_interface",
         "@envoy//envoy/http:filter_interface",
+        "@envoy//source/common/common:thread_lib",
         "@envoy//source/common/grpc:common_lib",
         "@envoy//source/common/grpc:status_lib",
         "@envoy//source/common/http:codes_lib",

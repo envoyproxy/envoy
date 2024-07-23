@@ -92,14 +92,8 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 // Takes care of percentage encoding http and https is needed
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
   std::string result = "";
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
-    for (const auto& resource : resources_protos) {
-      result += "&resource=" + Http::Utility::PercentEncoding::urlEncodeQueryParameter(resource);
-    }
-  } else {
-    for (const auto& resource : resources_protos) {
-      result += "&resource=" + Http::Utility::PercentEncoding::encode(resource, ":/=&? ");
-    }
+  for (const auto& resource : resources_protos) {
+    result += "&resource=" + Http::Utility::PercentEncoding::urlEncodeQueryParameter(resource);
   }
   return result;
 }
@@ -136,10 +130,8 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
   query_params.overwrite("client_id", proto_config.credentials().client_id());
   query_params.overwrite("response_type", "code");
   std::string scopes_list = absl::StrJoin(authScopesList(proto_config.auth_scopes()), " ");
-  query_params.overwrite(
-      "scope", Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
-                   ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(scopes_list)
-                   : Http::Utility::PercentEncoding::encode(scopes_list, ":/=&? "));
+  query_params.overwrite("scope",
+                         Http::Utility::PercentEncoding::urlEncodeQueryParameter(scopes_list));
   return query_params;
 }
 
@@ -328,11 +320,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       }
 
       std::string state;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
-        state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-      } else {
-        state = Http::Utility::PercentEncoding::decode(stateVal.value());
-      }
+      state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
         ENVOY_LOG(debug, "state url {} can not be initialized", state_url.toString());
@@ -407,11 +395,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   auth_code_ = codeVal.value();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")) {
-    state_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-  } else {
-    state_ = Http::Utility::PercentEncoding::decode(stateVal.value());
-  }
+  state_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
 
   Http::Utility::Url state_url;
   if (!state_url.initialize(state_, false)) {
@@ -482,17 +466,13 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string base_path = absl::StrCat(scheme, "://", host_);
   const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
   const std::string escaped_state =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
-          ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(state_path)
-          : Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
+      Http::Utility::PercentEncoding::urlEncodeQueryParameter(state_path);
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
       formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
-          ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri)
-          : Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
+      Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
 
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite("redirect_uri", escaped_redirect_uri);

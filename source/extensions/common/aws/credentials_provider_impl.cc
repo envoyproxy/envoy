@@ -147,33 +147,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       tls_slot_->set(
           [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
 
-      auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
-      // Async credential refresh timer
-      cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
-        stats_->credential_refreshes_performed_.inc();
-        refresh();
-      });
-
-      // Store the timer in pending cluster list for use in onClusterAddOrUpdate
-      cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
-          (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
-
-      // TODO(suniltheta): use random number generator here for cluster version.
-      // While adding multiple clusters make sure that change in random version number across
-      // multiple clusters won't make Envoy delete/replace previously registered internal
-      // cluster.
-      context_->clusterManager().addOrUpdateCluster(cluster, "12345");
-
-      const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
-                                        ->FindValueByNumber(cluster.type())
-                                        ->name();
-      absl::string_view host_port;
-      absl::string_view path;
-      Http::Utility::extractHostPathFromUri(uri_, host_port, path);
-      ENVOY_LOG_MISC(info,
-                     "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
-                     "credentials",
-                     cluster_type_str, cluster_name_, host_port);
+      createCluster(true);
 
       init_target_->ready();
       init_target_.reset();
@@ -190,6 +164,39 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
   }
 }
 
+void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
+  auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
+  // Async credential refresh timer. Only create this if it is the first time we're creating a
+  // cluster
+  if (new_timer) {
+    cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
+      stats_->credential_refreshes_performed_.inc();
+      refresh();
+    });
+
+    // Store the timer in pending cluster list for use in onClusterAddOrUpdate
+    cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
+        (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
+
+    const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
+                                      ->FindValueByNumber(cluster.type())
+                                      ->name();
+    absl::string_view host_port;
+    absl::string_view path;
+    Http::Utility::extractHostPathFromUri(uri_, host_port, path);
+    ENVOY_LOG_MISC(info,
+                   "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
+                   "credentials",
+                   cluster_type_str, cluster_name_, host_port);
+  }
+
+  // TODO(suniltheta): use random number generator here for cluster version.
+  // While adding multiple clusters make sure that change in random version number across
+  // multiple clusters won't make Envoy delete/replace previously registered internal
+  // cluster.
+  context_->clusterManager().addOrUpdateCluster(cluster, "12345");
+}
+
 // A thread local callback that occurs on every worker thread during cluster initialization.
 // Credential refresh is only allowed on the main thread as its execution logic is not thread safe.
 // So the first thread local cluster that comes online will post a job to the main thread to perform
@@ -199,6 +206,15 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
 void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
   Thread::LockGuard lock(lock_);
+
+  if (cluster_name == parent_.cluster_name_) {
+    // Cluster has been created
+    auto already_creating_ = parent_.is_creating_.exchange(false);
+    if (already_creating_) {
+      parent_.stats_->clusters_readded_after_cds_.inc();
+    }
+  }
+
   auto it = pending_clusters_.find(cluster_name);
   if (it != pending_clusters_.end()) {
     for (auto* cluster : it->second) {
@@ -216,9 +232,22 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterAddO
   }
 }
 
+// If we have a cluster removal event, such as during cds update, recreate the cluster but leave the
+// refresh timer as-is
+
 void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemoval(
-    const std::string&){
-    // Unused callback
+    const std::string& name) {
+
+  if (name == parent_.cluster_name_) {
+    // Atomic check to prevent excessive cluster re-adds
+    auto already_creating_ = parent_.is_creating_.exchange(true);
+    if (!already_creating_) {
+      parent_.stats_->clusters_removed_by_cds_.inc();
+      // Recreate our cluster if it has been deleted via CDS
+      parent_.context_->mainThreadDispatcher().post([this]() { parent_.createCluster(false); });
+      ENVOY_LOG_MISC(debug, "Re-adding async credential cluster {}", parent_.cluster_name_);
+    }
+  }
 };
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
