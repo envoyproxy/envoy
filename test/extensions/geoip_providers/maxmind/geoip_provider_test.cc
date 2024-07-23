@@ -425,7 +425,10 @@ TEST_F(GeoipProviderTest, DbReloadError) {
   EXPECT_EQ("Boxford", city_it->second);
   TestEnvironment::renameFile(city_db_path, city_db_path + "1");
   TestEnvironment::renameFile(reloaded_invalid_city_db_path, city_db_path);
-  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  {
+    absl::MutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
   // On mmdb reload error the old mmdb instance should be used for subsequent lookup requests.
   expectReloadStats("city_db", 0, 1);
   captured_lookup_response_.clear();
@@ -574,7 +577,10 @@ TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
   std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
   TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
-  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  {
+    absl::MutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
   GeoipProviderPeer::synchronizer(provider_).signal(lookup_sync_point_name);
   t0.join();
   // Clean up modifications to mmdb file names.
