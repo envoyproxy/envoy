@@ -27,6 +27,7 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
   ON_CALL(host, address()).WillByDefault(Return(address));
   std::shared_ptr<Upstream::HostImplBase::AddressVector> address_list =
       std::make_shared<Upstream::HostImplBase::AddressVector>();
+  address_list->push_back(*Network::Utility::resolveUrl(address_url));
   for (auto& new_addr : additional_addresses_url) {
     address_list->push_back(*Network::Utility::resolveUrl(new_addr));
   }

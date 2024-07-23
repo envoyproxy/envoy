@@ -569,6 +569,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
@@ -1901,6 +1902,8 @@ envoy_cc_test(
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//source/extensions/upstreams/http/udp:config",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",

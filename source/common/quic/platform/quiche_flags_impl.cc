@@ -72,29 +72,10 @@ template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int
 #include "quiche/common/quiche_feature_flags_list.h"
 #undef QUICHE_FLAG
 
-#define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                         \
-  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, value), help);
-
-#define DEFINE_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                                  \
-  DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
-
-#define DEFINE_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, external_value, doc)           \
-  DEFINE_PROTOCOL_FLAG_IMPL(type, flag, external_value, doc)
-
-// Select the right macro based on the number of arguments.
-#define GET_6TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
-
-#define PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                           \
-  GET_6TH_ARG(__VA_ARGS__, DEFINE_PROTOCOL_FLAG_TWO_VALUES, DEFINE_PROTOCOL_FLAG_SINGLE_VALUE)
-
-#define QUICHE_PROTOCOL_FLAG(...) PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+#define QUICHE_PROTOCOL_FLAG(type, flag, value, doc)                                               \
+  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, value), doc);
 #include "quiche/common/quiche_protocol_flags_list.h"
 #undef QUICHE_PROTOCOL_FLAG
-
-#undef PROTOCOL_FLAG_MACRO_CHOOSER
-#undef GET_6TH_ARG
-#undef DEFINE_PROTOCOL_FLAG_TWO_VALUES
-#undef DEFINE_PROTOCOL_FLAG_SINGLE_VALUE
 
 namespace quiche {
 
