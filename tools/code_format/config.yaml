@@ -411,6 +411,7 @@ visibility_excludes:
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
+- source/extensions/filters/network/generic_proxy/interface/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/transport_sockets/tap/BUILD

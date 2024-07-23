@@ -278,7 +278,12 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     resumeCoroutine(0, yield_callback_);
   }
 
-  if (state_ == State::HttpCall || state_ == State::WaitForBody) {
+  if (state_ == State::HttpCall) {
+    return (Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.lua_flow_control_while_http_call"))
+               ? Http::FilterDataStatus::StopIterationAndWatermark
+               : Http::FilterDataStatus::StopIterationAndBuffer;
+  } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
   } else if (state_ == State::Responded) {
