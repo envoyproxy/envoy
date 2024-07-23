@@ -408,7 +408,7 @@ FormatterProviderPtr BuiltInHttpCommandParser::parse(const std::string& command,
 
 class BuiltInHttpCommandParserFactory : public BuiltInCommandParserFactory {
 public:
-  std::string name() const override { return "envoy.formatter.built_in_http"; }
+  std::string name() const override { return "envoy.built_in_formatters.built_in_http"; }
 };
 
 REGISTER_FACTORY(BuiltInHttpCommandParserFactory, BuiltInCommandParserFactory);

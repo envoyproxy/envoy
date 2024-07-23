@@ -821,14 +821,14 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
-envoy.formatter.built_in_http:
+envoy.built_in_formatters.built_in_http:
   categories:
-  - envoy.formatter
+  - envoy.built_in_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.formatter.built_in_stream_info:
+envoy.built_in_formatters.built_in_stream_info:
   categories:
-  - envoy.formatter
+  - envoy.built_in_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.geoip_providers.maxmind:

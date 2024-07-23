@@ -1764,7 +1764,7 @@ public:
 
 class BuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {
 public:
-  std::string name() const override { return "envoy.formatter.built_in_stream_info"; }
+  std::string name() const override { return "envoy.built_in_formatters.built_in_stream_info"; }
 };
 
 REGISTER_FACTORY(BuiltInStreamInfoCommandParserFactory, BuiltInCommandParserFactory);

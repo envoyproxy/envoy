@@ -133,7 +133,7 @@ using CommandParsersBase = std::vector<CommandParserBasePtr<FormatterContext>>;
 
 class BuiltInCommandParserFactory : public Config::UntypedFactory {
 public:
-  std::string category() const override { return "envoy.formatters"; }
+  std::string category() const override { return "envoy.built_in_formatters"; }
 };
 
 template <class FormatterContext> class BuiltInCommandParserRegistryBase {
