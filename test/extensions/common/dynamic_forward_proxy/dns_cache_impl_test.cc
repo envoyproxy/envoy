@@ -191,10 +191,6 @@ TEST_P(DnsCacheImplPreresolveTest, PreresolveFailure) {
 }
 
 TEST_F(DnsCacheImplTest, DnsFirstResolveComplete) {
-  // This test relies on below runtime flag to be true.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.dns_cache_set_first_resolve_complete", "true"}});
   Network::DnsResolver::ResolveCb resolve_cb;
   std::string hostname = "bar.baz.com:443";
   EXPECT_CALL(*resolver_, resolve("bar.baz.com", _, _))
