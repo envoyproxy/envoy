@@ -96,6 +96,11 @@ public:
     ASSERT(provider_factory_);
   }
 
+  ~GeoipProviderTestBase() {
+    absl::WriterMutexLock lock(&mutex_);
+    on_changed_cbs_.clear();
+  };
+
   void initializeProvider(const std::string& yaml) {
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
     EXPECT_CALL(context_, serverFactoryContext())
@@ -106,6 +111,7 @@ public:
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
           .WillRepeatedly(
               Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+                absl::WriterMutexLock lock(&mutex_);
                 on_changed_cbs_.emplace_back(cb);
                 return absl::OkStatus();
               }));
@@ -147,7 +153,8 @@ public:
   MaxmindProviderFactory* provider_factory_;
   Event::SimulatedTimeSystem time_system_;
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
-  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_;
+  absl::Mutex mutex_;
+  std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_ ABSL_GUARDED_BY(mutex_);
 };
 
 class GeoipProviderTest : public testing::Test, public GeoipProviderTestBase {};
@@ -367,7 +374,10 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   EXPECT_EQ("Boxford", city_it->second);
   TestEnvironment::renameFile(city_db_path, city_db_path + "1");
   TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
-  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  {
+    absl::MutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
   expectReloadStats("city_db", 1, 0);
   captured_lookup_response_.clear();
   EXPECT_EQ(0, captured_lookup_response_.size());
@@ -510,7 +520,10 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
   TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
-  EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  {
+    absl::MutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
   expectReloadStats(test_case.db_type_, 1, 0);
   captured_lookup_response_.clear();
   remote_address = Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
@@ -588,7 +601,10 @@ TEST_P(MmdbReloadImplTest, MmdbNotReloadedRuntimeFeatureDisabled) {
   std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
   TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
-  EXPECT_EQ(0, on_changed_cbs_.size());
+  {
+    absl::MutexLock guard(&mutex_);
+    EXPECT_EQ(0, on_changed_cbs_.size());
+  }
   expectReloadStats(test_case.db_type_, 0, 0);
   captured_lookup_response_.clear();
   remote_address = Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
