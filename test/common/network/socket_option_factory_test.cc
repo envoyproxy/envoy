@@ -165,7 +165,6 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
     level: %d
     name: %d
     int_value: 1
-    type: ALL
   )proto";
   auto all_socket_type_option =
       absl::StrFormat(all_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
@@ -177,7 +176,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
     level: %d
     name: %d
     int_value: 1
-    type: STREAM
+    stream: {}
   )proto";
   auto stream_socket_type_option =
       absl::StrFormat(stream_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
@@ -189,7 +188,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
     level: %d
     name: %d
     int_value: 1
-    type: DATAGRAM
+    datagram: {}
   )proto";
   auto datagram_socket_type_option =
       absl::StrFormat(datagram_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);

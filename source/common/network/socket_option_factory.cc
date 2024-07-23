@@ -99,11 +99,17 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
       continue;
     }
 
-    absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
-    if (socket_option.type() == envoy::config::core::v3::SocketOption::STREAM) {
+    absl::optional<Network::Socket::Type> socket_type;
+    switch (socket_option.type_case()) {
+    case envoy::config::core::v3::SocketOption::TypeCase::kStream:
       socket_type = Network::Socket::Type::Stream;
-    } else if (socket_option.type() == envoy::config::core::v3::SocketOption::DATAGRAM) {
+      break;
+    case envoy::config::core::v3::SocketOption::TypeCase::kDatagram:
       socket_type = Network::Socket::Type::Datagram;
+      break;
+    default:
+      socket_type = absl::nullopt;
+      break;
     }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
