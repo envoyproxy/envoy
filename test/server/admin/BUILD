@@ -36,6 +36,8 @@ envoy_cc_test_library(
     srcs = envoy_select_admin_functionality(["admin_instance.cc"]),
     hdrs = envoy_select_admin_functionality(["admin_instance.h"]),
     deps = [
+        "//source/extensions/formatter/built_in_http:config",
+        "//source/extensions/formatter/built_in_stream_info:config",
         "//source/server:configuration_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -58,6 +60,8 @@ envoy_cc_test(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/extensions/formatter/built_in_http:config",
+        "//source/extensions/formatter/built_in_stream_info:config",
         "//source/server:null_overload_manager_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",

@@ -15,6 +15,7 @@ envoy_cc_library(
         "substitution_formatter.cc",
     ],
     hdrs = [
+        "http_formatter_context.h",
         "substitution_formatter.h",
     ],
     external_deps = ["abseil_str_format"],

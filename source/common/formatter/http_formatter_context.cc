@@ -2,6 +2,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 
@@ -39,6 +40,19 @@ const Tracing::Span& HttpFormatterContext::activeSpan() const {
   }
 
   return *active_span_;
+}
+
+static constexpr absl::string_view DEFAULT_FORMAT =
+    "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
+    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
+    "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
+    "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
+    "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
+
+FormatterPtr HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
+  // It is possible that failed to parse the default format string if the required formatters
+  // are compiled out.
+  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
 }
 
 } // namespace Formatter

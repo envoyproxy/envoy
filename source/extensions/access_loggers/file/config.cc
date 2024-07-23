@@ -31,8 +31,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
   switch (fal_config.access_log_format_case()) {
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
     if (fal_config.format().empty()) {
-      formatter = std::make_unique<Envoy::Formatter::FormatterImpl>(
-          Envoy::Formatter::DEFAULT_HTTP_LOG_FORMAT, false);
+      formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
     } else {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
       sff_config.mutable_text_format_source()->set_inline_string(fal_config.format());
@@ -56,8 +55,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       ACCESS_LOG_FORMAT_NOT_SET:
-    formatter = std::make_unique<Envoy::Formatter::FormatterImpl>(
-        Envoy::Formatter::DEFAULT_HTTP_LOG_FORMAT, false);
+    formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
     break;
   }
 

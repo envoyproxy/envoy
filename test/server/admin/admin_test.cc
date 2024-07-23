@@ -82,9 +82,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {},
-      std::make_unique<Envoy::Formatter::FormatterImpl>(Envoy::Formatter::DEFAULT_HTTP_LOG_FORMAT,
-                                                        false),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "info", "admin address:",
@@ -99,9 +97,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {},
-      std::make_unique<Envoy::Formatter::FormatterImpl>(Envoy::Formatter::DEFAULT_HTTP_LOG_FORMAT,
-                                                        false),
+      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical",

@@ -13,6 +13,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/formatter/http_formatter_context.h"
 #include "source/common/json/json_loader.h"
 
 #include "absl/types/optional.h"
