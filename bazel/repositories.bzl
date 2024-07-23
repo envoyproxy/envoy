@@ -774,11 +774,7 @@ def _io_opentracing_cpp():
     )
 
 def _io_opentelemetry_api_cpp():
-    external_http_archive(
-        name = "io_opentelemetry_cpp",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
-    )
+    external_http_archive(name = "io_opentelemetry_cpp")
     native.bind(
         name = "opentelemetry_api",
         actual = "@io_opentelemetry_cpp//api:api",
