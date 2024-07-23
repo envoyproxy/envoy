@@ -100,9 +100,9 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     }
 
     absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
-    if (socket_option.has_stream()) {
+    if (socket_option.has_type() && socket_option.type().has_stream()) {
       socket_type = Network::Socket::Type::Stream;
-    } else if (socket_option.has_datagram()) {
+    } else if (socket_option.has_type() && socket_option.type().has_datagram()) {
       socket_type = Network::Socket::Type::Datagram;
     }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(

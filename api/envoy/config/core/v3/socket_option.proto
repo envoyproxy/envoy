@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`admin's <envoy_v3_api_field_config.bootstrap.v3.Admin.socket_options>` socket_options etc.
 //
 // It should be noted that the name or level may have different values on different platforms.
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message SocketOption {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketOption";
 
@@ -51,12 +51,24 @@ message SocketOption {
     STATE_LISTENING = 2;
   }
 
-  // The stream socket type.
-  message Stream {
-  }
+  // The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.
+  // If :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.stream>` is set, it takes
+  // precendence over :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.datagram>`.
+  // If none of the fields is set, the socket option will be applied to all socket types.
+  message SocketType {
+    // The stream socket type.
+    message Stream {
+    }
 
-  // The datagram socket type.
-  message Datagram {
+    // The datagram socket type.
+    message Datagram {
+    }
+
+    // Apply the socket option to the stream socket type.
+    Stream stream = 1;
+
+    // Apply the socket option to the datagram socket type.
+    Datagram datagram = 2;
   }
 
   // An optional name to give this socket option for debugging, etc.
@@ -83,17 +95,9 @@ message SocketOption {
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 
-  // Apply the socket option to the `stream socket type <https://linux.die.net/man/2/socket>`_.
-  // If both :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.stream>` and
-  // :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.datagram>` fields are not
-  // specified, the socket option will be applied to all socket types.
-  Stream stream = 7;
-
-  // Apply the socket option to the `datagram socket type <https://linux.die.net/man/2/socket>`_.
-  // If both :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.stream>` and
-  // :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.datagram>` fields are not
-  // specified, the socket option will be applied to all socket types.
-  Datagram datagram = 8;
+  // Apply the socket option to the specified `socket type <https://linux.die.net/man/2/socket>`_.
+  // If not specified, the socket option will be applied to all socket types.
+  SocketType type = 7;
 }
 
 message SocketOptionsOverride {
