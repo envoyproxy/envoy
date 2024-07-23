@@ -621,9 +621,11 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(
-      *manager_.createSslServerContext(*store_.rootScope(), *server_context_config, {}, nullptr),
-      EnvoyException, "has neither subject CN nor SAN names");
+  EXPECT_EQ(
+      manager_.createSslServerContext(*store_.rootScope(), *server_context_config, {}, nullptr)
+          .status()
+          .message(),
+      "Invalid TLS context has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
@@ -831,8 +833,10 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager_.createSslServerContext(
-        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(
+        THROW_OR_RETURN_VALUE(manager_.createSslServerContext(*store_.rootScope(), cfg,
+                                                              std::vector<std::string>{}, nullptr),
+                              Ssl::ServerContextSharedPtr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -1910,10 +1914,12 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Server TlsCertificates must have a certificate specified");
+  EXPECT_EQ(manager
+                .createSslServerContext(*store.rootScope(), *server_context_config,
+                                        std::vector<std::string>{}, nullptr)
+                .status()
+                .message(),
+            "Server TlsCertificates must have a certificate specified");
 }
 
 // Cannot ignore certificate expiration without a trusted CA.
@@ -2032,10 +2038,12 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Failed to get BoringSSL private key method from provider");
+  EXPECT_EQ(manager
+                .createSslServerContext(*store.rootScope(), *server_context_config,
+                                        std::vector<std::string>{}, nullptr)
+                .status()
+                .message(),
+            "Failed to get BoringSSL private key method from provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {

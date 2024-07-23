@@ -29,6 +29,7 @@ TEST(DelegatingRoute, DelegatingRouteTest) {
   TEST_METHOD(metadata);
   TEST_METHOD(typedMetadata);
   TEST_METHOD(routeName);
+  TEST_METHOD(virtualHost);
 
   std::string name;
   TEST_METHOD(mostSpecificPerFilterConfig, name);
@@ -74,8 +75,6 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   TEST_METHOD(grpcTimeoutHeaderOffset);
   TEST_METHOD(maxGrpcTimeout);
   TEST_METHOD(grpcTimeoutOffset);
-  TEST_METHOD(virtualCluster, request_headers);
-  TEST_METHOD(virtualHost);
   TEST_METHOD(autoHostRewrite);
   TEST_METHOD(appendXfh);
   TEST_METHOD(metadataMatchCriteria);

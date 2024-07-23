@@ -419,6 +419,55 @@ TEST_F(ConnectivityGridTest, ParallelConnectionsTcpConnects) {
   EXPECT_TRUE(grid_->isHttp3Broken());
 }
 
+// Test all three connections in parallel, TCP fails and H3 connecting.
+TEST_F(ConnectivityGridTest, ParallelConnectionsTcpFailsFirst) {
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
+  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(2);
+  EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
+
+  EXPECT_LOG_CONTAINS("trace", "http3 pool attempting to create a new stream to host 'hostname'",
+                      grid_->newStream(decoder_, callbacks_,
+                                       {/*can_send_early_data=*/false,
+                                        /*can_use_http3_=*/true}));
+
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_EQ(grid_->http2Pool(), nullptr);
+  EXPECT_EQ(grid_->alternate(), nullptr);
+
+  // The failover timer should kick off H3 alternate and H2
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+  EXPECT_NE(grid_->alternate(), nullptr);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  // Fail the H3 pool. H3 should still not be broken as TCP has not connected.
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "handshake timeout1", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // Fail the TCP pool. H3 should still not be broken.
+  grid_->callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "TCP failure details", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // Now the alternate H3 pool also fail.
+  // onPoolFailure should be passed from the pool back to the original caller.
+  ASSERT_NE(grid_->callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_->callbacks(2)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "handshake timeout2", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+  // Only the previous TCP failure details will be appended.
+  EXPECT_EQ(callbacks_.transport_failure_reason_,
+            "handshake timeout2 (with earlier TCP attempt failure reason 1, TCP failure details)");
+}
+
 // Test the first pool failing inline but http/3 happy eyeballs succeeding inline
 TEST_F(ConnectivityGridTest, H3HappyEyeballsMeansNoH2Pool) {
   // The alternate H3 pool will succeed inline.
@@ -606,6 +655,45 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelSecondConnectsFirstFail) 
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
   EXPECT_TRUE(grid_->isHttp3Broken());
+}
+
+// Tests 1 H3 pool and 1 TCP pool connecting and both fail with TCP fails first.
+TEST_F(ConnectivityGridTest, TcpFailsFollowedByH3Failure) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_->newStream(decoder_, callbacks_,
+                   {/*can_send_early_data_=*/false,
+                    /*can_use_http3_=*/true});
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  // TCP pool failed first. Failure shouldn't be propagated to the original caller, but wait for
+  // HTTP/3 pool to finish.
+  EXPECT_NE(grid_->callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_->callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "network unreachable", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // HTTP/3 pool fails.
+  EXPECT_NE(grid_->callbacks(0), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "handshake time out", host_);
+  // HTTP/3 shouldn't be marked broken as TCP also failed.
+  EXPECT_FALSE(grid_->isHttp3Broken());
+  EXPECT_TRUE(alternate_protocols_->findAlternatives(origin_).has_value());
+  EXPECT_EQ(callbacks_.transport_failure_reason_,
+            "handshake time out (with earlier TCP attempt failure reason 1, network unreachable)");
 }
 
 // Test both connections happening in parallel and the second connecting before

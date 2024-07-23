@@ -136,8 +136,13 @@ public:
   const std::string& responseBody() const override { return EMPTY_STRING; }
 };
 
+class CommonVirtualHostImpl;
+using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
+
 class SslRedirectRoute : public Route {
 public:
+  SslRedirectRoute(CommonVirtualHostSharedPtr virtual_host) : virtual_host_(virtual_host) {}
+
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
@@ -153,8 +158,11 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
+  const VirtualHost& virtualHost() const override;
 
 private:
+  CommonVirtualHostSharedPtr virtual_host_;
+
   static const SslRedirector SSL_REDIRECTOR;
   static const envoy::config::core::v3::Metadata metadata_;
   static const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
@@ -306,6 +314,9 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
+    return virtualClusterFromEntries(headers);
+  }
 
 private:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
@@ -376,8 +387,6 @@ private:
   const bool include_is_timeout_retry_header_ : 1;
 };
 
-using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
-
 /**
  * Virtual host that holds a collection of routes.
  */
@@ -404,10 +413,9 @@ public:
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
-  static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
-
   CommonVirtualHostSharedPtr shared_virtual_host_;
 
+  std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
@@ -744,9 +752,6 @@ public:
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-    return vhost_->virtualClusterFromEntries(headers);
-  }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
 
@@ -911,10 +916,6 @@ public:
     }
     const TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return parent_->tlsContextMatchCriteria();
-    }
-
-    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-      return parent_->virtualCluster(headers);
     }
 
     const std::multimap<std::string, std::string>& opaqueConfig() const override {

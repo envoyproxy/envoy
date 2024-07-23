@@ -1,7 +1,7 @@
 Credentials
 -----------
 
-The filter uses a few different credentials providers to obtain an AWS access key ID, AWS secret access key, and AWS session token.
+The filter uses a number of different credentials providers to obtain an AWS access key ID, AWS secret access key, and AWS session token.
 It moves through the credentials providers in the order described below, stopping when one of them returns an access key ID and a
 secret access key (the session token is optional).
 
@@ -45,3 +45,21 @@ secret access key (the session token is optional).
    from ECS task metadata. If these clusters are not provided in the bootstrap configuration then either of these will be added by default.
    The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
    not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
+
+Statistics
+----------
+
+When using the ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` reloadable feature, the following
+statistics are output under the ``aws.metadata_credentials_provider`` namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :escape: '
+  :widths: 1, 1, 2
+
+  <provider_cluster>.credential_refreshes_performed, Counter, Total credential refreshes performed by this cluster
+  <provider_cluster>.credential_refreshes_failed, Counter, Total credential refreshes failed by this cluster. For example', this would be incremented if a WebIdentity token was expired
+  <provider_cluster>.credential_refreshes_succeeded, Counter, Total successful credential refreshes for this cluster. Successful refresh would indicate credentials are available for signing
+  <provider_cluster>.metadata_refresh_state, Gauge, 0 means the cluster is in initial refresh state', ie no successful credential refreshes have been performed. In 0 state the cluster will attempt credential refresh up to a maximum of once every 30 seconds. 1 means the cluster is in normal credential expiration based refresh state
+  <provider_cluster>.clusters_removed_by_cds, Counter, Number of metadata clusters removed during CDS refresh
+  <provider_cluster>.clusters_readded_after_cds, Counter, Number of metadata clusters replaced when CDS deletion occurs

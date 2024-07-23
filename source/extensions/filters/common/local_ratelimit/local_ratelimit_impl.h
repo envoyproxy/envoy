@@ -11,6 +11,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/thread_synchronizer.h"
+#include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -108,6 +109,26 @@ public:
   const double fill_rate_{};
 };
 
+class AtomicTokenBucket : public RateLimitTokenBucket {
+public:
+  AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+                    std::chrono::milliseconds fill_interval, TimeSource& time_source);
+
+  // RateLimitTokenBucket
+  bool consume(double factor) override;
+  void onFillTimer(uint64_t, double) override {}
+  std::chrono::milliseconds fillInterval() const override { return {}; }
+  double fillRate() const override { return token_bucket_.fillRate(); }
+  uint32_t maxTokens() const override { return static_cast<uint32_t>(token_bucket_.maxTokens()); }
+  uint32_t remainingTokens() const override {
+    return static_cast<uint32_t>(token_bucket_.remainingTokens());
+  }
+  absl::optional<int64_t> remainingFillInterval() const override { return {}; }
+
+private:
+  AtomicTokenBucketImpl token_bucket_;
+};
+
 class LocalRateLimiterImpl {
 public:
   struct Result {
@@ -141,6 +162,7 @@ private:
 
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
+  const bool no_timer_based_rate_limit_token_bucket_{};
 
   friend class LocalRateLimiterImplTest;
   friend class TimerTokenBucket;

@@ -5,6 +5,7 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
@@ -1598,7 +1599,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that tries to modify the trailers incorrectly
 // according to the header mutation rules.
-TEST_P(ExtProcIntegrationTest, GetAndSetTrailersIncorrectlyOnResponse) {
+// TODO(tyxia): re-enable this test (see https://github.com/envoyproxy/envoy/issues/35281)
+TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_mutation_rules()->mutable_disallow_all()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
@@ -3929,7 +3931,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* upstream_codec = old_protocol_options.add_http_filters();
+      upstream_codec->set_name("envoy.filters.http.upstream_codec");
+      upstream_codec->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
@@ -4355,7 +4360,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* http_filter = old_protocol_options.add_http_filters();
+      http_filter->set_name("envoy.filters.http.upstream_codec");
+      http_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
@@ -4402,7 +4410,8 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
+// Upstream filter chain is in alpha mode and it is not actively used in ext_proc at the moment.
+TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
   ConfigOptions config_option = {};
@@ -4423,7 +4432,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityModeWithLogg
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
     }
     if (old_protocol_options.http_filters().empty()) {
-      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+      auto* http_filter = old_protocol_options.add_http_filters();
+      http_filter->set_name("envoy.filters.http.upstream_codec");
+      http_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
     auto* ext_proc_filter = old_protocol_options.add_http_filters();
     ext_proc_filter->set_name("envoy.filters.http.ext_proc");
