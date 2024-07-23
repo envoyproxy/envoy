@@ -5,6 +5,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls_common.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/file_event.h"
@@ -134,6 +135,8 @@ public:
     bool truncated_and_dropped_{false};
     // The contents of the TOS byte in the IP header.
     uint8_t tos_{0};
+    // UDP control message specified by save_cmsg_config in QUIC config.
+    Buffer::RawSlice saved_cmsg_;
   };
 
   /**
@@ -160,6 +163,11 @@ public:
     absl::FixedArray<RecvMsgPerPacketInfo> msg_;
   };
 
+  struct UdpSaveCmsgConfig {
+    int level;
+    int optname;
+  };
+
   /**
    * Receive a message into given slices, output overflow, source/destination
    * addresses via passed-in parameters upon success.
@@ -172,7 +180,9 @@ public:
    * err_ = nullptr and rc_ = the bytes received for success.
    */
   virtual Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                          uint32_t self_port, RecvMsgOutput& output) PURE;
+                                          uint32_t self_port,
+                                          const UdpSaveCmsgConfig& save_cmsg_config,
+                                          RecvMsgOutput& output) PURE;
 
   /**
    * If the platform supports, receive multiple messages into given slices, output overflow,
@@ -183,6 +193,7 @@ public:
    * @param output is modified upon each call and each message received.
    */
   virtual Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                           const UdpSaveCmsgConfig& save_cmsg_config,
                                            RecvMsgOutput& output) PURE;
 
   /**

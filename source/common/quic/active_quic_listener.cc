@@ -108,6 +108,13 @@ ActiveQuicListener::ActiveQuicListener(
   } else {
     quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
   }
+
+  if (listener_config.udpListenerConfig()) {
+    udp_save_cmsg_config_.level =
+        listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config().level();
+    udp_save_cmsg_config_.optname =
+        listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config().optname();
+  }
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -135,11 +142,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
   Buffer::RawSlice slice = data.buffer_->frontSlice();
   ASSERT(data.buffer_->length() == slice.len_);
   // TODO(danzh): pass in TTL and UDP header.
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
-                                  /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false,
-                                  getQuicEcnCodepointFromTosByte(data.tos_));
+  quic::QuicReceivedPacket packet(
+      reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
+      /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+      reinterpret_cast<char*>(data.saved_cmsg_.mem_), data.saved_cmsg_.len_,
+      /*owns_header_buffer*/ false, getQuicEcnCodepointFromTosByte(data.tos_));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
       non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));

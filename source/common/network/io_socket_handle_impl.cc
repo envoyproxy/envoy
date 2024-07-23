@@ -283,6 +283,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
+                                                    const UdpSaveCmsgConfig& save_cmsg_config,
                                                     RecvMsgOutput& output) {
   ASSERT(!output.msg_.empty());
 
@@ -335,6 +336,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      if (cmsg->cmsg_type == save_cmsg_config.optname &&
+          cmsg->cmsg_level == save_cmsg_config.level) {
+        Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+        output.msg_[0].saved_cmsg_ = cmsg_slice;
+      }
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (addr != nullptr) {
@@ -371,6 +377,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                                     const UdpSaveCmsgConfig& save_cmsg_config,
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.empty()) {
@@ -439,6 +446,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+        if (cmsg->cmsg_type == save_cmsg_config.optname &&
+            cmsg->cmsg_level == save_cmsg_config.level) {
+          Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+          output.msg_[0].saved_cmsg_ = cmsg_slice;
+        }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (receive_ecn_ &&
 #ifdef __APPLE__
