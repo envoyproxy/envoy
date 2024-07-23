@@ -1221,7 +1221,10 @@ def _com_github_grpc_grpc():
         name = "cares",
         actual = "//external:ares",
     )
-
+    native.bind(
+        name = "com_github_cares_cares",
+        actual = "//external:ares",
+    )
     native.bind(
         name = "grpc",
         actual = "@com_github_grpc_grpc//:grpc++",
