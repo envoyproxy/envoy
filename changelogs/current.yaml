@@ -5,9 +5,16 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: lua
+  change: |
+    When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dns
+  change: |
+    The DNS filter no longer returns FORMERR if a message has an ID of 0.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
