@@ -99,10 +99,6 @@ protected:
 
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
-          filter_mutation_rule_}});
-
     config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
@@ -654,7 +650,6 @@ protected:
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
   std::string header_raw_value_{"false"};
-  std::string filter_mutation_rule_{"false"};
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
 };
@@ -2148,7 +2143,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
 // Test the filter using an ext_proc server that responds to the request_header message
 // by sending back an immediate_response message with system header mutation.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
   // Disallow system header in the mutation rule config.
   proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
@@ -2170,7 +2164,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
 // Test the filter using an ext_proc server that responds to the request_header message
 // by sending back an immediate_response message with x-envoy header mutation.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
   initializeConfig();
@@ -2188,7 +2181,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
 
@@ -2215,8 +2207,6 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
 // The deprecated default checker allows x-envoy headers to be mutated and should
 // override config-level checkers if the runtime guard is disabled.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutationChecker) {
-  // this is default, but setting explicitly for test clarity
-  filter_mutation_rule_ = "false";
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
   initializeConfig();
   HttpIntegrationTest::initialize();
