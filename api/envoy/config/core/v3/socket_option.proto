@@ -52,10 +52,12 @@ message SocketOption {
   }
 
   // The stream socket type.
-  message Stream {}
+  message Stream {
+  }
 
   // The datagram socket type.
-  message Datagram {}
+  message Datagram {
+  }
 
   // An optional name to give this socket option for debugging, etc.
   // Uniqueness is not required and no special meaning is assumed.
