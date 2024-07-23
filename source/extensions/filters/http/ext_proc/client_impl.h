@@ -60,10 +60,9 @@ public:
 
     // Unregister the watermark callbacks(if any) to prevent access of filter callbacks after
     // the filter object is destroyed.
-    if (grpc_side_stream_flow_control_ && !watermark_callbacks_removed_) {
+    if (grpc_side_stream_flow_control_) {
       if (stream_ != nullptr) {
         stream_.removeWatermarkCallbacks();
-        watermark_callbacks_removed_ = true;
       }
     }
   }
@@ -96,8 +95,6 @@ private:
   Grpc::AsyncStream<ProcessingRequest> stream_;
   Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
-  // Boolean flag to prevent double removal of the watermark callbacks.
-  bool watermark_callbacks_removed_ = false;
   // Boolean flag initiated by runtime flag.
   const bool grpc_side_stream_flow_control_;
 };
