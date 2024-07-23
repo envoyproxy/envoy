@@ -440,7 +440,7 @@ typed_config:
   EXPECT_EQ(output_.front(), "cluster-0");
 }
 
-// Test RAW_UPSTREAM_CLUSTER log formatter.
+// Test UPSTREAM_CLUSTER_RAW log formatter.
 TEST_F(RouterUpstreamLogTest, RawUpstreamCluster) {
   const std::string yaml = R"EOF(
 name: accesslog
@@ -448,7 +448,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
     text_format_source:
-      inline_string: "%RAW_UPSTREAM_CLUSTER%"
+      inline_string: "%UPSTREAM_CLUSTER_RAW%"
   path: "/dev/null"
   )EOF";
 

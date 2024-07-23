@@ -18,6 +18,6 @@ removed_config_or_runtime:
 new_features:
 - area: access_log
   change: |
-    added %RAW_UPSTREAM_CLUSTER% access log formatter to log the original upstream cluster name, regadless of whether
+    added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
     ``alt_stat_name`` is set.
 deprecated:

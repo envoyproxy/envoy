@@ -1128,7 +1128,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                : absl::make_optional<std::string>(upstream_cluster_name);
                   });
             }}},
-          {"RAW_UPSTREAM_CLUSTER",
+          {"UPSTREAM_CLUSTER_RAW",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoStringFormatterProvider>(
