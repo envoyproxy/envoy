@@ -710,6 +710,13 @@ public:
    * for this virtual host.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
+   * @param headers supplies the request headers.
+   * @return the virtual cluster or nullptr if there is no match.
+   */
+  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 };
 
 /**
@@ -1045,18 +1052,6 @@ public:
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
 
   /**
-   * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
-   * @param headers supplies the request headers.
-   * @return the virtual cluster or nullptr if there is no match.
-   */
-  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
-
-  /**
-   * @return const VirtualHost& the virtual host that owns the route.
-   */
-  virtual const VirtualHost& virtualHost() const PURE;
-
-  /**
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
@@ -1264,6 +1259,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return const VirtualHost& the virtual host that owns the route.
+   */
+  virtual const VirtualHost& virtualHost() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
