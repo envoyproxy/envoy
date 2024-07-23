@@ -931,9 +931,11 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
-    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
-                    "connections. Configure a "
-                    "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.");
+    ENVOY_LOG(
+        warn,
+        "There is no configured limit to the number of allowed active downstream "
+        "connections. Configure a "
+        "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.");
   }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
