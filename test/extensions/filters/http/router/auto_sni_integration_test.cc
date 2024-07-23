@@ -152,6 +152,7 @@ TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamAndAutoSanValidationFailureTes
         options->set_auto_san_validation(true);
       },
       "not-a-san");
+  fake_upstreams_[0]->setReadDisableOnNewConnection(false);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}});
@@ -160,6 +161,7 @@ TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamAndAutoSanValidationFailureTes
   EXPECT_EQ("503", response_->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(AutoSniIntegrationTest, AutoSniFromUpstreamAndAutoSanValidationTest) {
