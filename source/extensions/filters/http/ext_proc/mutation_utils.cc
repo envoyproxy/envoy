@@ -153,8 +153,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       continue;
     }
 
-    absl::string_view header_value;
-    header_value = sh.header().raw_value();
+    const absl::string_view header_value = sh.header().raw_value();
     if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
         !Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_LOG(debug,
