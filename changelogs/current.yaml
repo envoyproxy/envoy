@@ -22,6 +22,9 @@ removed_config_or_runtime:
   change: |
     Removed runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` and legacy code
     path.
+- area: stateful_session
+  change: |
+    Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
 
 new_features:
 
