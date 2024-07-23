@@ -218,6 +218,7 @@ EXTENSIONS = {
     "envoy.filters.network.sni_dynamic_forward_proxy":            "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
     "envoy.filters.network.wasm":                                 "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":                      "//source/extensions/filters/network/zookeeper_proxy:config",
+    "envoy.filters.network.generic_proxy":                        "//source/extensions/filters/network/generic_proxy:config",
 
     #
     # UDP filters
@@ -519,6 +520,13 @@ EXTENSIONS = {
     #
 
     "envoy.router.cluster_specifier_plugin.lua": "//source/extensions/router/cluster_specifiers/lua:config",
+
+    #
+    # Extensions for generic proxy
+    #
+    "envoy.filters.generic.router":                             "//source/extensions/filters/network/generic_proxy/router:config",
+    "envoy.generic_proxy.codecs.dubbo":                         "//source/extensions/filters/network/generic_proxy/codecs/dubbo:config",
+    "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

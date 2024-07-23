@@ -60,12 +60,7 @@ public:
                                                 if (route == nullptr) {
                                                   return nullptr;
                                                 }
-                                                const Router::RouteEntry* route_entry =
-                                                    route->routeEntry();
-                                                if (route_entry == nullptr) {
-                                                  return nullptr;
-                                                }
-                                                return &route_entry->virtualHost().metadata();
+                                                return &route->virtualHost().metadata();
                                               }) {}
 };
 
