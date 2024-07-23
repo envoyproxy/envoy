@@ -200,17 +200,13 @@ public:
                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
-class HttpBuiltInCommandParser : public CommandParser {
+class BuiltInHttpCommandParser : public CommandParser {
 public:
-  HttpBuiltInCommandParser() = default;
+  BuiltInHttpCommandParser() = default;
 
   // CommandParser
   FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
                              absl::optional<size_t>& max_length) const override;
-
-  static const CommandParser& builtInCommandParser() {
-    CONSTRUCT_ON_FIRST_USE(HttpBuiltInCommandParser);
-  }
 
 private:
   using FormatterProviderCreateFunc =
@@ -220,14 +216,6 @@ private:
       absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
                                                        FormatterProviderCreateFunc>>;
   static const FormatterProviderLookupTbl& getKnownFormatters();
-};
-
-/**
- * Util class for HTTP access log format.
- */
-class HttpSubstitutionFormatUtils {
-public:
-  static FormatterPtr defaultSubstitutionFormatter();
 };
 
 } // namespace Formatter

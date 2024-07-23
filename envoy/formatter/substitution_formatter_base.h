@@ -62,8 +62,30 @@ public:
                          const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
+template <> class FormatterProviderBase<void> {
+public:
+  virtual ~FormatterProviderBase() = default;
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return absl::optional<std::string> optional string containing a single value extracted from
+   *         the given stream info.
+   */
+  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
+   */
+  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
+};
+
 template <class FormatterContext>
 using FormatterProviderBasePtr = std::unique_ptr<FormatterProviderBase<FormatterContext>>;
+using StreamInfoFormatterProvider = FormatterProviderBase<void>;
+using StreamInfoFormatterProviderPtr = FormatterProviderBasePtr<void>;
 
 template <class FormatterContext> class CommandParserBase {
 public:
@@ -86,9 +108,8 @@ public:
 
 template <class FormatterContext>
 using CommandParserBasePtr = std::unique_ptr<CommandParserBase<FormatterContext>>;
-
-template <class FormatterContext>
-using CommandParsersBase = std::vector<CommandParserBasePtr<FormatterContext>>;
+using StreamInfoCommandParser = CommandParserBase<void>;
+using StreamInfoCommandParserPtr = CommandParserBasePtr<void>;
 
 template <class FormatterContext> class CommandParserFactoryBase : public Config::TypedFactory {
 public:
@@ -104,12 +125,18 @@ public:
   createCommandParserFromProto(const Protobuf::Message& config,
                                Server::Configuration::GenericFactoryContext& context) PURE;
 
-  std::string category() const override {
-    return fmt::format("envoy.{}.formatters", FormatterContext::category());
-  }
+  std::string category() const override { return "envoy.formatters"; }
 };
 
-template <class FormatterContext> class BuiltInCommandParsersBase {
+template <class FormatterContext>
+using CommandParsersBase = std::vector<CommandParserBasePtr<FormatterContext>>;
+
+class BuiltInCommandParserFactory : public Config::UntypedFactory {
+public:
+  std::string category() const override { return "envoy.formatters"; }
+};
+
+template <class FormatterContext> class BuiltInCommandParserRegistryBase {
 public:
   static void addCommandParser(CommandParserBasePtr<FormatterContext> parser) {
     mutableCommandParsers().push_back(std::move(parser));
@@ -125,14 +152,17 @@ private:
   }
 };
 
-template <class FormatterContext> struct BuiltInCommandPaserRegister {
-  BuiltInCommandPaserRegister(CommandParserBasePtr<FormatterContext> parser) {
-    BuiltInCommandParsersBase<FormatterContext>::addCommandParser(std::move(parser));
+using BuiltInStreamInfoCommandParserRegistry = BuiltInCommandParserRegistryBase<void>;
+
+template <class FormatterContext> class BuiltInCommandParserRegisterBase {
+public:
+  BuiltInCommandParserRegisterBase(CommandParserBasePtr<FormatterContext> parser) {
+    BuiltInCommandParserRegistryBase<FormatterContext>::addCommandParser(std::move(parser));
   }
 };
 
 #define REGISTER_BUILT_IN_COMMAND_PARSER(context, parser)                                          \
-  static BuiltInCommandPaserRegister<context> register_##context##_##parser{                       \
+  static BuiltInCommandParserRegisterBase<context> register_##context##_##parser{                  \
       std::make_unique<parser>()};
 
 } // namespace Formatter

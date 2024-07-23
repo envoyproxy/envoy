@@ -30,6 +30,8 @@ envoy_cc_fuzz_test(
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
         "//source/common/formatter:substitution_formatter_lib",
+        "//source/extensions/formatter/built_in_http:config",
+        "//source/extensions/formatter/built_in_stream_info:config",
         "//test/fuzz:utility_lib",
     ],
 )
@@ -56,6 +58,8 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_id_provider_lib",
+        "//source/extensions/formatter/built_in_http:config",
+        "//source/extensions/formatter/built_in_stream_info:config",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
@@ -77,6 +81,8 @@ envoy_cc_test(
     deps = [
         ":command_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
+        "//source/extensions/formatter/built_in_http:config",
+        "//source/extensions/formatter/built_in_stream_info:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -96,6 +102,8 @@ envoy_cc_benchmark_binary(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
+        "//source/extensions/formatter/built_in_http:config",
+        "//source/extensions/formatter/built_in_stream_info:config",
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

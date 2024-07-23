@@ -9,8 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/formatter/http_specific_formatter.h"
-#include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
@@ -18,6 +17,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/extensions/formatter/built_in_http/http_specific_formatter.h"
+#include "source/extensions/formatter/built_in_stream_info/stream_info_formatter.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
@@ -47,6 +48,26 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Formatter {
 namespace {
+
+using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
+using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
+
+// Helper class to test StreamInfoFormatter.
+class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+public:
+  StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
+                      absl::optional<size_t> max_length = absl::nullopt)
+      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
+    for (const auto& cmd : BuiltInStreamInfoCommandParserRegistry::commandParsers()) {
+      auto formatter = cmd->parse(command, sub_command, max_length);
+      if (formatter) {
+        formatter_ = std::move(formatter);
+        return;
+      }
+    }
+    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
+  }
+};
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:

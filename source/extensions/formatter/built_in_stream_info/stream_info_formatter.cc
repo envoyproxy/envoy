@@ -1,4 +1,4 @@
-#include "source/common/formatter/stream_info_formatter.h"
+#include "source/extensions/formatter/built_in_stream_info/stream_info_formatter.h"
 
 #include <regex>
 
@@ -817,6 +817,10 @@ public:
 private:
   FieldExtractor field_extractor_;
 };
+
+using StreamInfoFormatterProviderLookupTable =
+    absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
+                                                     StreamInfoFormatterProviderCreateFunc>>;
 
 const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders() {
   CONSTRUCT_ON_FIRST_USE(
@@ -1734,6 +1738,39 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
       });
 }
+
+class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
+public:
+  BuiltInStreamInfoCommandParser() = default;
+
+  // StreamInfoCommandParser
+  StreamInfoFormatterProviderPtr parse(const std::string& command, const std::string& sub_command,
+                                       absl::optional<size_t>& max_length) const override {
+
+    auto it = getKnownStreamInfoFormatterProviders().find(command);
+
+    // No throw because the stream info command parser may not be the last parser and other
+    // formatter parsers may be tried.
+    if (it == getKnownStreamInfoFormatterProviders().end()) {
+      return nullptr;
+    }
+    // Check flags for the command.
+    THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
+        (*it).second.first, command, sub_command, max_length));
+
+    return (*it).second.second(sub_command, max_length);
+  }
+};
+
+class BuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {
+public:
+  std::string name() const override { return "envoy.formatter.built_in_stream_info"; }
+};
+
+REGISTER_FACTORY(BuiltInStreamInfoCommandParserFactory, BuiltInCommandParserFactory);
+// Use the void type as FormatterContext because the StreamInfoCommandParser is context
+// independent.
+REGISTER_BUILT_IN_COMMAND_PARSER(void, BuiltInStreamInfoCommandParser);
 
 } // namespace Formatter
 } // namespace Envoy

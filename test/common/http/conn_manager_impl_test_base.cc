@@ -149,7 +149,9 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
       access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          std::make_unique<Envoy::Formatter::FormatterImpl>(
+              Envoy::Formatter::DEFAULT_HTTP_LOG_FORMAT, false),
+          log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
