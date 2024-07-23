@@ -83,7 +83,7 @@ message SocketOption {
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 
-  // The `socket type <https://linux.die.net/man/2/socket>` to apply the socket option to.
+  // The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.
   // If not specified, the socket option will be applied to all socket types.
   oneof type {
     // Apply the socket option to the stream socket type.
