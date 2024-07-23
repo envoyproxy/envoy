@@ -332,6 +332,9 @@ removed_config_or_runtime:
 - area: oauth2
   change: |
     Removed ``envoy.reloadable_features.oauth_use_url_encoding`` runtime flag and legacy code paths.
+- area: DNS
+  change: |
+    Removed ``envoy.reloadable_features.dns_cache_set_first_resolve_complete`` runtime flag and legacy code paths.
 
 new_features:
 - area: redis
