@@ -266,6 +266,17 @@ TEST_F(MatcherTest, TestMatchPathMatchPolicy) {
   EXPECT_TRUE(matcher->matches(headers));
 }
 
+TEST_F(MatcherTest, TestMatchPathMatchPolicyError) {
+  const char config[] = R"(match:
+  path_match_policy:
+    name: envoy.path.match.uri_template.uri_template_matcher
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+      wrong_key: "/bar/*/foo"
+  )";
+  EXPECT_THROW_WITH_REGEX(createMatcher(config), EnvoyException, "no such field:   'wrong_key'")
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
