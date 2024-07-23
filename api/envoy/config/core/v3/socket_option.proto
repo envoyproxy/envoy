@@ -83,15 +83,17 @@ message SocketOption {
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 
-  // The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.
-  // If not specified, the socket option will be applied to all socket types.
-  oneof type {
-    // Apply the socket option to the stream socket type.
-    Stream stream = 7;
+  // Apply the socket option to the `stream socket type <https://linux.die.net/man/2/socket>`_.
+  // If both :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.stream>` and
+  // :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.datagram>` fields are not
+  // specified, the socket option will be applied to all socket types.
+  Stream stream = 7;
 
-    // Apply the socket option to the datagram socket type.
-    Datagram datagram = 8;
-  }
+  // Apply the socket option to the `datagram socket type <https://linux.die.net/man/2/socket>`_.
+  // If both :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.stream>` and
+  // :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.datagram>` fields are not
+  // specified, the socket option will be applied to all socket types.
+  Datagram datagram = 8;
 }
 
 message SocketOptionsOverride {
