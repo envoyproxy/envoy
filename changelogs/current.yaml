@@ -30,5 +30,10 @@ removed_config_or_runtime:
     path.
 
 new_features:
+- area: ext_authz
+  change: |
+    Added config field
+    :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_metadata>`
+    for injecting arbitrary data to the filter state for logging.
 
 deprecated:

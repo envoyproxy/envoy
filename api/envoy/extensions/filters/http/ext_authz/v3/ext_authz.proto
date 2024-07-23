@@ -11,6 +11,7 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -29,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -291,6 +292,11 @@ message ExtAuthz {
   //
   // If unset, defaults to true.
   google.protobuf.BoolValue enable_dynamic_metadata_ingestion = 27;
+
+  // Additional metadata to be added to the filter state for logging purposes. The metadata will be
+  // added to StreamInfo's filter state under the namespace corresponding to the ext_authz filter
+  // name.
+  google.protobuf.Struct filter_metadata = 28;
 }
 
 // Configuration for buffering the request data.
