@@ -28,6 +28,9 @@ removed_config_or_runtime:
   change: |
     Removed runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` and legacy code
     path.
+- area: DNS
+  change: |
+    Removed ``envoy.reloadable_features.dns_cache_set_first_resolve_complete`` runtime flag and legacy code paths.
 
 new_features:
 - area: ext_authz
