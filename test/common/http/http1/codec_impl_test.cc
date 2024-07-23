@@ -5464,11 +5464,17 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCRAccept) {
   EXPECT_EQ(0u, buffer.length());
 }
 
-// If the first request contains a "Connection: close" header,
-// then http-parser signals an error if a second request is received,
-// but BalsaParser happily parses it.
+// If the first request contains a "Connection: close" header, then http-parser in strict mode
+// signals an error if a second request is received, but BalsaParser happily parses it.
 TEST_P(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
   initialize();
+
+#ifdef ENVOY_ENABLE_UHV
+  // If UHV is enabled, then strict mode is turned off for http-parser.
+  const bool accept = true;
+#else
+  const bool accept = parser_impl_ == Http1ParserImpl::BalsaParser;
+#endif
 
   {
     Http::ResponseEncoder* response_encoder = nullptr;
@@ -5493,7 +5499,7 @@ TEST_P(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
   {
     MockRequestDecoder decoder;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    if (accept) {
       EXPECT_CALL(decoder, decodeHeaders_(_, true));
     } else {
       EXPECT_CALL(decoder,
@@ -5502,7 +5508,7 @@ TEST_P(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
     auto status = codec_->dispatch(buffer);
-    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    if (accept) {
       EXPECT_TRUE(status.ok());
       EXPECT_EQ(Protocol::Http11, codec_->protocol());
     } else {
@@ -5513,10 +5519,17 @@ TEST_P(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
 }
 
 // If a "Connection: close" header is received in the first response, and then a second request is
-// sent, then http-parser correctly signals an error upon receiving the second response,
-// but BalsaParser happily parses it.
+// sent, then http-parser in strict mode correctly signals an error upon receiving the second
+// response, but BalsaParser happily parses it.
 TEST_P(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
   initialize();
+
+#ifdef ENVOY_ENABLE_UHV
+  // If UHV is enabled, then strict mode is turned off for http-parser.
+  const bool accept = true;
+#else
+  const bool accept = parser_impl_ == Http1ParserImpl::BalsaParser;
+#endif
 
   {
     NiceMock<MockResponseDecoder> response_decoder;
@@ -5545,7 +5558,7 @@ TEST_P(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
         {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
     EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
 
-    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    if (accept) {
       EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
       EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("bar"), false));
       EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
@@ -5556,7 +5569,7 @@ TEST_P(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
                              "\r\n"
                              "bar");
     auto status = codec_->dispatch(buffer);
-    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    if (accept) {
       EXPECT_TRUE(status.ok());
       EXPECT_EQ(0u, buffer.length());
     } else {
