@@ -42,7 +42,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
     auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).Times(2).WillRepeatedly(testing::Return(upstream_host));
+    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
 
     // No valid address then update it by set-cookie.
     std::string cookie_content;
@@ -75,7 +75,6 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     // Repeat, but cluster routed to different host 2.3.4.5:80. "set-cookie" should be added to
     // response headers.
 
-    // Run the test twice - once with PROTO style cookie and once with "old" style plain address.
     std::string cookie_content;
     envoy::Cookie cookie;
     cookie.set_address("1.2.3.4:80");
@@ -103,7 +102,6 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     session_state->onUpdate(mock_host, response_headers);
 
     // Update session state because the current request is routed to a new upstream host.
-    envoy::Cookie cookie;
     cookie.set_address("2.3.4.5:80");
     cookie.set_expires(1005);
     cookie.SerializeToString(&cookie_content);
