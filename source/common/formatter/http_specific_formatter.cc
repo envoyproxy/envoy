@@ -1,4 +1,4 @@
-#include "source/extensions/formatter/built_in_http/http_specific_formatter.h"
+#include "source/common/formatter/http_specific_formatter.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"

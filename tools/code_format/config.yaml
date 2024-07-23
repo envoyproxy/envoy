@@ -106,9 +106,9 @@ paths:
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
-    - source/extensions/formatter/built_in_http/http_specific_formatter.cc
-    - source/extensions/formatter/built_in_stream_info/stream_info_formatter.h
-    - source/extensions/formatter/built_in_stream_info/stream_info_formatter.cc
+    - source/common/formatter/http_specific_formatter.cc
+    - source/common/formatter/stream_info_formatter.h
+    - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
     - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
@@ -295,8 +295,8 @@ paths:
     - source/common/common/regex.h
     - source/common/common/regex.cc
     - source/common/common/utility.cc
-    - source/extensions/formatter/built_in_http/http_specific_formatter.cc
-    - source/extensions/formatter/built_in_stream_info/stream_info_formatter.cc
+    - source/common/formatter/http_specific_formatter.cc
+    - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
     - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.h

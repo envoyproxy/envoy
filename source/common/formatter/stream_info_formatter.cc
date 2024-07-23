@@ -1,4 +1,4 @@
-#include "source/extensions/formatter/built_in_stream_info/stream_info_formatter.h"
+#include "source/common/formatter/stream_info_formatter.h"
 
 #include <regex>
 

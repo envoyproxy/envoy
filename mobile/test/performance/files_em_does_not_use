@@ -8,8 +8,6 @@ source/server/guarddog_impl.h
 source/server/watchdog_impl.h
 source/server/options_impl.cc
 source/extensions/access_loggers/common/file_access_log_impl.h
-source/extensions/formatter/built_in_http/http_specific_formatter.h
-source/extensions/formatter/built_in_stream_info/stream_info_formatter.h
 source/common/router/scoped_rds.h
 source/extensions/load_balancing_policies/subset/subset_lb.h
 source/extensions/transport_sockets/tls/downstream_config.h
@@ -19,3 +17,5 @@ source/common/router/vhds.h
 source/common/tls/server_context_config_impl.h
 source/common/tls/server_context_impl.h
 source/common/tls/ocsp/ocsp.h
+source/common/formatter/http_specific_formatter.h
+source/common/formatter/stream_info_formatter.h

@@ -164,6 +164,8 @@ envoy_cc_library(
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
+        "//source/common/formatter:http_speicific_formatter_lib",
+        "//source/common/formatter:stream_info_formatter_lib",
         "//source/server:options_lib",
         # TODO(wbpcode) make this a proper extension
         "//source/extensions/filters/http/match_delegate:config",
