@@ -343,6 +343,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 # Match delegate extension
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
+# Generic proxy and related extensions
+/*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
 
 /*/extensions/health_checkers/common @zuercher @botengyao
 

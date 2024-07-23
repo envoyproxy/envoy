@@ -496,10 +496,9 @@ public:
     decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_
         .emplace_back(route_rate_limit_);
-    decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_
-        .rate_limit_policy_entry_.clear();
-    decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_
-        .rate_limit_policy_entry_.emplace_back(vh_rate_limit_);
+    decoder_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_.clear();
+    decoder_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
+        .emplace_back(vh_rate_limit_);
   }
 
   std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}}};
@@ -719,6 +718,28 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedXRateLimitHeaders)
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
+TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedWithoutXRateLimitHeaders) {
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+
+  auto request_headers = Http::TestRequestHeaderMapImpl();
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-ratelimit-limit")).empty());
+  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-ratelimit-remaining")).empty());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
 TEST_F(DescriptorFilterTest,
        RouteDescriptorRequestRatelimitedXRateLimitHeadersWithTimerTokenBucket) {
   TestScopedRuntime runtime;
@@ -761,7 +782,7 @@ TEST_F(DescriptorFilterTest, NoVHRateLimitOption) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
   auto headers = Http::TestRequestHeaderMapImpl();
@@ -784,7 +805,7 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
   auto headers = Http::TestRequestHeaderMapImpl();
@@ -805,7 +826,7 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))
@@ -825,7 +846,7 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))
@@ -848,7 +869,7 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet)
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))
@@ -871,7 +892,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
 
@@ -890,7 +911,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
 
@@ -908,7 +929,7 @@ TEST_F(DescriptorFilterTest, IncludeVirtualHostRateLimitsSetTrue) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))

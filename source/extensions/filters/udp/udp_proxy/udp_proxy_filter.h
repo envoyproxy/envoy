@@ -402,9 +402,7 @@ public:
                               Upstream::LoadBalancerContext* context,
                               const UdpTunnelingConfig& tunnel_config,
                               UpstreamTunnelCallbacks& upstream_callbacks,
-                              StreamInfo::StreamInfo& downstream_info,
-                              bool flush_access_log_on_tunnel_connected,
-                              const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs);
+                              StreamInfo::StreamInfo& downstream_info);
   ~TunnelingConnectionPoolImpl() override = default;
 
   bool valid() const { return conn_pool_data_.has_value(); }
@@ -445,8 +443,6 @@ private:
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   const UdpTunnelingConfig& tunnel_config_;
   StreamInfo::StreamInfo& downstream_info_;
-  const bool flush_access_log_on_tunnel_connected_;
-  const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   StreamInfo::StreamInfo* upstream_info_;
@@ -462,17 +458,13 @@ public:
    * @param tunnel_config the tunneling config.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @param stream_info is the downstream session stream info.
-   * @param flush_access_log_on_tunnel_connected indicates whether to flush access log on tunnel
-   * connected.
-   * @param session_access_logs is the list of access logs for the session.
    * @return may be null if pool creation failed.
    */
-  TunnelingConnectionPoolPtr
-  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                 Upstream::LoadBalancerContext* context, const UdpTunnelingConfig& tunnel_config,
-                 UpstreamTunnelCallbacks& upstream_callbacks, StreamInfo::StreamInfo& stream_info,
-                 bool flush_access_log_on_tunnel_connected,
-                 const std::vector<AccessLog::InstanceSharedPtr>& session_access_logs) const;
+  TunnelingConnectionPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+                                            Upstream::LoadBalancerContext* context,
+                                            const UdpTunnelingConfig& tunnel_config,
+                                            UpstreamTunnelCallbacks& upstream_callbacks,
+                                            StreamInfo::StreamInfo& stream_info) const;
 };
 
 using TunnelingConnectionPoolFactoryPtr = std::unique_ptr<TunnelingConnectionPoolFactory>;
