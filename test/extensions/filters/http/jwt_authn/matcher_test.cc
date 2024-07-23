@@ -274,7 +274,7 @@ TEST_F(MatcherTest, TestMatchPathMatchPolicyError) {
       "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
       wrong_key: "/bar/*/foo"
   )";
-  EXPECT_THROW_WITH_REGEX(createMatcher(config), EnvoyException, "no such field:   'wrong_key'")
+  EXPECT_THROW_WITH_REGEX(createMatcher(config), EnvoyException, "INVALID_ARGUMENT")
 }
 
 } // namespace
