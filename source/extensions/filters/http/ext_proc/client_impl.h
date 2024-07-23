@@ -61,7 +61,7 @@ public:
     // Unregister the watermark callbacks(if any) to prevent access of filter callbacks after
     // the filter object is destroyed.
     if (grpc_side_stream_flow_control_) {
-      if (stream_ != nullptr) {
+      if (!stream_closed_) {
         stream_.removeWatermarkCallbacks();
       }
     }
