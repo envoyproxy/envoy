@@ -783,7 +783,7 @@ TEST_F(OrderingTest, GrpcErrorAfterTimeout) {
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   request_timer->invokeCallback();
   // Nothing should happen now despite the gRPC error
@@ -836,7 +836,7 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_body, true));
 
   // Now, fire the timeout, which will end everything
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   response_timer->invokeCallback();
 }
 
@@ -869,8 +869,8 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 
-  // Now fire the timeout and expect a 500 error
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  // Now fire the timeout and expect a 504 error
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   request_timer->invokeCallback();
 }
 

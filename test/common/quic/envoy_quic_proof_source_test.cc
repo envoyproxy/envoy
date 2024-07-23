@@ -211,7 +211,9 @@ public:
           .WillRepeatedly(ReturnRef(pkey_));
     }
     ASSERT_TRUE(secret_update_callback_ != nullptr);
-    ASSERT_TRUE(secret_update_callback_().ok());
+    absl::Status callback_status = secret_update_callback_();
+    THROW_IF_NOT_OK(callback_status);
+    ASSERT_TRUE(callback_status.ok());
   }
 
 protected:

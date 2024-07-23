@@ -17,6 +17,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -4104,7 +4104,7 @@ TEST_F(HttpFilterTest, HeaderProcessingInObservabilityMode) {
   // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
   // which is triggered by filter onDestroy() function below.
   EXPECT_CALL(*deferred_close_timer_,
-              enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS), _));
+              enableTimer(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS), _));
   filter_->onDestroy();
   deferred_close_timer_->invokeCallback();
 
@@ -4192,7 +4192,7 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
   // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
   // which is triggered by filter onDestroy() function.
   EXPECT_CALL(*deferred_close_timer_,
-              enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS), _));
+              enableTimer(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS), _));
   filter_->onDestroy();
   deferred_close_timer_->invokeCallback();
 
@@ -4240,7 +4240,7 @@ TEST_F(HttpFilterTest, StreamingAllDataInObservabilityMode) {
   // Deferred close timer is expected to be enabled by `DeferredDeletableStream`'s deferredClose(),
   // which is triggered by filter onDestroy() function.
   EXPECT_CALL(*deferred_close_timer_,
-              enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS), _));
+              enableTimer(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS), _));
   filter_->onDestroy();
   deferred_close_timer_->invokeCallback();
 

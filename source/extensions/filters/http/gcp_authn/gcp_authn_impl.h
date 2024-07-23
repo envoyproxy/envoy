@@ -13,6 +13,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
+constexpr absl::string_view UrlString =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/"
+    "identity?audience=[AUDIENCE]";
+
 Http::RequestMessagePtr buildRequest(absl::string_view url);
 
 /**

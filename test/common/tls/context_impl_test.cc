@@ -12,6 +12,8 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ssl_certs_test.h"
@@ -138,6 +140,56 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
             "Failed to initialize cipher suites "
             "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
             "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
+}
+
+// Envoy's default cipher preference is server's.
+TEST_F(SslContextImplTest, TestServerCipherPreference) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_).value();
+  ASSERT_FALSE(cfg.get()->preferClientCiphers());
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), manager_, *store_.rootScope(), {});
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory->createDownstreamTransportSocket();
+  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+
+  EXPECT_TRUE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_CIPHER_SERVER_PREFERENCE);
+}
+
+TEST_F(SslContextImplTest, TestPreferClientCiphers) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  prefer_client_ciphers: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_).value();
+  ASSERT_TRUE(cfg.get()->preferClientCiphers());
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), manager_, *store_.rootScope(), {});
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory->createDownstreamTransportSocket();
+  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+
+  EXPECT_FALSE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_CIPHER_SERVER_PREFERENCE);
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {
@@ -620,9 +672,11 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(
-      *manager_.createSslServerContext(*store_.rootScope(), *server_context_config, {}, nullptr),
-      EnvoyException, "has neither subject CN nor SAN names");
+  EXPECT_EQ(
+      manager_.createSslServerContext(*store_.rootScope(), *server_context_config, {}, nullptr)
+          .status()
+          .message(),
+      "Invalid TLS context has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
@@ -830,8 +884,10 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager_.createSslServerContext(
-        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(
+        THROW_OR_RETURN_VALUE(manager_.createSslServerContext(*store_.rootScope(), cfg,
+                                                              std::vector<std::string>{}, nullptr),
+                              Ssl::ServerContextSharedPtr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -1909,10 +1965,12 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Server TlsCertificates must have a certificate specified");
+  EXPECT_EQ(manager
+                .createSslServerContext(*store.rootScope(), *server_context_config,
+                                        std::vector<std::string>{}, nullptr)
+                .status()
+                .message(),
+            "Server TlsCertificates must have a certificate specified");
 }
 
 // Cannot ignore certificate expiration without a trusted CA.
@@ -2031,10 +2089,12 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Failed to get BoringSSL private key method from provider");
+  EXPECT_EQ(manager
+                .createSslServerContext(*store.rootScope(), *server_context_config,
+                                        std::vector<std::string>{}, nullptr)
+                .status()
+                .message(),
+            "Failed to get BoringSSL private key method from provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {

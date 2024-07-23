@@ -58,11 +58,10 @@ public:
     // should be reset to avoid the dangling reference.
     callbacks_.reset();
 
-    if (grpc_side_stream_flow_control_ && !watermark_callbacks_removed_) {
-      if (stream_ != nullptr) {
-        stream_.removeWatermarkCallbacks();
-        watermark_callbacks_removed_ = true;
-      }
+    // Unregister the watermark callbacks(if any) to prevent access of filter callbacks after
+    // the filter object is destroyed.
+    if (grpc_side_stream_flow_control_ && !stream_closed_) {
+      stream_.removeWatermarkCallbacks();
     }
   }
 
@@ -94,7 +93,6 @@ private:
   Grpc::AsyncStream<ProcessingRequest> stream_;
   Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
-  bool watermark_callbacks_removed_ = false;
   // Boolean flag initiated by runtime flag.
   const bool grpc_side_stream_flow_control_;
 };
