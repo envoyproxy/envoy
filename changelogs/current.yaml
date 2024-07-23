@@ -31,6 +31,9 @@ removed_config_or_runtime:
 - area: DNS
   change: |
     Removed ``envoy.reloadable_features.dns_cache_set_first_resolve_complete`` runtime flag and legacy code paths.
+- area: tls
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.ssl_transport_failure_reason_format``.
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
