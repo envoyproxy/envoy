@@ -63,8 +63,8 @@ public:
   }
 
 #define RETURN_IF_NOT_OK(variable)                                                                 \
-  if (!variable.ok()) {                                                                            \
-    return variable;                                                                               \
+  if (absl::Status temp_status = variable; !temp_status.ok()) {                                    \
+    return temp_status;                                                                            \
   }
 
 template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
