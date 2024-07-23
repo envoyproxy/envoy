@@ -52,13 +52,13 @@ message SocketOption {
   }
 
   enum SocketType {
-    // Apply the socket option irrespective of the socket type.
-    NONE = 0;
+    // Apply the socket option to all socket types (default).
+    ALL = 0;
 
     // Apply the socket option to the stream socket type.
     STREAM = 1;
 
-    // Apply the socket type to the datagram socket type.
+    // Apply the socket option to the datagram socket type.
     DATAGRAM = 2;
   }
 
@@ -86,9 +86,8 @@ message SocketOption {
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 
-  // The socket type (see man 2 socket) to apply the socket option to. If
-  // this field is not specified, the option will be applied irrespective
-  // of the socket type.
+  // The socket type (see man 2 socket) to apply the socket option to. By
+  // default, the socket option will be applied to all socket types.
   SocketType type = 7 [(validate.rules).enum = {defined_only: true}];
 }
 

@@ -160,15 +160,15 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   ASSERT_TRUE(parser.ParseFromString(keepalive_option, &socket_option_proto));
   *socket_options_proto.Add() = socket_option_proto;
 
-  static constexpr char none_socket_type_option_format[] = R"proto(
+  static constexpr char all_socket_type_option_format[] = R"proto(
     state: STATE_PREBIND
     level: %d
     name: %d
     int_value: 1
-    type: NONE
+    type: ALL
   )proto";
   auto all_socket_type_option =
-      absl::StrFormat(none_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
+      absl::StrFormat(all_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
   ASSERT_TRUE(parser.ParseFromString(all_socket_type_option, &socket_option_proto));
   *socket_options_proto.Add() = socket_option_proto;
 
@@ -214,8 +214,8 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   absl::string_view value_bstr{reinterpret_cast<const char*>(&value), sizeof(int)};
   EXPECT_EQ(value_bstr, option_details->value_);
 
-  auto none_socket_option = dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(2));
-  EXPECT_FALSE(none_socket_option->socketType().has_value());
+  auto all_socket_option = dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(2));
+  EXPECT_FALSE(all_socket_option->socketType().has_value());
 
   auto stream_socket_option = dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(3));
   EXPECT_TRUE(stream_socket_option->socketType().has_value());
