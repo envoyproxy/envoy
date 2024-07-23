@@ -318,6 +318,11 @@ EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
   respect_system_proxy_settings_ = value;
   return *this;
 }
+
+EngineBuilder& EngineBuilder::setIosNetworkServiceType(int ios_network_service_type) {
+  ios_network_service_type_ = ios_network_service_type;
+  return *this;
+}
 #endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
@@ -722,12 +727,25 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
     // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
     // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
-    envoy::config::core::v3::SocketOption* sock_opt =
+    envoy::config::core::v3::SocketOption* rcv_buf_sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
-    sock_opt->set_name(SO_RCVBUF);
-    sock_opt->set_level(SOL_SOCKET);
-    sock_opt->set_int_value(socket_receive_buffer_size_);
-    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
+    rcv_buf_sock_opt->set_name(SO_RCVBUF);
+    rcv_buf_sock_opt->set_level(SOL_SOCKET);
+    rcv_buf_sock_opt->set_int_value(socket_receive_buffer_size_);
+    rcv_buf_sock_opt->set_description(
+        absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
+    // Set the network service type on iOS, if supplied.
+#if defined(__APPLE__)
+    if (ios_network_service_type_ > 0) {
+      envoy::config::core::v3::SocketOption* net_svc_sock_opt =
+          base_cluster->mutable_upstream_bind_config()->add_socket_options();
+      net_svc_sock_opt->set_name(SO_NET_SERVICE_TYPE);
+      net_svc_sock_opt->set_level(SOL_SOCKET);
+      net_svc_sock_opt->set_int_value(ios_network_service_type_);
+      net_svc_sock_opt->set_description(
+          absl::StrCat("SO_NET_SERVICE_TYPE = ", ios_network_service_type_));
+    }
+#endif
   }
 
   // Set up stats.

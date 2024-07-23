@@ -154,6 +154,19 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
   fill_time_ = parent_.time_source_.monotonicTime();
 }
 
+AtomicTokenBucket::AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+                                     std::chrono::milliseconds fill_interval,
+                                     TimeSource& time_source)
+    : token_bucket_(max_tokens, time_source,
+                    // Calculate the fill rate in tokens per second.
+                    tokens_per_fill / std::chrono::duration<double>(fill_interval).count()) {}
+
+bool AtomicTokenBucket::consume(double factor) {
+  ASSERT(!(factor <= 0.0 || factor > 1.0));
+  auto cb = [tokens = 1.0 / factor](double total) { return total < tokens ? 0.0 : tokens; };
+  return token_bucket_.consume(cb) != 0.0;
+}
+
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
@@ -164,15 +177,23 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
       time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
-      always_consume_default_token_bucket_(always_consume_default_token_bucket) {
+      always_consume_default_token_bucket_(always_consume_default_token_bucket),
+      no_timer_based_rate_limit_token_bucket_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.no_timer_based_rate_limit_token_bucket")) {
   if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
 
-  default_token_bucket_ =
-      std::make_shared<TimerTokenBucket>(max_tokens, tokens_per_fill, fill_interval, 1, *this);
+  if (no_timer_based_rate_limit_token_bucket_) {
+    default_token_bucket_ = std::make_shared<AtomicTokenBucket>(max_tokens, tokens_per_fill,
+                                                                fill_interval, time_source_);
+  } else {
+    default_token_bucket_ =
+        std::make_shared<TimerTokenBucket>(max_tokens, tokens_per_fill, fill_interval, 1, *this);
+  }
 
-  if (fill_timer_ && default_token_bucket_->fillInterval().count() > 0) {
+  if (fill_timer_ && default_token_bucket_->fillInterval().count() > 0 &&
+      !no_timer_based_rate_limit_token_bucket_) {
     fill_timer_->enableTimer(default_token_bucket_->fillInterval());
   }
 
@@ -196,9 +217,16 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     // Save the multiplicative factor to control the descriptor refill frequency.
     const auto per_descriptor_multiplier = per_descriptor_fill_interval / fill_interval;
 
-    auto per_descriptor_token_bucket = std::make_shared<TimerTokenBucket>(
-        per_descriptor_max_tokens, per_descriptor_tokens_per_fill, per_descriptor_fill_interval,
-        per_descriptor_multiplier, *this);
+    RateLimitTokenBucketSharedPtr per_descriptor_token_bucket;
+    if (no_timer_based_rate_limit_token_bucket_) {
+      per_descriptor_token_bucket = std::make_shared<AtomicTokenBucket>(
+          per_descriptor_max_tokens, per_descriptor_tokens_per_fill, per_descriptor_fill_interval,
+          time_source_);
+    } else {
+      per_descriptor_token_bucket = std::make_shared<TimerTokenBucket>(
+          per_descriptor_max_tokens, per_descriptor_tokens_per_fill, per_descriptor_fill_interval,
+          per_descriptor_multiplier, *this);
+    }
 
     auto result =
         descriptors_.emplace(std::move(new_descriptor), std::move(per_descriptor_token_bucket));
@@ -248,7 +276,7 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
     }
   }
 
-  if (!matched_descriptors.empty()) {
+  if (matched_descriptors.size() > 1) {
     // Sort the matched descriptors by token bucket fill rate to ensure the descriptor with the
     // smallest fill rate is consumed first.
     std::sort(matched_descriptors.begin(), matched_descriptors.end(),
