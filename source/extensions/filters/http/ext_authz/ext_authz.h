@@ -51,6 +51,17 @@ struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  explicit ExtAuthzLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+      : filter_metadata_(filter_metadata) {}
+
+  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+
+private:
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
+};
+
 /**
  * Configuration for the External Authorization (ext_authz) filter.
  */
@@ -139,6 +150,8 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
+  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
@@ -189,6 +202,7 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
+  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
