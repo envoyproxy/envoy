@@ -18,6 +18,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.avoid_zombie_streams`` and legacy code paths.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` and legacy code
