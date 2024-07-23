@@ -33,6 +33,11 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.dns_cache_set_first_resolve_complete`` runtime flag and legacy code paths.
 
 new_features:
+- area: tls
+  change: |
+    Added :ref:`prefer_client_ciphers
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.prefer_client_ciphers>`
+    to support enabling client cipher preference instead of server's for TLS handshakes.
 - area: ext_authz
   change: |
     Added config field
