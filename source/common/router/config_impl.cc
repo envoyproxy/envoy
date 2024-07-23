@@ -1909,6 +1909,7 @@ VirtualHostImpl::VirtualHostImpl(
     ssl_requirements_ = SslRequirements::All;
     break;
   }
+  ssl_redirect_route_ = std::make_shared<SslRedirectRoute>(shared_virtual_host_);
 
   if (virtual_host.has_matcher()) {
     RouteActionContext context{shared_virtual_host_, factory_context};
@@ -1935,8 +1936,7 @@ VirtualHostImpl::VirtualHostImpl(
   }
 }
 
-const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
-    new SslRedirectRoute()};
+const VirtualHost& SslRedirectRoute::virtualHost() const { return *virtual_host_; }
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const Http::RequestHeaderMap& headers,
@@ -1992,10 +1992,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
-    return SSL_REDIRECT_ROUTE;
+    return ssl_redirect_route_;
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return SSL_REDIRECT_ROUTE;
+    return ssl_redirect_route_;
   }
 
   if (matcher_) {
