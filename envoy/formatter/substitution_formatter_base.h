@@ -6,6 +6,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -129,41 +130,42 @@ public:
 };
 
 template <class FormatterContext>
-using CommandParsersBase = std::vector<CommandParserBasePtr<FormatterContext>>;
-
-class BuiltInCommandParserFactory : public Config::UntypedFactory {
+class BuiltInCommandParserFactoryBase : public Config::UntypedFactory {
 public:
   std::string category() const override { return "envoy.built_in_formatters"; }
+
+  /**
+   * Creates a particular CommandParser implementation.
+   */
+  virtual CommandParserBasePtr<FormatterContext> createCommandParser() const PURE;
 };
 
-template <class FormatterContext> class BuiltInCommandParserRegistryBase {
+using BuiltInStreamInfoCommandParserFactory = BuiltInCommandParserFactoryBase<void>;
+
+/**
+ * Helper class to get all built-in command parsers for a given formatter context.
+ */
+template <class FormatterContext> class BuiltInCommandParserFactoryHelper {
 public:
-  static void addCommandParser(CommandParserBasePtr<FormatterContext> parser) {
-    mutableCommandParsers().push_back(std::move(parser));
-  }
+  using Factory = BuiltInCommandParserFactoryBase<FormatterContext>;
+  using Parsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
-  static const CommandParsersBase<FormatterContext>& commandParsers() {
-    return mutableCommandParsers();
-  }
-
-private:
-  static CommandParsersBase<FormatterContext>& mutableCommandParsers() {
-    MUTABLE_CONSTRUCT_ON_FIRST_USE(CommandParsersBase<FormatterContext>);
-  }
-};
-
-using BuiltInStreamInfoCommandParserRegistry = BuiltInCommandParserRegistryBase<void>;
-
-template <class FormatterContext> class BuiltInCommandParserRegisterBase {
-public:
-  BuiltInCommandParserRegisterBase(CommandParserBasePtr<FormatterContext> parser) {
-    BuiltInCommandParserRegistryBase<FormatterContext>::addCommandParser(std::move(parser));
+  /**
+   * Get all built-in command parsers for a given formatter context.
+   * @return Parsers all built-in command parsers for a given formatter context.
+   */
+  static const Parsers& commandParsers() {
+    CONSTRUCT_ON_FIRST_USE(Parsers, []() {
+      Parsers parsers;
+      for (auto& f : Registry::FactoryRegistry<Factory>::factories()) {
+        auto parser = f.second->createCommandParser();
+        RELEASE_ASSERT(parser != nullptr, "Null built-in command parser");
+        parsers.push_back(std::move(parser));
+      }
+      return parsers;
+    }());
   }
 };
-
-#define REGISTER_BUILT_IN_COMMAND_PARSER(context, parser)                                          \
-  static BuiltInCommandParserRegisterBase<context> register_##context##_##parser{                  \
-      std::make_unique<parser>()};
 
 } // namespace Formatter
 } // namespace Envoy

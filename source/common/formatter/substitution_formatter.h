@@ -157,7 +157,8 @@ public:
       // for backward compatibility.
 
       // First, try the built-in command parsers.
-      for (const auto& cmd : BuiltInCommandParserRegistryBase<FormatterContext>::commandParsers()) {
+      for (const auto& cmd :
+           BuiltInCommandParserFactoryHelper<FormatterContext>::commandParsers()) {
         auto formatter = cmd->parse(command, subcommand, max_length);
         if (formatter) {
           formatters.push_back(std::move(formatter));
@@ -180,7 +181,7 @@ public:
 
       // Finally, try the command parsers that are built-in and context-independent.
       if (!added) {
-        for (const auto& cmd : BuiltInStreamInfoCommandParserRegistry::commandParsers()) {
+        for (const auto& cmd : BuiltInCommandParserFactoryHelper<void>::commandParsers()) {
           auto formatter = cmd->parse(command, subcommand, max_length);
           if (formatter) {
             formatters.push_back(std::make_unique<StreamInfoFormatterWrapper<FormatterContext>>(

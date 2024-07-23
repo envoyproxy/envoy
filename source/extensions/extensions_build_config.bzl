@@ -429,8 +429,8 @@ EXTENSIONS = {
     # Formatter
     #
 
-    "envoy.built_in_formatters.built_in_http":          "//source/extensions/formatter/built_in_http:config",
-    "envoy.built_in_formatters.built_in_stream_info":   "//source/extensions/formatter/built_in_stream_info:config",
+    "envoy.built_in_formatters.http_specific":          "//source/extensions/formatter/built_in_http:config",
+    "envoy.built_in_formatters.stream_info":            "//source/extensions/formatter/built_in_stream_info:config",
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",

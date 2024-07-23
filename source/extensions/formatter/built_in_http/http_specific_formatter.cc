@@ -406,13 +406,17 @@ FormatterProviderPtr BuiltInHttpCommandParser::parse(const std::string& command,
   return (*it).second.second(subcommand, max_length);
 }
 
-class BuiltInHttpCommandParserFactory : public BuiltInCommandParserFactory {
+using BuiltInHttpCommandParserFactory = BuiltInCommandParserFactoryBase<HttpFormatterContext>;
+
+class DefaultBuiltInHttpCommandParserFactory : public BuiltInHttpCommandParserFactory {
 public:
-  std::string name() const override { return "envoy.built_in_formatters.built_in_http"; }
+  std::string name() const override { return "envoy.built_in_formatters.http_specific"; }
+  CommandParserPtr createCommandParser() const override {
+    return std::make_unique<BuiltInHttpCommandParser>();
+  }
 };
 
-REGISTER_FACTORY(BuiltInHttpCommandParserFactory, BuiltInCommandParserFactory);
-REGISTER_BUILT_IN_COMMAND_PARSER(HttpFormatterContext, BuiltInHttpCommandParser);
+REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInHttpCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

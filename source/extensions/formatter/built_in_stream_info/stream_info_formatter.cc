@@ -1762,15 +1762,17 @@ public:
   }
 };
 
-class BuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {
+class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInStreamInfoCommandParserFactory {
 public:
-  std::string name() const override { return "envoy.built_in_formatters.built_in_stream_info"; }
+  std::string name() const override { return "envoy.built_in_formatters.stream_info"; }
+
+  StreamInfoCommandParserPtr createCommandParser() const override {
+    return std::make_unique<BuiltInStreamInfoCommandParser>();
+  }
 };
 
-REGISTER_FACTORY(BuiltInStreamInfoCommandParserFactory, BuiltInCommandParserFactory);
-// Use the void type as FormatterContext because the StreamInfoCommandParser is context
-// independent.
-REGISTER_BUILT_IN_COMMAND_PARSER(void, BuiltInStreamInfoCommandParser);
+REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
+                 BuiltInStreamInfoCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

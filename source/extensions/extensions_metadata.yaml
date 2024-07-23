@@ -821,12 +821,12 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
-envoy.built_in_formatters.built_in_http:
+envoy.built_in_formatters.http_specific:
   categories:
   - envoy.built_in_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.built_in_formatters.built_in_stream_info:
+envoy.built_in_formatters.stream_info:
   categories:
   - envoy.built_in_formatters
   security_posture: robust_to_untrusted_downstream_and_upstream
