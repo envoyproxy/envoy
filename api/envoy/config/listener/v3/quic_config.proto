@@ -24,10 +24,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
+
+  message SaveCmsgConfig {
+    int32 level = 1;
+
+    int32 optname = 2;
+  }
 
   core.v3.QuicProtocolOptions quic_protocol_options = 1;
 
@@ -88,10 +94,5 @@ message QuicProtocolOptions {
   core.v3.TypedExtensionConfig connection_debug_visitor_config = 11;
 
   // Configure a type of UDP cmsg to pass to listener filters via QuicReceivedPacket.
-  message SaveCmsgConfig {
-    int32 level = 1;
-    int32 optname = 2;
-  }
-
   SaveCmsgConfig save_cmsg_config = 12;
 }
