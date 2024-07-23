@@ -193,14 +193,15 @@ public:
   void waitForPrimaryXdsRetryTimer(uint32_t expected_failures = 1, uint32_t seconds = 1) {
     // There's no easy way to wait for the xDS gRPC stream to retry reconnection,
     // so we do this by waiting for a CDS failure to be acknowledged, followed
-    // by waiting for a config dump and advancing the simulated time.
-    // Fetching the config dump from Envoy is used as a hack to allow waiting
-    // for the main thread's dispatcher to add a retry-timer after disconnecting
-    // from the primary/failover xDS-servers.
+    // by waiting for a notification on the main thread and advancing the
+    // simulated time.
+    // Adding the notification on the main thread is done after the CDS
+    // update_failure stat is incremented, and ensures that a notification will
+    // occur after the retry timer is enabled.
     test_server_->waitForCounterGe("cluster_manager.cds.update_failure", expected_failures);
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
-    EXPECT_TRUE(response->complete());
+    absl::Notification notification;
+    test_server_->server().dispatcher().post([&]() { notification.Notify(); });
+    notification.WaitForNotification();
     timeSystem().advanceTimeWait(std::chrono::seconds(seconds));
   }
 
@@ -495,12 +496,12 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
   // Now disconnect the primary.
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
-  // CDS was successful, but EDS will fail. After that fetch the config dump to
-  // ensure that the retry timer kicks in.
+  // CDS was successful, but EDS will fail. After that add a notification to the
+  // main thread to ensure that the retry timer kicks in.
   test_server_->waitForCounterGe("cluster.cluster_0.update_failure", 1);
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
-  EXPECT_TRUE(response->complete());
+  absl::Notification notification;
+  test_server_->server().dispatcher().post([&]() { notification.Notify(); });
+  notification.WaitForNotification();
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
   // In this case (received a response), both EnvoyGrpc and GoogleGrpc keep the connection open.
@@ -605,12 +606,12 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   // Now disconnect the primary.
   failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
-  // CDS was successful, but EDS will fail. After that fetch the config dump to
-  // ensure that the retry timer kicks in.
+  // CDS was successful, but EDS will fail. After that add a notification to the
+  // main thread to ensure that the retry timer kicks in.
   test_server_->waitForCounterGe("cluster.cluster_0.update_failure", 1);
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
-  EXPECT_TRUE(response->complete());
+  absl::Notification notification;
+  test_server_->server().dispatcher().post([&]() { notification.Notify(); });
+  notification.WaitForNotification();
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
   // In this case (received a response), both EnvoyGrpc and GoogleGrpc keep the connection open.
