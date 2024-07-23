@@ -52,8 +52,8 @@ message SocketOption {
   }
 
   // The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.
-  // If :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.stream>` is set, it takes
-  // precedence over :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.datagram>`.
+  // If :ref:`stream <envoy_v3_api_field_config.core.v3.SocketOption.SocketType.stream>` is set,
+  // it takes precedence over :ref:`datagram <envoy_v3_api_field_config.core.v3.SocketOption.SocketType.datagram>`.
   // If none of the fields is set, the socket option will be applied to all socket types.
   message SocketType {
     // The stream socket type.
