@@ -6,7 +6,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/io_handle_bio.h"
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/common/tls/utility.h"
@@ -230,7 +229,7 @@ void SslSocket::drainErrorQueue() {
       failure_reason_ = "TLS_error:";
     }
 
-    absl::StrAppend(&failure_reason_, new_ssl_failure_format ? "|" : " ", err, ":",
+    absl::StrAppend(&failure_reason_, "|", err, ":",
                     absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
                     absl::NullSafeStringView(ERR_func_error_string(err)), ":",
                     absl::NullSafeStringView(ERR_reason_error_string(err)));
@@ -241,9 +240,7 @@ void SslSocket::drainErrorQueue() {
   }
 
   if (!failure_reason_.empty()) {
-    if (new_ssl_failure_format) {
-      absl::StrAppend(&failure_reason_, ":TLS_error_end");
-    }
+    absl::StrAppend(&failure_reason_, ":TLS_error_end");
     ENVOY_CONN_LOG(debug, "remote address:{},{}", callbacks_->connection(),
                    callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
                    failure_reason_);
