@@ -5464,5 +5464,107 @@ TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCRAccept) {
   EXPECT_EQ(0u, buffer.length());
 }
 
+// If the first request contains a "Connection: close" header,
+// then http-parser signals an error if a second request is received,
+// but BalsaParser happily parses it.
+TEST_P(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
+  initialize();
+
+  {
+    Http::ResponseEncoder* response_encoder = nullptr;
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                             "connection: close\r\n\r\n");
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0u, buffer.length());
+
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder->encodeHeaders(response_headers, true);
+  }
+
+  {
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    } else {
+      EXPECT_CALL(decoder,
+                  sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+    }
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    auto status = codec_->dispatch(buffer);
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_TRUE(status.ok());
+      EXPECT_EQ(Protocol::Http11, codec_->protocol());
+    } else {
+      EXPECT_TRUE(isCodecProtocolError(status));
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_CLOSED_CONNECTION");
+    }
+  }
+}
+
+// If a "Connection: close" header is received in the first response, and then a second request is
+// sent, then http-parser correctly signals an error upon receiving the second response,
+// but BalsaParser happily parses it.
+TEST_P(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
+  initialize();
+
+  {
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
+
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+
+    Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
+                             "content-length: 3\r\n"
+                             "connection: close\r\n\r\n"
+                             "foo");
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0u, buffer.length());
+  }
+
+  {
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
+
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+      EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("bar"), false));
+      EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+    }
+
+    Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
+                             "content-length: 3\r\n"
+                             "\r\n"
+                             "bar");
+    auto status = codec_->dispatch(buffer);
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      EXPECT_TRUE(status.ok());
+      EXPECT_EQ(0u, buffer.length());
+    } else {
+      EXPECT_TRUE(isCodecProtocolError(status));
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_CLOSED_CONNECTION");
+    }
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
