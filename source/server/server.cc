@@ -619,7 +619,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = createOverloadManager();
+  auto overload_manager_or_error = createOverloadManager();
+  RETURN_IF_NOT_OK(overload_manager_or_error.status());
+  overload_manager_ = std::move(*overload_manager_or_error);
   null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
