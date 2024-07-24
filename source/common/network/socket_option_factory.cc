@@ -101,7 +101,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
 
     absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
     if (socket_option.has_type() && socket_option.type().has_stream()) {
-      if (socket_option.has_type() && socket_option.type().has_datagram()) {
+      if (socket_option.type().has_datagram()) {
         ENVOY_LOG(
             warn,
             "Both Stream and Datagram socket types are set, setting the socket type to Stream.");
