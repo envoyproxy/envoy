@@ -62,7 +62,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @suniltheta @mattklein123
+/*/extensions/tracers/xray @suniltheta @mattklein123 @nbaws
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
