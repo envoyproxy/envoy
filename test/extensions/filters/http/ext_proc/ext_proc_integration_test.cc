@@ -97,10 +97,6 @@ protected:
         [&total_cluster_endpoints](const auto& item) { total_cluster_endpoints += item.second; });
     ASSERT_EQ(total_cluster_endpoints, grpc_upstream_count_);
 
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
-          filter_mutation_rule_}});
-
     config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
@@ -680,7 +676,6 @@ protected:
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
-  std::string filter_mutation_rule_{"false"};
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
 };
@@ -2150,7 +2145,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
 // Test the filter using an ext_proc server that responds to the request_header message
 // by sending back an immediate_response message with system header mutation.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
   // Disallow system header in the mutation rule config.
   proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
@@ -2172,7 +2166,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
 // Test the filter using an ext_proc server that responds to the request_header message
 // by sending back an immediate_response message with x-envoy header mutation.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
   initializeConfig();
@@ -2190,7 +2183,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
 
@@ -2210,28 +2202,6 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
   verifyDownstreamResponse(*response, 401);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("host", "test"));
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-envoy-foo", "bar"));
-}
-
-// Test the filter using an ext_proc server that responds to the request_header message
-// by sending back an immediate_response message with x-envoy header mutation.
-// The deprecated default checker allows x-envoy headers to be mutated and should
-// override config-level checkers if the runtime guard is disabled.
-TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutationChecker) {
-  // this is default, but setting explicitly for test clarity
-  filter_mutation_rule_ = "false";
-  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
-    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
-    auto* hdr = immediate.mutable_headers()->add_set_headers();
-    // Adding x-envoy header is allowed since default overrides config.
-    hdr->mutable_header()->set_key("x-envoy-foo");
-    hdr->mutable_header()->set_raw_value("bar");
-  });
-  verifyDownstreamResponse(*response, 401);
-  EXPECT_FALSE(response->headers().get(LowerCaseString("x-envoy-foo")).empty());
 }
 
 // Test the filter with request body buffering enabled using

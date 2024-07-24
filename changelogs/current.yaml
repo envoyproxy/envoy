@@ -33,6 +33,10 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.reloadable_features.avoid_zombie_streams`` and legacy code paths.
 - area: ext_proc
   change: |
+    Removed runtime flag ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` and legacy code
+    path.
+- area: ext_proc
+  change: |
     Removed runtime flag ``envoy_reloadable_features_send_header_raw_value`` and legacy code path.
 - area: http
   change: |
