@@ -24,6 +24,12 @@ AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
       connect_timer_(dispatcher.createTimer([this]() { onConnectTimeout(); })),
       enable_half_close_(enable_half_close) {}
 
+AsyncTcpClientImpl::~AsyncTcpClientImpl() {
+  if (connection_) {
+        connection_->removeConnectionCallbacks(*this);
+  }
+}
+
 bool AsyncTcpClientImpl::connect() {
   if (connection_) {
     return false;
