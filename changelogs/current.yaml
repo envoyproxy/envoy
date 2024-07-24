@@ -13,5 +13,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: access_log
+  change: |
+    added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
+    ``alt_stat_name`` is set.
 
 deprecated:
