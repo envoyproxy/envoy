@@ -3859,8 +3859,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  // No received response for dynamic metadata as response is ignored in observability mode.
-  // The added system header is not sent to the client.
+  // No headers from dynamic metadata response as the response is ignored in observability mode.
   EXPECT_THAT(response->headers(), HasNoHeader(Http::LowerCaseString("receiving_ns_untyped.foo")));
   verifyDownstreamResponse(*response, 200);
 }
