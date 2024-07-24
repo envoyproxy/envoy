@@ -24,5 +24,10 @@ removed_config_or_runtime:
     path.
 
 new_features:
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:save_cmsg_config`
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.save_cmsg_config>` to allow a configurable CMSG type to be saved to
+    QuicReceivedPacket, which can be accessed via QuicListenerFilter::onFirstPacketReceived.
 
 deprecated:
