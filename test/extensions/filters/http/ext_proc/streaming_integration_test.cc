@@ -8,7 +8,6 @@
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -46,7 +45,6 @@ protected:
   }
 
   void initializeConfig() {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     skip_tag_extraction_rule_check_ = true;
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
@@ -148,7 +146,6 @@ protected:
   IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 // Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
