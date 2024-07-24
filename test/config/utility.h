@@ -70,6 +70,16 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setPreferClientCiphers(bool prefer_client_ciphers) {
+      prefer_client_ciphers_ = prefer_client_ciphers;
+      return *this;
+    }
+
+    ServerSslOptions& setCiphers(const std::vector<std::string>& ciphers) {
+      ciphers_ = ciphers;
+      return *this;
+    }
+
     ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
       curves_ = curves;
       return *this;
@@ -127,9 +137,11 @@ public:
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
     bool ecdsa_cert_ocsp_staple_{false};
+    bool prefer_client_ciphers_{false};
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     std::vector<std::string> curves_;
+    std::vector<std::string> ciphers_;
     bool expect_client_ecdsa_cert_{false};
     bool keylog_local_filter_{false};
     bool keylog_remote_filter_{false};

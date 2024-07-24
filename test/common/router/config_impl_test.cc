@@ -4973,10 +4973,9 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"backoff"}, {});
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException, "retry_policy.max_interval must greater than or equal to the base_interval");
+  TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true, creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "retry_policy.max_interval must greater than or equal to the base_interval");
 }
 
 TEST_F(RouteMatcherTest, RateLimitedRetryBackOff) {
