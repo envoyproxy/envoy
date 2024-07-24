@@ -40,6 +40,7 @@ public:
   }
 
   bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
+  bool preferClientCiphers() const override { return prefer_client_ciphers_; }
 
 private:
   ServerContextConfigImpl(
@@ -71,6 +72,7 @@ private:
   const bool disable_stateless_session_resumption_;
   const bool disable_stateful_session_resumption_;
   bool full_scan_certs_on_sni_mismatch_;
+  const bool prefer_client_ciphers_;
 };
 
 } // namespace Tls

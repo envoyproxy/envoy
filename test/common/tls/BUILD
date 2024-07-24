@@ -145,6 +145,7 @@ envoy_cc_test_library(
         "ssl_test_utility.h",
     ],
     deps = [
+        "//source/common/tls:ssl_socket_lib",
         "//source/common/tls:utility_lib",
         "//test/test_common:environment_lib",
     ],
@@ -197,6 +198,7 @@ envoy_cc_test(
     name = "handshaker_factory_test",
     srcs = ["handshaker_factory_test.cc"],
     deps = [
+        ":ssl_test_utils",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
