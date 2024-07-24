@@ -18,14 +18,14 @@ using testing::Return;
 namespace Envoy {
 namespace Tcp {
 
-class MockClientConnection2 : public Network::MockClientConnection {
-public:
-  ~MockClientConnection2() {
-    if (state_ != Connection::State::Closed) {
-      raiseEvent(Network::ConnectionEvent::LocalClose);
-    }
-  };
-};
+// class MockClientConnection2 : public Network::MockClientConnection {
+// public:
+//   ~MockClientConnection2() {
+//     if (state_ != Connection::State::Closed) {
+//       raiseEvent(Network::ConnectionEvent::LocalClose);
+//     }
+//   };
+// };
 
 class AsyncTcpClientImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
@@ -41,7 +41,7 @@ public:
   }
 
   void expectCreateConnection(bool trigger_connected = true) {
-    connection_ = new NiceMock<MockClientConnection2>();
+    connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     connection_->streamInfo().setAttemptCount(1);
     conn_info.connection_ = connection_;
@@ -68,7 +68,7 @@ public:
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  MockClientConnection2* connection_{};
+  Network::MockClientConnection* connection_{};
 
   NiceMock<Tcp::AsyncClient::MockAsyncTcpClientCallbacks> callbacks_;
 };
