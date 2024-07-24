@@ -5,19 +5,53 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: lua
+  change: |
+    When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
+- area: ext_authz
+  change: |
+    Fixed fail-open behaviour of the :ref:`failure_mode_allow config option
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
+    when a grpc external authz server is used.
+    The behaviour can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: ext_proc
+  change: |
+    Removed runtime flag ``envoy_reloadable_features_send_header_raw_value`` and legacy code path.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` and legacy code
+    path.
+- area: DNS
+  change: |
+    Removed ``envoy.reloadable_features.dns_cache_set_first_resolve_complete`` runtime flag and legacy code paths.
+- area: tls
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.ssl_transport_failure_reason_format``.
 
 new_features:
+- area: tls
+  change: |
+    Added :ref:`prefer_client_ciphers
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.prefer_client_ciphers>`
+    to support enabling client cipher preference instead of server's for TLS handshakes.
+- area: ext_authz
+  change: |
+    Added config field
+    :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_metadata>`
+    for injecting arbitrary data to the filter state for logging.
 - area: access_log
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
     ``alt_stat_name`` is set.
+
 deprecated:

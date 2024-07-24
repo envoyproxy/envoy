@@ -11,6 +11,7 @@
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/server/process_context_impl.h"
 
+#include "test/common/tls/ssl_test_utility.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/registry.h"
@@ -103,14 +104,6 @@ protected:
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
     custom_handshaker->set_name(HandshakerFactoryImplForTest::kFactoryName);
     custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::StringValue());
-  }
-
-  // Helper for downcasting a socket to a test socket so we can examine its
-  // SSL_CTX.
-  SSL_CTX* extractSslCtx(Network::TransportSocket* socket) {
-    SslSocket* ssl_socket = dynamic_cast<SslSocket*>(socket);
-    SSL* ssl = ssl_socket->rawSslForTest();
-    return SSL_get_SSL_CTX(ssl);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
