@@ -139,11 +139,7 @@ MockClientConnection::MockClientConnection() {
   initializeMockConnection(*this);
 }
 
-MockClientConnection::~MockClientConnection() {
-  if (state_ != Connection::State::Closed) {
-    raiseEvent(Network::ConnectionEvent::LocalClose);
-  }
-};
+MockClientConnection::~MockClientConnection() = default;
 
 MockFilterManagerConnection::MockFilterManagerConnection() {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
