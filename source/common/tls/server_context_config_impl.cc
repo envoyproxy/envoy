@@ -123,7 +123,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
       disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
       full_scan_certs_on_sni_mismatch_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, full_scan_certs_on_sni_mismatch, false)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, full_scan_certs_on_sni_mismatch, false)),
+      prefer_client_ciphers_(config.prefer_client_ciphers()) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
