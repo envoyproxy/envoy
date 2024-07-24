@@ -33,10 +33,18 @@ public:
     }
   }
 
+  /**
+   * The set function needs to be called by stream decoder filter before side stream connection is
+   * established, to apply the backpressure to downsream when it is above watermark,
+   */
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks* decode_callback) {
     decode_callback_ = decode_callback;
   }
 
+  /**
+   * The set function needs to be called by stream encoder filter before side stream connection is
+   * established, to apply the backpressure to upstream when it is above watermark,
+   */
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks* encode_callback) {
     encode_callback_ = encode_callback;
   }

@@ -65,7 +65,6 @@ bool ExternalProcessorStreamImpl::close() {
     // Unregister the watermark callbacks, if any exist (e.g., filter is not destroyed yet)
     if (grpc_side_stream_flow_control_ && callbacks_.has_value()) {
       stream_.removeWatermarkCallbacks();
-      watermark_callbacks_removed_ = true;
     }
     stream_.closeStream();
     stream_closed_ = true;
