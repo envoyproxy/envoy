@@ -26,7 +26,7 @@ AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
 
 AsyncTcpClientImpl::~AsyncTcpClientImpl() {
   if (connection_) {
-        connection_->removeConnectionCallbacks(*this);
+    connection_->removeConnectionCallbacks(*this);
   }
 }
 
