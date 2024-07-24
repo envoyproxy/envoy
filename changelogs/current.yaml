@@ -24,6 +24,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: ext_proc
+  change: |
+    Removed runtime flag ``envoy_reloadable_features_send_header_raw_value`` and legacy code path.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.no_downgrade_to_canonical_name`` and legacy code
@@ -34,6 +37,10 @@ removed_config_or_runtime:
 - area: tls
   change: |
     Removed runtime flag ``envoy.reloadable_features.ssl_transport_failure_reason_format``.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
+    code path.
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
@@ -49,5 +56,9 @@ new_features:
     Added config field
     :ref:`filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_metadata>`
     for injecting arbitrary data to the filter state for logging.
+- area: access_log
+  change: |
+    added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
+    ``alt_stat_name`` is set.
 
 deprecated:
