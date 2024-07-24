@@ -64,5 +64,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
     ``alt_stat_name`` is set.
+- area: conn pool
+  change: |
+    Added :ref:`auto_sni_from_upstream <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni_from_upstream>`
+    to use value of :ref:`hostnames <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` of
+    upstream cluster's endpoints as the value for SNI.
 
 deprecated:
