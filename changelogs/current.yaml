@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tcp
+  change: |
+    Added support for :ref:`connection_pool_per_downstream_connection
+    <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
