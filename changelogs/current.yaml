@@ -156,6 +156,9 @@ bug_fixes:
     Fixed a bug where using ``clear_route_cache`` with remote JWKs works
     incorrectly and may cause a crash when the modified request does not match
     any route.
+- area: http_async_client
+  change: |
+    Fixed the local reply and destroy order crashes when using the http async client for websocket handshake.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
