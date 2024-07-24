@@ -191,13 +191,17 @@ public:
   }
 
   void waitForPrimaryXdsRetryTimer(uint32_t expected_failures = 1, uint32_t seconds = 1) {
-    // There's no easy way to wait for the xDS gRPC stream to retry reconnection,
-    // so we do this by waiting for a CDS failure to be acknowledged, followed
-    // by waiting for a notification on the main thread and advancing the
-    // simulated time.
-    // Adding the notification on the main thread is done after the CDS
-    // update_failure stat is incremented, and ensures that a notification will
-    // occur after the retry timer is enabled.
+    // When a gRPC stream is closed, first the onEstablishmentFailure() callbacks are
+    // called and retry timer is added after. To make the test (current) thread
+    // increase the simulated time *after* the retry timer is added is done as
+    // follows:
+    // 1. The test thread waits for the CDS update_failure counter update which
+    // will occur as part of the onEstablishmentFailure() callbacks.
+    // 2. The test thread will install a barrier notification in Envoy's main
+    // thread dispatcher. This will be called after the main thread finishes the
+    // current invocation of gRPC stream closure piece of code that will also
+    // enable the retry timer.
+    // 3. The test thread will increase the simulated time.
     test_server_->waitForCounterGe("cluster_manager.cds.update_failure", expected_failures);
     absl::Notification notification;
     test_server_->server().dispatcher().post([&]() { notification.Notify(); });
