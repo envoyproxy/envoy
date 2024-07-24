@@ -469,7 +469,8 @@ private:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
                   Upstream::RetryExtensionFactoryContext& factory_context,
-                  Server::Configuration::CommonFactoryContext& common_context);
+                  Server::Configuration::CommonFactoryContext& common_context,
+                  absl::Status& creation_status);
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
@@ -992,10 +993,11 @@ public:
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
+    static absl::StatusOr<std::unique_ptr<WeightedClusterEntry>>
+    create(const RouteEntryImplBase* parent, const std::string& rutime_key,
+           Server::Configuration::ServerFactoryContext& factory_context,
+           ProtobufMessage::ValidationVisitor& validator,
+           const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
@@ -1064,6 +1066,11 @@ public:
     const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
 
   private:
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         ProtobufMessage::ValidationVisitor& validator,
+                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
+
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
