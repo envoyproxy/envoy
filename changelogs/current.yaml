@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tcp
+  change: |
+    Added support for :ref:`connection_pool_per_downstream_connection
+    <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
@@ -24,6 +28,13 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.avoid_zombie_streams`` and legacy code paths.
+- area: ext_proc
+  change: |
+    Removed runtime flag ``envoy_reloadable_features_immediate_response_use_filter_mutation_rule`` and legacy code
+    path.
 - area: ext_proc
   change: |
     Removed runtime flag ``envoy_reloadable_features_send_header_raw_value`` and legacy code path.
@@ -41,6 +52,10 @@ removed_config_or_runtime:
   change: |
     Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
     code path.
+- area: grpc reverse bridge
+  change: |
+    Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` runtime
+    flag and legacy code paths.
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
@@ -60,5 +75,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
     ``alt_stat_name`` is set.
+- area: sockets
+  change: |
+    Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
+    <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied to all socket
+    types.
 
 deprecated:

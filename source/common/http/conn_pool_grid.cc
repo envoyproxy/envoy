@@ -215,7 +215,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   if (callbacks != nullptr) {
     callbacks->onPoolReady(encoder, host, info, protocol);
-  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.avoid_zombie_streams")) {
+  } else {
     encoder.getStream().resetStream(StreamResetReason::LocalReset);
   }
 }
