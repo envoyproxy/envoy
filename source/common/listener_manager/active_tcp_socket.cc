@@ -128,30 +128,33 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           no_error = false;
           break;
         } else {
-          // If the listener maxReadBytes() is 0, then it shouldn't return
-          // `FilterStatus::StopIteration` from `onAccept` to wait for more data.
-          ASSERT((*iter_)->maxReadBytes() != 0);
-          if (listener_filter_buffer_ == nullptr) {
-            if ((*iter_)->maxReadBytes() > 0) {
+          // There are two cases for returning StopIteration. One is listener filter
+          // needs to wait for data. The other is listener filter with 0 maxReadBytes()
+          // doesn't inspect data, but needs to wait for some asynchronous callback.
+          if ((*iter_)->maxReadBytes() > 0) {
+            if (listener_filter_buffer_ == nullptr) {
               createListenerFilterBuffer();
+            } else {
+              // If the current filter expect more data than previous filters, then
+              // increase the filter buffer's capacity.
+              if (listener_filter_buffer_->capacity() < (*iter_)->maxReadBytes()) {
+                listener_filter_buffer_->resetCapacity((*iter_)->maxReadBytes());
+              }
             }
+            if (listener_filter_buffer_ != nullptr) {
+              // There are two cases for activate event manually: One is
+              // the data is already available when connect, activate the read event to peek
+              // data from the socket . Another one is the data already
+              // peeked into the buffer when previous filter processing the data, then activate the
+              // read event to trigger the current filter callback to process the data.
+              listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
+            }
+            // Waiting for more data.
+            return;
           } else {
-            // If the current filter expect more data than previous filters, then
-            // increase the filter buffer's capacity.
-            if (listener_filter_buffer_->capacity() < (*iter_)->maxReadBytes()) {
-              listener_filter_buffer_->resetCapacity((*iter_)->maxReadBytes());
-            }
+            // Waiting for asynchronous callback.
+            return;
           }
-          if (listener_filter_buffer_ != nullptr) {
-            // There are two cases for activate event manually: One is
-            // the data is already available when connect, activate the read event to peek
-            // data from the socket . Another one is the data already
-            // peeked into the buffer when previous filter processing the data, then activate the
-            // read event to trigger the current filter callback to process the data.
-            listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
-          }
-          // Waiting for more data.
-          return;
         }
       }
     }
