@@ -92,7 +92,7 @@ public:
         failure_details = transformation_result.details();
       }
       sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                      nullptr, absl::nullopt, failure_details);
+                     nullptr, absl::nullopt, failure_details);
       // These tests assume that connection is not closed on protocol errors
     } else {
       MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
