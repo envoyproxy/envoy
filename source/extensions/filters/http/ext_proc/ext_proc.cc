@@ -396,15 +396,18 @@ void Filter::onDestroy() {
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
 
-  if (stream_ != nullptr) {
-    stream_->notifyFilterDestroy();
-  }
-
   if (config_->observabilityMode()) {
     // In observability mode where the main stream processing and side stream processing are
     // asynchronous, it is possible that filter instance is destroyed before the side stream request
     // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
     // closure is deferred upon filter destruction with a timer.
+
+    // First, release the referenced filter resource.
+    if (stream_ != nullptr) {
+      stream_->notifyFilterDestroy();
+    }
+
+    // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
     // Perform immediate close on the stream otherwise.
