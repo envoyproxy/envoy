@@ -68,5 +68,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
     ``alt_stat_name`` is set.
+- area: sockets
+  change: |
+    Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
+    <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied to all socket
+    types.
 
 deprecated:
