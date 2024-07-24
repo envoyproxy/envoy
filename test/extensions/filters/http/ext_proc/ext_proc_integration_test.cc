@@ -98,8 +98,6 @@ protected:
     ASSERT_EQ(total_cluster_endpoints, grpc_upstream_count_);
 
     scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.send_header_raw_value", header_raw_value_}});
-    scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
           filter_mutation_rule_}});
 
@@ -555,7 +553,7 @@ protected:
       auto* headers = mutation.add_set_headers();
       auto str = absl::StrCat("x-test-header-internal-", std::to_string(i));
       headers->mutable_header()->set_key(str);
-      headers->mutable_header()->set_value(str);
+      headers->mutable_header()->set_raw_value(str);
     }
   }
 
@@ -571,7 +569,7 @@ protected:
           auto* content_length =
               headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
           content_length->mutable_header()->set_key("content-length");
-          content_length->mutable_header()->set_value("13");
+          content_length->mutable_header()->set_raw_value("13");
           return true;
         });
 
@@ -682,7 +680,6 @@ protected:
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
-  std::string header_raw_value_{"false"};
   std::string filter_mutation_rule_{"false"};
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
@@ -941,7 +938,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("new");
+        mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
         return true;
       });
@@ -1025,7 +1022,7 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
         // Set host header to match the domain of virtual host in routing configuration.
         auto* mut = response_header_mutation->add_set_headers();
         mut->mutable_header()->set_key(":authority");
-        mut->mutable_header()->set_value(vhost_domain);
+        mut->mutable_header()->set_raw_value(vhost_domain);
 
         // Clear the route cache to trigger the route re-pick.
         headers_resp.mutable_response()->set_clear_route_cache(true);
@@ -1086,7 +1083,7 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
         // configuration.
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key(":authority");
-        mut1->mutable_header()->set_value("wrong_host");
+        mut1->mutable_header()->set_raw_value("wrong_host");
 
         // Clear the route cache to trigger the route re-pick.
         headers_resp.mutable_response()->set_clear_route_cache(true);
@@ -1116,19 +1113,19 @@ TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key(":path");
-        mut1->mutable_header()->set_value("/mutated_path/bluh");
+        mut1->mutable_header()->set_raw_value("/mutated_path/bluh");
 
         auto* mut2 = response_header_mutation->add_set_headers();
         mut2->mutable_header()->set_key(":scheme");
-        mut2->mutable_header()->set_value("https");
+        mut2->mutable_header()->set_raw_value("https");
 
         auto* mut3 = response_header_mutation->add_set_headers();
         mut3->mutable_header()->set_key(":authority");
-        mut3->mutable_header()->set_value("new_host");
+        mut3->mutable_header()->set_raw_value("new_host");
 
         auto* mut4 = response_header_mutation->add_set_headers();
         mut4->mutable_header()->set_key(":method");
-        mut4->mutable_header()->set_value("POST");
+        mut4->mutable_header()->set_raw_value("POST");
         return true;
       });
 
@@ -1170,7 +1167,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersWithLogging) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("new");
+        mut1->mutable_header()->set_raw_value("new");
         return true;
       });
 
@@ -1212,11 +1209,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
             {":method", "GET"},
             {"host", "host"},
             {":path", "/"},
-            {"x-bad-utf8", "valid_prefix!(valid_suffix"},
+            {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
-          EXPECT_TRUE(!header.value().empty());
-          EXPECT_TRUE(header.raw_value().empty());
+          EXPECT_TRUE(!header.raw_value().empty());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
@@ -1246,8 +1242,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInString) {
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  // Set up runtime flag to have header value encoded in raw_value.
-  header_raw_value_ = "true";
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
@@ -1272,7 +1266,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
             {"x-bad-utf8", "valid_prefix\303(valid_suffix"},
             {"x-forwarded-proto", "http"}};
         for (const auto& header : headers.headers().headers()) {
-          EXPECT_TRUE(header.value().empty());
           EXPECT_TRUE(!header.raw_value().empty());
         }
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
@@ -1298,26 +1291,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
               SingleHeaderValueIs("x-new-utf8", "valid_prefix\303(valid_suffix"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
-}
-
-TEST_P(ExtProcIntegrationTest, BothValueAndValueBytesAreSetInHeaderValueWrong) {
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  // Set up runtime flag to have header value encoded in raw_value.
-  header_raw_value_ = "true";
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
-        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
-        auto* mut1 = response_header_mutation->add_set_headers();
-        mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("foo");
-        mut1->mutable_header()->set_raw_value("bar");
-        return true;
-      });
-  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter with body buffering turned on, but sending a GET
@@ -1458,7 +1431,7 @@ TEST_P(ExtProcIntegrationTest, RemoveResponseContentLengthAfterBodyProcessing) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
-        content_length->mutable_header()->set_value("13");
+        content_length->mutable_header()->set_raw_value("13");
         return true;
       });
 
@@ -1493,7 +1466,7 @@ TEST_P(ExtProcIntegrationTest, MismatchedContentLengthAndBodyLength) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
-        content_length->mutable_header()->set_value(absl::StrCat(set_content_length));
+        content_length->mutable_header()->set_raw_value(absl::StrCat(set_content_length));
         return true;
       });
 
@@ -1524,10 +1497,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
         add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
+        add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
         add2->mutable_header()->set_key(":status");
-        add2->mutable_header()->set_value("201");
+        add2->mutable_header()->set_raw_value("201");
         return true;
       });
 
@@ -1550,10 +1523,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseBadStatus) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
         add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
+        add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
         add2->mutable_header()->set_key(":status");
-        add2->mutable_header()->set_value("100");
+        add2->mutable_header()->set_raw_value("100");
         return true;
       });
 
@@ -1579,13 +1552,13 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
         add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
+        add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
         add2->mutable_header()->set_key(":status");
-        add2->mutable_header()->set_value("201");
+        add2->mutable_header()->set_raw_value("201");
         auto* add3 = response_mutation->add_set_headers();
         add3->mutable_header()->set_key(":status");
-        add3->mutable_header()->set_value("202");
+        add3->mutable_header()->set_raw_value("202");
         add3->mutable_append()->set_value(true);
         return true;
       });
@@ -1615,7 +1588,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
         trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_value("xxx");
+        trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
       });
 
@@ -1644,7 +1617,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) 
       *grpc_upstreams_[0], false, [](const HttpTrailers&, TrailersResponse& resp) {
         auto* trailer_add = resp.mutable_header_mutation()->add_set_headers();
         trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_value("xxx");
+        trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
       });
 
@@ -1673,7 +1646,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
         trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_value("xxx");
+        trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
       });
 
@@ -1699,7 +1672,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
-        content_length->mutable_header()->set_value("13");
+        content_length->mutable_header()->set_raw_value("13");
         return true;
       });
 
@@ -1712,7 +1685,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
         header_add->mutable_header()->set_key("x-testing-response-header");
-        header_add->mutable_header()->set_value("Yes");
+        header_add->mutable_header()->set_raw_value("Yes");
         return true;
       });
 
@@ -1760,7 +1733,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
-        content_length->mutable_header()->set_value("100");
+        content_length->mutable_header()->set_raw_value("100");
         return true;
       });
   // Should get just one message with the body
@@ -1770,7 +1743,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
         header_add->mutable_header()->set_key("x-testing-response-header");
-        header_add->mutable_header()->set_value("Yes");
+        header_add->mutable_header()->set_raw_value("Yes");
         return true;
       });
 
@@ -1807,7 +1780,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersAndTrailersOnResponse) {
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
         trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_value("xxx");
+        trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
       });
 
@@ -1870,7 +1843,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnBigResponse) {
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
         header_add->mutable_header()->set_key("x-testing-response-header");
-        header_add->mutable_header()->set_value("Yes");
+        header_add->mutable_header()->set_raw_value("Yes");
         return true;
       });
 
@@ -1893,7 +1866,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
-        content_length->mutable_header()->set_value("13");
+        content_length->mutable_header()->set_raw_value("13");
         return true;
       });
 
@@ -1939,7 +1912,7 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
         add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
+        add1->mutable_header()->set_raw_value("1");
         return true;
       });
 
@@ -1962,10 +1935,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
     immediate.set_details("Failed because you are not authorized");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
     hdr1->mutable_header()->set_key("x-failure-reason");
-    hdr1->mutable_header()->set_value("testing");
+    hdr1->mutable_header()->set_raw_value("testing");
     auto* hdr2 = immediate.mutable_headers()->add_set_headers();
     hdr2->mutable_header()->set_key("content-type");
-    hdr2->mutable_header()->set_value("application/json");
+    hdr2->mutable_header()->set_raw_value("application/json");
   });
 
   verifyDownstreamResponse(*response, 401);
@@ -1986,10 +1959,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithLogging) {
     immediate.set_details("Failed because you are not authorized");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
     hdr1->mutable_header()->set_key("x-failure-reason");
-    hdr1->mutable_header()->set_value("testing");
+    hdr1->mutable_header()->set_raw_value("testing");
     auto* hdr2 = immediate.mutable_headers()->add_set_headers();
     hdr2->mutable_header()->set_key("content-type");
-    hdr2->mutable_header()->set_value("application/json");
+    hdr2->mutable_header()->set_raw_value("application/json");
   });
 
   verifyDownstreamResponse(*response, 401);
@@ -2007,7 +1980,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithInvalidCharacter) {
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     hdr->mutable_header()->set_key("x-failure-reason\n");
-    hdr->mutable_header()->set_value("testing");
+    hdr->mutable_header()->set_raw_value("testing");
   });
 
   verifyDownstreamResponse(*response, 401);
@@ -2189,7 +2162,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     // Adding system header in the ext_proc response.
     hdr->mutable_header()->set_key(":foo");
-    hdr->mutable_header()->set_value("bar");
+    hdr->mutable_header()->set_raw_value("bar");
   });
   verifyDownstreamResponse(*response, 401);
   // The added system header is not sent to the client.
@@ -2210,7 +2183,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     // Adding x-envoy header is not allowed.
     hdr->mutable_header()->set_key("x-envoy-foo");
-    hdr->mutable_header()->set_value("bar");
+    hdr->mutable_header()->set_raw_value("bar");
   });
   verifyDownstreamResponse(*response, 401);
   EXPECT_THAT(response->headers(), HasNoHeader("x-envoy-foo"));
@@ -2228,10 +2201,10 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     hdr->mutable_header()->set_key("x-envoy-foo");
-    hdr->mutable_header()->set_value("bar");
+    hdr->mutable_header()->set_raw_value("bar");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
     hdr1->mutable_header()->set_key("host");
-    hdr1->mutable_header()->set_value("test");
+    hdr1->mutable_header()->set_raw_value("test");
   });
 
   verifyDownstreamResponse(*response, 401);
@@ -2255,7 +2228,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutation
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     // Adding x-envoy header is allowed since default overrides config.
     hdr->mutable_header()->set_key("x-envoy-foo");
-    hdr->mutable_header()->set_value("bar");
+    hdr->mutable_header()->set_raw_value("bar");
   });
   verifyDownstreamResponse(*response, 401);
   EXPECT_FALSE(response->headers().get(LowerCaseString("x-envoy-foo")).empty());
@@ -2276,7 +2249,7 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBody) {
         EXPECT_TRUE(body.end_of_stream());
         auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
         mut->mutable_header()->set_key(":scheme");
-        mut->mutable_header()->set_value("tcp");
+        mut->mutable_header()->set_raw_value("tcp");
         return true;
       });
 
@@ -2298,7 +2271,7 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBodyPartialBuffer)
         EXPECT_TRUE(body.end_of_stream());
         auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
         mut->mutable_header()->set_key(":scheme");
-        mut->mutable_header()->set_value("tcp");
+        mut->mutable_header()->set_raw_value("tcp");
         return true;
       });
 
@@ -2318,10 +2291,10 @@ TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
         auto* header_mut = headers_resp.mutable_response()->mutable_header_mutation();
         auto* method = header_mut->add_set_headers();
         method->mutable_header()->set_key(":method");
-        method->mutable_header()->set_value("POST");
+        method->mutable_header()->set_raw_value("POST");
         auto* content_type = header_mut->add_set_headers();
         content_type->mutable_header()->set_key("content-type");
-        content_type->mutable_header()->set_value("text/plain");
+        content_type->mutable_header()->set_raw_value("text/plain");
         headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
         // This special status tells us to replace the whole request
         headers_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
@@ -2962,10 +2935,10 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
         add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
+        add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
         add2->mutable_header()->set_key(":status");
-        add2->mutable_header()->set_value("201");
+        add2->mutable_header()->set_raw_value("201");
         return true;
       });
   verifyDownstreamResponse(*response, 201);
@@ -3039,7 +3012,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("new");
+        mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
         return true;
       });
@@ -3403,7 +3376,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         content_length->mutable_header()->set_key("content-length");
-        content_length->mutable_header()->set_value("13");
+        content_length->mutable_header()->set_raw_value("13");
         headers_resp.mutable_response()->set_clear_route_cache(true);
         return true;
       });
@@ -3435,7 +3408,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
         header_add->mutable_header()->set_key("x-testing-response-header");
-        header_add->mutable_header()->set_value("Yes");
+        header_add->mutable_header()->set_raw_value("Yes");
         body_resp.mutable_response()->set_clear_route_cache(true);
         return true;
       });
@@ -3989,7 +3962,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("new");
+        mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
         return true;
       });
@@ -4023,7 +3996,6 @@ TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
   proto_config_.mutable_message_timeout()->set_seconds(5);
   proto_config_.mutable_max_message_timeout()->set_seconds(10);
 
-  header_raw_value_ = "true";
   envoy::config::core::v3::RetryPolicy* retry_policy =
       proto_config_.mutable_grpc_service()->mutable_retry_policy();
   retry_policy->mutable_num_retries()->set_value(1);
@@ -4078,7 +4050,6 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
   proto_config_.mutable_message_timeout()->set_seconds(5);
   proto_config_.mutable_max_message_timeout()->set_seconds(10);
 
-  header_raw_value_ = "true";
   envoy::config::core::v3::RetryPolicy* retry_policy =
       proto_config_.mutable_grpc_service()->mutable_retry_policy();
   retry_policy->mutable_num_retries()->set_value(2);
@@ -4167,7 +4138,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
         add1->mutable_header()->set_key("x-response-processed");
-        add1->mutable_header()->set_value("1");
+        add1->mutable_header()->set_raw_value("1");
         return true;
       });
 
@@ -4277,7 +4248,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
         trailer_add->mutable_header()->set_key("x-modified-trailers");
-        trailer_add->mutable_header()->set_value("xxx");
+        trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
       });
 
@@ -4418,7 +4389,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("new");
+        mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
         return true;
       });
@@ -4490,7 +4461,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
         mut1->mutable_header()->set_key("x-new-header");
-        mut1->mutable_header()->set_value("new");
+        mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
         return true;
       });
