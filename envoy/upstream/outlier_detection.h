@@ -275,9 +275,8 @@ class ExtMonitorFactory : public Envoy::Config::TypedFactory {
 public:
   ~ExtMonitorFactory() override = default;
 
-  virtual ExtMonitorCreateFn createMonitor(const std::string& name,
-                                           ProtobufTypes::MessagePtr&& config,
-                                           const ExtMonitorFactoryContext& context) PURE;
+  virtual ExtMonitorCreateFn createMonitor(const std::string& name, const Protobuf::Message& config,
+                                           ExtMonitorFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.outlier_detection_monitors"; }
 };
