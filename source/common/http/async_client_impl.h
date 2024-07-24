@@ -38,6 +38,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/null_route_impl.h"
+#include "source/common/local_reply/local_reply.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -84,6 +85,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
   Runtime::Loader& runtime_;
+  const LocalReply::LocalReplyPtr local_reply_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestSharedImpl;
@@ -103,7 +105,7 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
   ~AsyncStreamImpl() override {
-    router_.onDestroy();
+    routerDestroy();
     // UpstreamRequest::cleanUp() is guaranteed to reset the high watermark calls.
     ENVOY_BUG(high_watermark_calls_ == 0, "Excess high watermark calls after async stream ended.");
     if (destructor_callback_.has_value()) {
@@ -161,6 +163,7 @@ private:
   void cleanup();
   void closeRemote(bool end_stream);
   bool complete() { return local_closed_ && remote_closed_; }
+  void routerDestroy();
 
   // Http::StreamDecoderFilterCallbacks
   OptRef<const Network::Connection> connection() override { return {}; }
@@ -191,26 +194,7 @@ private:
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override {
-    if (encoded_response_headers_) {
-      resetStream();
-      return;
-    }
-    Utility::sendLocalReply(
-        remote_closed_,
-        Utility::EncodeFunctions{nullptr, nullptr,
-                                 [this, modify_headers, &details](ResponseHeaderMapPtr&& headers,
-                                                                  bool end_stream) -> void {
-                                   if (modify_headers != nullptr) {
-                                     modify_headers(*headers);
-                                   }
-                                   encodeHeaders(std::move(headers), end_stream, details);
-                                 },
-                                 [this](Buffer::Instance& data, bool end_stream) -> void {
-                                   encodeData(data, end_stream);
-                                 }},
-        Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
-  }
+                      absl::string_view details) override;
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}
   ResponseHeaderMapOptRef informationalHeaders() const override { return {}; }
@@ -273,6 +257,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
+  const LocalReply::LocalReply& local_reply_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
@@ -280,10 +265,12 @@ private:
   Buffer::InstancePtr buffered_body_;
   Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
   absl::optional<uint32_t> buffer_limit_{absl::nullopt};
+  RequestHeaderMap* request_headers_{};
   bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool send_xff_{true};
+  bool router_destroyed_{false};
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

@@ -16,6 +16,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http_async_client
+  change: |
+    Fixed the local reply and destroy order crashes when using the http async client for websocket handshake.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

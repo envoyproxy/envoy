@@ -10,6 +10,7 @@
 
 #include "source/common/grpc/common.h"
 #include "source/common/http/utility.h"
+#include "source/common/local_reply/local_reply.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -28,7 +29,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
       config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
               runtime, random, std::move(shadow_writer), true, false, false, false, false, false,
               {}, dispatcher.timeSource(), http_context, router_context),
-      dispatcher_(dispatcher), runtime_(runtime) {}
+      dispatcher_(dispatcher), runtime_(runtime),
+      local_reply_(LocalReply::Factory::createDefault()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -85,7 +87,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
-      tracing_config_(Tracing::EgressConfig::get()),
+      tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
       route_(std::make_shared<NullRouteImpl>(parent_.cluster_->name(), parent_.singleton_manager_,
                                              options.timeout, options.hash_policy,
                                              options.retry_policy)),
@@ -104,6 +106,35 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
+void AsyncStreamImpl::sendLocalReply(Code code, absl::string_view body,
+                                     std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                     absl::string_view details) {
+  if (encoded_response_headers_) {
+    resetStream();
+    return;
+  }
+  Utility::sendLocalReply(
+      remote_closed_,
+      Utility::EncodeFunctions{
+          [modify_headers](ResponseHeaderMap& headers) -> void {
+            if (modify_headers != nullptr) {
+              modify_headers(headers);
+            }
+          },
+          [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                 absl::string_view& content_type) -> void {
+            local_reply_.rewrite(request_headers_, response_headers, stream_info_, code, body,
+                                 content_type);
+          },
+          [this, &details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            encodeHeaders(std::move(headers), end_stream, details);
+          },
+          [this](Buffer::Instance& data, bool end_stream) -> void {
+            encodeData(data, end_stream);
+          }},
+      Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
+}
 void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                     absl::string_view) {
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
@@ -144,6 +175,7 @@ void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
+  request_headers_ = &headers;
   if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
     is_head_request_ = true;
   }
@@ -239,8 +271,15 @@ void AsyncStreamImpl::closeRemote(bool end_stream) {
 }
 
 void AsyncStreamImpl::reset() {
-  router_.onDestroy();
+  routerDestroy();
   resetStream();
+}
+
+void AsyncStreamImpl::routerDestroy() {
+  if (!router_destroyed_) {
+    router_destroyed_ = true;
+    router_.onDestroy();
+  }
 }
 
 void AsyncStreamImpl::cleanup() {
@@ -249,6 +288,7 @@ void AsyncStreamImpl::cleanup() {
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (inserted()) {
+    routerDestroy();
     dispatcher().deferredDelete(removeFromList(parent_.active_streams_));
   }
 }
