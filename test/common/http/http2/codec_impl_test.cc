@@ -64,10 +64,7 @@ namespace {
 // the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
 // validateRequestHeaderMap() method. This will validate and apply transformations expected by the
 // test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
-// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error. This
-// class also handles behavior specific to the H/2 codec, where it resets requests with headers
-// containing underscores (when configured), instead of sending 400. See
-// https://github.com/envoyproxy/envoy/issues/24466
+// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
   MockRequestDecoderShimWithUhv() = default;
@@ -94,11 +91,8 @@ public:
         }
         failure_details = transformation_result.details();
       }
-      if (failure_details != UhvResponseCodeDetail::get().InvalidUnderscore) {
-        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                       nullptr, absl::nullopt, failure_details);
-      }
-      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
+                      nullptr, absl::nullopt, failure_details);
       // These tests assume that connection is not closed on protocol errors
     } else {
       MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);

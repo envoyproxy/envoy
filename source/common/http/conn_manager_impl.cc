@@ -1094,19 +1094,10 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
-      // H/2 codec was resetting requests that were rejected due to headers with underscores,
-      // instead of sending 400. Preserving this behavior for now.
-      // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-      if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
-          connection_manager_.codec_->protocol() == Protocol::Http2) {
-        filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
-        resetStream();
-      } else {
-        sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
-            !streamErrorOnlyErrors(failure_details)) {
-          connection_manager_.handleCodecError(failure_details);
-        }
+      sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
+      if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
+          !streamErrorOnlyErrors(failure_details)) {
+        connection_manager_.handleCodecError(failure_details);
       }
       return false;
     }
@@ -1136,24 +1127,15 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
 
-  // H/2 codec was resetting requests that were rejected due to headers with underscores,
-  // instead of sending 400. Preserving this behavior for now.
-  // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-  if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
-      connection_manager_.codec_->protocol() == Protocol::Http2) {
+  // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
+  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+    sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
+  } else {
     filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
-  } else {
-    // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
-    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-      sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
-    } else {
-      filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
-      resetStream();
-    }
-    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(failure_details);
-    }
+  }
+  if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+    connection_manager_.handleCodecError(failure_details);
   }
   return false;
 }

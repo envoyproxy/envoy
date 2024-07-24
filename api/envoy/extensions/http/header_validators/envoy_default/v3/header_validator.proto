@@ -38,8 +38,7 @@ message HeaderValidatorConfig {
     // Allow headers with underscores. This is the default behavior.
     ALLOW = 0;
 
-    // Reject client request. HTTP/1 requests are rejected with the 400 status. HTTP/2 requests
-    // end with the stream reset. The
+    // Reject client request. All HTTP/1, HTTP/2 and HTTP/3 requests are rejected with the 400 status. The
     // :ref:`httpN.requests_rejected_with_underscores_in_headers <config_http_conn_man_stats_per_codec>` counter
     // is incremented for each rejected request.
     REJECT_REQUEST = 1;
