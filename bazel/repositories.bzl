@@ -992,7 +992,7 @@ def _com_google_protobuf():
         # instead.
         external_http_archive(
             "com_google_protobuf_protoc_%s" % platform,
-            build_file = "@rules_proto//proto/private:BUILD.protoc",
+            build_file = "//bazel/protoc:BUILD.protoc",
         )
 
     external_http_archive(
