@@ -10,9 +10,13 @@ envoy_mobile_swift_test(
     srcs = [
         "HTTPRequestUsingProxyTest.swift",
     ],
-    exec_properties = {
-        "sandboxNetwork": "standard",
-    },
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
+    tags = [
+        "no-remote-exec",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
