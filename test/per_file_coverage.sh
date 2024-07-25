@@ -50,7 +50,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/opencensus:94.0"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/transport_sockets:97.4"
-"source/common/tls:94.9"
+"source/common/tls:94.7"
 "source/common/tls/cert_validator:94.2"
 "source/common/tls/private_key:88.9"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build

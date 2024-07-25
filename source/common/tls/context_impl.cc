@@ -692,7 +692,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
 
 namespace Ssl {
 
-bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
+bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) const {
   const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
   if (c == nullptr) {
     return false;
