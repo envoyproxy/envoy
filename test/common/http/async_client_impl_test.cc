@@ -470,9 +470,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   auto* request =
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
-  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
-  // // Registering a new watermark callback should note that the high watermark has already been
-  // hit. EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   // Registering a new watermark callback should note that the high watermark has already been hit.
