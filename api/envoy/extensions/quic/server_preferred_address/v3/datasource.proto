@@ -20,7 +20,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for DataSourceServerPreferredAddressConfig.
 message DataSourceServerPreferredAddressConfig {
-
   // Addresses for server preferred address for a single address family (IPv4 or IPv6).
   message AddressFamilyConfig {
     // The server preferred address sent to clients. The data must contain an IP address string.
