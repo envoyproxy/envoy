@@ -143,6 +143,7 @@ public:
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
+  std::string sameSiteAttribute() { return same_site_attribute_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
@@ -169,6 +170,8 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
+  // const SameSiteAttribute same_site_attribute_;
+  const std::string same_site_attribute_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
   const bool forward_bearer_token_ : 1;

@@ -123,6 +123,29 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   }
 }
 
+std::string getSameSiteAttribute(
+    envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues same_site_value) {
+  switch (same_site_value) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
+      CookieSettings_SameSiteValues_DISABLED:
+    break; // Do nothing.
+  case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
+      CookieSettings_SameSiteValues_NONE:
+    return "SameSite=None";
+  case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
+      CookieSettings_SameSiteValues_LAX:
+    return "SameSite=Lax";
+  case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
+      CookieSettings_SameSiteValues_STRICT:
+    return "SameSite=Strict";
+  default:
+    break;
+  }
+
+  return EMPTY_STRING;
+}
+
 Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
   auto query_params =
@@ -188,6 +211,8 @@ FilterConfig::FilterConfig(
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
+      same_site_attribute_(
+          getSameSiteAttribute(proto_config.cookie_settings().same_site_attribute_value())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
@@ -684,8 +709,11 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
   // We use HTTP Only cookies.
-  const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+  const std::string same_site_attribute = config_->sameSiteAttribute();
+  if (!same_site_attribute.empty()) {
+    cookie_tail_http_only = absl::StrCat(cookie_tail_http_only, ";", same_site_attribute);
+  }
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(
@@ -703,16 +731,24 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
 
     if (!id_token_.empty()) {
-      const std::string id_token_cookie_tail_http_only =
+      std::string id_token_cookie_tail_http_only =
           fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
+      if (!same_site_attribute.empty()) {
+        id_token_cookie_tail_http_only =
+            absl::StrCat(id_token_cookie_tail_http_only, ";", same_site_attribute);
+      }
       headers.addReferenceKey(
           Http::Headers::get().SetCookie,
           absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
     }
 
     if (!refresh_token_.empty()) {
-      const std::string refresh_token_cookie_tail_http_only =
+      std::string refresh_token_cookie_tail_http_only =
           fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
+      if (!same_site_attribute.empty()) {
+        refresh_token_cookie_tail_http_only =
+            absl::StrCat(refresh_token_cookie_tail_http_only, ";", same_site_attribute);
+      }
       headers.addReferenceKey(Http::Headers::get().SetCookie,
                               absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
                                            refresh_token_cookie_tail_http_only));

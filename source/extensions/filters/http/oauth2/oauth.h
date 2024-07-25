@@ -38,6 +38,8 @@ public:
  */
 enum class AuthType { UrlEncodedBody, BasicAuth };
 
+enum class SameSiteAttribute { Disabled, None, Lax, Strict };
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
