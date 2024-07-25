@@ -155,7 +155,7 @@ TEST_F(SslContextImplTest, TestServerCipherPreference) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_).value();
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, false).value();
   ASSERT_FALSE(cfg.get()->preferClientCiphers());
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
@@ -180,7 +180,7 @@ TEST_F(SslContextImplTest, TestPreferClientCiphers) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_).value();
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, false).value();
   ASSERT_TRUE(cfg.get()->preferClientCiphers());
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
