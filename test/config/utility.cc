@@ -1537,6 +1537,16 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
+  if (!options.tls_cert_selector_yaml_.empty()) {
+    auto* cert_selector = common_tls_context.mutable_custom_tls_certificate_selector();
+#ifdef ENVOY_ENABLE_YAML
+    TestUtility::loadFromYaml(TestEnvironment::substitute(options.tls_cert_selector_yaml_),
+                              *cert_selector);
+#else
+    UNREFERENCED_PARAMETER(cert_selector);
+    PANIC("YAML support compiled out");
+#endif
+  }
   initializeTlsKeyLog(common_tls_context, options);
 }
 

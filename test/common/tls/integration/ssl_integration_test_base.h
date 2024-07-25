@@ -39,6 +39,7 @@ protected:
   bool ocsp_staple_required_{false};
   bool prefer_client_ciphers_{false};
   bool client_ecdsa_cert_{false};
+  std::string tls_cert_selector_yaml_{""};
   // Set this true to debug SSL handshake issues with openssl s_client. The
   // verbose trace will be in the logs, openssl must be installed separately.
   bool debug_with_s_client_{false};
