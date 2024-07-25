@@ -60,7 +60,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Socket::Type type) {
-  auto instance = Utility::parseInternetAddressAndPort(addr_port);
+  auto instance = Utility::parseInternetAddressAndPortNoThrow(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
   } else {
@@ -174,7 +174,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), errorDetails(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
-    throw EnvoyException(msg);
+    throwEnvoyExceptionOrPanic(msg);
   }
 
   return std::make_pair(sock->connectionInfoProvider().localAddress(), std::move(sock));

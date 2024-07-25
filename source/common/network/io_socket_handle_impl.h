@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
@@ -11,8 +13,15 @@
 #include "source/common/network/io_socket_handle_base_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "quiche/quic/core/quic_lru_cache.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
+
 namespace Envoy {
 namespace Network {
+
+using AddressInstanceLRUCache =
+    quic::QuicLRUCache<quic::QuicSocketAddress, Address::InstanceConstSharedPtr,
+                       quic::QuicSocketAddressHash>;
 
 /**
  * IoHandle derivative for sockets.
@@ -20,11 +29,16 @@ namespace Network {
 class IoSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                              absl::optional<int> domain = absl::nullopt)
+                              absl::optional<int> domain = absl::nullopt,
+                              size_t address_cache_max_capacity = 0)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
         udp_read_normalize_addresses_(
             Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")),
         receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
+    if (address_cache_max_capacity > 0) {
+      recent_received_addresses_ =
+          std::make_unique<AddressInstanceLRUCache>(address_cache_max_capacity);
+    }
   }
 
   // Close underlying socket if close() hasn't been call yet.
@@ -98,6 +112,25 @@ protected:
 
   // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
   const bool receive_ecn_;
+
+  size_t addressCacheMaxSize() const {
+    return recent_received_addresses_ == nullptr ? 0 : recent_received_addresses_->MaxSize();
+  }
+
+private:
+  // Returns the destination address if the control message carries it.
+  // Otherwise returns nullptr.
+  Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
+                                                               uint32_t self_port);
+
+  Address::InstanceConstSharedPtr getOrCreateEnvoyAddressInstance(sockaddr_storage ss,
+                                                                  socklen_t ss_len);
+
+  // Caches the address instances of the most recently received packets on this socket.
+  // Should only be used by UDP sockets to avoid creating multiple address instances for the same
+  // address in each read operation. Only be instantiated if the non-zero address_cache_max_capacity
+  // is passed in during the construction.
+  std::unique_ptr<AddressInstanceLRUCache> recent_received_addresses_;
 };
 } // namespace Network
 } // namespace Envoy

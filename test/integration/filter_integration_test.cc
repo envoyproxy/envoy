@@ -224,51 +224,6 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   }
 }
 
-TEST_P(FilterIntegrationTest, RoundTripTimeForDownstreamConnection) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.refresh_rtt_after_request", "true");
-
-  config_helper_.prependFilter(R"EOF(
-  name: stream-info-to-headers-filter
-  )EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Send first request.
-  {
-    // Send a headers only request.
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    waitForNextUpstreamRequest();
-
-    // Make sure that the body was injected to the request.
-    EXPECT_TRUE(upstream_request_->complete());
-
-    // Send a headers only response.
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    ASSERT_TRUE(response->waitForEndStream());
-
-    // Make sure that round trip time was populated
-    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
-  }
-
-  // Send second request.
-  {
-    // Send a headers only request.
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    waitForNextUpstreamRequest();
-
-    // Make sure that the body was injected to the request.
-    EXPECT_TRUE(upstream_request_->complete());
-
-    // Send a headers only response.
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    ASSERT_TRUE(response->waitForEndStream());
-
-    // Make sure that round trip time was populated
-    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("round_trip_time")).empty());
-  }
-}
-
 TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
@@ -1280,50 +1235,7 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
 }
 
 // Verify filters can reset the stream
-TEST_P(FilterIntegrationTest, ResetFilterWithRuntimeFlagFalse) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.abort_filter_chain_on_stream_reset",
-                                    "false");
-
-  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
-  prependFilter(R"EOF(
-  name: reset-stream-filter
-  )EOF");
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForReset());
-  EXPECT_FALSE(response->complete());
-}
-
-// Verify filters can reset the stream
 TEST_P(FilterIntegrationTest, EncoderResetFilter) {
-  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
-  prependFilter(R"EOF(
-  name: encoder-reset-stream-filter
-  )EOF");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  // Accept request and send response.
-  waitForNextUpstreamRequest(0);
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-
-  // The stream will be in the response path.
-  ASSERT_TRUE(response->waitForReset());
-  EXPECT_FALSE(response->complete());
-}
-
-TEST_P(FilterIntegrationTest, EncoderResetFilterWithRuntimeFlagFalse) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.abort_filter_chain_on_stream_reset",
-                                    "false");
-
   // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
   prependFilter(R"EOF(
   name: encoder-reset-stream-filter

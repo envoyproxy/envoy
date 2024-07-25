@@ -241,6 +241,11 @@ public:
   virtual bool pausedForConnect() const PURE;
   virtual void setPausedForConnect(bool value) PURE;
 
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a WebSocket upgrade. These should only be used by the upstream codec filter.
+  virtual bool pausedForWebsocketUpgrade() const PURE;
+  virtual void setPausedForWebsocketUpgrade(bool value) PURE;
+
   // Return the upstreamStreamOptions for this stream.
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 
@@ -521,33 +526,12 @@ public:
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 };
 
-class DecoderFilterWatermarkCallbacks {
-public:
-  virtual ~DecoderFilterWatermarkCallbacks() = default;
-
-  /**
-   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
-   * their high watermark.
-   *
-   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
-   * the low watermark callbacks an equal number of times as the respective buffers are drained.
-   */
-  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when a decoder filter or any buffers the filter sends data to go from over its high
-   * watermark to under its low watermark.
-   */
-  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
-};
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a
  * decoding filter to restart decoding if they decide to hold data (e.g. for
  * buffering or rate limiting).
  */
-class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks,
-                                     public virtual DecoderFilterWatermarkCallbacks {
+class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
@@ -721,6 +705,22 @@ public:
    * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
    */
   virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
 
   /**
    * This routine can be called by a filter to subscribe to watermark events on the downstream

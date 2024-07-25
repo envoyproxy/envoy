@@ -36,6 +36,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_chain_helper.h"
+#include "source/common/http/sidestream_watermark.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
@@ -119,11 +120,13 @@ public:
 
   /**
    * Set the :scheme header using the best information available. In order this is
+   * - whether the upstream connection is using TLS if use_upstream is true
    * - existing scheme header if valid
    * - x-forwarded-proto header if valid
-   * - security of downstream connection
+   * - whether the downstream connection is using TLS
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_ssl,
+                                bool upstream_ssl, bool use_upstream);
 
   /**
    * Determine whether a request should be shadowed.
@@ -304,7 +307,8 @@ public:
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+                                               "envoy.reloadable_features.streaming_shadow")),
+        upstream_request_started_(false) {}
 
   ~Filter() override;
 
@@ -596,6 +600,7 @@ private:
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;
@@ -605,6 +610,7 @@ private:
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
   const bool streaming_shadows_ : 1;
+  bool upstream_request_started_ : 1;
 };
 
 class ProdFilter : public Filter {

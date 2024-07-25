@@ -19,7 +19,7 @@
 #include "source/common/stats/allocator_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
+#include "source/server/options_impl_base.h"
 #include "source/server/server.h"
 
 #include "test/integration/server_stats.h"
@@ -39,15 +39,15 @@ struct FieldValidationConfig {
   bool ignore_unknown_dynamic_fields = false;
 };
 
-// Create OptionsImpl structures suitable for tests. Disables hot restart.
-OptionsImpl
-createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                      Network::Address::IpVersion ip_version,
-                      FieldValidationConfig validation_config = FieldValidationConfig(),
-                      uint32_t concurrency = 1,
-                      std::chrono::seconds drain_time = std::chrono::seconds(1),
-                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-                      bool use_bootstrap_node_metadata = false);
+// Create OptionsImplBase structures suitable for tests. Disables hot restart.
+OptionsImplBase createTestOptionsImpl(
+    const std::string& config_path, const std::string& config_yaml,
+    Network::Address::IpVersion ip_version,
+    FieldValidationConfig validation_config = FieldValidationConfig(), uint32_t concurrency = 1,
+    std::chrono::seconds drain_time = std::chrono::seconds(1),
+    Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+    bool use_bootstrap_node_metadata = false,
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -407,7 +407,8 @@ public:
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
          Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
          Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
-         bool use_bootstrap_node_metadata = false);
+         bool use_bootstrap_node_metadata = false,
+         std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -550,14 +551,16 @@ public:
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
-                        const std::string& config_path)
-      : time_system_(time_system), api_(api), config_path_(config_path) {}
+                        const std::string& config_path,
+                        std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto)
+      : time_system_(time_system), api_(api), config_path_(config_path),
+        config_proto_(std::move(config_proto)) {}
 
   // Create the running envoy server. This function will call serverReady() when the virtual
   // functions server(), statStore(), and adminAddress() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
-  virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+  virtual void createAndRunEnvoyServer(OptionsImplBase& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
@@ -596,13 +599,16 @@ private:
   TcpDumpPtr tcp_dump_;
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
   bool use_admin_interface_to_quit_{};
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_;
 };
 
 // Default implementation of IntegrationTestServer
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
-  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path, bool real_stats = false);
+  IntegrationTestServerImpl(
+      Event::TestTimeSystem& time_system, Api::Api& api, const std::string& config_path,
+      bool real_stats = false,
+      std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
 
   ~IntegrationTestServerImpl() override;
 
@@ -629,7 +635,7 @@ public:
   }
 
 private:
-  void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+  void createAndRunEnvoyServer(OptionsImplBase& options, Event::TimeSystem& time_system,
                                Network::Address::InstanceConstSharedPtr local_address,
                                ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,

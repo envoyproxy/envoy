@@ -7,6 +7,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/default_tls_certificate_selector.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/network/mocks.h"
@@ -73,7 +74,7 @@ public:
         .WillByDefault(ReturnRef(empty_string_list));
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
-    auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
+    auto context = *Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, server_factory_context_);
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(verify_context_, transportSocketOptions())
@@ -191,6 +192,16 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
+    auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
+        getDefaultTlsCertificateSelectorConfigFactory();
+    ASSERT_TRUE(factory);
+    const ProtobufWkt::Any any;
+    absl::Status creation_status = absl::OkStatus();
+    auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorFactory(
+        any, factory_context_, ProtobufMessage::getNullValidationVisitor(), creation_status, true);
+    EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
+        .WillRepeatedly(Return(tls_certificate_selector_factory_cb));
+
     EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
         std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
@@ -211,7 +222,9 @@ public:
           .WillRepeatedly(ReturnRef(pkey_));
     }
     ASSERT_TRUE(secret_update_callback_ != nullptr);
-    ASSERT_TRUE(secret_update_callback_().ok());
+    absl::Status callback_status = secret_update_callback_();
+    THROW_IF_NOT_OK(callback_status);
+    ASSERT_TRUE(callback_status.ok());
   }
 
 protected:

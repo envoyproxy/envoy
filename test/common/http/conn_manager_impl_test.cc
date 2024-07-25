@@ -1258,13 +1258,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        EXPECT_EQ(default_route->routeEntry()->virtualCluster(test_req_headers),
-                  delegating_route_foo->routeEntry()->virtualCluster(test_req_headers));
+        EXPECT_EQ(default_route->virtualHost().virtualCluster(test_req_headers),
+                  delegating_route_foo->virtualHost().virtualCluster(test_req_headers));
 
-        EXPECT_EQ(default_route->routeEntry()->virtualHost().corsPolicy(),
-                  delegating_route_foo->routeEntry()->virtualHost().corsPolicy());
-        EXPECT_EQ(default_route->routeEntry()->virtualHost().rateLimitPolicy().empty(),
-                  delegating_route_foo->routeEntry()->virtualHost().rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->virtualHost().corsPolicy(),
+                  delegating_route_foo->virtualHost().corsPolicy());
+        EXPECT_EQ(default_route->virtualHost().rateLimitPolicy().empty(),
+                  delegating_route_foo->virtualHost().rateLimitPolicy().empty());
 
         EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
                   delegating_route_foo->routeEntry()->autoHostRewrite());
@@ -3568,44 +3568,6 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
   EXPECT_EQ("world", response_body);
-}
-
-TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasValue) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.refresh_rtt_after_request", "true"}});
-
-  setup(false, "");
-
-  // Set up the codec.
-  Buffer::OwnedImpl fake_input("input");
-  conn_manager_->createCodec(fake_input);
-
-  startRequest(true);
-
-  EXPECT_CALL(filter_callbacks_.connection_, lastRoundTripTime())
-      .WillOnce(Return(absl::optional<std::chrono::milliseconds>(300)));
-  EXPECT_CALL(filter_callbacks_.connection_, connectionInfoSetter());
-
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasNoValue) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.refresh_rtt_after_request", "true"}});
-
-  setup(false, "");
-
-  // Set up the codec.
-  Buffer::OwnedImpl fake_input("input");
-  conn_manager_->createCodec(fake_input);
-
-  startRequest(true);
-
-  EXPECT_CALL(filter_callbacks_.connection_, lastRoundTripTime())
-      .WillOnce(Return(absl::optional<std::chrono::milliseconds>()));
-  EXPECT_CALL(filter_callbacks_.connection_, connectionInfoSetter()).Times(0);
-
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledByDefault) {

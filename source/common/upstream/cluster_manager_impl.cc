@@ -88,16 +88,25 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
 
 bool isBlockingAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           absl::string_view cluster_name) {
+  bool blocking_ads_cluster = false;
   if (bootstrap.dynamic_resources().has_ads_config()) {
     const auto& ads_config_source = bootstrap.dynamic_resources().ads_config();
     // We only care about EnvoyGrpc, not GoogleGrpc, because we only need to delay ADS mux
     // initialization if it uses an Envoy cluster that needs to be initialized first. We don't
     // depend on the same cluster initialization when opening a gRPC stream for GoogleGrpc.
-    return (ads_config_source.grpc_services_size() > 0 &&
-            ads_config_source.grpc_services(0).has_envoy_grpc() &&
-            ads_config_source.grpc_services(0).envoy_grpc().cluster_name() == cluster_name);
+    blocking_ads_cluster =
+        (ads_config_source.grpc_services_size() > 0 &&
+         ads_config_source.grpc_services(0).has_envoy_grpc() &&
+         ads_config_source.grpc_services(0).envoy_grpc().cluster_name() == cluster_name);
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      // Validate the failover server if there is one.
+      blocking_ads_cluster |=
+          (ads_config_source.grpc_services_size() == 2 &&
+           ads_config_source.grpc_services(1).has_envoy_grpc() &&
+           ads_config_source.grpc_services(1).envoy_grpc().cluster_name() == cluster_name);
+    }
   }
-  return false;
+  return blocking_ads_cluster;
 }
 
 } // namespace
@@ -428,7 +437,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
         dyn_resources.ads_config(), random_,
         Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
         Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
-    THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+    RETURN_IF_STATUS_NOT_OK(strategy_or_error);
     JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
     const bool use_eds_cache =
@@ -447,14 +456,22 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
-      ads_mux_ =
-          factory->create(factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_,
-                          random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-                          std::move(custom_config_validators), std::move(backoff_strategy),
-                          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 0);
+      RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
+      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+            *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 1);
+        RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
+        factory_failover = std::move(factory_failover_or_error.value());
+      }
+      ads_mux_ = factory->create(
+          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
+          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          std::move(custom_config_validators), std::move(backoff_strategy),
+          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -470,12 +487,20 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 0);
+      RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
+      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+            *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 1);
+        RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
+        factory_failover = std::move(factory_failover_or_error.value());
+      }
       ads_mux_ = factory->create(
-          factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_, random_,
-          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
+          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
     }
@@ -526,10 +551,11 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   if (dyn_resources.has_cds_config() || !dyn_resources.cds_resources_locator().empty()) {
     std::unique_ptr<xds::core::v3::ResourceLocator> cds_resources_locator;
     if (!dyn_resources.cds_resources_locator().empty()) {
+      auto url_or_error =
+          Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator());
+      RETURN_IF_STATUS_NOT_OK(url_or_error);
       cds_resources_locator =
-          std::make_unique<xds::core::v3::ResourceLocator>(THROW_OR_RETURN_VALUE(
-              Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()),
-              xds::core::v3::ResourceLocator));
+          std::make_unique<xds::core::v3::ResourceLocator>(std::move(url_or_error.value()));
     }
     cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
     init_helper_.setCds(cds_api_.get());
@@ -567,8 +593,8 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false);
-    THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0);
+    RETURN_IF_STATUS_NOT_OK(factory_or_error);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(),
         factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_);
@@ -2104,6 +2130,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
 
   for (const auto& option : *upstream_options) {
     option->hashKey(hash_key);
+  }
+
+  // If configured, use the downstream connection id in pool hash key
+  if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
+      context->downstreamConnection()) {
+    ENVOY_LOG(trace, "honoring connection_pool_per_downstream_connection");
+    context->downstreamConnection()->hashKey(hash_key);
   }
 
   bool have_transport_socket_options = false;

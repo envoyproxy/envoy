@@ -353,6 +353,8 @@ TEST_F(OpenTracingDriverTest, GetTraceId) {
 
   // This method is unimplemented and a noop.
   ASSERT_EQ(first_span->getTraceId(), "");
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(first_span->getSpanId(), "");
 }
 
 TEST_F(OpenTracingDriverTest, ExtractUsingForeach) {

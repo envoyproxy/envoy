@@ -46,6 +46,8 @@ struct Bucket {
   QuotaUsage quota_usage;
   // Rate limiter based on token bucket algorithm.
   TokenBucketPtr token_bucket_limiter;
+  // First assignment time.
+  Envoy::MonotonicTime first_assignment_time = {};
 };
 
 using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;

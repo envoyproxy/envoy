@@ -197,11 +197,13 @@ public:
   };
 
   UdpProxyFilterTest()
-      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ip_address_)) {}
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPortNoThrow(peer_ip_address_)) {
+  }
 
   explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& peer_address)
       : os_calls_(&os_sys_calls_),
-        upstream_address_(Network::Utility::parseInternetAddressAndPort(upstream_ip_address_)),
+        upstream_address_(
+            Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ip_address_)),
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
@@ -242,8 +244,8 @@ public:
   void recvDataFromDownstream(const std::string& peer_address, const std::string& local_address,
                               const std::string& buffer) {
     Network::UdpRecvData data;
-    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort(peer_address);
-    data.addresses_.local_ = Network::Utility::parseInternetAddressAndPort(local_address);
+    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow(peer_address);
+    data.addresses_.local_ = Network::Utility::parseInternetAddressAndPortNoThrow(local_address);
     data.buffer_ = std::make_unique<Buffer::OwnedImpl>(buffer);
     data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
     filter_->onData(data);
@@ -388,10 +390,11 @@ class UdpProxyFilterIpv6Test : public UdpProxyFilterTest {
 public:
   UdpProxyFilterIpv6Test()
       : UdpProxyFilterIpv6Test(
-            Network::Utility::parseInternetAddressAndPort(upstream_ipv6_address_)) {}
+            Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ipv6_address_)) {}
 
   explicit UdpProxyFilterIpv6Test(Network::Address::InstanceConstSharedPtr&& upstream_address_v6)
-      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ipv6_address_)),
+      : UdpProxyFilterTest(
+            Network::Utility::parseInternetAddressAndPortNoThrow(peer_ipv6_address_)),
         upstream_address_v6_(std::move(upstream_address_v6)) {
     EXPECT_CALL(
         *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_,
@@ -407,7 +410,7 @@ public:
 class UdpProxyFilterIpv4Ipv6Test : public UdpProxyFilterIpv6Test {
 public:
   UdpProxyFilterIpv4Ipv6Test()
-      : UdpProxyFilterIpv6Test(Network::Utility::parseInternetAddressAndPort(
+      : UdpProxyFilterIpv6Test(Network::Utility::parseInternetAddressAndPortNoThrow(
             UdpProxyFilterIpv6Test::upstream_ipv6_address_, false)) {}
 
   void ensureNoIpTransparentSocketOptions() {
@@ -1005,7 +1008,7 @@ matcher:
       *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_,
       coarseHealth())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
-  auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
+  auto new_host_address = Network::Utility::parseInternetAddressAndPortNoThrow("20.0.0.2:443");
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
@@ -1103,7 +1106,7 @@ use_per_packet_load_balancing: true
   test_sessions_[0].recvDataFromUpstream("world");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 
-  auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
+  auto new_host_address = Network::Utility::parseInternetAddressAndPortNoThrow("20.0.0.2:443");
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
@@ -1248,7 +1251,7 @@ use_per_packet_load_balancing: true
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
+  auto new_host_address = Network::Utility::parseInternetAddressAndPortNoThrow("20.0.0.2:443");
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
@@ -1734,8 +1737,8 @@ TEST_F(HttpUpstreamImplTest, OnResetStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
 
-  // If the creation callbacks are active will resetting the stream, it means that response
-  // headers were not received, so it's expected to be a failure.
+  // If the creation callbacks are active, it means that response headers were not received,
+  // so it's expected to call onStreamFailure.
   EXPECT_CALL(creation_callbacks_, onStreamFailure());
   upstream_->onResetStream(Http::StreamResetReason::ConnectionTimeout, "reason");
 }
@@ -1744,10 +1747,10 @@ TEST_F(HttpUpstreamImplTest, LocalCloseByDownstreamResetsStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
 
-  // If the creation callbacks are active will resetting the stream, it means that response
-  // headers were not received, so it's expected to be a failure.
-  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  // If the creation callbacks are active, it means that response headers were not received,
+  // so it's expected to reset the stream, but not to call onStreamFailure as it's Downstream event.
   EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -1755,10 +1758,10 @@ TEST_F(HttpUpstreamImplTest, RemoteCloseByDownstreamResetsStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
 
-  // If the creation callbacks are active will resetting the stream, it means that response
-  // headers were not received, so it's expected to be a failure.
-  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  // If the creation callbacks are active, it means that response headers were not received,
+  // so it's expected to reset the stream, but not to call onStreamFailure as it's Downstream event.
   EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   upstream_->onDownstreamEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1946,9 +1949,8 @@ public:
     header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add).value();
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     stream_info_.downstream_connection_info_provider_->setConnectionID(0);
-    session_access_logs_ = std::make_unique<std::vector<AccessLog::InstanceSharedPtr>>();
-    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(
-        cluster_, &context_, *config_, callbacks_, stream_info_, false, *session_access_logs_);
+    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(cluster_, &context_, *config_, callbacks_,
+                                                          stream_info_);
   }
 
   void createNewStream() { pool_->newStream(stream_callbacks_); }
@@ -1959,7 +1961,6 @@ public:
   std::unique_ptr<NiceMock<MockUdpTunnelingConfig>> config_;
   NiceMock<MockUpstreamTunnelCallbacks> callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  std::unique_ptr<std::vector<AccessLog::InstanceSharedPtr>> session_access_logs_;
   NiceMock<MockHttpStreamCallbacks> stream_callbacks_;
   NiceMock<Http::MockRequestEncoder> request_encoder_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
@@ -2003,6 +2004,7 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
 
   std::string upstream_host_name = "upstream_host_test";
   EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
+  EXPECT_CALL(stream_callbacks_, resetIdleTimer());
   pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
 }
@@ -2022,17 +2024,28 @@ TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   pool_->onStreamSuccess(request_encoder_);
 }
 
+TEST_F(TunnelingConnectionPoolImplTest, OnDownstreamEvent) {
+  setup();
+  createNewStream();
+
+  EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+
+  EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
+  EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  pool_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+}
+
 TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   setup();
 
   TunnelingConnectionPoolFactory factory;
-  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_,
-                                           false, *session_access_logs_);
+  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
 
   EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  auto invalid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_,
-                                             stream_info_, false, *session_access_logs_);
+  auto invalid_pool =
+      factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
 }
 

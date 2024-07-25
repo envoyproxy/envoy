@@ -27,9 +27,9 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
   if (!config.isReady()) {
     return nullptr;
   }
-
-  Envoy::Ssl::ClientContextSharedPtr context =
-      std::make_shared<ClientContextImpl>(scope, config, factory_context_);
+  auto context_or_error = ClientContextImpl::create(scope, config, factory_context_);
+  RETURN_IF_NOT_OK(context_or_error.status());
+  Envoy::Ssl::ClientContextSharedPtr context = std::move(context_or_error.value());
   contexts_.insert(context);
   return context;
 }
@@ -48,10 +48,12 @@ absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSsl
     IS_ENVOY_BUG("No envoy.ssl.server_context_factory registered");
     return nullptr;
   }
-  Envoy::Ssl::ServerContextSharedPtr context = factory->createServerContext(
-      scope, config, server_names, factory_context_, std::move(additional_init));
-  contexts_.insert(context);
-  return context;
+  absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> context_or_error =
+      factory->createServerContext(scope, config, server_names, factory_context_,
+                                   std::move(additional_init));
+  RETURN_IF_NOT_OK(context_or_error.status());
+  contexts_.insert(*context_or_error);
+  return *context_or_error;
 }
 
 absl::optional<uint32_t> ContextManagerImpl::daysUntilFirstCertExpires() const {

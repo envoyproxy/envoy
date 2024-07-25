@@ -55,6 +55,7 @@ TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(nullptr, admin_.tracer());
   EXPECT_FALSE(admin_.streamErrorOnInvalidHttpMessaging());
   EXPECT_FALSE(admin_.schemeToSet().has_value());
+  EXPECT_FALSE(admin_.shouldSchemeMatchUpstream());
   EXPECT_EQ(admin_.pathWithEscapedSlashesAction(),
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED);
@@ -167,8 +168,8 @@ TEST_P(AdminInstanceTest, Help) {
   /listeners: print listener info
       format: File format to use; One of (text, json)
   /logging (POST): query/change logging levels
-      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>.
-      level: desired logging level; One of (, trace, debug, info, warning, error, critical, off)
+      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>. If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. For example, source/common*:warning
+      level: desired logging level, this will change all loggers's level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /quitquitquit (POST): exit the server
   /ready: print server state, return 200 if LIVE, otherwise return 503
@@ -337,8 +338,6 @@ TEST_P(AdminInstanceTest, Overrides) {
   ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
-  peer.scopedRouteConfigProvider().getConfigProto();
-  peer.scopedRouteConfigProvider().getConfigVersion();
   peer.scopedRouteConfigProvider().getConfig();
   peer.scopedRouteConfigProvider().apiType();
   peer.scopedRouteConfigProvider().getConfigProtos();

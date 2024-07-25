@@ -360,6 +360,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
+        "//source/common/http:sidestream_watermark_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -441,6 +442,7 @@ envoy_cc_library(
         "//envoy/router:shadow_writer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
     ],
 )

@@ -53,6 +53,8 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
+constexpr char FilterConfigName[] = "ext_authz_filter";
+
 template <class T> class HttpFilterTestBase : public T {
 public:
   HttpFilterTestBase() {}
@@ -70,6 +72,7 @@ public:
                                              "ext_authz_prefix", factory_context_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
+    ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
@@ -250,6 +253,44 @@ public:
   const std::string invalid_value_;
 };
 
+TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
+  InSequence s;
+
+  initialize(R"(
+      grpc_service:
+        envoy_grpc:
+          cluster_name: "ext_authz_server"
+      enable_dynamic_metadata_ingestion:
+        value: false
+  )");
+
+  // Simulate a downstream request.
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  // Send response. Dynamic metadata should be ignored.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  (*response.dynamic_metadata.mutable_fields())["key"] = ValueUtil::stringValue("value");
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().ignored_dynamic_metadata_.value());
+}
+
 // Tests that the filter rejects authz responses with mutations with an invalid key when
 // validate_authz_response is set to true in config.
 TEST_F(InvalidMutationTest, HeadersToSetKey) {
@@ -386,6 +427,329 @@ TEST_F(InvalidMutationTest, QueryParametersToSetValue) {
   // Add a valid header to see if it gets added to the downstream response.
   response.query_parameters_to_set = {{"foo", "b a r"}};
   testResponse(response);
+}
+
+struct DecoderHeaderMutationRulesTestOpts {
+  absl::optional<envoy::config::common::mutation_rules::v3::HeaderMutationRules> rules;
+  bool expect_reject_response = false;
+  Filters::Common::ExtAuthz::UnsafeHeaderVector allowed_headers_to_add;
+  Filters::Common::ExtAuthz::UnsafeHeaderVector disallowed_headers_to_add;
+  Filters::Common::ExtAuthz::UnsafeHeaderVector allowed_headers_to_append;
+  Filters::Common::ExtAuthz::UnsafeHeaderVector disallowed_headers_to_append;
+  Filters::Common::ExtAuthz::UnsafeHeaderVector allowed_headers_to_set;
+  Filters::Common::ExtAuthz::UnsafeHeaderVector disallowed_headers_to_set;
+  std::vector<absl::string_view> allowed_headers_to_remove;
+  std::vector<absl::string_view> disallowed_headers_to_remove;
+};
+class DecoderHeaderMutationRulesTest
+    : public HttpFilterTestBase<testing::TestWithParam<bool /*disallow_is_error*/>> {
+public:
+  void runTest(DecoderHeaderMutationRulesTestOpts opts) {
+    InSequence s;
+
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
+    TestUtility::loadFromYaml(R"(
+        transport_api_version: V3
+        grpc_service:
+          envoy_grpc:
+            cluster_name: "ext_authz_server"
+        failure_mode_allow: false
+    )",
+                              proto_config);
+    if (opts.rules != std::nullopt) {
+      *(proto_config.mutable_decoder_header_mutation_rules()) = *opts.rules;
+    }
+
+    initialize(proto_config);
+
+    // Simulate a downstream request.
+    populateRequestHeadersFromOpts(opts);
+
+    ON_CALL(decoder_filter_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(Invoke(
+            [&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+              filter_->decodeHeaders(request_headers_, false));
+    if (opts.expect_reject_response) {
+      EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
+          .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+            EXPECT_EQ(headers.getStatusValue(),
+                      std::to_string(enumToInt(Http::Code::InternalServerError)));
+          }));
+    } else {
+      EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+    }
+
+    // Construct authz response from opts.
+    Filters::Common::ExtAuthz::Response response = getResponseFromOpts(opts);
+
+    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+    if (!opts.expect_reject_response) {
+      // Now make sure the downstream header is / is not there depending on the test.
+      checkRequestHeadersFromOpts(opts);
+    }
+  }
+
+  void populateRequestHeadersFromOpts(const DecoderHeaderMutationRulesTestOpts& opts) {
+    for (const auto& [key, _] : opts.allowed_headers_to_set) {
+      request_headers_.addCopy(Http::LowerCaseString(key), "will be overridden");
+    }
+    for (const auto& [key, _] : opts.disallowed_headers_to_set) {
+      request_headers_.addCopy(Http::LowerCaseString(key), "will not be overridden");
+    }
+
+    for (const auto& [key, _] : opts.allowed_headers_to_append) {
+      request_headers_.addCopy(Http::LowerCaseString(key), "will be appended to");
+    }
+    for (const auto& [key, _] : opts.disallowed_headers_to_append) {
+      request_headers_.addCopy(Http::LowerCaseString(key), "will not be appended to");
+    }
+
+    for (const auto& key : opts.allowed_headers_to_remove) {
+      request_headers_.addCopy(Http::LowerCaseString(key), "will be removed");
+    }
+    for (const auto& key : opts.disallowed_headers_to_remove) {
+      request_headers_.addCopy(Http::LowerCaseString(key), "will not be removed");
+    }
+  }
+
+  void checkRequestHeadersFromOpts(const DecoderHeaderMutationRulesTestOpts& opts) {
+    for (const auto& [key, value] : opts.allowed_headers_to_add) {
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), value)
+          << "(key: '" << key << "')";
+    }
+    for (const auto& [key, _] : opts.disallowed_headers_to_add) {
+      EXPECT_FALSE(request_headers_.has(Http::LowerCaseString(key))) << "(key: '" << key << "')";
+    }
+
+    for (const auto& [key, value] : opts.allowed_headers_to_set) {
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), value)
+          << "(key: '" << key << "')";
+    }
+    for (const auto& [key, _] : opts.disallowed_headers_to_set) {
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be overridden")
+          << "(key: '" << key << "')";
+    }
+
+    for (const auto& [key, value] : opts.allowed_headers_to_append) {
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)),
+                absl::StrCat("will be appended to,", value))
+          << "(key: '" << key << "')";
+    }
+    for (const auto& [key, value] : opts.disallowed_headers_to_append) {
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be appended to")
+          << "(key: '" << key << "')";
+    }
+
+    for (const auto& key : opts.allowed_headers_to_remove) {
+      EXPECT_FALSE(request_headers_.has(Http::LowerCaseString(key))) << "(key: '" << key << "')";
+    }
+    for (const auto& key : opts.disallowed_headers_to_remove) {
+      EXPECT_EQ(request_headers_.get_(Http::LowerCaseString(key)), "will not be removed")
+          << "(key: '" << key << "')";
+    }
+  }
+
+  static Filters::Common::ExtAuthz::Response
+  getResponseFromOpts(const DecoderHeaderMutationRulesTestOpts& opts) {
+    Filters::Common::ExtAuthz::Response response;
+    response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+    for (const auto& vec : {opts.allowed_headers_to_add, opts.disallowed_headers_to_add}) {
+      for (const auto& [key, value] : vec) {
+        response.headers_to_add.emplace_back(key, value);
+      }
+    }
+
+    for (const auto& vec : {opts.allowed_headers_to_set, opts.disallowed_headers_to_set}) {
+      for (const auto& [key, value] : vec) {
+        response.headers_to_set.emplace_back(key, value);
+      }
+    }
+
+    for (const auto& vec : {opts.allowed_headers_to_append, opts.disallowed_headers_to_append}) {
+      for (const auto& [key, value] : vec) {
+        response.headers_to_append.emplace_back(key, value);
+      }
+    }
+
+    for (const auto& vec : {opts.allowed_headers_to_remove, opts.disallowed_headers_to_remove}) {
+      for (const auto& key : vec) {
+        response.headers_to_remove.emplace_back(key);
+      }
+    }
+
+    return response;
+  }
+};
+
+// If decoder_header_mutation_rules is empty, there should be no additional restrictions to
+// ext_authz header mutations.
+TEST_F(DecoderHeaderMutationRulesTest, EmptyConfig) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.allowed_headers_to_add = {{":authority", "google"}};
+  opts.allowed_headers_to_append = {{"normal", "one"}, {":fake-pseudo-header", "append me"}};
+  opts.allowed_headers_to_set = {{"x-envoy-whatever", "override"}};
+  opts.allowed_headers_to_remove = {"delete-me"};
+  // These are not allowed not because of the header mutation rules config, but because ext_authz
+  // doesn't allow the removable of headers starting with `:` anyway.
+  opts.disallowed_headers_to_remove = {":method", ":fake-pseudoheader"};
+  runTest(opts);
+}
+
+// Test behavior when the rules field exists but all sub-fields are their default values (should be
+// exactly the same as above)
+TEST_F(DecoderHeaderMutationRulesTest, ExplicitDefaultConfig) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.disallowed_headers_to_add = {{":authority", "google"}};
+  opts.allowed_headers_to_append = {{"normal", "one"}};
+  opts.disallowed_headers_to_append = {{":fake-pseudo-header", "append me"}};
+  opts.disallowed_headers_to_set = {{"x-envoy-whatever", "override"}};
+  opts.allowed_headers_to_remove = {"delete-me"};
+  // These are not allowed not because of the header mutation rules config, but because ext_authz
+  // doesn't allow the removable of headers starting with `:` anyway.
+  opts.disallowed_headers_to_remove = {":method", ":fake-pseudoheader"};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, DisallowAll) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+
+  opts.disallowed_headers_to_add = {{"cant-add-me", "sad"}};
+  opts.disallowed_headers_to_append = {{"cant-append-to-me", "fail"}};
+  opts.disallowed_headers_to_set = {{"cant-override-me", "nope"}};
+  opts.disallowed_headers_to_remove = {"cant-delete-me"};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAdd) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_add = {{"cant-add-me", "sad"}};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAppend) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_append = {{"cant-append-to-me", "fail"}};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAppendPseudoheader) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_append = {{":fake-pseudo-header", "fail"}};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseSet) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_set = {{"cant-override-me", "nope"}};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseRemove) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_remove = {"cant-delete-me"};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseRemovePseudoHeader) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_is_error()->set_value(true);
+  opts.expect_reject_response = true;
+
+  opts.disallowed_headers_to_remove = {":fake-pseudo-header"};
+  runTest(opts);
+}
+
+TEST_F(DecoderHeaderMutationRulesTest, DisallowExpression) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_expression()->set_regex("^x-example-.*");
+
+  opts.allowed_headers_to_add = {{"add-me-one", "one"}, {"add-me-two", "two"}};
+  opts.disallowed_headers_to_add = {{"x-example-add", "nope"}};
+  opts.allowed_headers_to_append = {{"append-to-me", "appended value"}};
+  opts.disallowed_headers_to_append = {{"x-example-append", "no sir"}};
+  opts.allowed_headers_to_set = {{"override-me", "new value"}};
+  opts.disallowed_headers_to_set = {{"x-example-set", "no can do"}};
+  opts.allowed_headers_to_remove = {"delete-me"};
+  opts.disallowed_headers_to_remove = {"x-example-remove"};
+  runTest(opts);
+}
+
+// Tests that allow_expression overrides other settings (except disallow, which is tested
+// elsewhere).
+TEST_F(DecoderHeaderMutationRulesTest, AllowExpression) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+  opts.rules->mutable_allow_expression()->set_regex("^x-allow-.*");
+
+  opts.allowed_headers_to_add = {{"x-allow-add-me-one", "one"}, {"x-allow-add-me-two", "two"}};
+  opts.disallowed_headers_to_add = {{"not-allowed", "nope"}};
+  opts.allowed_headers_to_append = {{"x-allow-append-to-me", "appended value"}};
+  opts.disallowed_headers_to_append = {{"xx-allow-wrong-prefix", "no sir"}};
+  opts.allowed_headers_to_set = {{"x-allow-override-me", "new value"}};
+  opts.disallowed_headers_to_set = {{"cant-set-me", "no can do"}};
+  opts.allowed_headers_to_remove = {"x-allow-delete-me"};
+  opts.disallowed_headers_to_remove = {"cannot-remove"};
+  runTest(opts);
+}
+
+// Tests that disallow_expression overrides allow_expression.
+TEST_F(DecoderHeaderMutationRulesTest, OverlappingAllowAndDisallowExpressions) {
+  DecoderHeaderMutationRulesTestOpts opts;
+  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+  opts.rules->mutable_disallow_all()->set_value(true);
+  // Note the disallow expression's matches are a subset of the allow expression's matches.
+  opts.rules->mutable_allow_expression()->set_regex(".*allowed.*");
+  opts.rules->mutable_disallow_expression()->set_regex(".*disallowed.*");
+
+  opts.allowed_headers_to_add = {{"allowed-add", "yes"}};
+  opts.disallowed_headers_to_add = {{"disallowed-add", "nope"}};
+  opts.allowed_headers_to_append = {{"allowed-append", "appended value"}};
+  opts.disallowed_headers_to_append = {{"disallowed-append", "no sir"}};
+  opts.allowed_headers_to_set = {{"allowed-set", "new value"}};
+  opts.disallowed_headers_to_set = {{"disallowed-set", "no can do"}};
+  opts.allowed_headers_to_remove = {"allowed-remove"};
+  opts.disallowed_headers_to_remove = {"disallowed-remove"};
+  runTest(opts);
 }
 
 // Test that the per route config is properly merged: more specific keys override previous keys.
@@ -2563,6 +2927,71 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
                     .counterFromString("ext_authz.ok")
                     .value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+TEST_F(HttpFilterTest, LoggingInfoOK) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_metadata:
+    foo: "bar"
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
+}
+
+// Test that if no filter metadata is configured, filter state is not added to stream info.
+TEST_F(HttpFilterTest, LoggingInfoEmpty) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  EXPECT_FALSE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 }
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP

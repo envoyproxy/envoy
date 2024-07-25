@@ -16,6 +16,10 @@
 
 namespace Envoy {
 
+// If Envoy is built with lite protos, this will register Envoy-Mobile specific
+// descriptors for reflection.
+void registerMobileProtoDescriptors();
+
 /**
  * This class is used instead of Envoy::MainCommon to customize logic for the Envoy Mobile setting.
  * It largely leverages Envoy::StrippedMainBase.

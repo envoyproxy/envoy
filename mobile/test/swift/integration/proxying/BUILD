@@ -10,7 +10,10 @@ envoy_mobile_swift_test(
     srcs = [
         "HTTPRequestUsingProxyTest.swift",
     ],
-    # The test starts an Envoy test server, which requires the `no-remote-exec` tag.
+    # TODO(fredyw): Re-enable remote-exec.
+    # exec_properties = {
+    #     "sandboxNetwork": "standard",
+    # },
     tags = [
         "no-remote-exec",
     ],
