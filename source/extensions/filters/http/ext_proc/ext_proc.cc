@@ -309,6 +309,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   filter_callbacks_ = &callbacks;
+  watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
@@ -324,6 +325,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setEncoderFilterCallbacks(callbacks);
   encoding_state_.setEncoderFilterCallbacks(callbacks);
+  watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
 Filter::StreamOpenState Filter::openStream() {
@@ -345,7 +347,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(true);
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options, decoder_callbacks_);
+        client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
