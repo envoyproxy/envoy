@@ -19,6 +19,9 @@ bug_fixes:
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
+- area: quic
+  change: |
+    Fixes access log formatter %CONNECTION_ID% for QUIC connections.
 - area: ext_authz
   change: |
     Fixed fail-open behaviour of the :ref:`failure_mode_allow config option
