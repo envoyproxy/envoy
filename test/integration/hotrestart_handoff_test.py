@@ -403,7 +403,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior",
         )
         for response in slow_responses:
-            self.assertEquals(await response.join(), 0)
+            self.assertEqual(await response.join(), 0)
         log.info("waiting for parent instance to terminate")
         await envoy_process_1.wait()
         log.info("sending second request to fast upstream")
