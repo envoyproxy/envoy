@@ -16,6 +16,7 @@ envoy_cc_library(
         "//source/common/upstream:__subpackages__",
         "//source/extensions/outlier_detection_monitors:__subpackages__",
         "//test/common/upstream:__subpackages__",
+        "//test/extensions/outlier_detection_monitors:__subpackages__",
     ],
     deps = [
         "//source/common/protobuf",
