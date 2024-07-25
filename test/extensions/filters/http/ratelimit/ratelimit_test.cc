@@ -9,6 +9,8 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
+#include "envoy/stream_info/stream_info.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -262,10 +264,9 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   setUpTest(filter_config_);
   InSequence s;
 
-  ProtobufWkt::Struct request_struct;
-  request_struct.mutable_fields()->insert({"hits_addend", ValueUtil::numberValue(5)});
-  (*filter_callbacks_.stream_info_.metadata_.mutable_filter_metadata())["envoy.ratelimit"] =
-      request_struct;
+  filter_callbacks_.stream_info_.filter_state_->setData("envoy.ratelimit.hits_addend",
+                                     std::make_unique<StreamInfo::UInt32AccessorImpl>(5),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))

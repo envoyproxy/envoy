@@ -11,12 +11,34 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/router/config_impl.h"
+#include "envoy/stream_info/stream_info.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
+
+namespace {
+constexpr absl::string_view HitsAddendFilterStateKey = "envoy.ratelimit.hits_addend";
+
+class HitsAddendObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return std::string(HitsAddendFilterStateKey); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    uint32_t port = 0;
+    if (absl::SimpleAtoi(data, &port)) {
+      return std::make_unique<StreamInfo::UInt32AccessorImpl>(port);
+    }
+    return nullptr;
+  }
+};
+
+REGISTER_FACTORY(HitsAddendObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+} // namespace
 
 struct RcDetailsValues {
   // This request went above the configured limits for the rate limit filter.
@@ -66,19 +88,14 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     break;
   }
 
+  const StreamInfo::UInt32Accessor* hits_addend_filter_state =
+    callbacks_
+        ->streamInfo()
+        .filterState()
+        ->getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.ratelimit.hits_addend");
   double hits_addend = 0;
-  const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  const auto filter_it = request_metadata.find("envoy.ratelimit");
-  if (filter_it != request_metadata.end()) {
-    const auto field_it = filter_it->second.fields().find("hits_addend");
-    if (field_it != filter_it->second.fields().end()) {
-      if (!field_it->second.has_number_value()) {
-        IS_ENVOY_BUG("Expected number value for envoy.ratelimit:hits_addend.")
-      } else if (field_it->second.number_value() < 0) {
-       IS_ENVOY_BUG(fmt::format("Expected value > 0, got %f", field_it->second.number_value()));
-      }
-      hits_addend = field_it->second.number_value();
-    }
+  if (hits_addend_filter_state != nullptr) {
+    hits_addend = hits_addend_filter_state->value();
   }
 
   if (!descriptors.empty()) {
