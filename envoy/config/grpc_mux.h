@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Config {
 
 using ScopedResume = std::unique_ptr<Cleanup>;
+using ScopedResumes = std::unique_ptr<std::vector<ScopedResume>>;
 /**
  * All control plane related stats. @see stats_macros.h
  */

@@ -52,7 +52,9 @@ public:
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
-  MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
+  MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, (absl::string_view), (const));
+  MOCK_METHOD(Config::ScopedResumes, pauseAdsMuxes, (const std::string&), (const));
+  MOCK_METHOD(Config::ScopedResumes, pauseAdsMuxes, (const std::vector<std::string>&), (const));
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, localClusterName, (), (const));
@@ -100,6 +102,7 @@ public:
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
+  absl::flat_hash_map<std::string, std::shared_ptr<NiceMock<Config::MockGrpcMux>>> additional_ads_muxes_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;

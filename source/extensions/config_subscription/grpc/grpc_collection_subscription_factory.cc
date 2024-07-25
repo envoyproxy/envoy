@@ -53,8 +53,9 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
 
 SubscriptionPtr AggregatedGrpcCollectionConfigSubscriptionFactory::create(
     ConfigSubscriptionFactory::SubscriptionData& data) {
+  auto instance = data.config_.ads().instance();
   return std::make_unique<GrpcCollectionSubscriptionImpl>(
-      data.collection_locator_.value(), data.cm_.adsMux(), data.callbacks_, data.resource_decoder_,
+      data.collection_locator_.value(), data.cm_.adsMux(instance), data.callbacks_, data.resource_decoder_,
       data.stats_, data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_),
       /*is_aggregated=*/true, data.options_);
 }
@@ -63,8 +64,9 @@ SubscriptionPtr
 AdsCollectionConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionData& data) {
   // All Envoy collections currently are xDS resource graph roots and require node context
   // parameters.
+  auto instance = data.config_.ads().instance();
   return std::make_unique<GrpcCollectionSubscriptionImpl>(
-      data.collection_locator_.value(), data.cm_.adsMux(), data.callbacks_, data.resource_decoder_,
+      data.collection_locator_.value(), data.cm_.adsMux(instance), data.callbacks_, data.resource_decoder_,
       data.stats_, data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_), true,
       data.options_);
 }

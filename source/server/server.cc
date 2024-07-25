@@ -954,10 +954,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
-    Config::ScopedResume maybe_resume_rds;
-    if (cm.adsMux()) {
-      maybe_resume_rds = cm.adsMux()->pause(type_url);
-    }
+    auto maybe_resume_rds = cm.pauseAdsMuxes(type_url);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);

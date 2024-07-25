@@ -65,7 +65,7 @@ public:
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/nullptr};
     if (should_use_unified_) {
-      xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
+      xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(std::move(grpc_mux_context), false);
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(grpc_mux_context);
     }

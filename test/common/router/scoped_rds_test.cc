@@ -334,7 +334,7 @@ dynamic_scoped_route_configs:
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup() {
-    ON_CALL(server_factory_context_.cluster_manager_, adsMux())
+    ON_CALL(server_factory_context_.cluster_manager_, adsMux(_))
         .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl>()));
 
     InSequence s;

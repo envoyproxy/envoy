@@ -49,14 +49,11 @@ absl::Status
 LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                            const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                            const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_rds_sds;
-  if (cm_.adsMux()) {
-    const std::vector<std::string> paused_xds_types{
-        Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
-        Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
-        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-    maybe_resume_rds_sds = cm_.adsMux()->pause(paused_xds_types);
-  }
+  const std::vector<std::string> paused_xds_types{
+      Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
+      Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+  auto maybe_resume_rds_sds = cm_.pauseAdsMuxes(paused_xds_types);
 
   bool any_applied = false;
   listener_manager_.beginListenerUpdate();

@@ -87,7 +87,7 @@ public:
             random_),
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
-    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(std::move(grpc_mux_context), true);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -941,7 +941,7 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/nullptr};
   EXPECT_THROW_WITH_MESSAGE(
-      XdsMux::GrpcMuxSotw(grpc_mux_context, true), EnvoyException,
+      XdsMux::GrpcMuxSotw(std::move(grpc_mux_context), true), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -967,7 +967,7 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/nullptr};
   EXPECT_THROW_WITH_MESSAGE(
-      XdsMux::GrpcMuxSotw(grpc_mux_context, true), EnvoyException,
+      XdsMux::GrpcMuxSotw(std::move(grpc_mux_context), true), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -1093,7 +1093,7 @@ TEST_P(GrpcMuxImplTest, AllMuxesStateTest) {
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/nullptr};
-  auto grpc_mux_1 = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+  auto grpc_mux_1 = std::make_unique<XdsMux::GrpcMuxSotw>(std::move(grpc_mux_context), true);
   Config::XdsMux::GrpcMuxSotw::shutdownAll();
 
   EXPECT_TRUE(grpc_mux_->isShutdown());

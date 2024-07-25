@@ -22,7 +22,8 @@ MockClusterManager::MockClusterManager()
       cluster_request_response_size_stat_names_(*symbol_table_),
       cluster_timeout_budget_stat_names_(*symbol_table_) {
   ON_CALL(*this, bindConfig()).WillByDefault(ReturnRef(bind_config_));
-  ON_CALL(*this, adsMux()).WillByDefault(Return(ads_mux_));
+  ON_CALL(*this, adsMux(testing::Eq(absl::string_view()))).WillByDefault(Return(ads_mux_));
+  ON_CALL(*this, adsMux(_)).WillByDefault(Invoke([this](absl::string_view instance){ return additional_ads_muxes_[instance]; } ));
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));

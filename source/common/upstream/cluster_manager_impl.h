@@ -292,11 +292,16 @@ public:
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
-      resume_cds_->cancel();
+      for (auto& resume: *resume_cds_) {
+        resume->cancel();
+      }
     }
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
+    for (auto& mux: additional_ads_muxes_) {
+      mux.second.reset();
+    }
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
@@ -308,7 +313,9 @@ public:
     return bind_config_;
   }
 
-  Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
+  Config::GrpcMuxSharedPtr adsMux(absl::string_view instance = {}) const override;
+  Config::ScopedResumes pauseAdsMuxes(const std::string& type_url) const override;
+  Config::ScopedResumes pauseAdsMuxes(const std::vector<std::string>& type_urls) const override;
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const absl::optional<std::string>& localClusterName() const override {
@@ -371,8 +378,6 @@ public:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
     return common_lb_config_pool_->getObject(common_lb_config);
   }
-
-  Config::EdsResourcesCacheOptRef edsResourcesCache() override;
 
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
@@ -877,6 +882,11 @@ private:
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
+  absl::Status bootstrapAdsMux(
+      absl::string_view instance, 
+      const envoy::config::core::v3::ApiConfigSource& ads_config, 
+      Config::GrpcMuxSharedPtr& mux) const;
+
   Server::Instance& server_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
@@ -894,8 +904,9 @@ private:
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
+  absl::flat_hash_map<std::string, Config::GrpcMuxSharedPtr> additional_ads_muxes_;
   // Temporarily saved resume cds callback from updateClusterCounts invocation.
-  Config::ScopedResume resume_cds_;
+  Config::ScopedResumes resume_cds_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.
   absl::optional<std::string> local_cluster_name_;

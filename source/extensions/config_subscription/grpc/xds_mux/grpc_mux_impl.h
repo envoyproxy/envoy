@@ -60,7 +60,7 @@ class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
                     public ShutdownableMux,
                     Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext& grpc_mux_context,
+  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext&& grpc_mux_context,
               bool skip_subsequent_node);
 
   ~GrpcMuxImpl() override;
@@ -237,7 +237,7 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
-  GrpcMuxDelta(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  GrpcMuxDelta(GrpcMuxContext&& grpc_mux_context, bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -248,7 +248,7 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryRequest,
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
-  GrpcMuxSotw(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  GrpcMuxSotw(GrpcMuxContext&& grpc_mux_context, bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {

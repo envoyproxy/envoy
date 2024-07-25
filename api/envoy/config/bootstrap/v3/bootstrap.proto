@@ -67,7 +67,7 @@ message Bootstrap {
     repeated envoy.extensions.transport_sockets.tls.v3.Secret secrets = 3;
   }
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message DynamicResources {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.Bootstrap.DynamicResources";
@@ -96,9 +96,18 @@ message Bootstrap {
     // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
     // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
     // :ref:`ConfigSources <envoy_v3_api_msg_config.core.v3.ConfigSource>` that have
-    // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
-    // streamed on the ADS channel.
+    // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set
+    // with no explicit instance name will be streamed on this ADS channel.
     core.v3.ApiConfigSource ads_config = 3;
+
+    // Additional :ref:`ADS <config_overview_ads>` sources may be optionally
+    // specified. This must have :ref:`api_type
+    // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+    // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
+    // :ref:`ConfigSources <envoy_v3_api_msg_config.core.v3.ConfigSource>` that have
+    // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set and explicitly
+    // referring to the provided name will be streamed on those ADS channel.
+    map<string, core.v3.ApiConfigSource> additional_ads_configs = 7;
   }
 
   message ApplicationLogConfig {

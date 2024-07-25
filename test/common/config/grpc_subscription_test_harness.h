@@ -75,7 +75,7 @@ public:
         /*eds_resources_cache_=*/nullptr};
 
     if (should_use_unified_) {
-      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(std::move(grpc_mux_context), true);
     } else {
       mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
     }
