@@ -112,7 +112,7 @@ public:
           .WillRepeatedly(
               Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 absl::WriterMutexLock lock(&mutex_);
-                on_changed_cbs_.emplace_back(cb);
+                on_changed_cbs_.emplace_back(std::move(cb));
                 return absl::OkStatus();
               }));
       return mock_watcher;
