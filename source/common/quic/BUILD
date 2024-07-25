@@ -686,6 +686,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_tls_server_handshaker_lib",
+    srcs = ["envoy_tls_server_handshaker.cc"],
+    hdrs = ["envoy_tls_server_handshaker.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_source_lib",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
+        "@com_github_google_quiche//:quic_server_session_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http_datagram_handler",
     srcs = ["http_datagram_handler.cc"],
     hdrs = ["http_datagram_handler.h"],
