@@ -31,6 +31,7 @@ struct GrpcInitializeConfigOpts {
   bool encode_raw_headers = false;
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
+  bool retry_5xx = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -92,6 +93,12 @@ public:
       // Override timeout if needed.
       *proto_config_.mutable_grpc_service()->mutable_timeout() =
           Protobuf::util::TimeUtil::MillisecondsToDuration(opts.timeout_ms);
+
+      if (opts.retry_5xx) {
+        auto* retry_policy = proto_config_.mutable_grpc_service()->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_num_retries()->set_value(2);
+      }
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
@@ -205,11 +212,15 @@ public:
     response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
   }
 
-  void waitForExtAuthzRequest(const std::string& expected_check_request_yaml) {
+  void waitForExtAuthzRequest(const std::string& expected_check_request_yaml,
+                              bool connection_already_established = false) {
+    if (!connection_already_established) {
+      AssertionResult result =
+          fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+      RELEASE_ASSERT(result, result.message());
+    }
     AssertionResult result =
-        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+        fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
     RELEASE_ASSERT(result, result.message());
 
     // Check for the validity of the received CheckRequest.
@@ -1108,6 +1119,37 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
+  }
+
+  GrpcInitializeConfigOpts opts;
+  opts.retry_5xx = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  ext_authz_request_->encodeHeaders(response_headers, true);
+
+  // After the first failure, a second request is expected due to configured retries.
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1),
+                         true /*connection_already_established*/);
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{}, Headers{},
+                       Headers{});
+  waitForSuccessfulUpstreamResponse("200");
 
   cleanup();
 }

@@ -36,6 +36,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_chain_helper.h"
+#include "source/common/http/sidestream_watermark.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
@@ -599,6 +600,7 @@ private:
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;

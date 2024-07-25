@@ -131,6 +131,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTlsCertSelector(std::string yaml) {
+      tls_cert_selector_yaml_ = yaml;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
     bool rsa_cert_{true};
@@ -152,6 +157,7 @@ public:
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
+    std::string tls_cert_selector_yaml_{""};
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};

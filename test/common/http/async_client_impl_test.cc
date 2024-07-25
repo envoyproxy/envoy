@@ -470,26 +470,30 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   auto* request =
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
-  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  // // Registering a new watermark callback should note that the high watermark has already been
+  // hit. EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   // Registering a new watermark callback should note that the high watermark has already been hit.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
 
   // Upstream gets unblocked.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runLowWatermarkCallbacks();
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);
   // Blocked again.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
   // Clear the callback, which calls the low watermark function.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   request->removeWatermarkCallbacks();
   // Add the callback back.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
@@ -498,7 +502,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   // On request end, we expect to run the low watermark callbacks.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
@@ -528,17 +532,18 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);
   // Upstream is blocked.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
   // Reset the stream, which will call the low watermark callbacks.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
