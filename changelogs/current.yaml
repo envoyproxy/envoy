@@ -56,6 +56,11 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` runtime
     flag and legacy code paths.
+- area: grpc reverse bridge
+  change: |
+    Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` runtime flag
+    and legacy code paths.
+
 
 new_features:
 - area: tls
