@@ -13,7 +13,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/out
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Outlier detection error buckets]
-// [#extension: envoy.outlier_detection_monitors.common]
 
 // Outlier detection extensions require attaching error buckets. The purpose
 // of error buckets is describing which results should be of interest to

@@ -984,12 +984,6 @@ envoy.matching.matchers.cel_matcher:
   status: stable
   type_urls:
   - xds.type.matcher.v3.CelMatcher
-envoy.outlier_detection_monitors.common:
-  categories:
-  - envoy.outlier_detection_monitors
-  security_posture: robust_to_untrusted_downstream
-  status: alpha
-  undocumented: true
 envoy.outlier_detection_monitors.consecutive_errors:
   categories:
   - envoy.outlier_detection_monitors

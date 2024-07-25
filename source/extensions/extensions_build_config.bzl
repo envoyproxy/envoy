@@ -316,7 +316,6 @@ EXTENSIONS = {
     # Outlier Detection Monitors
     #
     #
-    "envoy.outlier_detection_monitors.common":             "//source/extensions/outlier_detection_monitors/common:outlier_detection_monitors_lib",
     "envoy.outlier_detection_monitors.consecutive_errors": "//source/extensions/outlier_detection_monitors/consecutive_errors:consecutive_errors_monitor_lib",
 
     #
