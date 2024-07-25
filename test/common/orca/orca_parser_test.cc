@@ -124,9 +124,10 @@ TEST(OrcaParserUtilTest, JsonHeaderIncorrectFieldType) {
 }
 
 TEST(OrcaParserUtilTest, BinaryHeader) {
-  auto orca_load_report_serialized_string = ExampleOrcaLoadReport().SerializeAsString();
-  auto orca_load_report_header_bin = Envoy::Base64::encode(
-      orca_load_report_serialized_string.c_str(), orca_load_report_serialized_string.length());
+  std::string proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
+  auto orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
   Http::TestRequestHeaderMapImpl headers{
       {kEndpointLoadMetricsHeaderBin, orca_load_report_header_bin}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
@@ -134,10 +135,11 @@ TEST(OrcaParserUtilTest, BinaryHeader) {
 }
 
 TEST(OrcaParserUtilTest, InvalidBinaryHeader) {
-  auto orca_load_report_serialized_string = ExampleOrcaLoadReport().SerializeAsString();
+  std::string proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
   // Force a bad base64 encoding by shortening the length of the output.
-  auto orca_load_report_header_bin = Envoy::Base64::encode(
-      orca_load_report_serialized_string.c_str(), orca_load_report_serialized_string.length() / 2);
+  auto orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length() / 2);
   Http::TestRequestHeaderMapImpl headers{
       {kEndpointLoadMetricsHeaderBin, orca_load_report_header_bin}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
