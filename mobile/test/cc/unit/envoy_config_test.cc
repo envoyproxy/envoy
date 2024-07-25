@@ -331,7 +331,7 @@ TEST(TestConfig, DisableHttp3) {
 }
 
 #ifdef ENVOY_ENABLE_QUIC
-TEST(TestConfig, SocketReceiveBufferSize) {
+TEST(TestConfig, UdpSocketReceiveBufferSize) {
   EngineBuilder engine_builder;
   engine_builder.enableHttp3(true);
 
@@ -358,6 +358,7 @@ TEST(TestConfig, SocketReceiveBufferSize) {
   // When using an H3 cluster, the UDP receive buffer size option should always be set.
   ASSERT_THAT(rcv_buf_option, NotNull());
   EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(rcv_buf_option->type().has_datagram());
   EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
 }
 
