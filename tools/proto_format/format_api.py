@@ -76,9 +76,9 @@ $frozen_pkgs    ],
 )
 """)
 
-IMPORT_REGEX = re.compile('import "(.*)";')
-SERVICE_REGEX = re.compile('service \w+ {')
-PACKAGE_REGEX = re.compile('\npackage ([a-z0-9_\.]*);')
+IMPORT_REGEX = re.compile(r'import "(.*)";')
+SERVICE_REGEX = re.compile(r'service \w+ {')
+PACKAGE_REGEX = re.compile(r'\npackage ([a-z0-9_\.]*);')
 PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
 
