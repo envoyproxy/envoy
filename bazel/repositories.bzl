@@ -1464,13 +1464,6 @@ filegroup(
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-    # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during integration tests.
-    external_http_archive(
-        name = "kafka_python_client",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
 def _com_github_fdio_vpp_vcl():
     external_http_archive(
         name = "com_github_fdio_vpp_vcl",
