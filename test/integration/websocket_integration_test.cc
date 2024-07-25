@@ -784,37 +784,38 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-static const std::string WebsocketUpgradeWithDisabledSmallBufferConfig = R"EOF(
-            name: typed-per-filter-config-for-ws
-            virtual_hosts:
-            - name: app-ws
-              domains:
-              - "*"
-              routes:
-              - match:
-                  prefix: "/ws-disabled-per-route-filter"
-                route:
-                  cluster: cluster_0
-                  upgrade_configs:
-                  - upgrade_type: websocket
-                typed_per_filter_config:
-                  buffer:
-                    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
-                    disabled: true
-)EOF";
-
-static const std::string TinyBufferFilter = R"EOF(
-name: buffer
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
-    max_request_bytes : 1
-)EOF";
-
 TEST_P(WebsocketIntegrationTest, WebsocketUpgradeWithDisabledSmallBufferFilter) {
   if (downstreamProtocol() != Http::CodecType::HTTP1 ||
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
+
+  const std::string WebsocketUpgradeWithDisabledSmallBufferConfig = R"EOF(
+    name: typed-per-filter-config-for-ws
+    virtual_hosts:
+    - name: app-ws
+      domains:
+      - "*"
+      routes:
+      - match:
+          prefix: "/websocket/test"
+        route:
+          cluster: cluster_0
+          upgrade_configs:
+          - upgrade_type: websocket
+        typed_per_filter_config:
+          buffer:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            disabled: true
+)EOF";
+
+  const std::string TinyBufferFilter = R"EOF(
+    name: buffer
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+        max_request_bytes : 1
+)EOF";
+
   config_helper_.prependFilter(TinyBufferFilter);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -824,22 +825,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketUpgradeWithDisabledSmallBufferFilter) 
       });
   initialize();
 
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/ws-disabled-per-route-filter"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"},
-                                                 {"connection", "Upgrade"},
-                                                 {"upgrade", "websocket"},
-                                                 {"sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="},
-                                                 {"sec-websocket-version", "13"}};
-
-  Http::TestRequestHeaderMapImpl response_headers{
-      {":status", "101"},
-      {"connection", "Upgrade"},
-      {"upgrade", "websocket"},
-      {"Sec-WebSocket-Accept", "EDJa7WCAQQzMCYNJM42Syuo9SqQ="}};
-
-  performUpgrade(request_headers, response_headers);
+  performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
   sendBidirectionalData();
 
   // Send some final data from the client, and disconnect.
