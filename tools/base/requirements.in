@@ -27,6 +27,7 @@ gsutil
 icalendar
 idna>=3.7
 jinja2>=3.1.4
+kafka-python-ng
 multidict>=6.0.2
 orjson>=3.9.15
 pep8-naming

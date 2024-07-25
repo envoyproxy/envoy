@@ -57,7 +57,7 @@ MULTI_COMMENT_END = re.compile(r'^(.*?)\*/')
 TODO = re.compile(r'(TODO|NOTE)\s*\(@?[A-Za-z0-9-]+\):?')
 
 # Ignore parameter names in doxygen comments.
-METHOD_DOC = re.compile('@(param\s+\w+|return(\s+const)?\s+\w+)')
+METHOD_DOC = re.compile(r'@(param\s+\w+|return(\s+const)?\s+\w+)')
 
 # Camel Case splitter
 CAMEL_CASE = re.compile(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z]|$)')
@@ -164,8 +164,8 @@ class SpellChecker:
         self.prefixes = prefixes
         self.suffixes = suffixes
 
-        self.prefix_re = re.compile("(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
-        self.suffix_re = re.compile("(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
+        self.prefix_re = re.compile(r"(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
+        self.suffix_re = re.compile(r"(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
 
         # Generate aspell personal dictionary.
         pws = os.path.join(CURR_DIR, '.aspell.en.pws')
