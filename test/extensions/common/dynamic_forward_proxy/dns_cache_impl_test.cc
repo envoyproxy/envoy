@@ -42,6 +42,7 @@ public:
   void initialize(
       std::vector<std::pair<std::string /*host*/, uint32_t /*port*/>> preresolve_hostnames = {},
       uint32_t max_hosts = 1024) {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.dfp_mixed_scheme", "true"}});
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
@@ -87,6 +88,7 @@ public:
               TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
   }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
@@ -143,9 +145,8 @@ INSTANTIATE_TEST_SUITE_P(DnsCachePreresolveNormalizedDfpHost, DnsCacheImplPreres
                          testing::Bool());
 
 TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns",
-                               absl::StrCat(normalizeDfpHost())}});
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns",
+                                absl::StrCat(normalizeDfpHost())}});
 
   Network::DnsResolver::ResolveCb resolve_cb;
   std::string host = "bar.baz.com";
@@ -1218,8 +1219,7 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionUnSet) {
 }
 
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
 
   initialize();
@@ -1309,8 +1309,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponse) {
 }
 
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsEmptyResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
 
   initialize();
@@ -1351,8 +1350,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsEmptyResponse) {
 }
 
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveIgnoreIPv4LoopbackAddress) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
 
   initialize();
@@ -1396,8 +1394,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveIgnoreIPv4LoopbackAddress) {
 }
 
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveIgnoreIPv6LoopbackAddress) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
 
   initialize();
@@ -1438,8 +1435,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveIgnoreIPv6LoopbackAddress) {
 }
 
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveWithDnsPreresolveHostnames) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
 
   Network::DnsResolver::ResolveCb resolve_cb;
@@ -1891,6 +1887,8 @@ TEST(DnsCacheManagerImplTest, TestLifetime) {
 }
 
 TEST(NoramlizeHost, NormalizeHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.dfp_mixed_scheme", "true"}});
   EXPECT_EQ("localhost:80", DnsHostInfo::normalizeHostForDfp("localhost:80", 80));
   EXPECT_EQ("localhost:80", DnsHostInfo::normalizeHostForDfp("localhost:80", 443));
   EXPECT_EQ("localhost:443", DnsHostInfo::normalizeHostForDfp("localhost:443", 80));
