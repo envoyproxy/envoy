@@ -50,7 +50,7 @@ def csv_table(headers, widths, rows):
     csv_rows = '\n  '.join(', '.join(row) for row in rows)
     return f'''.. csv-table::
   :header: {', '.join(headers)}
-  :widths: {', '.join(str(w) for w in widths) }
+  :widths: {', '.join(str(w) for w in widths)}
 
   {csv_rows}
 

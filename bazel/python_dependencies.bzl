@@ -1,5 +1,5 @@
 load("@envoy_toolshed//:packages.bzl", "load_packages")
-load("@python3_11//:defs.bzl", "interpreter")
+load("@python3_12//:defs.bzl", "interpreter")
 load("@rules_python//python:pip.bzl", "pip_parse")
 
 def envoy_python_dependencies():
