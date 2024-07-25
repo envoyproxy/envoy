@@ -63,7 +63,7 @@ message UpstreamTlsContext {
   google.protobuf.BoolValue enforce_rsa_key_usage = 5;
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -140,6 +140,11 @@ message DownstreamTlsContext {
   // If the client provides SNI but no such cert matched, it will decide to full scan certificates or not based on this config.
   // Defaults to false. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
   google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
+
+  // By default, Envoy as a server uses its preferred cipher during the handshake.
+  // Setting this to true would allow the downstream client's preferred cipher to be used instead.
+  // Has no effect when using TLSv1_3.
+  bool prefer_client_ciphers = 11;
 }
 
 // TLS key log configuration.

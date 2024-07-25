@@ -111,9 +111,11 @@ void ValidationInstance::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  overload_manager_ = THROW_OR_RETURN_VALUE(
+      OverloadManagerImpl::create(
+          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
+          messageValidationContext().staticValidationVisitor(), *api_, options_),
+      std::unique_ptr<OverloadManagerImpl>);
   null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);

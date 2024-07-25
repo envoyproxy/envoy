@@ -774,11 +774,7 @@ def _io_opentracing_cpp():
     )
 
 def _io_opentelemetry_api_cpp():
-    external_http_archive(
-        name = "io_opentelemetry_cpp",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
-    )
+    external_http_archive(name = "io_opentelemetry_cpp")
     native.bind(
         name = "opentelemetry_api",
         actual = "@io_opentelemetry_cpp//api:api",
@@ -1143,7 +1139,6 @@ def _com_github_google_quiche():
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         patches = [
             "@envoy//bazel/external:quiche_sequencer_fix.patch",
-            "@envoy//bazel/external:quiche_stream_fix.patch",
         ],
         patch_args = ["-p1"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
@@ -1460,13 +1455,7 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive(
-        name = "rules_foreign_cc",
-        # This patch is needed to fix build on macos with xcode 15.3.
-        # remove this when https://github.com/bazelbuild/rules_foreign_cc/issues/1186 fixed.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
-    )
+    external_http_archive(name = "rules_foreign_cc")
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

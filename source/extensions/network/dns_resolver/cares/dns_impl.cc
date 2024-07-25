@@ -100,6 +100,12 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.options_.udp_max_queries = udp_max_queries_;
   }
 
+  // This block reinstates cares defaults before https://github.com/c-ares/c-ares/pull/542
+  options.optmask_ |= ARES_OPT_TIMEOUT;
+  options.options_.timeout = 5;
+  options.optmask_ |= ARES_OPT_TRIES;
+  options.options_.tries = 4;
+
   return options;
 }
 

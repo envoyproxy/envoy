@@ -126,6 +126,7 @@ public:
   MOCK_METHOD(const std::string&, cipherSuites, (), (const));
   MOCK_METHOD(const std::string&, ecdhCurves, (), (const));
   MOCK_METHOD(const std::string&, signatureAlgorithms, (), (const));
+  MOCK_METHOD(bool, preferClientCiphers, (), (const));
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));

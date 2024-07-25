@@ -735,11 +735,11 @@ void ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Liste
 void ListenerImpl::buildFilterChains(const envoy::config::listener::v3::Listener& config) {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
   ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
-  filter_chain_manager_->addFilterChains(
+  THROW_IF_NOT_OK(filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
-      *filter_chain_manager_);
+      *filter_chain_manager_));
 }
 
 void ListenerImpl::buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,

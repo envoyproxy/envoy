@@ -13,6 +13,7 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ssl_certs_test.h"
@@ -139,6 +140,56 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
             "Failed to initialize cipher suites "
             "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
             "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
+}
+
+// Envoy's default cipher preference is server's.
+TEST_F(SslContextImplTest, TestServerCipherPreference) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_).value();
+  ASSERT_FALSE(cfg.get()->preferClientCiphers());
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), manager_, *store_.rootScope(), {});
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory->createDownstreamTransportSocket();
+  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+
+  EXPECT_TRUE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_CIPHER_SERVER_PREFERENCE);
+}
+
+TEST_F(SslContextImplTest, TestPreferClientCiphers) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  prefer_client_ciphers: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_).value();
+  ASSERT_TRUE(cfg.get()->preferClientCiphers());
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), manager_, *store_.rootScope(), {});
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory->createDownstreamTransportSocket();
+  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+
+  EXPECT_FALSE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_CIPHER_SERVER_PREFERENCE);
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {

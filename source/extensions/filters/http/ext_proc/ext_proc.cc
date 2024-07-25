@@ -396,15 +396,18 @@ void Filter::onDestroy() {
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
 
-  if (stream_ != nullptr) {
-    stream_->notifyFilterDestroy();
-  }
-
   if (config_->observabilityMode()) {
     // In observability mode where the main stream processing and side stream processing are
     // asynchronous, it is possible that filter instance is destroyed before the side stream request
     // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
     // closure is deferred upon filter destruction with a timer.
+
+    // First, release the referenced filter resource.
+    if (stream_ != nullptr) {
+      stream_->notifyFilterDestroy();
+    }
+
+    // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
     // Perform immediate close on the stream otherwise.
@@ -1248,17 +1251,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      absl::Status mut_status;
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
-        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
-                                                         config().mutationChecker(),
-                                                         stats_.rejected_header_mutations_);
-      } else {
-        mut_status = MutationUtils::applyHeaderMutations(
-            response.headers(), headers, false, config().immediateMutationChecker().checker(),
-            stats_.rejected_header_mutations_);
-      }
+      const absl::Status mut_status = MutationUtils::applyHeaderMutations(
+          response.headers(), headers, false, config().mutationChecker(),
+          stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
