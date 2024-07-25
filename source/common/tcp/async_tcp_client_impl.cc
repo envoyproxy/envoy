@@ -28,6 +28,8 @@ AsyncTcpClientImpl::~AsyncTcpClientImpl() {
   if (connection_) {
     connection_->removeConnectionCallbacks(*this);
   }
+
+  close(Network::ConnectionCloseType::NoFlush);
 }
 
 bool AsyncTcpClientImpl::connect() {
