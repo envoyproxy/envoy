@@ -63,7 +63,7 @@ bool HttpBodyUtils::parseMessageByFieldPath(
 }
 
 void HttpBodyUtils::appendHttpBodyEnvelope(
-    Buffer::Instance& output, const std::vector<const Protobuf::Field*>& request_body_field_path,
+    Buffer::Instance& output, const std::vector<const ProtobufWkt::Field*>& request_body_field_path,
     std::string content_type, uint64_t content_length, const UnknownQueryParams& unknown_params) {
   // Manually encode the protobuf envelope for the body.
   // See https://developers.google.com/protocol-buffers/docs/encoding#embedded for wire format.
