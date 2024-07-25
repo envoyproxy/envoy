@@ -159,6 +159,11 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           this);
     }
 
+    if (!config.preferClientCiphers()) {
+      // Use server cipher preference based on config.
+      SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
+    }
+
     // If the handshaker handles session tickets natively, don't call
     // `SSL_CTX_set_tlsext_ticket_key_cb`.
     if (config.disableStatelessSessionResumption()) {
