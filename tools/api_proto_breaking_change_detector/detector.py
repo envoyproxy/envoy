@@ -81,7 +81,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
 
         if Path.cwd() not in Path(path_to_changed_dir).parents:
             raise ValueError(
-                f"path_to_changed_dir {path_to_changed_dir} must be a subdirectory of the cwd ({ Path.cwd() })"
+                f"path_to_changed_dir {path_to_changed_dir} must be a subdirectory of the cwd ({Path.cwd()})"
             )
 
         if not Path(git_path).exists():
