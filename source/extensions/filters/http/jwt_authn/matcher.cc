@@ -215,7 +215,7 @@ private:
     ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         rule.match().path_match_policy().typed_config(),
         ProtobufMessage::getStrictValidationVisitor(), factory);
-    
+
     absl::StatusOr<Router::PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
 
     if (!matcher.ok()) {
