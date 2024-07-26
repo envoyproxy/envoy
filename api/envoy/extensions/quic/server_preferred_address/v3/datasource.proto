@@ -4,8 +4,6 @@ package envoy.extensions.quic.server_preferred_address.v3;
 
 import "envoy/config/core/v3/base.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
