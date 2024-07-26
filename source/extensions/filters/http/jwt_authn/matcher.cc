@@ -193,21 +193,7 @@ class PathMatchPolicyMatcherImpl : public BaseMatcherImpl {
 public:
   PathMatchPolicyMatcherImpl(const RequirementRule& rule,
                              Server::Configuration::CommonFactoryContext& context)
-      : BaseMatcherImpl(rule, context) {
-    auto& factory = Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(
-        rule.match().path_match_policy());
-    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-        rule.match().path_match_policy().typed_config(),
-        ProtobufMessage::getStrictValidationVisitor(), factory);
-
-    absl::StatusOr<Router::PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
-
-    if (!matcher.ok()) {
-      throw EnvoyException(std::string(matcher.status().message()));
-    }
-
-    uri_template_matcher_ = matcher.value();
-  }
+      : BaseMatcherImpl(rule, context), uri_template_matcher_(createUriTemplateMatcher(rule)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
@@ -221,7 +207,23 @@ public:
   }
 
 private:
-  Router::PathMatcherSharedPtr uri_template_matcher_;
+  const Router::PathMatcherSharedPtr uri_template_matcher_;
+
+  Router::PathMatcherSharedPtr createUriTemplateMatcher(const RequirementRule& rule) {
+    auto& factory = Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(
+        rule.match().path_match_policy());
+    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        rule.match().path_match_policy().typed_config(),
+        ProtobufMessage::getStrictValidationVisitor(), factory);
+    
+    absl::StatusOr<Router::PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
+
+    if (!matcher.ok()) {
+      throw EnvoyException(std::string(matcher.status().message()));
+    }
+
+    return matcher.value();
+  }
 };
 
 MatcherConstPtr Matcher::create(const RequirementRule& rule,
