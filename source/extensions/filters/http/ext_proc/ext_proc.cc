@@ -184,8 +184,10 @@ FilterConfig::FilterConfig(
     Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
-      route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
-      max_message_timeout_ms_(max_message_timeout_ms),
+      route_cache_action_(config.route_cache_action()),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
+                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -307,6 +309,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   filter_callbacks_ = &callbacks;
+  watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
@@ -322,6 +325,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setEncoderFilterCallbacks(callbacks);
   encoding_state_.setEncoderFilterCallbacks(callbacks);
+  watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
 Filter::StreamOpenState Filter::openStream() {
@@ -343,7 +347,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(true);
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options, decoder_callbacks_);
+        client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -356,7 +360,8 @@ Filter::StreamOpenState Filter::openStream() {
 
     // TODO(tyxia) Switch to address of stream
     stream_ = config_->threadLocalStreamManager().store(decoder_callbacks_->streamId(),
-                                                        std::move(stream_object), config_->stats());
+                                                        std::move(stream_object), config_->stats(),
+                                                        config_->deferredCloseTimeout());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -393,15 +398,18 @@ void Filter::onDestroy() {
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
 
-  if (stream_ != nullptr) {
-    stream_->notifyFilterDestroy();
-  }
-
   if (config_->observabilityMode()) {
     // In observability mode where the main stream processing and side stream processing are
     // asynchronous, it is possible that filter instance is destroyed before the side stream request
     // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
     // closure is deferred upon filter destruction with a timer.
+
+    // First, release the referenced filter resource.
+    if (stream_ != nullptr) {
+      stream_->notifyFilterDestroy();
+    }
+
+    // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
     // Perform immediate close on the stream otherwise.
@@ -1208,7 +1216,7 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
@@ -1245,17 +1253,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      absl::Status mut_status;
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
-        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
-                                                         config().mutationChecker(),
-                                                         stats_.rejected_header_mutations_);
-      } else {
-        mut_status = MutationUtils::applyHeaderMutations(
-            response.headers(), headers, false, config().immediateMutationChecker().checker(),
-            stats_.rejected_header_mutations_);
-      }
+      const absl::Status mut_status = MutationUtils::applyHeaderMutations(
+          response.headers(), headers, false, config().mutationChecker(),
+          stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
@@ -1378,7 +1378,7 @@ void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher
                                             uint64_t stream_id) {
   derferred_close_timer =
       dispatcher.createTimer([this, stream_id] { closeStreamOnTimer(stream_id); });
-  derferred_close_timer->enableTimer(std::chrono::milliseconds(DEFAULT_CLOSE_TIMEOUT_MS));
+  derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {

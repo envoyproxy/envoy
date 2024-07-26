@@ -47,15 +47,15 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   return cluster_config;
 }
 
-template <typename ProtoType>
-bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                           const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+bool socketAddressesEqual(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>& lhs,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>& rhs) {
   if (lhs.size() != rhs.size()) {
     return false;
   }
 
   for (int i = 0; i < lhs.size(); ++i) {
-    if (!Protobuf::util::MessageDifferencer::Equals(lhs[i], rhs[i])) {
+    if ((lhs[i].address() != rhs[i].address()) || lhs[i].port_value() != rhs[i].port_value()) {
       return false;
     }
   }
@@ -291,7 +291,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr2 = *expected_dns_preresolve_hostnames.Add();
   host_addr2.set_address("lyft.com");
   host_addr2.set_port_value(443);
-  EXPECT_TRUE(repeatedPtrFieldEqual(
+  EXPECT_TRUE(socketAddressesEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 
@@ -302,7 +302,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr3 = *expected_dns_preresolve_hostnames.Add();
   host_addr3.set_address("google.com");
   host_addr3.set_port_value(443);
-  EXPECT_TRUE(repeatedPtrFieldEqual(
+  EXPECT_TRUE(socketAddressesEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 }
@@ -331,7 +331,7 @@ TEST(TestConfig, DisableHttp3) {
 }
 
 #ifdef ENVOY_ENABLE_QUIC
-TEST(TestConfig, SocketReceiveBufferSize) {
+TEST(TestConfig, UdpSocketReceiveBufferSize) {
   EngineBuilder engine_builder;
   engine_builder.enableHttp3(true);
 
@@ -358,7 +358,39 @@ TEST(TestConfig, SocketReceiveBufferSize) {
   // When using an H3 cluster, the UDP receive buffer size option should always be set.
   ASSERT_THAT(rcv_buf_option, NotNull());
   EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(rcv_buf_option->type().has_datagram());
   EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
+}
+
+TEST(TestConfig, UdpSocketSendBufferSize) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* snd_buf_option = nullptr;
+  for (const SocketOption& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == SO_SNDBUF) {
+      snd_buf_option = &sock_opt;
+      break;
+    }
+  }
+
+  // When using an H3 cluster, the UDP send buffer size option should always be set.
+  ASSERT_THAT(snd_buf_option, NotNull());
+  EXPECT_EQ(snd_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(snd_buf_option->type().has_datagram());
+  EXPECT_EQ(snd_buf_option->int_value(), 1452 * 20);
 }
 #endif
 

@@ -98,12 +98,24 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
                 socket_option.DebugString());
       continue;
     }
+
+    absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
+    if (socket_option.has_type() && socket_option.type().has_stream()) {
+      if (socket_option.type().has_datagram()) {
+        ENVOY_LOG(
+            warn,
+            "Both Stream and Datagram socket types are set, setting the socket type to Stream.");
+      }
+      socket_type = Network::Socket::Type::Stream;
+    } else if (socket_option.has_type() && socket_option.type().has_datagram()) {
+      socket_type = Network::Socket::Type::Datagram;
+    }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
         Network::SocketOptionName(
             socket_option.level(), socket_option.name(),
             fmt::format("{}/{}", socket_option.level(), socket_option.name())),
-        buf));
+        buf, socket_type));
   }
   return options;
 }

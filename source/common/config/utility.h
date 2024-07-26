@@ -299,9 +299,9 @@ public:
    * @param typed_config for the extension config.
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string& typed_struct_type =
+    static const std::string typed_struct_type =
         xds::type::v3::TypedStruct::default_instance().GetTypeName();
-    static const std::string& legacy_typed_struct_type =
+    static const std::string legacy_typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
