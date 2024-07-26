@@ -379,8 +379,9 @@ void EnvoyQuicServerStream::OnConnectionClosed(const quic::QuicConnectionCloseFr
                           ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
                                                                  session()->OneRttKeysAvailable())
                           : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
-                      absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
-                                   "|from:", source, "|", frame.error_details));
+                      absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|",
+                                   quic::ConnectionCloseSourceToString(source), "|",
+                                   frame.error_details));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(frame, source);
 }
