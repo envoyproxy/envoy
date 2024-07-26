@@ -39,6 +39,14 @@ public:
   bool isSupported() const override;
 
   /**
+   * Gets the socket type for this socket option. Empty means, the socket option is not specific to
+   * a particular socket type.
+   *
+   * @return the socket type
+   */
+  absl::optional<Network::Socket::Type> socketType() const;
+
+  /**
    * Set the option on the given socket.
    * @param socket the socket on which to apply the option.
    * @param optname the option name.

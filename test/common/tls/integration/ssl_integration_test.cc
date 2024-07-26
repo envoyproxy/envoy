@@ -1176,5 +1176,118 @@ TEST_P(SslKeyLogTest, SetMultipleIps) {
   logCheck();
 }
 
+TEST_P(SslIntegrationTest, SyncCertSelectorSucceeds) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sync
+  )EOF";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
+  checkStats();
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sync")->value(), 1);
+}
+
+TEST_P(SslIntegrationTest, AsyncCertSelectorSucceeds) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: async
+  )EOF";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
+  checkStats();
+
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_async")->value(), 1);
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_async_finished")->value(),
+            1);
+}
+
+TEST_P(SslIntegrationTest, AsyncSleepCertSelectorSucceeds) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sleep
+  )EOF";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
+  checkStats();
+
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sleep")->value(), 1);
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sleep_finished")->value(),
+            1);
+}
+
+TEST_P(SslIntegrationTest, AsyncSleepCertSelectionAfterTearDown) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sleep
+  )EOF";
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+
+  // wait for the server tls handshake into sleep state.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  ENVOY_LOG_MISC(debug, "debug: closing connection");
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  connection.reset();
+
+  // wait the sleep timer in cert selector is triggered.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+}
+
+TEST_P(SslIntegrationTest, AsyncCertSelectionAfterSslShutdown) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sleep
+  )EOF";
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+
+  // wait for the server tls handshake into sleep state.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+
+  // wait the sleep timer in cert selector is triggered.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
+  connection.reset();
+}
+
 } // namespace Ssl
 } // namespace Envoy

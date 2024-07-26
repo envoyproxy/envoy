@@ -988,7 +988,7 @@ def _com_google_protobuf():
         # instead.
         external_http_archive(
             "com_google_protobuf_protoc_%s" % platform,
-            build_file = "@rules_proto//proto/private:BUILD.protoc",
+            build_file = "@envoy//bazel/protoc:BUILD.protoc",
         )
 
     external_http_archive(
@@ -1431,13 +1431,6 @@ filegroup(
     # tests.
     external_http_archive(
         name = "kafka_server_binary",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
-    # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during integration tests.
-    external_http_archive(
-        name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
