@@ -3,14 +3,14 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/headers.h"
-#include "source/extensions/filters/http/ratelimit/ratelimit.h"
-#include "envoy/stream_info/stream_info.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -263,9 +263,9 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   setUpTest(filter_config_);
   InSequence s;
 
-  filter_callbacks_.stream_info_.filter_state_->setData("envoy.ratelimit.hits_addend",
-                                     std::make_unique<StreamInfo::UInt32AccessorImpl>(5),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  filter_callbacks_.stream_info_.filter_state_->setData(
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5),
+      StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))

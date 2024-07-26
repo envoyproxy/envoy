@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/http/codes.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
@@ -11,7 +12,6 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/router/config_impl.h"
-#include "envoy/stream_info/stream_info.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
@@ -87,10 +87,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   const StreamInfo::UInt32Accessor* hits_addend_filter_state =
-    callbacks_
-        ->streamInfo()
-        .filterState()
-        ->getDataReadOnly<StreamInfo::UInt32Accessor>("envoy.ratelimit.hits_addend");
+      callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+          "envoy.ratelimit.hits_addend");
   double hits_addend = 0;
   if (hits_addend_filter_state != nullptr) {
     hits_addend = hits_addend_filter_state->value();
