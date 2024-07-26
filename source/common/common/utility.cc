@@ -285,6 +285,8 @@ std::string DateFormatter::Specifier::toString(SystemTime time,
     // Handle the sub-seconds specifier.
     return subsecondsToString(time);
   }
+
+  return {}; // Should never reach here. Make the gcc happy.
 }
 
 DateFormatter::CacheableTime
