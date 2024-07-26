@@ -28,9 +28,9 @@ public:
   std::string name() const override { return std::string(HitsAddendFilterStateKey); }
   std::unique_ptr<StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view data) const override {
-    uint32_t port = 0;
-    if (absl::SimpleAtoi(data, &port)) {
-      return std::make_unique<StreamInfo::UInt32AccessorImpl>(port);
+    uint32_t hits_addend = 0;
+    if (absl::SimpleAtoi(data, &hits_addend)) {
+      return std::make_unique<StreamInfo::UInt32AccessorImpl>(hits_addend);
     }
     return nullptr;
   }
