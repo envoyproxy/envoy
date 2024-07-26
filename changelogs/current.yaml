@@ -66,6 +66,9 @@ removed_config_or_runtime:
 
 
 new_features:
+- area: jwt_authn
+  change: |
+    Added missing implementation to jwt_authn matchers to allow glob pattern matching.
 - area: tls
   change: |
     Added :ref:`prefer_client_ciphers
