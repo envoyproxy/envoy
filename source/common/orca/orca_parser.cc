@@ -42,7 +42,7 @@ absl::Status tryCopyNamedMetricToOrcaLoadReport(absl::string_view metric_name, d
 }
 
 std::vector<absl::string_view> parseCommaDelimitedHeader(const HeaderMap::GetResult& entry) {
-  std::vector<absl::string_view> values;
+  const std::vector<absl::string_view> values;
   for (size_t i = 0; i < entry.size(); ++i) {
     std::vector<absl::string_view> tokens =
         Envoy::Http::HeaderUtility::parseCommaDelimitedHeader(entry[i]->value().getStringView());
@@ -101,10 +101,6 @@ absl::Status tryCopyMetricToOrcaLoadReport(absl::string_view metric_name,
 
 absl::Status tryParseNativeHttpEncoded(const HeaderMap::GetResult& header,
                                        OrcaLoadReport& orca_load_report) {
-  if (header.empty()) {
-    return absl::InvalidArgumentError("header is empty.");
-  }
-
   const std::vector<absl::string_view> values = parseCommaDelimitedHeader(header);
 
   // Check for duplicate metric names here because OrcaLoadReport fields are not
@@ -157,7 +153,7 @@ absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& heade
   if (!load_metrics_json.empty()) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS) && defined(ENVOY_ENABLE_YAML)
     bool has_unknown_field = false;
-    std::string json_string = std::string(load_metrics_json[0]->value().getStringView());
+    const std::string json_string = std::string(load_metrics_json[0]->value().getStringView());
     RETURN_IF_ERROR(
         Envoy::MessageUtil::loadFromJsonNoThrow(json_string, load_report, has_unknown_field));
 #else
@@ -167,8 +163,8 @@ absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& heade
 
   // Binary protobuf format.
   if (!load_metrics_bin.empty()) {
-    auto header_value = load_metrics_bin[0]->value().getStringView();
-    std::string decoded_value = Envoy::Base64::decode(header_value);
+    const auto header_value = load_metrics_bin[0]->value().getStringView();
+    const std::string decoded_value = Envoy::Base64::decode(header_value);
     if (!load_report.ParseFromString(decoded_value)) {
       return absl::InvalidArgumentError(
           fmt::format("unable to parse binaryheader to OrcaLoadReport: {}", header_value));

@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "source/common/common/base64.h"
 #include "source/common/orca/orca_parser.h"
 
@@ -25,7 +27,7 @@ static xds::data::orca::v3::OrcaLoadReport ExampleOrcaLoadReport() {
   return orca_load_report;
 }
 
-TEST(OrcaParserUtilTest, EmptyHeaders) {
+TEST(OrcaParserUtilTest, NoHeaders) {
   Http::TestRequestHeaderMapImpl headers{};
   // parseOrcaLoadReport returns error when no ORCA data is sent from
   // the backend.
@@ -39,6 +41,14 @@ TEST(OrcaParserUtilTest, MissingOrcaHeaders) {
   // the backend.
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::NotFoundError("no ORCA data sent from the backend")));
+}
+
+TEST(OrcaParserUtilTest, MultipleOrcaHeaders) {
+  Http::TestRequestHeaderMapImpl headers{{kEndpointLoadMetricsHeader, "value-not-processed"},
+                                         {kEndpointLoadMetricsHeaderBin, "value-not-processed"}};
+  EXPECT_THAT(
+      parseOrcaLoadReportHeaders(headers),
+      StatusHelpers::HasStatus(absl::InvalidArgumentError("more than one ORCA header found")));
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
@@ -59,12 +69,39 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderIncorrectFieldType) {
                                              "value(cpu_utilization): \"0.7\"")));
 }
 
+TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderNanMetricValue) {
+  Http::TestRequestHeaderMapImpl headers{
+      {kEndpointLoadMetricsHeader,
+       absl::StrCat("cpu_utilization:", std::numeric_limits<double>::quiet_NaN())}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(absl::InvalidArgumentError(
+                  "custom backend load metric value(cpu_utilization) cannot be NaN.")));
+}
+
+TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderInfinityMetricValue) {
+  Http::TestRequestHeaderMapImpl headers{
+      {kEndpointLoadMetricsHeader,
+       absl::StrCat("cpu_utilization:", std::numeric_limits<double>::infinity())}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(absl::InvalidArgumentError(
+                  "custom backend load metric value(cpu_utilization) cannot be "
+                  "infinity.")));
+}
+
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateMetric) {
   Http::TestRequestHeaderMapImpl headers{
       {kEndpointLoadMetricsHeader, "cpu_utilization:0.7,cpu_utilization:0.8"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::AlreadyExistsError(absl::StrCat(
                   kEndpointLoadMetricsHeader, " contains duplicate metric: cpu_utilization"))));
+}
+
+TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderUnsupportedMetric) {
+  Http::TestRequestHeaderMapImpl headers{
+      {kEndpointLoadMetricsHeader, "cpu_utilization:0.7,unsupported_metric:0.8"}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(
+                  absl::InvalidArgumentError("unsupported metric name: unsupported_metric")));
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateNamedMetric) {
@@ -75,6 +112,12 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateNamedMetric) {
       parseOrcaLoadReportHeaders(headers),
       StatusHelpers::HasStatus(absl::AlreadyExistsError(absl::StrCat(
           kEndpointLoadMetricsHeader, " contains duplicate metric: named_metrics.duplicate"))));
+}
+
+TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsEmptyNamedMetricKey) {
+  Http::TestRequestHeaderMapImpl headers{{kEndpointLoadMetricsHeader, "named_metrics.:123"}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(absl::InvalidArgumentError("named metric key is empty.")));
 }
 
 TEST(OrcaParserUtilTest, InvalidNativeHttpEncodedHeader) {
