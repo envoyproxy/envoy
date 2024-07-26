@@ -77,7 +77,7 @@ public:
    * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
    * will trigger ENVOY_BUG.
    */
-  virtual void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks& callbacks) PURE;
+  virtual void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) PURE;
 
   /***
    * Remove previously set watermark callbacks. If there's no watermark callback registered, this

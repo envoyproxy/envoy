@@ -118,8 +118,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
 
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillOnce(Return(nullptr));
-    EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, corsPolicy())
-        .WillOnce(Return(nullptr));
+    EXPECT_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
 
     ON_CALL(decoder_callbacks_, traversePerFilterConfig(_))
         .WillByDefault(
@@ -138,8 +137,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
 
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy())
         .WillOnce(Return(cors_policy_.get()));
-    EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, corsPolicy())
-        .WillOnce(Return(nullptr));
+    EXPECT_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
 
     ON_CALL(decoder_callbacks_, traversePerFilterConfig(_))
         .WillByDefault(
@@ -157,7 +155,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
 
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillOnce(Return(nullptr));
-    EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, corsPolicy())
+    EXPECT_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy())
         .WillOnce(Return(cors_policy_.get()));
 
     ON_CALL(decoder_callbacks_, traversePerFilterConfig(_))
@@ -721,8 +719,7 @@ TEST_F(CorsFilterTest, NoCorsEntry) {
       .WillByDefault(Invoke([](std::function<void(const Router::RouteSpecificFilterConfig&)>) {}));
   // No cors policy in route entry or virtual host.
   ON_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillByDefault(Return(nullptr));
-  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, corsPolicy())
-      .WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillByDefault(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(false, isCorsRequest());

@@ -384,10 +384,13 @@ void ConfigDumpHandler::addLbEndpoint(
   endpoint.set_hostname(host->hostname());
   Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
   if (host->addressListOrNull() != nullptr) {
-    for (auto& additional_address : *host->addressListOrNull()) {
-      auto& new_address = *endpoint.mutable_additional_addresses()->Add();
-      Network::Utility::addressToProtobufAddress(*additional_address,
-                                                 *new_address.mutable_address());
+    const auto& address_list = *host->addressListOrNull();
+    if (address_list.size() > 1) {
+      // skip first address of the list as the default address is not an additional one.
+      for (auto it = std::next(address_list.begin()); it != address_list.end(); ++it) {
+        auto& new_address = *endpoint.mutable_additional_addresses()->Add();
+        Network::Utility::addressToProtobufAddress(**it, *new_address.mutable_address());
+      }
     }
   }
   auto& health_check_config = *endpoint.mutable_health_check_config();

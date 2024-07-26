@@ -26,8 +26,8 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -672,7 +672,7 @@ public:
     }
 
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
