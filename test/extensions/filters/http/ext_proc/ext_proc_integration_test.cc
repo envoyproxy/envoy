@@ -641,6 +641,45 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
+  void testSendDyanmicMetadata() {
+    ProtobufWkt::Struct test_md_struct;
+    (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
+
+    ProtobufWkt::Value md_val;
+    *(md_val.mutable_struct_value()) = test_md_struct;
+
+    processGenericMessage(
+        *grpc_upstreams_[0], true,
+        [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
+          // Verify the processing request contains the untyped metadata we injected.
+          EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+          const ProtobufWkt::Struct& fwd_metadata =
+              req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
+          EXPECT_EQ(1, fwd_metadata.fields_size());
+          EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
+          EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
+
+          // Verify the processing request contains the typed metadata we injected.
+          EXPECT_TRUE(
+              req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+          const ProtobufWkt::Any& fwd_typed_metadata =
+              req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
+          EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
+                    fwd_typed_metadata.type_url());
+          envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
+          fwd_typed_metadata.UnpackTo(&typed_md_from_req);
+          EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
+
+          // Spoof the response to contain receiving metadata.
+          HeadersResponse headers_resp;
+          (*resp.mutable_request_headers()) = headers_resp;
+          auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
+          (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
+
+          return true;
+        });
+  }
+
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control) {
     config_helper_.setBufferLimits(1024, 1024);
 
@@ -3750,40 +3789,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  ProtobufWkt::Struct test_md_struct;
-  (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
-
-  ProtobufWkt::Value md_val;
-  *(md_val.mutable_struct_value()) = test_md_struct;
-
-  processGenericMessage(
-      *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
-        // Verify the processing request contains the untyped metadata we injected.
-        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
-        const ProtobufWkt::Struct& fwd_metadata =
-            req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ(1, fwd_metadata.fields_size());
-        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
-        EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
-
-        // Verify the processing request contains the typed metadata we injected.
-        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
-        const ProtobufWkt::Any& fwd_typed_metadata =
-            req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
-        EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
-                  fwd_typed_metadata.type_url());
-        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
-        fwd_typed_metadata.UnpackTo(&typed_md_from_req);
-        EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
-
-        // Spoof the response to contain receiving metadata.
-        HeadersResponse headers_resp;
-        (*resp.mutable_request_headers()) = headers_resp;
-        auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
-        (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
-
-        return true;
-      });
+  testSendDyanmicMetadata();
 
   handleUpstreamRequest();
 
@@ -3797,6 +3803,34 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   ASSERT_EQ(1, md_header_result.size());
   EXPECT_EQ("value from ext_proc", md_header_result[0]->value().getStringView());
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
+  proto_config_.set_observability_mode(true);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_forwarding_namespaces()->add_untyped("forwarding_ns_untyped");
+  md_opts->mutable_forwarding_namespaces()->add_typed("forwarding_ns_typed");
+  md_opts->mutable_receiving_namespaces()->add_untyped("receiving_ns_untyped");
+
+  ConfigOptions config_option = {};
+  config_option.add_metadata = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  testSendDyanmicMetadata();
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  // No headers from dynamic metadata response as the response is ignored in observability mode.
+  EXPECT_THAT(response->headers(), HasNoHeader(Http::LowerCaseString("receiving_ns_untyped.foo")));
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -4148,14 +4182,17 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   const std::string original_body_str = "Hello";
   auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
 
-  processRequestBodyMessage(
-      *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
-        // Try to mutate the body.
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
+  processRequestBodyMessage(*grpc_upstreams_[0], true,
+                            [&original_body_str](const HttpBody& body, BodyResponse& body_resp) {
+                              // Verify the received body message.
+                              EXPECT_EQ(body.body(), original_body_str);
+                              EXPECT_TRUE(body.end_of_stream());
+                              // Try to mutate the body.
+                              auto* body_mut =
+                                  body_resp.mutable_response()->mutable_body_mutation();
+                              body_mut->set_body("Hello, World!");
+                              return true;
+                            });
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -4439,9 +4476,6 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);

@@ -19,6 +19,9 @@ bug_fixes:
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
+- area: quic
+  change: |
+    Fixes access log formatter %CONNECTION_ID% for QUIC connections.
 - area: ext_authz
   change: |
     Fixed fail-open behaviour of the :ref:`failure_mode_allow config option
@@ -56,6 +59,11 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` runtime
     flag and legacy code paths.
+- area: grpc reverse bridge
+  change: |
+    Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` runtime flag
+    and legacy code paths.
+
 
 new_features:
 - area: tls
@@ -77,9 +85,16 @@ new_features:
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
     <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied to all socket
     types.
+- area: tls
+  change: |
+    Added an extension point :ref:`custom_tls_certificate_selector
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
+    to allow overriding TLS certificate selection behavior.
+    An extension can select certificate base on the incoming SNI, in both sync and async mode.
 - area: ratelimit
   change: |
     Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
     by setting by setting filter state value ``envoy.ratelimit.hits_addend`` to the desired value.
+
 
 deprecated:
