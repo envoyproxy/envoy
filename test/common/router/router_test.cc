@@ -3422,6 +3422,11 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
 }
 
 TEST_F(RouterTest, NoRetryWithBodyLimit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
+
+  recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3453,6 +3458,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
+  recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -4311,6 +4317,10 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  // With upstream half close enabled router filter no longer resets the stream
+  // when upstream half closing first. As such it needs to be destroyed explicitly
+  // to avoid clean up problems in mocks
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
