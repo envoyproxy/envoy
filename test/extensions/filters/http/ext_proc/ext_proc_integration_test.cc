@@ -4477,9 +4477,6 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-new-header", "new"));
-
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
