@@ -271,7 +271,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
