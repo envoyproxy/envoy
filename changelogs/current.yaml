@@ -63,7 +63,9 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` runtime flag
     and legacy code paths.
-
+- area: stateful_session
+  change: |
+    Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
 
 new_features:
 - area: tls
