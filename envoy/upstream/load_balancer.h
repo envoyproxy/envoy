@@ -165,6 +165,8 @@ struct LoadBalancerParams {
   const PrioritySet& priority_set;
   // The worker local priority set of the local cluster.
   const PrioritySet* local_priority_set{};
+  // The main thread dispatcher, or nullptr if not specified.
+  Event::Dispatcher* main_thread_dispatcher = nullptr;
 };
 
 /**

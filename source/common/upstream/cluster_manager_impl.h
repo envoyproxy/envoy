@@ -425,20 +425,22 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map, UnitFloat drop_overload);
+                                HostMapConstSharedPtr map, UnitFloat drop_overload,
+                                Event::Dispatcher& main_thread_dispatcher);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
         LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-        UnitFloat drop_overload);
+        UnitFloat drop_overload, Event::Dispatcher& main_thread_dispatcher);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
     const HostMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
+    Event::Dispatcher& main_thread_dispatcher_;
   };
 
   using ClusterInitializationObjectConstSharedPtr =
@@ -571,7 +573,8 @@ private:
     class ClusterEntry : public ThreadLocalCluster {
     public:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory,
+                   Event::Dispatcher& main_thread_dispatcher);
       ~ClusterEntry() override;
 
       // Upstream::ThreadLocalCluster

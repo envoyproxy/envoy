@@ -1244,7 +1244,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
                         cluster_initialization_object = std::move(cluster_initialization_object),
-                        drop_overload](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+                        drop_overload, &main_thread_dispatcher = dispatcher_](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ASSERT(cluster_manager.has_value(),
            "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl creation.");
 
@@ -1293,8 +1294,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
           ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
         }
 
-        new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
-                                                                      load_balancer_factory);
+        new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+            *cluster_manager, info, load_balancer_factory, main_thread_dispatcher);
         cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
         cluster_manager->local_stats_.clusters_inflated_.set(
             cluster_manager->thread_local_clusters_.size());
@@ -1369,13 +1370,13 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
         entry->second->per_priority_state_, params, std::move(cluster_info),
         load_balancer_factory == nullptr ? entry->second->load_balancer_factory_
                                          : load_balancer_factory,
-        map, drop_overload);
+        map, drop_overload, dispatcher_);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;
   } else {
     // We need to create a fresh Cluster Initialization Object.
     auto new_initialization_object = std::make_shared<ClusterInitializationObject>(
-        params, std::move(cluster_info), load_balancer_factory, map, drop_overload);
+        params, std::move(cluster_info), load_balancer_factory, map, drop_overload, dispatcher_);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;
   }
@@ -1394,7 +1395,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
   const ClusterInitializationObjectConstSharedPtr& initialization_object = entry->second;
   ENVOY_LOG(debug, "initializing TLS cluster {} inline", cluster);
   auto cluster_entry = std::make_unique<ClusterEntry>(
-      *this, initialization_object->cluster_info_, initialization_object->load_balancer_factory_);
+      *this, initialization_object->cluster_info_, initialization_object->load_balancer_factory_,
+      initialization_object->main_thread_dispatcher_);
   ClusterEntry* cluster_entry_ptr = cluster_entry.get();
 
   thread_local_clusters_[cluster] = std::move(cluster_entry);
@@ -1419,9 +1421,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
     LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-    UnitFloat drop_overload)
+    UnitFloat drop_overload, Event::Dispatcher& main_thread_dispatcher)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
-      cross_priority_host_map_(map), drop_overload_(drop_overload) {
+      cross_priority_host_map_(map), drop_overload_(drop_overload),
+      main_thread_dispatcher_(main_thread_dispatcher) {
   // Copy the update since the map is empty.
   for (const auto& update : params.per_priority_update_params_) {
     per_priority_state_.emplace(update.priority_, update);
@@ -1432,11 +1435,10 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
     LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-    UnitFloat drop_overload)
+    UnitFloat drop_overload, Event::Dispatcher& main_thread_dispatcher)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
-      drop_overload_(drop_overload) {
-
+      drop_overload_(drop_overload), main_thread_dispatcher_(main_thread_dispatcher) {
   // Because EDS Clusters receive the entire ClusterLoadAssignment but only
   // provides the delta we must process the hosts_added and hosts_removed and
   // not simply overwrite with hosts added.
@@ -1554,7 +1556,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+    lb_ = lb_factory_->create(
+        {priority_set_, parent_.local_priority_set_, &parent_.parent_.dispatcher_});
   }
 }
 
@@ -1768,7 +1771,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     const auto& local_cluster_name = local_cluster_params->info_->name();
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name);
     thread_local_clusters_[local_cluster_name] = std::make_unique<ClusterEntry>(
-        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_);
+        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_,
+        parent.dispatcher_);
     local_priority_set_ = &thread_local_clusters_[local_cluster_name]->prioritySet();
     local_stats_.clusters_inflated_.set(thread_local_clusters_.size());
   }
@@ -1901,7 +1905,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-    const LoadBalancerFactorySharedPtr& lb_factory)
+    const LoadBalancerFactorySharedPtr& lb_factory, Event::Dispatcher& main_thread_dispatcher)
     : parent_(parent), cluster_info_(cluster), lb_factory_(lb_factory),
       override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
@@ -1909,7 +1913,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   ASSERT(lb_factory_ != nullptr);
-  lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+  lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_, &main_thread_dispatcher});
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
