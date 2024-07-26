@@ -42,7 +42,7 @@ absl::Status tryCopyNamedMetricToOrcaLoadReport(absl::string_view metric_name, d
 }
 
 std::vector<absl::string_view> parseCommaDelimitedHeader(const HeaderMap::GetResult& entry) {
-  const std::vector<absl::string_view> values;
+  std::vector<absl::string_view> values;
   values.reserve(entry.size());
   for (size_t i = 0; i < entry.size(); ++i) {
     std::vector<absl::string_view> tokens =
