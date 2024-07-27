@@ -4507,9 +4507,11 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 
   ASSERT_TRUE(response->waitForEndStream());
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_THAT(waitForAccessLog(access_log_name_),
-                HasSubstr("upstream_reset_before_response_started{connection_termination|QUIC_"
-                          "PACKET_WRITE_ERROR|Write_failed_with_error:_9_(Bad_file_descriptor)}"));
+    EXPECT_THAT(
+        waitForAccessLog(access_log_name_),
+        HasSubstr(
+            "upstream_reset_before_response_started{connection_termination|QUIC_"
+            "PACKET_WRITE_ERROR|FROM_SELF|Write_failed_with_error:_9_(Bad_file_descriptor)}"));
   } else {
     EXPECT_THAT(waitForAccessLog(access_log_name_),
                 HasSubstr("upstream_reset_before_response_started{connection_termination}"));
@@ -4718,8 +4720,9 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_EQ(waitForAccessLog(access_log_name_), "upstream_reset_before_response_started{protocol_"
-                                                  "error|QUIC_HTTP_FRAME_ERROR|Invalid_headers}");
+    EXPECT_EQ(waitForAccessLog(access_log_name_),
+              "upstream_reset_before_response_started{protocol_"
+              "error|QUIC_HTTP_FRAME_ERROR|FROM_SELF|Invalid_headers}");
   } else {
     EXPECT_EQ(waitForAccessLog(access_log_name_),
               "upstream_reset_before_response_started{protocol_error}");
