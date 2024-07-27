@@ -1,5 +1,6 @@
 #include "extension_registry.h"
 
+#include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/resolver_impl.h"
@@ -65,6 +66,9 @@ namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
   ExtensionRegistryPlatformAdditions::registerFactories();
+
+  // The formatter extension is required by default.
+  Envoy::Formatter::forceRegisterDefaultBuiltInHttpCommandParserFactory();
 
   // The uuid extension is required for E-M for server mode. Ideally E-M could skip it.
   Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();

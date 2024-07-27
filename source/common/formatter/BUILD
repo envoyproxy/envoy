@@ -20,11 +20,12 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_str_format"],
     deps = [
-        ":substitution_format_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:utility_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -58,17 +59,10 @@ envoy_cc_library(
     ],
 )
 
-# The library is compiled as extension and linked to the main library.
 envoy_cc_library(
-    name = "http_speicific_formatter_lib",
+    name = "http_speicific_formatter_extension_lib",
     srcs = ["http_specific_formatter.cc"],
     hdrs = ["http_specific_formatter.h"],
-    # This visibility is used to ensure this library will works like an extension
-    # and could only be linked to the main library (or test library).
-    visibility = [
-        "//source/exe:__subpackages__",
-        "//test:__subpackages__",
-    ],
     deps = [
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
@@ -84,20 +78,13 @@ envoy_cc_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
     ],
-    alwayslink = True,
+    alwayslink = 1,  # has factory registration
 )
 
-# The library is compiled as extension and linked to the main library.
 envoy_cc_library(
-    name = "stream_info_formatter_lib",
+    name = "stream_info_formatter_extension_lib",
     srcs = ["stream_info_formatter.cc"],
     hdrs = ["stream_info_formatter.h"],
-    # This visibility is used to ensure this library will works like an extension
-    # and could only be linked to the main library (or test library).
-    visibility = [
-        "//source/exe:__subpackages__",
-        "//test:__subpackages__",
-    ],
     deps = [
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
@@ -114,5 +101,5 @@ envoy_cc_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
     ],
-    alwayslink = True,
+    alwayslink = 1,  # has factory registration
 )

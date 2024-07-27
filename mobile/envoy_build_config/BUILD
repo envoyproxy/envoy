@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["extension_registry.h"],
     repository = "@envoy",
     deps = [
+        "@envoy//source/common/formatter:http_speicific_formatter_extension_lib",
         "extension_registry_platform_additions",
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",

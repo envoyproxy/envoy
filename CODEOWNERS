@@ -210,8 +210,6 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
-/*/extensions/formatter/built_in_http @wbpcode @zuercher
-/*/extensions/formatter/built_in_stream_info @wbpcode @zuercher
 /*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
 /*/extensions/formatter/cel @kyessenov @zirain
 # IP address input matcher

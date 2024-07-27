@@ -218,5 +218,14 @@ private:
   static const FormatterProviderLookupTbl& getKnownFormatters();
 };
 
+using BuiltInHttpCommandParserFactory = BuiltInCommandParserFactoryBase<HttpFormatterContext>;
+class DefaultBuiltInHttpCommandParserFactory : public BuiltInHttpCommandParserFactory {
+public:
+  std::string name() const override;
+  CommandParserPtr createCommandParser() const override;
+};
+
+DECLARE_FACTORY(DefaultBuiltInHttpCommandParserFactory);
+
 } // namespace Formatter
 } // namespace Envoy

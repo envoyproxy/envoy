@@ -239,5 +239,13 @@ private:
   ProtobufWkt::Value str_;
 };
 
+class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInStreamInfoCommandParserFactory {
+public:
+  std::string name() const override;
+  StreamInfoCommandParserPtr createCommandParser() const override;
+};
+
+DECLARE_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory);
+
 } // namespace Formatter
 } // namespace Envoy

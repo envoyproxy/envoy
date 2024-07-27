@@ -126,7 +126,7 @@ public:
   createCommandParserFromProto(const Protobuf::Message& config,
                                Server::Configuration::GenericFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.formatters"; }
+  std::string category() const override { return "envoy.formatter"; }
 };
 
 template <class FormatterContext>

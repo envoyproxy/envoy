@@ -58,7 +58,7 @@ public:
   StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
                       absl::optional<size_t> max_length = absl::nullopt)
       : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
-    for (const auto& cmd : BuiltInStreamInfoCommandParserRegistry::commandParsers()) {
+    for (const auto& cmd : BuiltInCommandParserFactoryHelper<void>::commandParsers()) {
       auto formatter = cmd->parse(command, sub_command, max_length);
       if (formatter) {
         formatter_ = std::move(formatter);

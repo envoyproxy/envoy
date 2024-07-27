@@ -1762,14 +1762,14 @@ public:
   }
 };
 
-class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInStreamInfoCommandParserFactory {
-public:
-  std::string name() const override { return "envoy.built_in_formatters.stream_info"; }
+std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
+  return "envoy.built_in_formatter.stream_info";
+}
 
-  StreamInfoCommandParserPtr createCommandParser() const override {
-    return std::make_unique<BuiltInStreamInfoCommandParser>();
-  }
-};
+StreamInfoCommandParserPtr
+DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
+  return std::make_unique<BuiltInStreamInfoCommandParser>();
+}
 
 REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
                  BuiltInStreamInfoCommandParserFactory);
