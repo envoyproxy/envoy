@@ -842,7 +842,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
               "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
-              "ERROR|Closed_by_application}; UC\"");
+              "ERROR|FROM_PEER|Closed_by_application}; UC\"");
   } else {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
