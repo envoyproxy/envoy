@@ -129,7 +129,6 @@ paths:
     - source/common/common/regex.h
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
-    - source/server/overload_manager_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
     - source/server/admin/runtime_handler.cc

@@ -27,6 +27,7 @@ gitpython
 gsutil
 icalendar
 jinja2
+kafka-python-ng
 multidict>=6.0.2
 orjson
 pep8-naming

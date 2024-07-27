@@ -233,6 +233,14 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
+class MockSidestreamWatermarkCallbacks : public SidestreamWatermarkCallbacks {
+public:
+  ~MockSidestreamWatermarkCallbacks() override = default;
+
+  MOCK_METHOD(void, onSidestreamAboveHighWatermark, ());
+  MOCK_METHOD(void, onSidestreamBelowLowWatermark, ());
+};
+
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
                                          public MockStreamFilterCallbacksBase {
 public:
@@ -565,7 +573,7 @@ public:
     destructor_callback_ = callback;
   }
   void removeDestructorCallback() override { destructor_callback_.reset(); }
-  MOCK_METHOD(void, setWatermarkCallbacks, (DecoderFilterWatermarkCallbacks & callback),
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks & callback),
               (override));
   MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));

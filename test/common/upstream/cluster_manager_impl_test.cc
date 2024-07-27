@@ -6330,6 +6330,53 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
                                                          Http::Protocol::Http11, &lb_context)));
 }
 
+TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_tcp) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      connection_pool_per_downstream_connection: true
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  NiceMock<MockLoadBalancerContext> lb_context;
+  NiceMock<Network::MockConnection> downstream_connection;
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+  ON_CALL(lb_context, downstreamConnection()).WillByDefault(Return(&downstream_connection));
+  ON_CALL(downstream_connection, socketOptions()).WillByDefault(ReturnRef(options_to_return));
+
+  std::vector<Tcp::ConnectionPool::MockInstance*> conn_pool_vector;
+  for (size_t i = 0; i < 3; ++i) {
+    conn_pool_vector.push_back(new Tcp::ConnectionPool::MockInstance());
+    EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
+    EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(downstream_connection, hashKey)
+        .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
+    EXPECT_EQ(conn_pool_vector.back(),
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, &lb_context)));
+  }
+
+  // Check that the first entry is still in the pool map
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+    hash_key.push_back(0);
+  }));
+  EXPECT_EQ(conn_pool_vector.front(),
+            TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                         ->tcpConnPool(ResourcePriority::Default, &lb_context)));
+}
+
 TEST_F(ClusterManagerImplTest, CheckAddressesList) {
   const std::string bootstrap = R"EOF(
   static_resources:
