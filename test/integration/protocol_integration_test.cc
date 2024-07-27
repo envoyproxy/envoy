@@ -1857,7 +1857,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->reset());
     EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
                    ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
+                   : Http::StreamResetReason::ConnectionTermination),
               response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
@@ -1898,7 +1898,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->reset());
     EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
                    ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
+                   : Http::StreamResetReason::ConnectionTermination),
               response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
