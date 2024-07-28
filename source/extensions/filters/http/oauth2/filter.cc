@@ -40,7 +40,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
+constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -132,13 +132,13 @@ std::string getSameSiteAttribute(
     break; // Do nothing.
   case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
       CookieSettings_SameSiteValues_NONE:
-    return "SameSite=None";
+    return ";SameSite=None";
   case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
       CookieSettings_SameSiteValues_LAX:
-    return "SameSite=Lax";
+    return ";SameSite=Lax";
   case envoy::extensions::filters::http::oauth2::v3::CookieSettings_SameSiteValues::
       CookieSettings_SameSiteValues_STRICT:
-    return "SameSite=Strict";
+    return ";SameSite=Strict";
   default:
     break;
   }
@@ -211,7 +211,7 @@ FilterConfig::FilterConfig(
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
       auth_type_(getAuthType(proto_config.auth_type())),
-      same_site_attribute_(
+      cookie_suffix_(
           getSameSiteAttribute(proto_config.cookie_settings().same_site_attribute_value())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
@@ -709,11 +709,9 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
   // We use HTTP Only cookies.
-  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
-  const std::string same_site_attribute = config_->sameSiteAttribute();
-  if (!same_site_attribute.empty()) {
-    cookie_tail_http_only = absl::StrCat(cookie_tail_http_only, ";", same_site_attribute);
-  }
+  const auto cookie_suffix = config_->cookieSuffix();
+  std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expires_in_, cookie_suffix);
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(
@@ -731,27 +729,13 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
 
     if (!id_token_.empty()) {
-      std::string id_token_cookie_tail_http_only =
-          fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
-      if (!same_site_attribute.empty()) {
-        id_token_cookie_tail_http_only =
-            absl::StrCat(id_token_cookie_tail_http_only, ";", same_site_attribute);
-      }
-      headers.addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
+      headers.addReferenceKey(Http::Headers::get().SetCookie,
+                              buildIdTokenCookie(cookie_names.id_token_ cookie_suffix));
     }
 
     if (!refresh_token_.empty()) {
-      std::string refresh_token_cookie_tail_http_only =
-          fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
-      if (!same_site_attribute.empty()) {
-        refresh_token_cookie_tail_http_only =
-            absl::StrCat(refresh_token_cookie_tail_http_only, ";", same_site_attribute);
-      }
       headers.addReferenceKey(Http::Headers::get().SetCookie,
-                              absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                           refresh_token_cookie_tail_http_only));
+                              buildRefreshTokenCookie(cookie_names.refresh_token_, cookie_suffix));
     }
   }
 }
@@ -760,6 +744,24 @@ void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
                                      absl::nullopt, EMPTY_STRING);
+}
+
+std::string OAuth2Filter::buildIdTokenCookie(absl::string_view cookie_name,
+                                             absl::string_view cookie_suffix) const {
+  return buildTokenCookie(cookie_name, id_token_, expires_id_token_in_, cookie_suffix);
+}
+
+std::string OAuth2Filter::buildRefreshTokenCookie(absl::string_view cookie_name,
+                                                  absl::string_view cookie_suffix) const {
+  return buildTokenCookie(cookie_name, refresh_token_, expires_refresh_token_in_, cookie_suffix);
+}
+
+std::string OAuth2Filter::buildTokenCookie(absl::string_view cookie_name, absl::string_view token,
+                                           absl::string_view expires_in,
+                                           absl::string_view cookie_suffix) const {
+  std::string token_cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expires_in, cookie_suffix);
+  return absl::StrCat(cookie_name, "=", token, token_cookie_tail_http_only);
 }
 
 } // namespace Oauth2

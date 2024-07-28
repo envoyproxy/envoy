@@ -143,7 +143,7 @@ public:
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
-  std::string sameSiteAttribute() { return same_site_attribute_; }
+  std::string cookieSuffix() { return cookie_suffix_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
@@ -170,8 +170,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
-  // const SameSiteAttribute same_site_attribute_;
-  const std::string same_site_attribute_;
+  const std::string cookie_suffix_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
   const bool forward_bearer_token_ : 1;
@@ -303,6 +302,12 @@ private:
                                        const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
+  std::string buildRefreshTokenCookie(absl::string_view cookie_name,
+                                      absl::string_view cookie_suffix) const;
+  std::string buildIdTokenCookie(absl::string_view cookie_name,
+                                 absl::string_view cookie_suffix) const;
+  std::string buildTokenCookie(absl::string_view cookie_name, absl::string_view token,
+                               absl::string_view expires_in, absl::string_view cookie_suffix) const;
 };
 
 } // namespace Oauth2
