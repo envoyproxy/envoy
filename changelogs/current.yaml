@@ -93,5 +93,9 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: oauth
+  change: |
+    Add ability to configure SameSite attribute for OAuth cookies using :ref:`same_site_attribute_value
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieSettings.same_site_attribute_value>`.
 
 deprecated:

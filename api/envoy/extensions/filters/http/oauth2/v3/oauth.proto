@@ -32,7 +32,8 @@ message CookieSettings {
     STRICT = 3;
   }
 
-  // The value used for the SameSite cookie attribute. Defaults to SAME_SITE.
+  // The value used for the SameSite cookie attribute. Defaults to DISABLED which does not add the
+  // SameSite attribute.
   SameSiteValues same_site_attribute_value = 1;
 }
 
