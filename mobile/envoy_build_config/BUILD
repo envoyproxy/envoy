@@ -18,8 +18,8 @@ envoy_cc_library(
     hdrs = ["extension_registry.h"],
     repository = "@envoy",
     deps = [
-        "@envoy//source/common/formatter:http_speicific_formatter_extension_lib",
         "extension_registry_platform_additions",
+        "@envoy//source/common/formatter:http_speicific_formatter_extension_lib",
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
@@ -110,6 +110,7 @@ envoy_cc_library(
     # the time, while for iOS we have to force register the extensions, so test files must pull in
     # the TestExtensions module and call register_test_extensions().
     deps = [
+        "@envoy//source/common/formatter:http_speicific_formatter_extension_lib",
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
         "@envoy//source/extensions/filters/http/buffer:config",
         "@envoy//source/extensions/load_balancing_policies/round_robin:config",

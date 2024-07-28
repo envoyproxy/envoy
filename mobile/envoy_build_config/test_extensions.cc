@@ -1,3 +1,4 @@
+#include "source/common/formatter/http_specific_formatter.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/filters/http/buffer/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
@@ -40,6 +41,9 @@ void register_test_extensions() {
   Envoy::Extensions::LoadBalancingPolices::RoundRobin::forceRegisterFactory();
   Envoy::HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
+
+  // The formatter extension is required by default.
+  Envoy::Formatter::forceRegisterDefaultBuiltInHttpCommandParserFactory();
 
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
   std::vector<Envoy::FileDescriptorInfo> file_descriptors = {
