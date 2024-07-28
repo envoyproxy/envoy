@@ -20,6 +20,8 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_str_format"],
     deps = [
+        ":http_speicific_formatter_extension_lib",
+        ":stream_info_formatter_extension_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/stream_info:stream_info_interface",
