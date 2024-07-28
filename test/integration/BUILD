@@ -1147,6 +1147,8 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_socket_lib",
