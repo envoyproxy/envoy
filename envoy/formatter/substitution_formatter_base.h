@@ -63,30 +63,8 @@ public:
                          const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
-template <> class FormatterProviderBase<void> {
-public:
-  virtual ~FormatterProviderBase() = default;
-
-  /**
-   * Format the value with the given stream info.
-   * @param stream_info supplies the stream info.
-   * @return absl::optional<std::string> optional string containing a single value extracted from
-   *         the given stream info.
-   */
-  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
-
-  /**
-   * Format the value with the given stream info.
-   * @param stream_info supplies the stream info.
-   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
-   */
-  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
-};
-
 template <class FormatterContext>
 using FormatterProviderBasePtr = std::unique_ptr<FormatterProviderBase<FormatterContext>>;
-using StreamInfoFormatterProvider = FormatterProviderBase<void>;
-using StreamInfoFormatterProviderPtr = FormatterProviderBasePtr<void>;
 
 template <class FormatterContext> class CommandParserBase {
 public:
@@ -109,16 +87,6 @@ public:
 
 template <class FormatterContext>
 using CommandParserBasePtr = std::unique_ptr<CommandParserBase<FormatterContext>>;
-using StreamInfoCommandParser = CommandParserBase<void>;
-using StreamInfoCommandParserPtr = CommandParserBasePtr<void>;
-
-template <class FormatterContext> constexpr absl::string_view formatterContextCategory() {
-  if constexpr (std::is_same_v<FormatterContext, void>) {
-    return "stream_info"; // Support for StreamInfo.
-  } else {
-    return FormatterContext::category();
-  }
-}
 
 template <class FormatterContext> class CommandParserFactoryBase : public Config::TypedFactory {
 public:
@@ -136,10 +104,10 @@ public:
 
   std::string category() const override {
     static constexpr absl::string_view HttpContextCategory = "http";
-    if constexpr (formatterContextCategory<FormatterContext>() == HttpContextCategory) {
+    if constexpr (FormatterContext::category() == HttpContextCategory) {
       return "envoy.formatter"; // Backward compatibility for HTTP.
     } else {
-      return fmt::format("envoy.formatters.{}", formatterContextCategory<FormatterContext>());
+      return fmt::format("envoy.formatters.{}", FormatterContext::category());
     }
   }
 };
@@ -148,8 +116,7 @@ template <class FormatterContext>
 class BuiltInCommandParserFactoryBase : public Config::UntypedFactory {
 public:
   std::string category() const override {
-    return fmt::format("envoy.built_in_formatters.{}",
-                       formatterContextCategory<FormatterContext>());
+    return fmt::format("envoy.built_in_formatters.{}", FormatterContext::category());
   }
 
   /**
@@ -157,8 +124,6 @@ public:
    */
   virtual CommandParserBasePtr<FormatterContext> createCommandParser() const PURE;
 };
-
-using BuiltInStreamInfoCommandParserFactory = BuiltInCommandParserFactoryBase<void>;
 
 /**
  * Helper class to get all built-in command parsers for a given formatter context.
@@ -175,15 +140,59 @@ public:
   static const Parsers& commandParsers() {
     CONSTRUCT_ON_FIRST_USE(Parsers, []() {
       Parsers parsers;
-      for (auto& f : Registry::FactoryRegistry<Factory>::factories()) {
-        auto parser = f.second->createCommandParser();
-        RELEASE_ASSERT(parser != nullptr, "Null built-in command parser");
-        parsers.push_back(std::move(parser));
+      for (const auto& factory : Envoy::Registry::FactoryRegistry<Factory>::factories()) {
+        if (auto parser = factory.second->createCommandParser(); parser == nullptr) {
+          ENVOY_BUG(false, fmt::format("Null built-in command parser: {}", factory.first));
+          continue;
+        } else {
+          parsers.push_back(std::move(parser));
+        }
       }
       return parsers;
     }());
   }
 };
+
+/**
+ * Type placeholder for formatter providers that only require StreamInfo.
+ */
+struct StreamInfoOnlyFormatterContext {
+  static constexpr absl::string_view category() { return "stream_info"; }
+};
+
+/**
+ * Template specialization for formatter providers that only require StreamInfo.
+ * The only difference from the main template is the providers inheriting from this class
+ * will only take StreamInfo as input parameter.
+ */
+template <> class FormatterProviderBase<StreamInfoOnlyFormatterContext> {
+public:
+  virtual ~FormatterProviderBase() = default;
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return absl::optional<std::string> optional string containing a single value extracted from
+   *         the given stream info.
+   */
+  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
+   */
+  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
+};
+
+using StreamInfoFormatterProvider = FormatterProviderBase<StreamInfoOnlyFormatterContext>;
+using StreamInfoFormatterProviderPtr = FormatterProviderBasePtr<StreamInfoOnlyFormatterContext>;
+using StreamInfoCommandParser = CommandParserBase<StreamInfoOnlyFormatterContext>;
+using StreamInfoCommandParserPtr = CommandParserBasePtr<StreamInfoOnlyFormatterContext>;
+using BuiltInStreamInfoCommandParserFactory =
+    BuiltInCommandParserFactoryBase<StreamInfoOnlyFormatterContext>;
+using BuiltInStreamInfoCommandParserFactoryHelper =
+    BuiltInCommandParserFactoryHelper<StreamInfoOnlyFormatterContext>;
 
 } // namespace Formatter
 } // namespace Envoy

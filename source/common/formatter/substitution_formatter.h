@@ -181,7 +181,7 @@ public:
 
       // Finally, try the command parsers that are built-in and context-independent.
       if (!added) {
-        for (const auto& cmd : BuiltInCommandParserFactoryHelper<void>::commandParsers()) {
+        for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
           auto formatter = cmd->parse(command, subcommand, max_length);
           if (formatter) {
             formatters.push_back(std::make_unique<StreamInfoFormatterWrapper<FormatterContext>>(
@@ -254,7 +254,9 @@ private:
 };
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
-template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
+template <class... Ts> struct StructFormatMapVisitorHelper : Ts... {
+  using Ts::operator()...;
+};
 template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
 /**
