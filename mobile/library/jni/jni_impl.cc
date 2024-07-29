@@ -1017,12 +1017,13 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
     JNIEnv* env, jclass, jlong engine_handle, jlong stream_handle, jobject headers,
-    jboolean end_stream) {
+    jboolean end_stream, jboolean idempotent) {
   Envoy::JNI::JniHelper jni_helper(env);
   auto cpp_headers = Envoy::Http::Utility::createRequestHeaderMapPtr();
   Envoy::JNI::javaHeadersToCppHeaders(jni_helper, headers, *cpp_headers);
   return reinterpret_cast<Envoy::InternalEngine*>(engine_handle)
-      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_headers), end_stream);
+      ->sendHeaders(static_cast<envoy_stream_t>(stream_handle), std::move(cpp_headers), end_stream,
+                    idempotent);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(

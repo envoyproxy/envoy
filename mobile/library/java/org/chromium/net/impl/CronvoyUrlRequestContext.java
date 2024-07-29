@@ -132,7 +132,8 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
       checkHaveAdapter();
       return new CronvoyUrlRequest(this, url, callback, executor, mUserAgent, allowDirectExecutor,
                                    requestAnnotations, trafficStatsTagSet, trafficStatsTag,
-                                   trafficStatsUidSet, trafficStatsUid, requestFinishedListener);
+                                   trafficStatsUidSet, trafficStatsUid, requestFinishedListener,
+                                   idempotency == 1);
     }
   }
 
