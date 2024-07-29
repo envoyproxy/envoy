@@ -342,6 +342,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   hcm->set_server_header_transformation(
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           PASS_THROUGH);
+  std::cerr << "STREAM IDLE TIMEOUT In SECONDS: " << stream_idle_timeout_seconds_ << "\n";
   hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
   auto* route_config = hcm->mutable_route_config();
   route_config->set_name("api_router");

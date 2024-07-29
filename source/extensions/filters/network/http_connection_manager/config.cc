@@ -423,6 +423,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+  std::cerr << "STREAM IDLE TIMEOUT INSIDE HCM: stream_idle_timeout_ "
+            << stream_idle_timeout_.count() << "\n";
   if (!creation_status.ok()) {
     return;
   }
@@ -437,6 +439,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
   }
+
+  std::cerr << "IDLE TIMEOUT INSIDE HCM: " << idle_timeout_->count() << "\n";
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
     creation_status = absl::InvalidArgumentError(fmt::format(
