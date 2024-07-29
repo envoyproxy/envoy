@@ -1283,9 +1283,9 @@ sphinxcontrib-googleanalytics==0.4 \
     --hash=sha256:4b19c1f0fce5df6c7da5633201b64a9e5b0cb3210a14fdb4134942ceee8c5d12 \
     --hash=sha256:a6574983f9a58e5864ec10d34dc99914c4d647108b22c9249c8f0038b0cb18b3
     # via -r requirements.in
-sphinxcontrib-htmlhelp==2.0.6 \
-    --hash=sha256:1b9af5a2671a61410a868fce050cab7ca393c218e6205cbc7f590136f207395c \
-    --hash=sha256:c6597da06185f0e3b4dc952777a04200611ef563882e0c244d27a15ee22afa73
+sphinxcontrib-htmlhelp==2.1.0 \
+    --hash=sha256:166759820b47002d22914d64a075ce08f4c46818e17cfc9470a9786b759b19f8 \
+    --hash=sha256:c9e2916ace8aad64cc13a0d233ee22317f2b9025b9cf3295249fa985cc7082e9
     # via
     #   -r requirements.in
     #   sphinx
