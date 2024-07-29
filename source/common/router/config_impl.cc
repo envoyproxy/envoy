@@ -1253,7 +1253,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
       route.route().path_rewrite_policy().typed_config(), validator, factory);
 
   absl::StatusOr<PathRewriterSharedPtr> rewriter = factory.createPathRewriter(*config);
-  RETURN_IF_STATUS_NOT_OK(rewriter);
+  RETURN_IF_NOT_OK_REF(rewriter.status());
 
   return rewriter.value();
 }
@@ -1271,7 +1271,7 @@ RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
       route.match().path_match_policy().typed_config(), validator, factory);
 
   absl::StatusOr<PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
-  RETURN_IF_STATUS_NOT_OK(matcher);
+  RETURN_IF_NOT_OK_REF(matcher.status());
 
   return matcher.value();
 }
