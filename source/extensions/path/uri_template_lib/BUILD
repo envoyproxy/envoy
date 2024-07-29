@@ -34,6 +34,7 @@ envoy_cc_library(
     srcs = ["uri_template_internal.cc"],
     hdrs = ["uri_template_internal.h"],
     deps = [
+        "//source/common/common:fmt_lib",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/functional:function_ref",

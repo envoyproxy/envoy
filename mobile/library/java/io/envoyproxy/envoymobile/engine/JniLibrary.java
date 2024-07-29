@@ -301,9 +301,5 @@ public class JniLibrary {
       long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain,
-      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
-      String rtdsResourceName, long rtdsTimeoutSeconds, String xdsAddress, long xdsPort,
-      byte[][] xdsGrpcInitialMetadata, String xdsRootCerts, String nodeId, String nodeRegion,
-      String nodeZone, String nodeSubZone, byte[] nodeMetadata, String cdsResourcesLocator,
-      long cdsTimeoutSeconds, boolean enableCds);
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards);
 }

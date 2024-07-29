@@ -8,6 +8,7 @@ export MANUAL=true
 export PORT_PROXY0="${WEBSOCKET_PORT_PROXY0:-12300}"
 export PORT_PROXY1="${WEBSOCKET_PORT_PROXY1:-12301}"
 export PORT_PROXY2="${WEBSOCKET_PORT_PROXY2:-12302}"
+export PORT_PROXY3="${WEBSOCKET_PORT_PROXY3:-12303}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -21,15 +22,18 @@ mkdir -p certs
 openssl req -batch -new -x509 -nodes -keyout certs/key.pem -out certs/cert.pem
 openssl pkcs12 -export -passout pass: -out certs/output.pkcs12 -inkey certs/key.pem -in certs/cert.pem
 
-UPARGS="proxy-ws proxy-wss-wss proxy-wss-passthrough service-ws service-wss"
+UPARGS="proxy-ws proxy-ws-route proxy-wss-wss proxy-wss-passthrough service-ws service-wss"
 
 bring_up_example
 
 run_log "Interact with web socket ws -> ws"
 "${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY0}" ws ws
 
+run_log "Interact with web socket ws -> ws for specific route"
+"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY1}/ws" ws ws
+
 run_log "Interact with web socket wss -> wss"
-"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY1}" wss wss
+"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY2}" wss wss
 
 run_log "Interact with web socket wss passthrough"
-"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY2}" wss wss
+"${DOCKER_COMPOSE[@]}" run client-ws "${PORT_PROXY3}" wss wss

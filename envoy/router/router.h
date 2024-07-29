@@ -218,6 +218,7 @@ public:
   static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS                  = 0x1000;
   static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED                 = 0x2000;
   static constexpr uint32_t RETRY_ON_HTTP3_POST_CONNECT_FAILURE         = 0x4000;
+  static constexpr uint32_t RETRY_ON_RESET_BEFORE_REQUEST               = 0x8000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -440,13 +441,17 @@ public:
    *                   not. nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
-   * inline.
+   *                 inline.
+   * @param upstream_request_started indicates whether the first byte has been transmitted to the
+   *                                 upstream server.
+   *
    * @return RetryStatus if a retry should take place. @param callback will be called at some point
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
-                                       DoRetryResetCallback callback) PURE;
+                                       DoRetryResetCallback callback,
+                                       bool upstream_request_started) PURE;
 
   /**
    * Determine whether a "hedged" retry should be sent after the per try
@@ -705,6 +710,13 @@ public:
    * for this virtual host.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
+   * @param headers supplies the request headers.
+   * @return the virtual cluster or nullptr if there is no match.
+   */
+  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 };
 
 /**
@@ -1040,18 +1052,6 @@ public:
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
 
   /**
-   * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
-   * @param headers supplies the request headers.
-   * @return the virtual cluster or nullptr if there is no match.
-   */
-  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
-
-  /**
-   * @return const VirtualHost& the virtual host that owns the route.
-   */
-  virtual const VirtualHost& virtualHost() const PURE;
-
-  /**
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
@@ -1259,6 +1259,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return const VirtualHost& the virtual host that owns the route.
+   */
+  virtual const VirtualHost& virtualHost() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

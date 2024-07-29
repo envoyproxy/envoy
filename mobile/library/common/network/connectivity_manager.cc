@@ -114,8 +114,6 @@ void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_p
     ENVOY_LOG_EVENT(info, "netconf_proxy_change", "{}", new_proxy_settings->asString());
     proxy_settings_ = new_proxy_settings;
   }
-
-  return;
 }
 
 ProxySettingsConstSharedPtr ConnectivityManagerImpl::getProxySettings() { return proxy_settings_; }

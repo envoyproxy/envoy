@@ -23,15 +23,15 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
   THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
   JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
 
-  auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true);
-  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+  auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+      data.cm_.grpcAsyncClientManager(), api_config_source, data.scope_, true, 0);
+  THROW_IF_STATUS_NOT_OK(factory_primary_or_error, throw);
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(api_config_source);
   THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
   GrpcMuxContext grpc_mux_context{
-      factory_or_error.value()->createUncachedRawAsyncClient(),
-      /*failover_async_client_*/ nullptr,
+      factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+      /*failover_async_client_=*/nullptr,
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),
       /*local_info_=*/data.local_info_,

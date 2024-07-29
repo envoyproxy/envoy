@@ -41,7 +41,7 @@ public:
         .WillRepeatedly(Return(true));
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);
-    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     manager_ = factory_->getAsyncFileManager(config, &mock_posix_file_operations_);
   }

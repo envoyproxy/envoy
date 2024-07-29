@@ -15,8 +15,8 @@ from aio.api import bazel
 
 import envoy_repo
 
-BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile('@(\w+)//')
-EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
+BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile(r'@(\w+)//')
+EXTENSION_LABEL_RE = re.compile(r'(//source/extensions/.*):')
 
 # We can safely ignore these as they are from Bazel or internal repository structure.
 IGNORE_DEPS = set([

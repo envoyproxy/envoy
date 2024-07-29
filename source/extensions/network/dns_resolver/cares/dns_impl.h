@@ -106,6 +106,7 @@ private:
     struct PendingResponse {
       ResolutionStatus status_;
       std::list<DnsResponse> address_list_;
+      std::string details_{"not_set"};
     };
 
     // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and

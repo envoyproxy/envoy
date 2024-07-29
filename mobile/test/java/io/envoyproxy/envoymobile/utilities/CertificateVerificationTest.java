@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -22,21 +23,22 @@ import org.robolectric.RobolectricTestRunner;
  */
 @RunWith(RobolectricTestRunner.class)
 public final class CertificateVerificationTest {
-  static {
-    JniLibrary.loadTestLibrary();
-    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-    if (ContextUtils.getApplicationContext() == null) {
-      ContextUtils.initApplicationContext(context.getApplicationContext());
-    }
-  }
-
   private static final byte[] host =
       FakeX509Util.getExpectedHost().getBytes(StandardCharsets.UTF_8);
   private static final byte[] authType =
       FakeX509Util.expectedAuthType.getBytes(StandardCharsets.UTF_8);
 
+  @BeforeClass
+  public static void beforeClass() {
+    JniLibrary.loadTestLibrary();
+  }
+
   @Before
   public void setUp() throws Exception {
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    if (ContextUtils.getApplicationContext() == null) {
+      ContextUtils.initApplicationContext(context.getApplicationContext());
+    }
     AndroidNetworkLibrary.setFakeCertificateVerificationForTesting(true);
   }
 

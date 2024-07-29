@@ -78,7 +78,6 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "org.mockito:mockito-core:4.8.0",
             "com.squareup.okhttp3:okhttp:4.10.0",
             "com.squareup.okhttp3:mockwebserver:4.10.0",
-            "io.github.classgraph:classgraph:4.8.149",
             "io.netty:netty-all:4.1.82.Final",
             # Android test artifacts
             "androidx.test:core:1.4.0",

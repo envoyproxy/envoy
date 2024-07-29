@@ -1,6 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/tls/context_config_impl.h"
@@ -97,26 +98,28 @@ name: stream-info-to-headers-filter
             ? envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY
             : envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V6_ONLY);
 
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    protocol_options_.mutable_upstream_http_protocol_options()->set_auto_sni(true);
     if (!override_auto_sni_header.empty()) {
-      protocol_options.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
+      protocol_options_.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
           override_auto_sni_header);
     }
-    protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+    protocol_options_.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
     if (upstreamProtocol() == Http::CodecType::HTTP1) {
-      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
-    } else {
-      ASSERT(upstreamProtocol() == Http::CodecType::HTTP2);
-      protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+      protocol_options_.mutable_explicit_http_config()->mutable_http_protocol_options();
+      ConfigHelper::setProtocolOptions(cluster_, protocol_options_);
+    } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
+      protocol_options_.mutable_explicit_http_config()->mutable_http2_protocol_options();
       if (low_stream_limits_) {
-        protocol_options.mutable_explicit_http_config()
+        protocol_options_.mutable_explicit_http_config()
             ->mutable_http2_protocol_options()
             ->mutable_max_concurrent_streams()
             ->set_value(1);
       }
+      ConfigHelper::setProtocolOptions(cluster_, protocol_options_);
+    } else {
+      ASSERT(!low_stream_limits_);
+      // H3 config is set below after fake upstream creation.
     }
-    ConfigHelper::setProtocolOptions(cluster_, protocol_options);
 
     if (low_stream_limits_) {
       envoy::config::cluster::v3::CircuitBreakers* circuit_breakers =
@@ -130,8 +133,15 @@ name: stream-info-to-headers-filter
           tls_context.mutable_common_tls_context()->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-      cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+      if (upstreamProtocol() != Http::CodecType::HTTP3) {
+        cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+        cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+      } else {
+        envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
+        quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
+        cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+        cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+      }
     }
 
     const std::string cluster_type_config_use_sub_cluster = fmt::format(
@@ -168,8 +178,7 @@ typed_config:
         ->mutable_max_pending_requests()
         ->set_value(max_pending_requests);
 
-    // Load the CDS cluster and wait for it to initialize.
-    cds_helper_.setCds({cluster_});
+    // CDS cluster is loaded in createUpstreams() to handle late H3 information.
     HttpIntegrationTest::initialize();
     test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
@@ -179,7 +188,7 @@ typed_config:
   }
 
   void createUpstreams() override {
-    if (upstream_tls_) {
+    if (upstream_tls_ && !upstream_cert_name_.empty()) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
                                                         factory_context_),
                       upstreamProtocol(), /*autonomous_upstream=*/false);
@@ -200,6 +209,20 @@ typed_config:
                                                              cache_file_value_contents_.length(),
                                                              "\n", cache_file_value_contents_));
     }
+    if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      protocol_options_.mutable_auto_config()->mutable_http3_protocol_options();
+      auto* alt_cache_options =
+          protocol_options_.mutable_auto_config()->mutable_alternate_protocols_cache_options();
+      alt_cache_options->set_name("default_alternate_protocols_cache");
+
+      alt_cache_options->add_canonical_suffixes(".lyft.com");
+      auto* entry = alt_cache_options->add_prepopulated_entries();
+      entry->set_hostname("sni.lyft.com");
+      entry->set_port(fake_upstreams_[0]->localAddress()->ip()->port());
+      ConfigHelper::setProtocolOptions(cluster_, protocol_options_);
+    }
+    // Load the CDS cluster and wait for it to initialize.
+    cds_helper_.setCds({cluster_});
   }
 
   void testConnectionTiming(IntegrationStreamDecoderPtr& response, bool cached_dns,
@@ -313,6 +336,7 @@ typed_config:
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
+  ConfigHelper::HttpProtocolOptions protocol_options_;
   std::string cache_file_value_contents_;
   bool use_cache_file_{};
   uint32_t host_ttl_{1};
@@ -956,6 +980,39 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
+
+#if defined(ENVOY_ENABLE_QUIC)
+TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
+  upstream_cert_name_ = ""; // Force standard TLS
+  dns_hostname_ = "sni.lyft.com";
+  autonomous_upstream_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+
+  use_cache_file_ = true;
+  // Unlike TCP happy eyeballs, HTTP/3 will only work if address families differ.
+  // Prepend a bad address with opposite address family.
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    cache_file_value_contents_ = "99.99.99.99:1|1000000|0\n";
+  } else {
+    cache_file_value_contents_ = "[::99]:1|1000000|0\n";
+  }
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  std::string host =
+      fmt::format("sni.lyft.com:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for the request to be received.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
+  EXPECT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+#endif
 
 TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
   upstream_tls_ = false; // config below uses bootstrap, tls config is in cluster_

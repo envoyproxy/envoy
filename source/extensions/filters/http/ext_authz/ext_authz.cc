@@ -84,7 +84,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
                     Filters::Common::MutationRules::Checker(config.decoder_header_mutation_rules(),
                                                             factory_context.regexEngine()))
               : absl::nullopt),
+      enable_dynamic_metadata_ingestion_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
+      filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
+                                                    : absl::nullopt),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -374,6 +378,15 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if (config_->filterMetadata().has_value() &&
+      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    filter_state->setData(decoder_callbacks_->filterConfigName(),
+                          std::make_shared<ExtAuthzLoggingInfo>(*config_->filterMetadata()),
+                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  }
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -404,18 +417,26 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
-    // Add duration of call to dynamic metadata if applicable
-    if (start_time_.has_value() && response->status == CheckStatus::OK) {
-      ProtobufWkt::Value ext_authz_duration_value;
-      auto duration =
-          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
-      ext_authz_duration_value.set_number_value(
-          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
-      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-          ext_authz_duration_value;
+    if (!config_->enableDynamicMetadataIngestion()) {
+      ENVOY_STREAM_LOG(trace,
+                       "Response is trying to inject dynamic metadata, but dynamic metadata "
+                       "ingestion is disabled. Ignoring...",
+                       *decoder_callbacks_);
+      stats_.ignored_dynamic_metadata_.inc();
+    } else {
+      // Add duration of call to dynamic metadata if applicable
+      if (start_time_.has_value() && response->status == CheckStatus::OK) {
+        ProtobufWkt::Value ext_authz_duration_value;
+        auto duration =
+            decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
+        ext_authz_duration_value.set_number_value(
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+        (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            ext_authz_duration_value;
+      }
+      decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
+                                                          response->dynamic_metadata);
     }
-    decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
-                                                        response->dynamic_metadata);
   }
 
   switch (response->status) {

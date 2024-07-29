@@ -29,6 +29,19 @@ There are 15 identities:
 - **SAN With URI**: It has the certificate *san_uri_cert.pem*, which is signed
   by the **CA** using the config *san_uri_cert.cfg*. The certificate has SAN
   field of URI type. *san_uri_key.pem* is its private key.
+- **SAN With OtherName**: It has the certificate *san_othername_cert.pem*, which is signed
+  by the **CA** using the config *san_othername_cert.cfg*. The certificate has SAN
+  field of OtherName(UPN) type. *san_othername_key.pem* is its private key.
+- **SAN With OtherName and DNS**: It has the certificate *san_dns_and_othername_cert.pem*, which is signed
+  by the **CA** using the config *san_dns_and_othername_cert.cfg*. The certificate has two SAN
+  fields, one DNS and one OtherName(UPN) type. *san_dns_and_othername_key.key* is its private key.
+- **SAN With Multiple Othername**: It has the certificate *san_multiple_othername_cert.pem*, which is signed
+  by the **CA** using the config *san_dns_and_othername_cert.cfg*. The certificate has 5 SAN fields
+  of NULL, ENUMERATED, INTEGER, BOOLEAN and OBJECT types. *san_multiple_othername_key.pem* is its private key.
+- **SAN With Multiple Othername (String Type)**: It has the certificate
+  *san_multiple_othername_string_type_cert.pem*, which is signed by the **CA** using the config
+  *san_multiple_othername_string_type_key.cfg*. The certificate has two SANfields, one DNS and one
+  OtherName(UPN) type. *san_multiple_othername_string_type_key.pem* is its private key.
 - **Password-protected**: The password-protected certificate *password_protected_cert.pem*,
   using the config *san_uri_cert.cfg*. *password_protected_key.pem* is
   its private key encrypted using the password supplied in *password_protected_password.txt*.

@@ -36,6 +36,7 @@ public:
     ON_CALL(*this, bypassCorsPreflightRequest()).WillByDefault(Return(true));
     ON_CALL(*this, findVerifier(_, _)).WillByDefault(Return(nullptr));
     ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+    ON_CALL(*this, stripFailureResponse()).WillByDefault(Return(false));
   }
 
   MOCK_METHOD(const Verifier*, findVerifier,
@@ -45,6 +46,7 @@ public:
               (const PerRouteFilterConfig& per_route), (const));
   MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
   MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
+  MOCK_METHOD(bool, stripFailureResponse, (), (const));
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   JwtAuthnFilterStats stats_;

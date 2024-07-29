@@ -31,8 +31,8 @@ class HttpInspectorTest : public testing::Test {
 public:
   HttpInspectorTest()
       : cfg_(std::make_shared<Config>(*store_.rootScope())),
-        io_handle_(
-            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt)) {}
+        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false,
+                                                                            absl::nullopt, {})) {}
   ~HttpInspectorTest() override { io_handle_->close(); }
 
   void init() {

@@ -3,8 +3,10 @@
 #include <cstdint>
 
 #include "envoy/network/connection.h"
+#include "envoy/router/string_accessor.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/router/string_accessor_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -123,13 +125,13 @@ CAPIStatus Filter::setFilterState(absl::string_view key, absl::string_view value
 
   if (dispatcher_->isThreadSafe()) {
     read_callbacks_->connection().streamInfo().filterState()->setData(
-        key, std::make_shared<GoStringFilterState>(value),
+        key, std::make_shared<Router::StringAccessorImpl>(value),
         static_cast<StreamInfo::FilterState::StateType>(state_type),
         static_cast<StreamInfo::FilterState::LifeSpan>(life_span),
         static_cast<StreamInfo::StreamSharingMayImpactPooling>(stream_sharing));
   } else {
     auto key_str = std::string(key);
-    auto filter_state = std::make_shared<GoStringFilterState>(value);
+    auto filter_state = std::make_shared<Router::StringAccessorImpl>(value);
     auto weak_ptr = weak_from_this();
     dispatcher_->post(
         [this, weak_ptr, key_str, filter_state, state_type, life_span, stream_sharing] {
@@ -160,9 +162,9 @@ CAPIStatus Filter::getFilterState(absl::string_view key, GoString* value_str) {
     auto go_filter_state = read_callbacks_->connection()
                                .streamInfo()
                                .filterState()
-                               ->getDataReadOnly<GoStringFilterState>(key);
+                               ->getDataReadOnly<Router::StringAccessor>(key);
     if (go_filter_state) {
-      wrapper_->str_value_ = go_filter_state->value();
+      wrapper_->str_value_ = go_filter_state->asString();
       value_str->p = wrapper_->str_value_.data();
       value_str->n = wrapper_->str_value_.length();
     }
@@ -174,9 +176,9 @@ CAPIStatus Filter::getFilterState(absl::string_view key, GoString* value_str) {
         auto go_filter_state = read_callbacks_->connection()
                                    .streamInfo()
                                    .filterState()
-                                   ->getDataReadOnly<GoStringFilterState>(key_str);
+                                   ->getDataReadOnly<Router::StringAccessor>(key_str);
         if (go_filter_state) {
-          wrapper_->str_value_ = go_filter_state->value();
+          wrapper_->str_value_ = go_filter_state->asString();
           value_str->p = wrapper_->str_value_.data();
           value_str->n = wrapper_->str_value_.length();
         }

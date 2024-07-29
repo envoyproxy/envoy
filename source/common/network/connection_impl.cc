@@ -753,7 +753,7 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      setFailureReason(absl::StrCat("delayed connect error: ", error));
+      setFailureReason(absl::StrCat("delayed connect error: ", errorDetails(error)));
       ENVOY_CONN_LOG_EVENT(debug, "connection_error", "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;

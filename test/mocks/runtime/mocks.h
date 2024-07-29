@@ -27,8 +27,8 @@ public:
     } else if (default_value == 100) {
       return true;
     } else {
-      throw std::invalid_argument("Not implemented yet. You may want to set expectation of mocked "
-                                  "featureEnabled() instead.");
+      PANIC("Not implemented yet. You may want to set expectation of mocked"
+            "featureEnabled() instead.");
     }
   }
 

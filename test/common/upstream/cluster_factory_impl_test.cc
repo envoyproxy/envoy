@@ -43,8 +43,10 @@ public:
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
-    return std::make_pair(
-        std::make_shared<CustomStaticCluster>(cluster, context, 1, "127.0.0.1", 80), nullptr);
+    absl::Status creation_status = absl::OkStatus();
+    return std::make_pair(std::make_shared<CustomStaticCluster>(cluster, context, 1, "127.0.0.1",
+                                                                80, creation_status),
+                          nullptr);
   }
 };
 

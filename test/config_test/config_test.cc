@@ -40,7 +40,7 @@ namespace ConfigTest {
 namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
-OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
+OptionsImplBase asConfigYaml(const OptionsImplBase& src, Api::Api& api) {
   return Envoy::Server::createTestOptionsImpl(
       "", api.fileSystem().fileReadToEnd(src.configPath()).value(), src.localAddressIpVersion());
 }
@@ -58,7 +58,8 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 
 class ConfigTest {
 public:
-  ConfigTest(OptionsImpl& options) : api_(Api::createApiForTest(time_system_)), options_(options) {
+  ConfigTest(OptionsImplBase& options)
+      : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -174,7 +175,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  OptionsImpl& options_;
+  OptionsImplBase& options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
       std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
@@ -212,8 +213,8 @@ void testMerge() {
             ]
           }
         })EOF";
-  OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
-                                                    Network::Address::IpVersion::v6));
+  OptionsImplBase options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
+                                                        Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
                   bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
@@ -238,7 +239,7 @@ uint32_t run(const std::string& directory) {
                      [filename](const absl::string_view& s) {
                        return filename.find(std::string(s)) != std::string::npos;
                      }) == unsuported_win32_configs.end()) {
-      OptionsImpl options(
+      OptionsImplBase options(
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -246,7 +247,7 @@ uint32_t run(const std::string& directory) {
                       bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
                       .ok());
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      OptionsImpl config = asConfigYaml(options, *api);
+      OptionsImplBase config = asConfigYaml(options, *api);
       ConfigTest test2(config);
     }
     num_tested++;

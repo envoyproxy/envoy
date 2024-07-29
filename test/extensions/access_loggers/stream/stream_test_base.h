@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/extensions/access_loggers/stream/v3/stream.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -28,7 +30,7 @@ public:
   StreamAccessLogTest() = default;
 
 protected:
-  virtual void runTest(const std::string& yaml, absl::string_view expected, bool is_json) {
+  void runTest(const std::string& yaml, absl::string_view expected, bool is_json) {
     T fal_config;
     TestUtility::loadFromYaml(yaml, fal_config);
 
@@ -64,6 +66,32 @@ protected:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+};
+
+class StreamAccessLogExtensionConfigYamlTest : public testing::Test {
+public:
+  void runTest(std::string yaml, Filesystem::DestinationType expected_file_type) {
+    ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+    ON_CALL(context_.server_factory_context_, accessLogManager())
+        .WillByDefault(ReturnRef(log_manager_));
+    EXPECT_CALL(log_manager_, createAccessLog(_))
+        .WillOnce(
+            Invoke([this, expected_file_type](const Envoy::Filesystem::FilePathAndType& file_info)
+                       -> absl::StatusOr<AccessLog::AccessLogFileSharedPtr> {
+              EXPECT_EQ(file_info.path_, "");
+              EXPECT_EQ(file_info.file_type_, expected_file_type);
+              return file_;
+            }));
+    envoy::config::accesslog::v3::AccessLog access_log;
+    TestUtility::loadFromYamlAndValidate(yaml, access_log);
+    EXPECT_NO_THROW(AccessLog::AccessLogFactory::fromProto(access_log, context_));
+  }
+
+private:
+  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  std::shared_ptr<AccessLog::MockAccessLogFile> file_;
 };
 
 } // namespace

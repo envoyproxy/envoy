@@ -101,8 +101,10 @@ public:
                    .value();
   }
 
-  void validate(const envoy::config::core::v3::Metadata& metadata, const std::string& expected) {
-    auto& factory = matcher_->resolve(&metadata).factory_;
+  void validate(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                const envoy::config::core::v3::Metadata* locality_metadata,
+                const std::string& expected) {
+    auto& factory = matcher_->resolve(endpoint_metadata, locality_metadata).factory_;
     const auto& config_factory = dynamic_cast<const FakeTransportSocketFactory&>(factory);
     EXPECT_EQ(expected, config_factory.id());
   }
@@ -132,7 +134,7 @@ transport_socket:
  )EOF"});
 
   envoy::config::core::v3::Metadata metadata;
-  validate(metadata, "default");
+  validate(&metadata, nullptr, "default");
 
   // Neither the defaults nor matcher support ALPN.
   EXPECT_FALSE(matcher_->allMatchesSupportAlpn());
@@ -218,13 +220,13 @@ filter_metadata:
 )EOF",
                             metadata);
 
-  validate(metadata, "sidecar");
+  validate(&metadata, nullptr, "sidecar");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
   envoy.transport_socket_match: { protocol: "http" }
 )EOF",
                             metadata);
-  validate(metadata, "http");
+  validate(&metadata, nullptr, "http");
 }
 
 TEST_F(TransportSocketMatcherTest, MultipleMatchFirstWin) {
@@ -255,7 +257,7 @@ filter_metadata:
   envoy.transport_socket_match: { sidecar: "true", protocol: "http" }
 )EOF",
                             metadata);
-  validate(metadata, "sidecar_http");
+  validate(&metadata, nullptr, "sidecar_http");
 }
 
 TEST_F(TransportSocketMatcherTest, MatchAllEndpointsFactory) {
@@ -269,13 +271,119 @@ transport_socket:
     id: "match_all"
  )EOF"});
   envoy::config::core::v3::Metadata metadata;
-  validate(metadata, "match_all");
+  validate(&metadata, nullptr, "match_all");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket: { random_label: "random_value" }
+  envoy.transport_socket_match: { random_label: "random_value" }
 )EOF",
                             metadata);
-  validate(metadata, "match_all");
+  validate(&metadata, nullptr, "match_all");
+}
+
+TEST_F(TransportSocketMatcherTest, VerifyNulls) {
+  init({R"EOF(
+name: "match_all"
+match: {}
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "match_all"
+ )EOF"});
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket_match: { whatever: "whatever" }
+)EOF",
+                            metadata);
+
+  validate(nullptr, nullptr, "match_all");
+  validate(&metadata, nullptr, "match_all");
+  validate(nullptr, &metadata, "match_all");
+  validate(&metadata, &metadata, "match_all");
+}
+
+// Test that matching on locality metadata works.
+TEST_F(TransportSocketMatcherTest, LocalityMatching) {
+  init({R"EOF(
+name: "one"
+match:
+  whodis: "one"
+transport_socket:
+  name: "one"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "socket1"
+ )EOF",
+        R"EOF(
+name: "two"
+match:
+  whodis: "two"
+transport_socket:
+  name: "two"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "socket2"
+ )EOF"});
+
+  envoy::config::core::v3::Metadata locality_metadata;
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket_match: { whodis: "two" }
+)EOF",
+                            locality_metadata);
+
+  // The endpoint and locality metadata will match different transport sockets, so let's make sure
+  // that the locality matching works at all.
+  validate(nullptr, &locality_metadata, "socket2");
+}
+
+// Test that the endpoint metadata takes precedence over locality metadata.
+TEST_F(TransportSocketMatcherTest, EndpointMetadataPrecedence) {
+  init({R"EOF(
+name: "endpoint"
+match:
+  whodis: "endpoint"
+transport_socket:
+  name: "endpoint"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "endpoint_match"
+ )EOF",
+        R"EOF(
+name: "locality"
+match:
+  whodis: "locality"
+transport_socket:
+  name: "locality"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "locality_match"
+ )EOF"});
+
+  envoy::config::core::v3::Metadata endpoint_metadata;
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket_match: { whodis: "endpoint" }
+)EOF",
+                            endpoint_metadata);
+
+  envoy::config::core::v3::Metadata locality_metadata;
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket_match: { whodis: "locality" }
+)EOF",
+                            locality_metadata);
+
+  // The endpoint and locality metadata will match to different transport sockets, so let's make
+  // sure that the endpoint metadata is the one that is matched.
+  validate(&endpoint_metadata, &locality_metadata, "endpoint_match");
+
+  // Let's also make sure that this isn't some behavior caused by the ordering of the match
+  // statements. If we present the locality metadata as the endpoint's metadata, it should match on
+  // "locality_match" instead.
+  validate(&locality_metadata, &endpoint_metadata, "locality_match");
 }
 
 } // namespace

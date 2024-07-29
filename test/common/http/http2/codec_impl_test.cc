@@ -17,6 +17,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -765,7 +766,7 @@ TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
   driveToCompletion();
 };
 
-// 104 headers etc. are passed to the response encoder (who is responsibly for deciding to
+// 105 headers etc. are passed to the response encoder (who is responsibly for deciding to
 // upgrade, ignore, etc.).
 TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
   initialize();
@@ -776,7 +777,7 @@ TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
 
-  TestResponseHeaderMapImpl other_headers{{":status", "104"}};
+  TestResponseHeaderMapImpl other_headers{{":status", "105"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(other_headers, false);
   driveToCompletion();
@@ -1462,7 +1463,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   server_->dumpState(ostream, 1);
 
   EXPECT_EQ(memory_test.consumedBytes(), 0);
@@ -1516,7 +1517,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     std::array<char, 2048> buffer;
     OutputBufferStream ostream{buffer.data(), buffer.size()};
     // Check no memory allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     server_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
     // Check contents for active stream, local_end_stream_, trailers to encode and header map.
@@ -1542,7 +1543,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     std::array<char, 2048> buffer;
     OutputBufferStream ostream{buffer.data(), buffer.size()};
     // Check no memory allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     client_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
 
@@ -1582,7 +1583,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
   EXPECT_CALL(request_decoder_, decodeData(_, false)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
     // dumpState here while we had a current slice of data. No Memory should be
     // allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     server_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
   }));
@@ -1627,7 +1628,7 @@ TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithout
     // dumpState here while decodingHeaders in the client. This means we're
     // working on a particular stream, whose corresponding request, we'll dump.
     // No Memory should be allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     client_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
   }));

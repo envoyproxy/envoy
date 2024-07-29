@@ -93,7 +93,8 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
-  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id);
+  Http::FilterHeadersStatus processCachedBucket(size_t bucket_id,
+                                                const RateLimitOnMatchAction& match_action);
   // TODO(tyxia) Build the customized response based on `DenyResponseSettings`.
   void sendDenyResponse() {
     callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt, "");

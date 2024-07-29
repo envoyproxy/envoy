@@ -1,0 +1,13 @@
+#pragma once
+
+// NOLINT(namespace-envoy)
+constexpr char TEST_SAN_DNS_AND_OTHERNAME_CERT_256_HASH[] =
+    "10b81b089fa82a542ef4637cd058e8a8ce9aac13703bc7c0f3b18eecd0bafa01";
+constexpr char TEST_SAN_DNS_AND_OTHERNAME_CERT_1_HASH[] =
+    "b2cdaab75e39c57abb9134271432a15a7078a83c";
+constexpr char TEST_SAN_DNS_AND_OTHERNAME_CERT_SPKI[] =
+    "orMj1YQ0Kw6uh/WkfJ/IITdlgbQTF+Lb1Jj+b6R+J+w=";
+constexpr char TEST_SAN_DNS_AND_OTHERNAME_CERT_SERIAL[] =
+    "39d378e3465eb9c40620527bb9125cce4bd6208a";
+constexpr char TEST_SAN_DNS_AND_OTHERNAME_CERT_NOT_BEFORE[] = "Jun  1 22:21:31 2024 GMT";
+constexpr char TEST_SAN_DNS_AND_OTHERNAME_CERT_NOT_AFTER[] = "Jun  1 22:21:31 2026 GMT";

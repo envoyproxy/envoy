@@ -151,7 +151,7 @@ public:
   NiceMock<Server::MockAdmin>& admin_ = server_context_.admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager>& log_manager_ = server_context_.access_log_manager_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;

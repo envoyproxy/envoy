@@ -9,6 +9,17 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
   cb_(callbacks);
 }
 
+bool ExecuteFilterActionFactory::isSampled(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Envoy::Runtime::Loader& runtime) {
+  if (composite_action.has_sample_percent() &&
+      !runtime.snapshot().featureEnabled(composite_action.sample_percent().runtime_key(),
+                                         composite_action.sample_percent().default_value())) {
+    return false;
+  }
+  return true;
+}
+
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
     const Protobuf::Message& config, Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -66,6 +77,28 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryC
       provider_manager);
 }
 
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbCommon(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
+    bool is_downstream) {
+  const std::string stream_str = is_downstream ? "downstream" : "upstream";
+
+  if (callback == nullptr) {
+    throw EnvoyException(
+        fmt::format("Failed to get {} filter factory creation function", stream_str));
+  }
+  std::string name = composite_action.typed_config().name();
+  ASSERT(context.server_factory_context_ != absl::nullopt);
+  Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+  return [cb = std::move(callback), n = std::move(name),
+          composite_action = std::move(composite_action), &runtime, this]() -> Matcher::ActionPtr {
+    if (!isSampled(composite_action, runtime)) {
+      return nullptr;
+    }
+    return std::make_unique<ExecuteFilterAction>(cb, n);
+  };
+}
+
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbDownstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
@@ -93,14 +126,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
         *message, context.stat_prefix_, context.server_factory_context_.value());
   }
 
-  if (callback == nullptr) {
-    throw EnvoyException("Failed to get downstream filter factory creation function");
-  }
-  std::string name = composite_action.typed_config().name();
-
-  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb, n);
-  };
+  return createActionFactoryCbCommon(composite_action, context, callback, true);
 }
 
 Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbUpstream(
@@ -124,14 +150,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
     callback = callback_or_status.value();
   }
 
-  if (callback == nullptr) {
-    throw EnvoyException("Failed to get upstream filter factory creation function");
-  }
-  std::string name = composite_action.typed_config().name();
-
-  return [cb = std::move(callback), n = std::move(name)]() -> Matcher::ActionPtr {
-    return std::make_unique<ExecuteFilterAction>(cb, n);
-  };
+  return createActionFactoryCbCommon(composite_action, context, callback, false);
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,

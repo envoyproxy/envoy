@@ -55,13 +55,11 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
-                                 headers);
+    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
-                                   headers);
+      populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     }
     break;
   }

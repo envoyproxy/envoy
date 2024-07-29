@@ -46,6 +46,8 @@ public:
 
   virtual bool bypassCorsPreflightRequest() const PURE;
 
+  virtual bool stripFailureResponse() const PURE;
+
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
@@ -79,6 +81,8 @@ public:
   JwtAuthnFilterStats& stats() override { return stats_; }
 
   bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
+
+  bool stripFailureResponse() const override { return proto_config_.strip_failure_response(); }
 
   const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                const StreamInfo::FilterState& filter_state) const override {

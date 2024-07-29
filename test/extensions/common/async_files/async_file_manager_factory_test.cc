@@ -30,7 +30,7 @@ using ::testing::StrictMock;
 class AsyncFileManagerFactoryTest : public ::testing::Test {
 public:
   void SetUp() override {
-    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>(Thread::threadFactoryForTest());
+    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
         .WillRepeatedly(Return(true));

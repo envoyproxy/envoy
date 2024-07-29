@@ -177,9 +177,10 @@ public:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::MockOptions& options)
+                      const Server::MockOptions& options, absl::Status& creation_status)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                            api, options) {
+                            api, options, creation_status) {
+    THROW_IF_NOT_OK(creation_status);
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &TestOverloadManager::createDefaultScaledRangeTimerManager));
@@ -224,9 +225,10 @@ protected:
   }
 
   std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+    absl::Status creation_status = absl::OkStatus();
     return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_,
-                                                 options_);
+                                                 options_, creation_status);
   }
 
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;

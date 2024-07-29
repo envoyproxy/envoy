@@ -18,7 +18,7 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 ReusableFilterFactory::ReusableFilterFactory()
-    : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
+    : addr_(*Network::Address::PipeInstance::create("/test/test.sock")) {
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 

@@ -25,6 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -204,7 +205,7 @@ protected:
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
     return std::make_unique<TestActiveQuicListenerFactory>(
-        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, absl::nullopt);
+        options, /*concurrency=*/1, quic_stat_names_, validation_visitor_, context_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -342,6 +343,7 @@ protected:
                        handshake_timeout_);
   }
 
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   TestScopedRuntime scoped_runtime_;
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
@@ -674,32 +676,34 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
 class ActiveQuicListenerFactoryTest : public testing::Test {
 protected:
   std::unique_ptr<ActiveQuicListenerFactory>
-  createQuicListenerFactory(envoy::config::listener::v3::QuicProtocolOptions options,
-                            ProcessContextOptRef context) {
+  createQuicListenerFactory(envoy::config::listener::v3::QuicProtocolOptions options) {
     return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
-                                                       validation_visitor_, context);
+                                                       validation_visitor_, server_context_);
   }
 
   Stats::SymbolTable symbol_table_;
   QuicStatNames quic_stat_names_ = QuicStatNames(symbol_table_);
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
 };
 
 TEST_F(ActiveQuicListenerFactoryTest, NoDebugVisitorConfigured) {
   envoy::config::listener::v3::QuicProtocolOptions options;
-  auto factory = createQuicListenerFactory(options, std::nullopt);
+  auto factory = createQuicListenerFactory(options);
   EXPECT_EQ(ActiveQuicListenerFactoryPeer::debugVisitorFactory(factory.get()), std::nullopt);
 }
 
 TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   TestProcessObject test_process_object;
   ProcessContextImpl context(test_process_object);
+  EXPECT_CALL(server_context_, processContext())
+      .WillRepeatedly(Return(ProcessContextOptRef(context)));
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
       "envoy.quic.connection_debug_visitor.mock");
   quic_config.mutable_connection_debug_visitor_config()->mutable_typed_config()->PackFrom(
       test::common::config::DummyConfig());
-  auto listener_factory = createQuicListenerFactory(quic_config, context);
+  auto listener_factory = createQuicListenerFactory(quic_config);
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
   EXPECT_TRUE(debug_visitor_factory.has_value());

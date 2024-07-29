@@ -167,7 +167,7 @@ public:
   envoy::config::core::v3::Node last_node_;
 
   // Functions for testing reloadable config (xDS)
-  void createXdsUpstream();
+  virtual void createXdsUpstream();
   void createXdsConnection();
   void cleanUpXdsConnection();
 

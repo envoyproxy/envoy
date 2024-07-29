@@ -420,11 +420,6 @@ config_setting(
 )
 
 config_setting(
-    name = "disable_envoy_mobile_xds",
-    values = {"define": "envoy_mobile_xds=disabled"},
-)
-
-config_setting(
     name = "disable_yaml",
     values = {"define": "envoy_yaml=disabled"},
 )
@@ -474,6 +469,11 @@ selects.config_setting_group(
         ":apple",
         ":disable_hot_restart_setting",
     ],
+)
+
+config_setting(
+    name = "disable_nghttp2",
+    values = {"define": "nghttp2=disabled"},
 )
 
 config_setting(

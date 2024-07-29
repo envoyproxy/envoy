@@ -26,7 +26,7 @@ Upstream::HostSharedPtr CustomStaticCluster::makeHost() {
       Network::Utility::parseInternetAddressNoThrow(address_, port_, true);
   return Upstream::HostSharedPtr{new Upstream::HostImpl(
       info(), "", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(info()->metadata()), 1,
+      std::make_shared<const envoy::config::core::v3::Metadata>(info()->metadata()), nullptr, 1,
       envoy::config::core::v3::Locality::default_instance(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), priority_,
       envoy::config::core::v3::UNKNOWN, time_source_)};

@@ -29,6 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
 
+  // [#next-free-field: 6]
   message EnvoyGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.EnvoyGrpc";
@@ -55,6 +56,12 @@ message GrpcService {
     // This limit is applied to individual messages in the streaming response and not the total size of streaming response.
     // Defaults to 0, which means unlimited.
     google.protobuf.UInt32Value max_receive_message_length = 4;
+
+    // This provides gRPC client level control over envoy generated headers.
+    // If false, the header will be sent but it can be overridden by per stream option.
+    // If true, the header will be removed and can not be overridden by per stream option.
+    // Default to false.
+    bool skip_envoy_headers = 5;
   }
 
   // [#next-free-field: 9]

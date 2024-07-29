@@ -13,8 +13,7 @@ using ::testing::ReturnRef;
 
 MockInstance::MockInstance()
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(admin_.getConfigTracker())),
-      cluster_manager_(timeSource()),
-      singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
+      cluster_manager_(timeSource()), singleton_manager_(new Singleton::ManagerImpl()),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), quic_stat_names_(stats_store_.symbolTable()),
       stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),

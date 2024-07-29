@@ -114,6 +114,8 @@ public:
   COUNTER(credential_refreshes_performed)                                                          \
   COUNTER(credential_refreshes_failed)                                                             \
   COUNTER(credential_refreshes_succeeded)                                                          \
+  COUNTER(clusters_removed_by_cds)                                                                 \
+  COUNTER(clusters_readded_after_cds)                                                              \
   GAUGE(metadata_refresh_state, Accumulate)
 
 struct MetadataCredentialsProviderStats {
@@ -139,6 +141,9 @@ public:
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
+
+private:
+  void createCluster(bool new_timer);
 
 protected:
   struct LoadClusterEntryHandleImpl
@@ -236,6 +241,8 @@ protected:
   Stats::ScopeSharedPtr scope_ = nullptr;
   // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
+  // Atomic flag for cluster recreate
+  std::atomic<bool> is_creating_ = false;
 };
 
 /**

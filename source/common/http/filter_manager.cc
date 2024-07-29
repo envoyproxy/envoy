@@ -281,32 +281,7 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
   if (current_route == nullptr) {
     return nullptr;
   }
-
-  auto* result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
-
-  /**
-   * If:
-   * 1. no per filter config is found for the filter config name.
-   * 2. filter config name is different from the filter canonical name.
-   * 3. downgrade feature is not disabled.
-   * we fallback to use the filter canonical name.
-   */
-  if (result == nullptr && !parent_.no_downgrade_to_canonical_name_ &&
-      filter_context_.filter_name != filter_context_.config_name) {
-    // Fallback to use filter canonical name.
-    result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
-
-    if (result != nullptr) {
-      ENVOY_LOG_FIRST_N(
-          warn, 10,
-          "No per filter config is found by filter config name \"{}\" and fallback to use "
-          "filter canonical name \"{}\". This is deprecated and will be forbidden very "
-          "soon. Please use the filter config name to index per filter config. See "
-          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
-          filter_context_.config_name, filter_context_.filter_name);
-    }
-  }
-  return result;
+  return current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 }
 
 void ActiveStreamFilterBase::traversePerFilterConfig(
@@ -316,30 +291,9 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
     return;
   }
 
-  bool handled = false;
   current_route->traversePerFilterConfig(
       filter_context_.config_name,
-      [&handled, &cb](const Router::RouteSpecificFilterConfig& config) {
-        handled = true;
-        cb(config);
-      });
-
-  if (handled || parent_.no_downgrade_to_canonical_name_ ||
-      filter_context_.filter_name == filter_context_.config_name) {
-    return;
-  }
-
-  current_route->traversePerFilterConfig(
-      filter_context_.filter_name, [&cb, this](const Router::RouteSpecificFilterConfig& config) {
-        ENVOY_LOG_FIRST_N(
-            warn, 10,
-            "No per filter config is found by filter config name \"{}\" and fallback to use "
-            "filter canonical name \"{}\". This is deprecated and will be forbidden very "
-            "soon. Please use the filter config name to index per filter config. See "
-            "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
-            filter_context_.config_name, filter_context_.filter_name);
-        cb(config);
-      });
+      [&cb](const Router::RouteSpecificFilterConfig& config) { cb(config); });
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
@@ -1789,15 +1743,12 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
 
 void FilterManager::resetStream(StreamResetReason reason,
                                 absl::string_view transport_failure_reason) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.abort_filter_chain_on_stream_reset")) {
-    // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
-    // are running.
-    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
-      state_.decoder_filter_chain_aborted_ = true;
-    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
-      state_.encoder_filter_chain_aborted_ = true;
-    }
+  // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
+  // are running.
+  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    state_.decoder_filter_chain_aborted_ = true;
+  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+    state_.encoder_filter_chain_aborted_ = true;
   }
 
   filter_manager_callbacks_.resetStream(reason, transport_failure_reason);

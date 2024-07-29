@@ -485,3 +485,4 @@ and security team to ensure they still qualify for inclusion on the list.
 | Apple         | Yes      | 05/21       |
 | Spotify       | Yes      | 06/21       |
 | Netflix       | Yes      | 06/22       |
+| Slack         | Yes      | 07/24       |

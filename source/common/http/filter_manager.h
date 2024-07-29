@@ -646,9 +646,8 @@ public:
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
-        filter_chain_factory_(filter_chain_factory),
-        no_downgrade_to_canonical_name_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.no_downgrade_to_canonical_name")) {}
+        filter_chain_factory_(filter_chain_factory) {}
+
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -1084,8 +1083,6 @@ private:
   // clang-format on
 
   State state_;
-
-  const bool no_downgrade_to_canonical_name_{};
 };
 
 // The DownstreamFilterManager has explicit handling to send local replies.

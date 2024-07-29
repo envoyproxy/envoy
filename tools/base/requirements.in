@@ -2,6 +2,7 @@ abstracts>=0.0.12
 aio.api.bazel
 aio.api.github>=0.2.5
 aio.core>=0.10.2
+aiodocker>=0.22.2
 aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
@@ -26,19 +27,20 @@ gitpython
 gsutil
 icalendar
 jinja2
+kafka-python-ng
 multidict>=6.0.2
 orjson
 pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<4.26.0
+protobuf<5.28.0
 pygithub
 pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7,<7.4
+sphinx>=7,<7.5
 sphinxcontrib-applehelp>=1.0.8
 sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics

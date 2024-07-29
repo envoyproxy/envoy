@@ -40,7 +40,6 @@ public:
   static const std::string&
   protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
   static const absl::optional<std::string> getHostname();
-  static const std::string getHostnameOrDefault();
 
   /**
    * Unspecified value for protobuf.

@@ -58,7 +58,7 @@ void UberFilterFuzzer::fuzzerSetup() {
   factory_context_.prepareSimulatedSystemTime();
 
   // Prepare address for filters such as ext_authz filter.
-  pipe_addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+  pipe_addr_ = *Network::Address::PipeInstance::create("/test/test.sock");
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 
   // Set featureEnabled for mongo_proxy

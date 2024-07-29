@@ -254,6 +254,7 @@ public:
               (const));
 
   MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
+  MOCK_METHOD(void, onFirstPacketReceived, (const quic::QuicReceivedPacket&));
 };
 
 #endif

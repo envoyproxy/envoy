@@ -238,7 +238,7 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
-    ProcessContextOptRef context)
+    Server::Configuration::ServerFactoryContext& context)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
@@ -294,7 +294,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
         Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryInterface>(
             config.connection_debug_visitor_config());
     if (connection_debug_visitor_factory_.has_value()) {
-      connection_debug_visitor_factory_->setContext(context_);
+      connection_debug_visitor_factory_->setContext(context_.processContext());
     }
   }
 

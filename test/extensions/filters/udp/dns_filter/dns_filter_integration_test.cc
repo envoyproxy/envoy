@@ -134,6 +134,13 @@ listener_filters:
                 - cluster_name: "cluster_0"
                   weight: 20
                   priority: 10
+        - name: "*.foo1.com"
+          endpoint:
+            address_list:
+              address:
+              - 10.10.0.1
+              - 10.10.0.2
+              - 10.10.0.3
 )EOF",
                               addr->ip()->addressAsString(), addr->ip()->addressAsString(),
                               addr->ip()->port());
@@ -400,6 +407,24 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTe
   }
 
   EXPECT_EQ(endpoints, ports.size());
+}
+
+TEST_P(DnsFilterIntegrationTest, WildcardLookupTest) {
+  setup(0);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::UdpRecvData response;
+  std::string query =
+      Utils::buildQueryForDomain("wild.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+
+  EXPECT_EQ(3, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 } // namespace
 } // namespace DnsFilter

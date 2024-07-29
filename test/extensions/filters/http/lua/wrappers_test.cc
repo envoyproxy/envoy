@@ -396,14 +396,19 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnRequestedServerName) {
 
 // Set, get and iterate stream info dynamic metadata.
 TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
-  const std::string SCRIPT{R"EOF(
+  const std::string SCRIPT{
+      R"EOF(
       function callMe(object)
         testPrint(type(object:dynamicMetadata()))
         object:dynamicMetadata():set("envoy.lb", "foo", "bar")
         object:dynamicMetadata():set("envoy.lb", "so", "cool")
+        object:dynamicMetadata():set("envoy.lb", "nothing", nil)
 
         testPrint(object:dynamicMetadata():get("envoy.lb")["foo"])
         testPrint(object:dynamicMetadata():get("envoy.lb")["so"])
+        if object:dynamicMetadata():get("envoy.lb")["nothing"] == nil then
+          testPrint("yes")
+        end
 
         for filter, entry in pairs(object:dynamicMetadata()) do
           for key, value in pairs(entry) do
@@ -430,6 +435,7 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   EXPECT_CALL(printer_, testPrint("cool"));
   EXPECT_CALL(printer_, testPrint("'foo' 'bar'"));
   EXPECT_CALL(printer_, testPrint("'so' 'cool'"));
+  EXPECT_CALL(printer_, testPrint("yes"));
   EXPECT_CALL(printer_, testPrint("0"));
   start("callMe");
 
@@ -440,6 +446,12 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
                        .fields()
                        .at("foo")
                        .string_value());
+  EXPECT_TRUE(stream_info.dynamicMetadata()
+                  .filter_metadata()
+                  .at("envoy.lb")
+                  .fields()
+                  .at("nothing")
+                  .has_null_value());
   wrapper.reset();
 }
 

@@ -1258,13 +1258,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        EXPECT_EQ(default_route->routeEntry()->virtualCluster(test_req_headers),
-                  delegating_route_foo->routeEntry()->virtualCluster(test_req_headers));
+        EXPECT_EQ(default_route->virtualHost().virtualCluster(test_req_headers),
+                  delegating_route_foo->virtualHost().virtualCluster(test_req_headers));
 
-        EXPECT_EQ(default_route->routeEntry()->virtualHost().corsPolicy(),
-                  delegating_route_foo->routeEntry()->virtualHost().corsPolicy());
-        EXPECT_EQ(default_route->routeEntry()->virtualHost().rateLimitPolicy().empty(),
-                  delegating_route_foo->routeEntry()->virtualHost().rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->virtualHost().corsPolicy(),
+                  delegating_route_foo->virtualHost().corsPolicy());
+        EXPECT_EQ(default_route->virtualHost().rateLimitPolicy().empty(),
+                  delegating_route_foo->virtualHost().rateLimitPolicy().empty());
 
         EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
                   delegating_route_foo->routeEntry()->autoHostRewrite());

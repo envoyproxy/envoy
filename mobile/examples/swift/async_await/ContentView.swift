@@ -12,6 +12,9 @@ private struct ContentRow: Identifiable {
 private extension EngineBuilder {
     static let demoEngine = EngineBuilder()
         .setLogLevel(.debug)
+        .setLogger { _, msg in
+            print(msg, terminator: "")
+        }
         .build()
 }
 
@@ -88,6 +91,15 @@ private extension StreamClient {
                     .joined(separator: "\n")
 
                 logger("Upload failed.\nHeaders: \(headerMessage)")
+            }
+            .setOnError { error, _ in
+                let message: String
+                if let attemptCount = error.attemptCount {
+                    message = "Failed after \(attemptCount) attempt(s) with error: \(error.message)"
+                } else {
+                    message = "Failed with error: \(error.message)"
+                }
+                logger(message)
             }
             .start(queue: .networking)
 

@@ -2,6 +2,8 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/filter_state_proxy_info.h"
@@ -97,6 +99,8 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
                                          Network::ProxyResolverApi* proxy_resolver) {
+  RELEASE_ASSERT(Thread::MainThread::isMainOrTestThread(),
+                 "NetworkConfigurationProxy::resolveProxy not running on main thread.");
   ASSERT(proxy_resolver != nullptr, "proxy_resolver must not be null.");
 
   const std::string target_url = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
@@ -105,23 +109,16 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
       target_url, proxy_settings_,
       [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
+        RELEASE_ASSERT(
+            Thread::MainThread::isMainOrTestThread(),
+            "NetworkConfigurationProxy PAC proxy resolver callback not running on main thread.");
         // This is the callback invoked from the Apple APIs resolving the PAC file URL, which
-        // happens on a separate Apple run loop thread. We keep a weak_ptr to this filter instance
+        // gets invoked on the Envoy thread. We keep a weak_ptr to this filter instance
         // so that, if the stream is canceled and the filter chain is torn down in the meantime,
         // we will fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
         // proxies.
-        if (auto caller_ptr = weak_self.lock()) {
-          Network::ProxySettingsConstSharedPtr proxy_settings =
-              Network::ProxySettings::create(proxies);
-          // We are currently in the main thread, so post the proxy resolution callback to the
-          // worker thread's (i.e. the Engine thread) dispatcher.
-          caller_ptr->decoder_callbacks_->dispatcher().post([&weak_self, proxy_settings]() {
-            // Again, the stream may have been canceled in the interim, so try aquiring the
-            // filter through its weak_ptr before proceding with the proxy resolution callback.
-            if (auto filter_ptr = weak_self.lock()) {
-              filter_ptr->onProxyResolutionComplete(proxy_settings);
-            }
-          });
+        if (auto filter_ptr = weak_self.lock()) {
+          filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));
         }
       });
 

@@ -4,6 +4,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
+#include "source/common/http/http2/nghttp2.h"
 #include "source/server/proto_descriptors.h"
 
 namespace Envoy {
@@ -37,6 +38,7 @@ ProcessWide::ProcessWide(bool validate_proto_descriptors) {
 #else
     UNREFERENCED_PARAMETER(validate_proto_descriptors);
 #endif
+    Http::Http2::initializeNghttp2Logging();
 
     // We do not initialize Google gRPC here -- we instead instantiate
     // Grpc::GoogleGrpcContext in MainCommon immediately after instantiating

@@ -57,7 +57,7 @@ resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return std::make_shared<PipeInstance>(address.pipe().path(), address.pipe().mode());
+    return PipeInstance::create(address.pipe().path(), address.pipe().mode());
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
     switch (address.envoy_internal_address().address_name_specifier_case()) {
     case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::

@@ -15,11 +15,16 @@ namespace Upstream {
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                       ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
-
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+  static absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
+  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+         Network::DnsResolverSharedPtr dns_resolver);
+
+protected:
+  StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                       ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
+                       absl::Status& creation_status);
 
 private:
   struct ResolveTarget {

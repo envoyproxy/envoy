@@ -69,9 +69,9 @@ def kotlin_repos():
 
     http_archive(
         name = "rules_detekt",
-        sha256 = "44912c74dc2e164227b1102ef36227d0e78fdbd7c7359868ae13424eb4f0d5c2",
-        strip_prefix = "bazel_rules_detekt-0.6.0",
-        url = "https://github.com/buildfoundation/bazel_rules_detekt/archive/v0.6.0.tar.gz",
+        sha256 = "91837e301379c105ff4565ca822f6a6b30531f0b2ab6e75bbaf74e64f7d6879c",
+        strip_prefix = "bazel_rules_detekt-0.8.1.2",
+        url = "https://github.com/buildfoundation/bazel_rules_detekt/archive/v0.8.1.2.tar.gz",
     )
 
     http_archive(

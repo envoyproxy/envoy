@@ -105,6 +105,7 @@ public:
   MOCK_METHOD(void, onStreamFailure,
               (ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
                Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, resetIdleTimer, ());
 };
 
 } // namespace SessionFilters

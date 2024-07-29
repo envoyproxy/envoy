@@ -6,8 +6,8 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/utility.h"
 #include "source/common/tls/client_ssl_socket.h"
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/config/utility.h"
@@ -102,8 +102,8 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      tls_context, mock_factory_ctx);
+  auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context,
+                                                                                 mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
       THROW_OR_RETURN_VALUE(Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
@@ -118,8 +118,8 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, mock_factory_ctx);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, mock_factory_ctx, false);
 
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
@@ -151,8 +151,8 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
   tls_cert->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
       fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name)));
 
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context, false);
 
   static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(

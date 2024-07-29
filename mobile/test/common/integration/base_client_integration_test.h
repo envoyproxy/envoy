@@ -46,9 +46,9 @@ public:
   void TearDown();
 
 protected:
-  envoy_engine_t rawEngine() {
+  InternalEngine* internalEngine() {
     absl::MutexLock l(&engine_lock_);
-    return reinterpret_cast<envoy_engine_t>(engine_->engine_);
+    return engine_->engine_;
   }
   void initialize() override;
   Platform::StreamSharedPtr createNewStream(EnvoyStreamCallbacks&& stream_callbacks);

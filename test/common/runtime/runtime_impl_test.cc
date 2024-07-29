@@ -577,7 +577,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 
   // Test that Quiche flags can be overwritten via Envoy runtime config.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: "
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true: "
       "true");
   setup();
 
@@ -586,7 +586,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 
   // Test that Quiche flags can be overwritten again.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: "
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true: "
       "false");
   setup();
 

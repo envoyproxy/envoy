@@ -863,9 +863,14 @@ private:
           listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
+        if (context_ == nullptr) {
+          // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
+          context_ = std::make_unique<
+              testing::NiceMock<Server::Configuration::MockServerFactoryContext>>();
+        }
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
-            absl::nullopt);
+            *context_);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else
@@ -926,6 +931,7 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const Network::ListenerInfoConstSharedPtr listener_info_;
+    std::unique_ptr<Server::Configuration::MockServerFactoryContext> context_;
   };
 
   void threadRoutine();
@@ -965,6 +971,7 @@ private:
   // Setting this true disables all events and does not re-enable as the above does.
   bool disable_and_do_not_enable_{};
   const bool enable_half_close_;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
@@ -972,7 +979,6 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif

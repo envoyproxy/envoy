@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -168,7 +168,7 @@ message Cluster {
     // The name of the match, used in stats generation.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Optional endpoint metadata match criteria.
+    // Optional metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
     // will use the transport socket configuration specified here.
     // The endpoint's metadata entry in ``envoy.transport_socket_match`` is used to match
@@ -754,12 +754,14 @@ message Cluster {
 
   reserved "hosts", "tls_context", "extension_protocol_options";
 
-  // Configuration to use different transport sockets for different endpoints.
-  // The entry of ``envoy.transport_socket_match`` in the
-  // :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`
-  // is used to match against the transport sockets as they appear in the list. The first
-  // :ref:`match <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>` is used.
-  // For example, with the following match
+  // Configuration to use different transport sockets for different endpoints. The entry of
+  // ``envoy.transport_socket_match`` in the :ref:`LbEndpoint.Metadata
+  // <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` is used to match against the
+  // transport sockets as they appear in the list. If a match is not found, the search continues in
+  // :ref:`LocalityLbEndpoints.Metadata
+  // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`. The first :ref:`match
+  // <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>` is used. For example, with
+  // the following match
   //
   // .. code-block:: yaml
   //
@@ -783,8 +785,9 @@ message Cluster {
   // socket match in case above.
   //
   // If an endpoint metadata's value under ``envoy.transport_socket_match`` does not match any
-  // ``TransportSocketMatch``, socket configuration fallbacks to use the ``tls_context`` or
-  // ``transport_socket`` specified in this cluster.
+  // ``TransportSocketMatch``, the locality metadata is then checked for a match. Barring any
+  // matches in the endpoint or locality metadata, the socket configuration fallbacks to use the
+  // ``tls_context`` or ``transport_socket`` specified in this cluster.
   //
   // This field allows gradual and flexible transport socket configuration changes.
   //
@@ -1147,6 +1150,22 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.v3.ConfigSource lrs_server = 42;
+
+  // [#not-implemented-hide:]
+  // A list of metric names from ORCA load reports to propagate to LRS.
+  //
+  // For map fields in the ORCA proto, the string will be of the form ``<map_field_name>.<map_key>``.
+  // For example, the string ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA
+  // ``named_metrics`` field.
+  //
+  // The special map key ``*`` means to report all entries in the map (e.g., ``named_metrics.*`` means to
+  // report all entries in the ORCA named_metrics field). Note that this should be used only with trusted
+  // backends.
+  //
+  // The metric names in LRS will follow the same semantics as this field. In other words, if this field
+  // contains ``named_metrics.foo``, then the LRS load report will include the data with that same string
+  // as the key.
+  repeated string lrs_report_endpoint_metrics = 57;
 
   // If track_timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each

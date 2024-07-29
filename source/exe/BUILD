@@ -215,6 +215,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
+        "//source/common/http/http2:nghttp2_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/server:proto_descriptors_lib",
     ],

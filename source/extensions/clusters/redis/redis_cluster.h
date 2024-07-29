@@ -90,12 +90,12 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
-               const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
-               Upstream::ClusterFactoryContext& context,
-               NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Network::DnsResolverSharedPtr dns_resolver,
-               ClusterSlotUpdateCallBackSharedPtr factory);
+  static absl::StatusOr<std::unique_ptr<RedisCluster>>
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+         Upstream::ClusterFactoryContext& context,
+         NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+         Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
@@ -116,8 +116,20 @@ public:
 
   TimeSource& timeSource() const { return time_source_; }
 
+protected:
+  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
+               const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+               Upstream::ClusterFactoryContext& context,
+               NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+               Network::DnsResolverSharedPtr dns_resolver,
+               ClusterSlotUpdateCallBackSharedPtr factory, absl::Status& creation_status);
+
 private:
+  friend class RedisClusterFactory;
   friend class RedisClusterTest;
+
+  friend class RedisClusterTest;
+  friend class RedisClsuterFactory;
 
   void startPreInit() override;
 
@@ -148,6 +160,8 @@ private:
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
               std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
+              std::make_shared<envoy::config::core::v3::Metadata>(
+                  parent.localityLbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),

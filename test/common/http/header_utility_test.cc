@@ -1265,6 +1265,28 @@ TEST(HeaderAddTest, HeaderAdd) {
   });
 }
 
+void headerNameIsValid() {
+  // Isn't valid but passes legacy checks.
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid(":"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid("::"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid("\n"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid(":\n"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid("asd\n"));
+
+  EXPECT_TRUE(HeaderUtility::headerNameIsValid("asd"));
+  // Not actually valid but passes legacy Envoy checks.
+  EXPECT_TRUE(HeaderUtility::headerNameIsValid(":asd"));
+}
+
+TEST(HeaderIsValidTest, HeaderNameIsValid) { headerNameIsValid(); }
+
+TEST(HeaderIsValidTest, HeaderNameIsValidLegacy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sanitize_http2_headers_without_nghttp2", "false"}});
+  headerNameIsValid();
+}
+
 TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {
   EXPECT_FALSE(HeaderUtility::headerNameContainsUnderscore("cookie"));
   EXPECT_FALSE(HeaderUtility::headerNameContainsUnderscore("x-something"));

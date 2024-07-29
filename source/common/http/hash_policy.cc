@@ -82,7 +82,11 @@ public:
   CookieHashMethod(const std::string& key, const std::string& path,
                    const absl::optional<std::chrono::seconds>& ttl, bool terminal,
                    const CookieAttributeRefVector attributes)
-      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl), attributes_(attributes) {}
+      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl) {
+    for (const auto& attribute : attributes) {
+      attributes_.push_back(attribute);
+    }
+  }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
@@ -91,7 +95,11 @@ public:
     absl::optional<uint64_t> hash;
     std::string value = Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
-      value = add_cookie(key_, path_, ttl_.value(), attributes_);
+      CookieAttributeRefVector attributes;
+      for (const auto& attribute : attributes_) {
+        attributes.push_back(attribute);
+      }
+      value = add_cookie(key_, path_, ttl_.value(), attributes);
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -104,7 +112,7 @@ private:
   const std::string key_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
-  const CookieAttributeRefVector attributes_;
+  std::vector<CookieAttribute> attributes_;
 };
 
 class IpHashMethod : public HashMethodImplBase {

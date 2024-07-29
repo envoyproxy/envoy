@@ -174,7 +174,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), errorDetails(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
-    throw EnvoyException(msg);
+    throwEnvoyExceptionOrPanic(msg);
   }
 
   return std::make_pair(sock->connectionInfoProvider().localAddress(), std::move(sock));

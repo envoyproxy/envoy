@@ -118,7 +118,7 @@ The community has implemented a :ref:`dubbo codec <envoy_v3_api_msg_extensions.f
 generic proxy. The dubbo codec is a good example showing how to implement a new codec for new protocol because of its moderate complexity.
 
 
-You could find the dubbo codec implementation in :repo:`contrib/generic_proxy/filters/network/source/codecs/dubbo` directory. You can also configure the
+You could find the dubbo codec implementation in :repo:`source/extensions/filters/network/generic_proxy/codecs/dubbo` directory. You can also configure the
 dubbo codec in the generic proxy with the following configuration:
 
 

@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
@@ -42,8 +42,8 @@ message OutlierDetection {
   // Defaults to 30000ms or 30s.
   google.protobuf.Duration base_ejection_time = 3 [(validate.rules).duration = {gt {}}];
 
-  // The maximum % of an upstream cluster that can be ejected due to outlier
-  // detection. Defaults to 10% but will eject at least one host regardless of the value.
+  // The maximum % of an upstream cluster that can be ejected due to outlier detection. Defaults to 10% .
+  // Will eject at least one host regardless of the value if :ref:`always_eject_one_host<envoy_v3_api_field_config.cluster.v3.OutlierDetection.always_eject_one_host>` is enabled.
   google.protobuf.UInt32Value max_ejection_percent = 4 [(validate.rules).uint32 = {lte: 100}];
 
   // The % chance that a host will be actually ejected when an outlier status
@@ -173,4 +173,8 @@ message OutlierDetection {
   // Set of host's passive monitors.
   // [#not-implemented-hide:]
   repeated core.v3.TypedExtensionConfig monitors = 24;
+
+  // If enabled, at least one host is ejected regardless of the value of :ref:`max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`.
+  // Defaults to false.
+  google.protobuf.BoolValue always_eject_one_host = 25;
 }

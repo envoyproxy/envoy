@@ -69,14 +69,6 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   return hostname;
 }
 
-const std::string SubstitutionFormatUtils::getHostnameOrDefault() {
-  absl::optional<std::string> hostname = getHostname();
-  if (hostname.has_value()) {
-    return hostname.value();
-  }
-  return DefaultUnspecifiedValueString;
-}
-
 const ProtobufWkt::Value& SubstitutionFormatUtils::unspecifiedValue() {
   return ValueUtil::nullValue();
 }

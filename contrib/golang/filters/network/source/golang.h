@@ -117,15 +117,6 @@ public:
   std::string str_value_;
 };
 
-class GoStringFilterState : public StreamInfo::FilterState::Object {
-public:
-  GoStringFilterState(absl::string_view value) : value_(value) {}
-  const std::string& value() const { return value_; }
-
-private:
-  const std::string value_;
-};
-
 } // namespace Golang
 } // namespace NetworkFilters
 } // namespace Extensions

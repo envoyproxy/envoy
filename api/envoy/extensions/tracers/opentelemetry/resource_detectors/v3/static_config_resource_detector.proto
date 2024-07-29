@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.tracers.opentelemetry.resource_detectors.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.resource_detectors.v3";
+option java_outer_classname = "StaticConfigResourceDetectorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/resource_detectors/v3;resource_detectorsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Static Config Resource Detector config]
+
+// Configuration for the Static Resource detector extension.
+// The resource detector uses static config for resource attribute,
+// as per the OpenTelemetry specification.
+//
+// [#extension: envoy.tracers.opentelemetry.resource_detectors.static_config]
+message StaticConfigResourceDetectorConfig {
+  // Custom Resource attributes to be included.
+  map<string, string> attributes = 1;
+}

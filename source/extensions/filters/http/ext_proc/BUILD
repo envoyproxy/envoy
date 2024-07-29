@@ -64,6 +64,7 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/http:sidestream_watermark_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],

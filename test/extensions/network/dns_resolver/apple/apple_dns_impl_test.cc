@@ -108,73 +108,74 @@ public:
                                           const DnsResolver::ResolutionStatus expected_status,
                                           const bool expected_results,
                                           const bool exit_dispatcher = true) {
-    return resolver_->resolve(
-        address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          EXPECT_EQ(expected_status, status);
-          if (expected_results) {
-            EXPECT_FALSE(results.empty());
-            absl::optional<bool> is_v4{};
-            for (const auto& result : results) {
-              const auto& addrinfo = result.addrInfo();
-              switch (lookup_family) {
-              case DnsLookupFamily::V4Only:
-                EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv4());
-                break;
-              case DnsLookupFamily::V6Only:
-                EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv6());
-                break;
-              // In CI these modes could return either IPv4 or IPv6 with the non-mocked API calls.
-              // But regardless of the family all returned addresses need to be one _or_ the other.
-              case DnsLookupFamily::V4Preferred:
-              case DnsLookupFamily::Auto:
-                // Set the expectation for subsequent responses based on the first one.
-                if (!is_v4.has_value()) {
-                  if (addrinfo.address_->ip()->ipv4()) {
-                    is_v4 = true;
-                  } else {
-                    is_v4 = false;
-                  }
-                }
+    return resolver_->resolve(address, lookup_family,
+                              [=](DnsResolver::ResolutionStatus status, absl::string_view,
+                                  std::list<DnsResponse>&& results) -> void {
+                                EXPECT_EQ(expected_status, status);
+                                if (expected_results) {
+                                  EXPECT_FALSE(results.empty());
+                                  absl::optional<bool> is_v4{};
+                                  for (const auto& result : results) {
+                                    const auto& addrinfo = result.addrInfo();
+                                    switch (lookup_family) {
+                                    case DnsLookupFamily::V4Only:
+                                      EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv4());
+                                      break;
+                                    case DnsLookupFamily::V6Only:
+                                      EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv6());
+                                      break;
+                                    // In CI these modes could return either IPv4 or IPv6 with the
+                                    // non-mocked API calls. But regardless of the family all
+                                    // returned addresses need to be one _or_ the other.
+                                    case DnsLookupFamily::V4Preferred:
+                                    case DnsLookupFamily::Auto:
+                                      // Set the expectation for subsequent responses based on the
+                                      // first one.
+                                      if (!is_v4.has_value()) {
+                                        if (addrinfo.address_->ip()->ipv4()) {
+                                          is_v4 = true;
+                                        } else {
+                                          is_v4 = false;
+                                        }
+                                      }
 
-                if (is_v4.value()) {
-                  EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv4());
-                } else {
-                  EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv6());
-                }
-                break;
-              // All could be either IPv4 or IPv6.
-              case DnsLookupFamily::All:
-                if (addrinfo.address_->ip()->ipv4()) {
-                  EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv4());
-                } else {
-                  EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv6());
-                }
-                break;
-              default:
-                PANIC("reached unexpected code");
-              }
-            }
-          } else {
-            EXPECT_TRUE(results.empty());
-          }
-          if (exit_dispatcher) {
-            dispatcher_->exit();
-          }
-        });
+                                      if (is_v4.value()) {
+                                        EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv4());
+                                      } else {
+                                        EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv6());
+                                      }
+                                      break;
+                                    // All could be either IPv4 or IPv6.
+                                    case DnsLookupFamily::All:
+                                      if (addrinfo.address_->ip()->ipv4()) {
+                                        EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv4());
+                                      } else {
+                                        EXPECT_NE(nullptr, addrinfo.address_->ip()->ipv6());
+                                      }
+                                      break;
+                                    default:
+                                      PANIC("reached unexpected code");
+                                    }
+                                  }
+                                } else {
+                                  EXPECT_TRUE(results.empty());
+                                }
+                                if (exit_dispatcher) {
+                                  dispatcher_->exit();
+                                }
+                              });
   }
 
   ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
                                                     const DnsLookupFamily lookup_family,
                                                     bool expected_to_execute) {
     return resolver_->resolve(address, lookup_family,
-                              [expected_to_execute](DnsResolver::ResolutionStatus status,
-                                                    std::list<DnsResponse>&& results) -> void {
+                              [expected_to_execute](DnsResolver::ResolutionStatus,
+                                                    absl::string_view,
+                                                    std::list<DnsResponse>&&) -> void {
                                 if (!expected_to_execute) {
                                   FAIL();
                                 }
-                                UNREFERENCED_PARAMETER(status);
-                                UNREFERENCED_PARAMETER(results);
                               });
   }
 
@@ -182,9 +183,7 @@ public:
                                        const DnsLookupFamily lookup_family) {
     return resolver_->resolve(
         address, lookup_family,
-        [](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          UNREFERENCED_PARAMETER(status);
-          UNREFERENCED_PARAMETER(results);
+        [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) -> void {
           throw EnvoyException("Envoy exception");
         });
   }
@@ -332,18 +331,18 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionAllSupportsV4Only) {
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionAllSupportsV6Only) {
-  auto* dns_query = resolver_->resolve(
-      "ipv6.google.com", DnsLookupFamily::All,
-      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-        // On v4 only networks, there will be no results.
-        for (const auto& result : results) {
-          const auto& addrinfo = result.addrInfo();
-          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
-          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
-        }
-        dispatcher_->exit();
-      });
+  auto* dns_query = resolver_->resolve("ipv6.google.com", DnsLookupFamily::All,
+                                       [=](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                         EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                         // On v4 only networks, there will be no results.
+                                         for (const auto& result : results) {
+                                           const auto& addrinfo = result.addrInfo();
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+                                         }
+                                         dispatcher_->exit();
+                                       });
   EXPECT_THAT(dns_query, NotNull());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -361,34 +360,34 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4OnlySupportsV6Only) {
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6OnlySupportsV4Only) {
-  auto* dns_query = resolver_->resolve(
-      "ipv4.google.com", DnsLookupFamily::V6Only,
-      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-        for (const auto& result : results) {
-          const auto& addrinfo = result.addrInfo();
-          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
-          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
-        }
-        dispatcher_->exit();
-      });
+  auto* dns_query = resolver_->resolve("ipv4.google.com", DnsLookupFamily::V6Only,
+                                       [=](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                         EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                         for (const auto& result : results) {
+                                           const auto& addrinfo = result.addrInfo();
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+                                         }
+                                         dispatcher_->exit();
+                                       });
   EXPECT_THAT(dns_query, NotNull());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6OnlySupportsV6Only) {
-  auto* dns_query = resolver_->resolve(
-      "ipv6.google.com", DnsLookupFamily::V6Only,
-      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-        EXPECT_FALSE(results.empty());
-        for (const auto& result : results) {
-          const auto& addrinfo = result.addrInfo();
-          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
-          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
-        }
-        dispatcher_->exit();
-      });
+  auto* dns_query = resolver_->resolve("ipv6.google.com", DnsLookupFamily::V6Only,
+                                       [=](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                         EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                         EXPECT_FALSE(results.empty());
+                                         for (const auto& result : results) {
+                                           const auto& addrinfo = result.addrInfo();
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+                                         }
+                                         dispatcher_->exit();
+                                       });
   EXPECT_THAT(dns_query, NotNull());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -400,18 +399,18 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionAutoSupportsV4Only) {
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionAutoSupportsV6Only) {
-  auto* dns_query = resolver_->resolve(
-      "ipv6.google.com", DnsLookupFamily::Auto,
-      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-        // On v4 only networks, there will be no results.
-        for (const auto& result : results) {
-          const auto& addrinfo = result.addrInfo();
-          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
-          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
-        }
-        dispatcher_->exit();
-      });
+  auto* dns_query = resolver_->resolve("ipv6.google.com", DnsLookupFamily::Auto,
+                                       [=](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                         EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                         // On v4 only networks, there will be no results.
+                                         for (const auto& result : results) {
+                                           const auto& addrinfo = result.addrInfo();
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+                                         }
+                                         dispatcher_->exit();
+                                       });
   EXPECT_THAT(dns_query, NotNull());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -423,18 +422,18 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4PreferredSupportsV4Only) {
 }
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4PreferredSupportsV6Only) {
-  auto* dns_query = resolver_->resolve(
-      "ipv6.google.com", DnsLookupFamily::V4Preferred,
-      [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-        // On v4 only networks, there will be no results.
-        for (const auto& result : results) {
-          const auto& addrinfo = result.addrInfo();
-          EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
-          EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
-        }
-        dispatcher_->exit();
-      });
+  auto* dns_query = resolver_->resolve("ipv6.google.com", DnsLookupFamily::V4Preferred,
+                                       [=](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                         EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                         // On v4 only networks, there will be no results.
+                                         for (const auto& result : results) {
+                                           const auto& addrinfo = result.addrInfo();
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
+                                           EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
+                                         }
+                                         dispatcher_->exit();
+                                       });
   EXPECT_THAT(dns_query, NotNull());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -517,14 +516,15 @@ TEST_F(AppleDnsImplTest, NonExistentDomain) {
 }
 
 TEST_F(AppleDnsImplTest, LocalResolution) {
-  auto pending_resolution = resolver_->resolve(
-      "0.0.0.0", DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-        EXPECT_EQ(1, results.size());
-        EXPECT_EQ("0.0.0.0:0", results.front().addrInfo().address_->asString());
-        EXPECT_EQ(std::chrono::seconds(60), results.front().addrInfo().ttl_);
-      });
+  auto pending_resolution =
+      resolver_->resolve("0.0.0.0", DnsLookupFamily::Auto,
+                         [](DnsResolver::ResolutionStatus status, absl::string_view,
+                            std::list<DnsResponse>&& results) -> void {
+                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                           EXPECT_EQ(1, results.size());
+                           EXPECT_EQ("0.0.0.0:0", results.front().addrInfo().address_->asString());
+                           EXPECT_EQ(std::chrono::seconds(60), results.front().addrInfo().ttl_);
+                         });
   EXPECT_EQ(nullptr, pending_resolution);
   // Note that the dispatcher does NOT have to run because resolution is synchronous.
 }
@@ -561,14 +561,14 @@ public:
         .WillOnce(Return(error_code));
 
     bool callback_called = false;
-    EXPECT_EQ(nullptr, resolver_->resolve("foo.com", Network::DnsLookupFamily::Auto,
-                                          [&](DnsResolver::ResolutionStatus status,
-                                              std::list<DnsResponse>&& responses) -> void {
-                                            EXPECT_EQ(DnsResolver::ResolutionStatus::Failure,
-                                                      status);
-                                            EXPECT_TRUE(responses.empty());
-                                            callback_called = true;
-                                          }));
+    EXPECT_EQ(nullptr,
+              resolver_->resolve("foo.com", Network::DnsLookupFamily::Auto,
+                                 [&](DnsResolver::ResolutionStatus status, absl::string_view,
+                                     std::list<DnsResponse>&& responses) -> void {
+                                   EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                                   EXPECT_TRUE(responses.empty());
+                                   callback_called = true;
+                                 }));
 
     EXPECT_TRUE(callback_called);
     checkErrorStat(error_code);
@@ -596,14 +596,15 @@ public:
 
     // The returned value is nullptr because the query has already been fulfilled. Verify that the
     // callback ran via notification.
-    EXPECT_EQ(nullptr, resolver_->resolve(
-                           hostname, Network::DnsLookupFamily::Auto,
-                           [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                    std::list<DnsResponse>&& responses) -> void {
-                             EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                             EXPECT_TRUE(responses.empty());
-                             dns_callback_executed.Notify();
-                           }));
+    EXPECT_EQ(nullptr,
+              resolver_->resolve(
+                  hostname, Network::DnsLookupFamily::Auto,
+                  [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& responses) -> void {
+                    EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                    EXPECT_TRUE(responses.empty());
+                    dns_callback_executed.Notify();
+                  }));
     dns_callback_executed.WaitForNotification();
     checkErrorStat(error_code);
   }
@@ -640,8 +641,9 @@ public:
 
     auto query = resolver_->resolve(
         hostname, dns_lookup_family,
-        [&dns_callback_executed, dns_lookup_family, address_type, expected_address_size](
-            DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) -> void {
+        [&dns_callback_executed, dns_lookup_family, address_type,
+         expected_address_size](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) -> void {
           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
           EXPECT_EQ(expected_address_size, response.size());
 
@@ -751,16 +753,16 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
 
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(-1));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           // Status is success because it isn't possible to attach a file event
-                           // error to a specific query.
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           EXPECT_EQ(0, response.size());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        // Status is success because it isn't possible to attach a file event
+        // error to a specific query.
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+        EXPECT_EQ(0, response.size());
+        dns_callback_executed.Notify();
+      });
 
   EXPECT_EQ(nullptr, query);
 
@@ -789,14 +791,14 @@ TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           EXPECT_EQ(0, response.size());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+        EXPECT_EQ(0, response.size());
+        dns_callback_executed.Notify();
+      });
 
   EXPECT_NE(nullptr, query);
 
@@ -825,14 +827,14 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           EXPECT_EQ(0, response.size());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+        EXPECT_EQ(0, response.size());
+        dns_callback_executed.Notify();
+      });
 
   EXPECT_NE(nullptr, query);
 
@@ -891,16 +893,17 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
 
   // The returned value is nullptr because the query has already been fulfilled. Verify that the
   // callback ran via notification.
-  EXPECT_EQ(nullptr, resolver_->resolve(
-                         hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(1, response.size());
-                           EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
-                           dns_callback_executed.Notify();
-                         }));
+  EXPECT_EQ(nullptr,
+            resolver_->resolve(
+                hostname, Network::DnsLookupFamily::Auto,
+                [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                                         std::list<DnsResponse>&& response) -> void {
+                  EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                  EXPECT_EQ(1, response.size());
+                  EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
+                  EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
+                  dns_callback_executed.Notify();
+                }));
   dns_callback_executed.WaitForNotification();
 }
 
@@ -929,16 +932,17 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
 
   // The returned value is nullptr because the query has already been fulfilled. Verify that the
   // callback ran via notification.
-  EXPECT_EQ(nullptr, resolver_->resolve(
-                         hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(1, response.size());
-                           EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
-                           dns_callback_executed.Notify();
-                         }));
+  EXPECT_EQ(nullptr,
+            resolver_->resolve(
+                hostname, Network::DnsLookupFamily::Auto,
+                [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                                         std::list<DnsResponse>&& response) -> void {
+                  EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                  EXPECT_EQ(1, response.size());
+                  EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
+                  EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
+                  dns_callback_executed.Notify();
+                }));
   dns_callback_executed.WaitForNotification();
 }
 
@@ -985,14 +989,14 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(2, response.size());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_EQ(2, response.size());
+        dns_callback_executed.Notify();
+      });
   ASSERT_NE(nullptr, query);
 
   // Fill the query with one address, and promise more addresses are coming. Meaning the query will
@@ -1066,14 +1070,14 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           EXPECT_TRUE(response.empty());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+        EXPECT_TRUE(response.empty());
+        dns_callback_executed.Notify();
+      });
   ASSERT_NE(nullptr, query);
 
   // Fill the query with one address, and promise more addresses are coming. Meaning the query will
@@ -1116,16 +1120,16 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(1, response.size());
-                           EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_EQ(1, response.size());
+        EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
+        EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
+        dns_callback_executed.Notify();
+      });
   ASSERT_NE(nullptr, query);
 
   // Start second query.
@@ -1137,16 +1141,16 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query2 =
-      resolver_->resolve(hostname2, Network::DnsLookupFamily::V4Only,
-                         [&dns_callback_executed2](DnsResolver::ResolutionStatus status,
-                                                   std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(1, response.size());
-                           EXPECT_EQ("5.6.7.8:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
-                           dns_callback_executed2.Notify();
-                         });
+  auto query2 = resolver_->resolve(
+      hostname2, Network::DnsLookupFamily::V4Only,
+      [&dns_callback_executed2](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_EQ(1, response.size());
+        EXPECT_EQ("5.6.7.8:0", response.front().addrInfo().address_->asString());
+        EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
+        dns_callback_executed2.Notify();
+      });
   ASSERT_NE(nullptr, query2);
 
   // Fill the query with one address, and promise more addresses are coming. Meaning the query will
@@ -1189,18 +1193,18 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           // Even though the second query will fail, this one will flush with the
-                           // state it had.
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(1, response.size());
-                           EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        // Even though the second query will fail, this one will flush with the
+        // state it had.
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_EQ(1, response.size());
+        EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
+        EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
+        dns_callback_executed.Notify();
+      });
   ASSERT_NE(nullptr, query);
 
   // Start second query.
@@ -1212,14 +1216,14 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query2 =
-      resolver_->resolve(hostname2, Network::DnsLookupFamily::V4Only,
-                         [&dns_callback_executed2](DnsResolver::ResolutionStatus status,
-                                                   std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                           EXPECT_TRUE(response.empty());
-                           dns_callback_executed2.Notify();
-                         });
+  auto query2 = resolver_->resolve(
+      hostname2, Network::DnsLookupFamily::V4Only,
+      [&dns_callback_executed2](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+        EXPECT_TRUE(response.empty());
+        dns_callback_executed2.Notify();
+      });
   ASSERT_NE(nullptr, query2);
 
   reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
@@ -1253,14 +1257,14 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_TRUE(response.empty());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_TRUE(response.empty());
+        dns_callback_executed.Notify();
+      });
   ASSERT_NE(nullptr, query);
 
   // Reply _without_ add and _without_ more coming flags. This should cause a flush with an empty
@@ -1290,9 +1294,9 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query = resolver_->resolve(
-      hostname, Network::DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void { FAIL(); });
+  auto query = resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
+                                  [](DnsResolver::ResolutionStatus, absl::string_view,
+                                     std::list<DnsResponse>&&) -> void { FAIL(); });
   ASSERT_NE(nullptr, query);
 
   EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,
@@ -1330,14 +1334,14 @@ TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
 
-  auto query =
-      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
-                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
-                                                  std::list<DnsResponse>&& response) -> void {
-                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-                           EXPECT_EQ(1, response.size());
-                           dns_callback_executed.Notify();
-                         });
+  auto query = resolver_->resolve(
+      hostname, Network::DnsLookupFamily::Auto,
+      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view,
+                               std::list<DnsResponse>&& response) -> void {
+        EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+        EXPECT_EQ(1, response.size());
+        dns_callback_executed.Notify();
+      });
   ASSERT_NE(nullptr, query);
 
   // The query's ref is going to be deallocated when the query is destroyed.

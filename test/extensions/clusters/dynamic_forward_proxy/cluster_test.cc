@@ -58,8 +58,10 @@ public:
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
     auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
-    cluster_.reset(
-        new Cluster(cluster_config, std::move(cache), config, factory_context, this->get()));
+    absl::Status creation_status = absl::OkStatus();
+    cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
+                               this->get(), creation_status));
+    THROW_IF_NOT_OK(creation_status);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();

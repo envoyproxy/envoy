@@ -17,6 +17,7 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -2480,9 +2481,9 @@ TEST_P(Http1ServerConnectionImplTest,
   EXPECT_TRUE(status.ok());
 
   // Dumps the header map without allocating memory
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
 
   // Check dump contents for completed headers and partial headers.
   EXPECT_THAT(
@@ -2520,9 +2521,9 @@ TEST_P(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_CALL(decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
-        Stats::TestUtil::MemoryTest memory_test;
+        Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-        EXPECT_EQ(memory_test.consumedBytes(), 0);
+        EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
       }))
       .WillOnce(Invoke([]() {}));
 
@@ -2908,6 +2909,40 @@ TEST_P(Http1ClientConnectionImplTest, EarlyHintHeaders) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
+  status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
+}
+
+// 104 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
+TEST_P(Http1ClientConnectionImplTest, UploadResumptionSupportedHeaders) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // As per Resumable Uploads for HTTP draft, the upload-draft-interop-version header
+  // must be passed through with 104 responses.
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_))
+      .WillOnce(Invoke([&](ResponseHeaderMapPtr& headers) {
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version")).size(), 1);
+        EXPECT_EQ(headers->get(Http::LowerCaseString("upload-draft-interop-version"))[0]
+                      ->value()
+                      .getStringView(),
+                  "4");
+      }));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl initial_response(
+      "HTTP/1.1 104 Upload Resumption Supported\r\nUpload-Draft-Interop-Version: 4\r\n\r\n");
+  auto status = codec_->dispatch(initial_response);
+  EXPECT_TRUE(status.ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
   status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
@@ -3476,8 +3511,6 @@ TEST_P(Http1ServerConnectionImplTest, ManyLargeRequestHeadersAccepted) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
-  TestScopedRuntime scoped_runtime;
-
   // No readDisable for normal non-piped HTTP request.
   {
     initialize();
@@ -3514,8 +3547,6 @@ TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
 // Tests the scenario where the client sends pipelined requests and the requests reach Envoy at the
 // same time.
 TEST_P(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
-  TestScopedRuntime scoped_runtime;
-
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -3550,8 +3581,6 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithSingleEvent) {
 // Tests the scenario where the client sends pipelined requests. The second request reaches Envoy
 // before the end of the first request.
 TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
-  TestScopedRuntime scoped_runtime;
-
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -3874,9 +3903,9 @@ TEST_P(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_CALL(response_decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
-        Stats::TestUtil::MemoryTest memory_test;
+        Memory::TestUtil::MemoryTest memory_test;
         dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
-        EXPECT_EQ(memory_test.consumedBytes(), 0);
+        EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
       }))
       .WillOnce(Invoke([]() {}));
 
@@ -3917,9 +3946,9 @@ TEST_P(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
 
   EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce(InvokeWithoutArgs([&]() {
     // dumpState here before buffers are drained. No memory should be allocated.
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 1);
-    EXPECT_EQ(memory_test.consumedBytes(), 0);
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   }));
 
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");
@@ -4838,10 +4867,11 @@ TEST_P(Http1ClientConnectionImplTest, InvalidCharacterInTrailerName) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
-// When receiving header value with obsolete line folding, `obs-fold` should be replaced by SP.
-// This is http-parser's behavior. BalsaParser does not support obsolete line folding and rejects
-// such messages (also permitted by the specification). See RFC9110 Section 5.5:
-// https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values.
+// When receiving a message with obsolete line folding, `obs-fold` should be replaced by one or more
+// SP characters, see RFC9110 Section 5.5:
+// https://www.rfc-editor.org/rfc/rfc9112.html#name-obsolete-line-folding.
+// However, both http-parser and BalsaParser simply strip the `\r\n`, and keep the SP or TAB at the
+// beginning of the next line.
 TEST_P(Http1ServerConnectionImplTest, ObsFold) {
   // SPELLCHECKER(off)
   initialize();
@@ -5141,6 +5171,412 @@ TEST_P(Http1ClientConnectionImplTest, ValueEndsWithLF) {
   const absl::string_view value = "value ends in line feed \n";
   const absl::string_view expected_value = "value ends in line feed";
   testRequestWithValueExpectSuccess(value, expected_value);
+}
+
+// The request line must have SP separators; CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-3
+TEST_P(Http1ServerConnectionImplTest, FirstLineInvalidCR) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "GET"},
+  };
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  } else {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  }
+
+  Buffer::OwnedImpl buffer("GET /\rHTTP/1.1\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0u, buffer.length());
+  } else {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_LF_EXPECTED");
+  }
+}
+
+// The status line must have SP separators; CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-4
+TEST_P(Http1ClientConnectionImplTest, FirstLineInvalidCR) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":authority", "host"},
+  };
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestResponseHeaderMapImpl expected_headers{
+      {":status", "200"},
+      {"content-length", "5"},
+  };
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("hello"), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+  }
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200\rOK\r\ncontent-length: 5\r\n\r\n"
+                           "hello");
+  auto status = codec_->dispatch(buffer);
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0u, buffer.length());
+  } else {
+    EXPECT_TRUE(isCodecProtocolError(status));
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+#else
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
+#endif
+  }
+}
+
+// Field name must not contain CR:
+// https://www.rfc-editor.org/rfc/rfc9110#section-5.1
+TEST_P(Http1ServerConnectionImplTest, HeaderNameInvalidCR) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nfo\ro: bar\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+// Field name must not contain CR:
+// https://www.rfc-editor.org/rfc/rfc9110#section-5.1
+TEST_P(Http1ClientConnectionImplTest, HeaderNameInvalidCR) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":authority", "host"},
+  };
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nfo\ro: bar\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_HEADER_NAME_CHARACTER");
+  } else {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+  }
+}
+
+// The ';' between chunk length and chunk extension may be surrounded by space
+// or TAB, but CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
+TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCR) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "true"}});
+
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6;\ra\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_CHUNK_EXTENSION");
+  } else {
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
+#else
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
+#endif
+  }
+}
+
+// The ';' between chunk length and chunk extension may be surrounded by space
+// or TAB, but CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
+TEST_P(Http1ServerConnectionImplTest, ChunkExtensionInvalidCRAccept) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+
+  // With the runtime flag false, BalsaParser accepts the message. However,
+  // since chunk extensions are ignored and the body is reframed, the offending
+  // CR is not proxied.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "false"}});
+
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_CALL(decoder, decodeData(BufferStringEqual("Hello World"), false));
+  EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6;\ra\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0u, buffer.length());
+}
+
+// The ';' between chunk length and chunk extension may be surrounded by space
+// or TAB, but CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
+TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCR) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "true"}});
+
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":authority", "host"},
+  };
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6;\ra\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: INVALID_CHUNK_EXTENSION");
+  } else {
+#ifdef ENVOY_ENABLE_UHV
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
+#else
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_STRICT");
+#endif
+  }
+}
+
+// The ';' between chunk length and chunk extension may be surrounded by space
+// or TAB, but CR is forbidden:
+// https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1.1
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.3
+TEST_P(Http1ClientConnectionImplTest, ChunkExtensionInvalidCRAccept) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
+    return;
+  }
+
+  // With the runtime flag false, BalsaParser accepts the message. However,
+  // since chunk extensions are ignored and the body is reframed, the offending
+  // CR is not proxied.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension", "false"}});
+
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":authority", "host"},
+  };
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
+  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("Hello World"), false));
+  EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+
+  // SPELLCHECKER(off)
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n"
+                           "6;\ra\r\nHello \r\n"
+                           "5\r\nWorld\r\n"
+                           "0\r\n\r\n");
+  // SPELLCHECKER(on)
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0u, buffer.length());
+}
+
+// If the first request contains a "Connection: close" header, then http-parser in strict mode
+// signals an error if a second request is received, but BalsaParser happily parses it.
+TEST_P(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
+  initialize();
+
+#ifdef ENVOY_ENABLE_UHV
+  // If UHV is enabled, then strict mode is turned off for http-parser.
+  const bool accept = true;
+#else
+  const bool accept = parser_impl_ == Http1ParserImpl::BalsaParser;
+#endif
+
+  {
+    Http::ResponseEncoder* response_encoder = nullptr;
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n"
+                             "connection: close\r\n\r\n");
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0u, buffer.length());
+
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder->encodeHeaders(response_headers, true);
+  }
+
+  {
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+    if (accept) {
+      EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    } else {
+      EXPECT_CALL(decoder,
+                  sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+    }
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    auto status = codec_->dispatch(buffer);
+    if (accept) {
+      EXPECT_TRUE(status.ok());
+      EXPECT_EQ(Protocol::Http11, codec_->protocol());
+    } else {
+      EXPECT_TRUE(isCodecProtocolError(status));
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_CLOSED_CONNECTION");
+    }
+  }
+}
+
+// If a "Connection: close" header is received in the first response, and then a second request is
+// sent, then http-parser in strict mode correctly signals an error upon receiving the second
+// response, but BalsaParser happily parses it.
+TEST_P(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
+  initialize();
+
+#ifdef ENVOY_ENABLE_UHV
+  // If UHV is enabled, then strict mode is turned off for http-parser.
+  const bool accept = true;
+#else
+  const bool accept = parser_impl_ == Http1ParserImpl::BalsaParser;
+#endif
+
+  {
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
+
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("foo"), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+
+    Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
+                             "content-length: 3\r\n"
+                             "connection: close\r\n\r\n"
+                             "foo");
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0u, buffer.length());
+  }
+
+  {
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(request_headers, true).ok());
+
+    if (accept) {
+      EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+      EXPECT_CALL(response_decoder, decodeData(BufferStringEqual("bar"), false));
+      EXPECT_CALL(response_decoder, decodeData(BufferStringEqual(""), true));
+    }
+
+    Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n"
+                             "content-length: 3\r\n"
+                             "\r\n"
+                             "bar");
+    auto status = codec_->dispatch(buffer);
+    if (accept) {
+      EXPECT_TRUE(status.ok());
+      EXPECT_EQ(0u, buffer.length());
+    } else {
+      EXPECT_TRUE(isCodecProtocolError(status));
+      EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_CLOSED_CONNECTION");
+    }
+  }
 }
 
 } // namespace Http

@@ -171,7 +171,7 @@ def get_runtime_and_pr():
                 if runtime_guard == 'envoy_reloadable_features_test_feature_true':
                     found_test_feature_true = True
                     continue
-                pr_num = re.search('\(#(\d+)\)', commit.message)
+                pr_num = re.search(r'\(#(\d+)\)', commit.message)
                 # Some commits may not come from a PR (if they are part of a security point release).
                 pr = (int(pr_num.group(1))) if pr_num else None
                 pr_date = date.fromtimestamp(commit.committed_date)

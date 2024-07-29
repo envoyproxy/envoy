@@ -347,11 +347,11 @@ TEST(Ipv6InstanceTest, BadAddress) {
 }
 
 TEST(PipeInstanceTest, Basic) {
-  PipeInstance address("/foo");
-  EXPECT_EQ("/foo", address.asString());
-  EXPECT_EQ(Type::Pipe, address.type());
-  EXPECT_EQ(nullptr, address.ip());
-  EXPECT_EQ(nullptr, address.envoyInternalAddress());
+  auto address = THROW_OR_RETURN_VALUE(PipeInstance::create("/foo"), std::unique_ptr<PipeInstance>);
+  EXPECT_EQ("/foo", address->asString());
+  EXPECT_EQ(Type::Pipe, address->type());
+  EXPECT_EQ(nullptr, address->ip());
+  EXPECT_EQ(nullptr, address->envoyInternalAddress());
 }
 
 TEST(InternalInstanceTest, Basic) {
@@ -377,15 +377,15 @@ TEST(PipeInstanceTest, BasicPermission) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
   const mode_t mode = 0777;
-  PipeInstance pipe(path, mode);
-  InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+  std::shared_ptr<PipeInstance> address =
+      THROW_OR_RETURN_VALUE(PipeInstance::create(path, mode), std::unique_ptr<PipeInstance>);
   SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
-  EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << address->asString();
 
   Api::SysCallIntResult result = sock.bind(address);
   ASSERT_EQ(result.return_value_, 0)
-      << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+      << address->asString() << "\nerror: " << errorDetails(result.errno_)
       << "\terrno: " << result.errno_;
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
@@ -405,11 +405,11 @@ TEST(PipeInstanceTest, PermissionFail) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
   const mode_t mode = 0777;
-  PipeInstance pipe(path, mode);
-  InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+  InstanceConstSharedPtr address =
+      THROW_OR_RETURN_VALUE(PipeInstance::create(path, mode), std::unique_ptr<PipeInstance>);
   SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
-  EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << address->asString();
 
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
@@ -420,8 +420,8 @@ TEST(PipeInstanceTest, AbstractNamespacePermission) {
 #if defined(__linux__)
   std::string path = "@/foo";
   const mode_t mode = 0777;
-  EXPECT_THROW_WITH_REGEX(PipeInstance address(path, mode), EnvoyException,
-                          "Cannot set mode for Abstract AF_UNIX sockets");
+  EXPECT_THAT(PipeInstance::create(path, mode).status().message(),
+              testing::ContainsRegex("Cannot set mode for Abstract AF_UNIX sockets"));
 
   sockaddr_un sun;
   sun.sun_family = AF_UNIX;
@@ -429,27 +429,28 @@ TEST(PipeInstanceTest, AbstractNamespacePermission) {
   sun.sun_path[0] = '\0';
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
 
-  EXPECT_THROW_WITH_REGEX(PipeInstance address(&sun, ss_len, mode), EnvoyException,
-                          "Cannot set mode for Abstract AF_UNIX sockets");
+  EXPECT_THAT(PipeInstance::create(&sun, ss_len, mode).status().message(),
+              testing::ContainsRegex("Cannot set mode for Abstract AF_UNIX sockets"));
 #endif
 }
 
 TEST(PipeInstanceTest, AbstractNamespace) {
 #if defined(__linux__)
-  PipeInstance address("@/foo");
-  EXPECT_EQ("@/foo", address.asString());
-  EXPECT_EQ("@/foo", address.asStringView());
-  EXPECT_EQ(Type::Pipe, address.type());
-  EXPECT_EQ(nullptr, address.ip());
+  auto address =
+      THROW_OR_RETURN_VALUE(PipeInstance::create("@/foo"), std::unique_ptr<PipeInstance>);
+  EXPECT_EQ("@/foo", address->asString());
+  EXPECT_EQ("@/foo", address->asStringView());
+  EXPECT_EQ(Type::Pipe, address->type());
+  EXPECT_EQ(nullptr, address->ip());
 #else
-  EXPECT_THROW(PipeInstance address("@/foo"), EnvoyException);
+  EXPECT_FALSE(PipeInstance::create("@/foo").status().ok());
 #endif
 }
 
 TEST(PipeInstanceTest, BadAddress) {
   std::string long_address(1000, 'X');
-  EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
-                          "exceeds maximum UNIX domain socket path size");
+  EXPECT_THAT(PipeInstance::create(long_address).status().message(),
+              testing::ContainsRegex("exceeds maximum UNIX domain socket path size"));
 }
 
 // Validate that embedded nulls in abstract socket addresses are included and represented with '@'.
@@ -457,13 +458,14 @@ TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
   std::string embedded_null("@/foo/bar");
   embedded_null[5] = '\0'; // Set embedded null.
 #if defined(__linux__)
-  PipeInstance address(embedded_null);
-  EXPECT_EQ("@/foo@bar", address.asString());
-  EXPECT_EQ("@/foo@bar", address.asStringView());
-  EXPECT_EQ(Type::Pipe, address.type());
-  EXPECT_EQ(nullptr, address.ip());
+  auto address =
+      THROW_OR_RETURN_VALUE(PipeInstance::create(embedded_null), std::unique_ptr<PipeInstance>);
+  EXPECT_EQ("@/foo@bar", address->asString());
+  EXPECT_EQ("@/foo@bar", address->asStringView());
+  EXPECT_EQ(Type::Pipe, address->type());
+  EXPECT_EQ(nullptr, address->ip());
 #else
-  EXPECT_THROW(PipeInstance address(embedded_null), EnvoyException);
+  EXPECT_FALSE(PipeInstance::create(embedded_null).status().ok());
 #endif
 }
 
@@ -471,22 +473,22 @@ TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
 TEST(PipeInstanceTest, EmbeddedNullPathError) {
   std::string embedded_null("/foo/bar");
   embedded_null[4] = '\0'; // Set embedded null.
-  EXPECT_THROW_WITH_REGEX(PipeInstance address(embedded_null), EnvoyException,
-                          "contains embedded null characters");
+  EXPECT_THAT(PipeInstance::create(embedded_null).status().message(),
+              testing::ContainsRegex("contains embedded null characters"));
 }
 
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
-    PipeInstance pipe(path);
-    InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+    std::shared_ptr<PipeInstance> address =
+        THROW_OR_RETURN_VALUE(PipeInstance::create(path), std::unique_ptr<PipeInstance>);
     SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
-    EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
+    EXPECT_TRUE(sock.ioHandle().isOpen()) << address->asString();
 
     const Api::SysCallIntResult result = sock.bind(address);
 
     ASSERT_EQ(result.return_value_, 0)
-        << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+        << address->asString() << "\nerror: " << errorDetails(result.errno_)
         << "\nerrno: " << result.errno_;
   };
 
@@ -610,7 +612,8 @@ protected:
       return std::make_shared<Ipv6Instance>(test_case.address_, test_case.port_);
       break;
     case TestCase::Pipe:
-      return std::make_shared<PipeInstance>(test_case.address_);
+      return THROW_OR_RETURN_VALUE(PipeInstance::create(test_case.address_),
+                                   std::unique_ptr<PipeInstance>);
       break;
     case TestCase::Internal:
       return std::make_shared<EnvoyInternalInstance>(test_case.address_);

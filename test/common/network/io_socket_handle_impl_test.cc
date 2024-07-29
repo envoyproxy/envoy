@@ -105,11 +105,10 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
   const mode_t mode = 0777;
-  Address::PipeInstance pipe(path, mode);
-  Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
+  Address::InstanceConstSharedPtr address = *Address::PipeInstance::create(path, mode);
   SocketImpl socket(Socket::Type::Stream, address, nullptr, {});
 
-  EXPECT_TRUE(socket.ioHandle().isOpen()) << pipe.asString();
+  EXPECT_TRUE(socket.ioHandle().isOpen()) << address->asString();
 
   Api::SysCallIntResult result = socket.bind(address);
   ASSERT_EQ(result.return_value_, 0);

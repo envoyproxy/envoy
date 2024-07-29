@@ -17,6 +17,27 @@ namespace Http {
 namespace Http3 {
 namespace {
 
+// Assuming here that happy eyeballs sorting results in the first address being
+// a different address family than the second, make a best effort attempt to
+// return a secondary address family.
+Network::Address::InstanceConstSharedPtr
+getHostAddress(std::shared_ptr<const Upstream::HostDescription> host,
+               bool secondary_address_family) {
+  if (!secondary_address_family) {
+    return host->address();
+  }
+  Upstream::HostDescription::SharedConstAddressVector list_or_null = host->addressListOrNull();
+  if (!list_or_null || list_or_null->size() < 2 || !(*list_or_null)[0]->ip() ||
+      !(*list_or_null)[1]->ip()) {
+    // This function is only called if the parallel address checks in conn_pool_grid.cc
+    // already passed so it should not return here, but if there was a DNS
+    // re-resolve between checking the address list in the grid and checking
+    // here, we'll fail over here rather than fast-fail the connection.
+    return host->address();
+  }
+  return (*list_or_null)[1];
+}
+
 uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
   return PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.http3Options().quic_protocol_options(),
                                          max_concurrent_streams, 100);
@@ -87,13 +108,14 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-    OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info)
+    OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info,
+    bool attempt_happy_eyeballs)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol, {}, nullptr),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
       server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port()), false),
-      connect_callback_(connect_callback) {}
+      connect_callback_(connect_callback), attempt_happy_eyeballs_(attempt_happy_eyeballs) {}
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
   if (connect_callback_ != absl::nullopt) {
@@ -121,19 +143,20 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
     return nullptr; // no secrets available yet.
   }
 
+  Network::Address::InstanceConstSharedPtr address =
+      getHostAddress(host(), attempt_happy_eyeballs_);
   auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
   auto upstream_local_address =
-      upstream_local_address_selector->getUpstreamLocalAddress(host()->address(), socketOptions());
+      upstream_local_address_selector->getUpstreamLocalAddress(address, socketOptions());
   auto source_address = upstream_local_address.address_;
 
   if (source_address == nullptr) {
-    auto host_address = host()->address();
-    source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
+    source_address = Network::Utility::getLocalAddress(address->ip()->version());
   }
 
   return Quic::createQuicNetworkConnection(
-      quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
-      source_address, quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
+      quic_info_, std::move(crypto_config), server_id_, dispatcher(), address, source_address,
+      quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
       transportSocketOptions(), connection_id_generator_, host_->transportSocketFactory());
 }
 
@@ -145,7 +168,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
-                 Http::PersistentQuicInfo& quic_info) {
+                 Http::PersistentQuicInfo& quic_info, bool attempt_happy_eyeballs) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names, rtt_cache,
@@ -185,7 +208,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             auto_connect);
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);
+      std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info, attempt_happy_eyeballs);
 }
 
 } // namespace Http3

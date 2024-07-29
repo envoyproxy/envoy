@@ -2824,7 +2824,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
@@ -2878,7 +2878,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
   cp1->idle_cb_();
   cp1->idle_cb_ = nullptr;
@@ -2912,7 +2912,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
@@ -2980,7 +2980,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
@@ -3076,7 +3076,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
   cp1->idle_cb_();
   cp1->idle_cb_ = nullptr;
@@ -3134,7 +3134,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
                TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
@@ -3924,7 +3924,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
@@ -3957,7 +3957,8 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   // crash.
   dns_timer_->invokeCallback();
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+               TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }
@@ -4017,7 +4018,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
@@ -4042,7 +4043,8 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
   // Remove the first host, this should lead to the cp being drained.
   dns_timer_->invokeCallback();
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+               TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
   EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));
@@ -6326,6 +6328,132 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
             HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
                                           ->httpConnPool(ResourcePriority::Default,
                                                          Http::Protocol::Http11, &lb_context)));
+}
+
+TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_tcp) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      connection_pool_per_downstream_connection: true
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  NiceMock<MockLoadBalancerContext> lb_context;
+  NiceMock<Network::MockConnection> downstream_connection;
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+  ON_CALL(lb_context, downstreamConnection()).WillByDefault(Return(&downstream_connection));
+  ON_CALL(downstream_connection, socketOptions()).WillByDefault(ReturnRef(options_to_return));
+
+  std::vector<Tcp::ConnectionPool::MockInstance*> conn_pool_vector;
+  for (size_t i = 0; i < 3; ++i) {
+    conn_pool_vector.push_back(new Tcp::ConnectionPool::MockInstance());
+    EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
+    EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(downstream_connection, hashKey)
+        .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
+    EXPECT_EQ(conn_pool_vector.back(),
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, &lb_context)));
+  }
+
+  // Check that the first entry is still in the pool map
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+    hash_key.push_back(0);
+  }));
+  EXPECT_EQ(conn_pool_vector.front(),
+            TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                         ->tcpConnPool(ResourcePriority::Default, &lb_context)));
+}
+
+TEST_F(ClusterManagerImplTest, CheckAddressesList) {
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  socketAddress:
+                    address: ::1
+                    portValue: 11001
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap));
+  // Verify address list for static cluster in bootstrap.
+  auto cluster = cluster_manager_->getThreadLocalCluster("cluster_0");
+  auto hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_NE(hosts[0]->addressListOrNull(), nullptr);
+  ASSERT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+
+  const std::string cluster_api = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  const std::string cluster_api_update = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            additionalAddresses:
+              - address:
+                  socketAddress:
+                    address: ::1
+                    portValue: 11001
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  // Add static cluster via api and check that addresses list is empty.
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
+  cluster = cluster_manager_->getThreadLocalCluster("added_via_api");
+  hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(hosts[0]->addressListOrNull(), nullptr);
+  // Update cluster to have additional addresses and check that address list is not empty anymore.
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api_update), "v2"));
+  cluster = cluster_manager_->getThreadLocalCluster("added_via_api");
+  hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_NE(hosts[0]->addressListOrNull(), nullptr);
+  ASSERT_EQ(hosts[0]->addressListOrNull()->size(), 2);
 }
 
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {

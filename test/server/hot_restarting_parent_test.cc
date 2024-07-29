@@ -186,7 +186,7 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildUnixDomainSocket) {
   Network::MockListenerConfig listener_config;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   Network::Address::InstanceConstSharedPtr local_address =
-      std::make_shared<Network::Address::PipeInstance>("domain.socket");
+      *Network::Address::PipeInstance::create("domain.socket");
   MockOptions options;
   InSequence s;
 

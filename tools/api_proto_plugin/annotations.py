@@ -4,7 +4,7 @@ import re
 from functools import partial
 
 # Key-value annotation regex.
-ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
+ANNOTATION_REGEX = re.compile(r'\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
 
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'

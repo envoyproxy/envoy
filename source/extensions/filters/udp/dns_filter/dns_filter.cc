@@ -39,9 +39,11 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   for (const auto& virtual_domain : dns_table.virtual_domains()) {
     AddressConstPtrVec addrs{};
 
-    const absl::string_view domain_name = virtual_domain.name();
-    const absl::string_view suffix = Utils::getDomainSuffix(domain_name);
-    ENVOY_LOG(trace, "Loading configuration for domain: {}. Suffix: {}", domain_name, suffix);
+    const absl::string_view virtual_domain_name =
+        Utils::getVirtualDomainName(virtual_domain.name());
+    const absl::string_view suffix = Utils::getDomainSuffix(virtual_domain_name);
+    ENVOY_LOG(trace, "Loading configuration for domain: {}. Suffix: {}", virtual_domain_name,
+              suffix);
 
     if (virtual_domain.endpoint().has_address_list()) {
       const auto& address_list = virtual_domain.endpoint().address_list().address();
@@ -69,7 +71,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       if (virtual_domains != nullptr) {
         // The suffix already has a node in the trie
 
-        auto existing_endpoint_config = virtual_domains->find(domain_name);
+        auto existing_endpoint_config = virtual_domains->find(virtual_domain_name);
         if (existing_endpoint_config != virtual_domains->end()) {
           // Update the existing endpoint config with the new addresses
 
@@ -79,11 +81,11 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         } else {
           // Add a new endpoint config for the new domain
           endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
-          virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
+          virtual_domains->emplace(std::string(virtual_domain_name), std::move(endpoint_config));
         }
       } else {
         endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
-        addEndpointToSuffix(suffix, domain_name, endpoint_config);
+        addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
       }
     }
 
@@ -147,12 +149,12 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       // See if there's a suffix already configured
       auto virtual_domains = dns_lookup_trie_.find(suffix);
       if (virtual_domains == nullptr) {
-        addEndpointToSuffix(suffix, domain_name, endpoint_config);
+        addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
       } else {
         // A domain can be redirected to one cluster. If it appears multiple times, the first
         // entry is the only one used
-        if (virtual_domains->find(domain_name) == virtual_domains->end()) {
-          virtual_domains->emplace(domain_name, std::move(endpoint_config));
+        if (virtual_domains->find(virtual_domain_name) == virtual_domains->end()) {
+          virtual_domains->emplace(virtual_domain_name, std::move(endpoint_config));
         }
       }
     }
@@ -160,7 +162,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     std::chrono::seconds ttl = virtual_domain.has_answer_ttl()
                                    ? std::chrono::seconds(virtual_domain.answer_ttl().seconds())
                                    : DEFAULT_RESOLVER_TTL;
-    domain_ttl_.emplace(virtual_domain.name(), ttl);
+    domain_ttl_.emplace(virtual_domain_name, ttl);
   }
 
   forward_queries_ = config.has_client_config();
@@ -393,12 +395,20 @@ const DnsEndpointConfig* DnsFilter::getEndpointConfigForDomain(const absl::strin
     return nullptr;
   }
 
-  const auto iter = virtual_domains->find(domain);
-  if (iter == virtual_domains->end()) {
-    ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
-    return nullptr;
+  // Try to find exact match at first and then look for possible wildcard match
+  // moving to the next label on each iteration.
+  size_t pos = 0;
+  while (pos != domain.npos) {
+    const auto iter = virtual_domains->find(domain.substr(pos));
+    if (iter != virtual_domains->end()) {
+      return &(iter->second);
+    }
+
+    pos = domain.find('.', pos + 1);
   }
-  return &(iter->second);
+
+  ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
+  return nullptr;
 }
 
 const DnsSrvRecord* DnsFilter::getServiceConfigForDomain(const absl::string_view domain) {

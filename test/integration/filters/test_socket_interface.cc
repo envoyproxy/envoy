@@ -64,7 +64,7 @@ IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen
     return nullptr;
   }
 
-  return std::make_unique<TestIoSocketHandle>(connect_override_, write_override_, read_override_,
+  return std::make_unique<TestIoSocketHandle>(connect_override_, write_override_, read_override_, 0,
                                               result.return_value_, socket_v6only_, domain_);
 }
 
@@ -75,7 +75,8 @@ IoHandlePtr TestIoSocketHandle::duplicate() {
                                      errorDetails(result.errno_)));
   }
   return std::make_unique<TestIoSocketHandle>(connect_override_, write_override_, read_override_,
-                                              result.return_value_, socket_v6only_, domain_);
+                                              addressCacheMaxSize(), result.return_value_,
+                                              socket_v6only_, domain_);
 }
 
 Api::SysCallIntResult TestIoSocketHandle::connect(Address::InstanceConstSharedPtr address) {
@@ -89,10 +90,11 @@ Api::SysCallIntResult TestIoSocketHandle::connect(Address::InstanceConstSharedPt
 }
 
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain) const {
-  return std::make_unique<TestIoSocketHandle>(connect_override_proc_, write_override_proc_,
-                                              read_override_proc_, socket_fd, socket_v6only,
-                                              domain);
+                                            absl::optional<int> domain,
+                                            const SocketCreationOptions& options) const {
+  return std::make_unique<TestIoSocketHandle>(
+      connect_override_proc_, write_override_proc_, read_override_proc_,
+      options.max_addresses_cache_size_, socket_fd, socket_v6only, domain);
 }
 
 } // namespace Network

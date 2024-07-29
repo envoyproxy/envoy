@@ -50,7 +50,7 @@ private:
   std::unique_ptr<ApplePacProxyResolver> pac_proxy_resolver_;
   absl::optional<SystemProxySettings> proxy_settings_;
   absl::Mutex mutex_;
-  bool started_;
+  bool started_ = false;
 };
 
 } // namespace Network

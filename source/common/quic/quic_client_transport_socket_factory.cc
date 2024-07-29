@@ -32,9 +32,11 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
   auto quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport&>(
       config, context.messageValidationVisitor());
-  auto client_config = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      quic_transport.upstream_tls_context(), context);
-  return QuicClientTransportSocketFactory::create(std::move(client_config), context);
+  absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ClientContextConfigImpl>>
+      client_config_or_error = Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
+          quic_transport.upstream_tls_context(), context);
+  RETURN_IF_NOT_OK(client_config_or_error.status());
+  return QuicClientTransportSocketFactory::create(std::move(*client_config_or_error), context);
 }
 
 QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(

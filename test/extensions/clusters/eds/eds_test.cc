@@ -133,7 +133,7 @@ public:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
+    cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
@@ -2857,7 +2857,7 @@ public:
     ON_CALL(server_context_.cluster_manager_, edsResourcesCache())
         .WillByDefault(
             Invoke([this]() -> Config::EdsResourcesCacheOptRef { return eds_resources_cache_; }));
-    cluster_pre_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
+    cluster_pre_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_pre_->initializePhase());
     eds_callbacks_pre_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
@@ -2895,7 +2895,7 @@ public:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    cluster_post_ = std::make_shared<EdsClusterImpl>(eds_cluster_, factory_context);
+    cluster_post_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     // EXPECT_EQ(initialize_phase, cluster_post_->initializePhase());
     eds_callbacks_post_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
 

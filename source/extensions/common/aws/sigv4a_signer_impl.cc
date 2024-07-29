@@ -51,7 +51,7 @@ std::string SigV4ASignerImpl::createStringToSign(const absl::string_view canonic
 
 void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
                                        const absl::string_view override_region) const {
-  headers.addCopy(SigV4ASignatureHeaders::get().RegionSet,
+  headers.setCopy(SigV4ASignatureHeaders::get().RegionSet,
                   override_region.empty() ? getRegion() : override_region);
 }
 

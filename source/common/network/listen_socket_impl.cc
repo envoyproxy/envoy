@@ -27,7 +27,11 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
     const std::string error =
         fmt::format("cannot bind '{}': {}", connection_info_provider_->localAddress()->asString(),
                     errorDetails(result.errno_));
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+    PANIC(error);
+#else
     throw SocketBindException(error, result.errno_);
+#endif
   }
   return {0, 0};
 }
@@ -35,7 +39,11 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+    PANIC("ListenSocket: Setting socket options failed");
+#else
     throw SocketOptionException("ListenSocket: Setting socket options failed");
+#endif
   }
 }
 

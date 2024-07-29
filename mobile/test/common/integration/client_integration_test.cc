@@ -106,6 +106,7 @@ public:
     } else if (getCodecType() == Http::CodecType::HTTP2) {
       default_request_headers_.setScheme("https");
     }
+    builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   }
 
   void SetUp() override {
@@ -1014,7 +1015,7 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
     ASSERT_TRUE(
         waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
     ASSERT_TRUE(waitForCounterGe(
-        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED", 1));
+        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED", 1));
   }
 }
 
@@ -1359,6 +1360,18 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
   ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);
 }
 #endif
+
+// This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
+// doesn't crash. It doesn't really test the actual network change event.
+TEST_P(ClientIntegrationTest, OnNetworkChanged) {
+  builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  initialize();
+  internalEngine()->setPreferredNetwork(NetworkType::WLAN);
+  basicTest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
+  }
+}
 
 } // namespace
 } // namespace Envoy

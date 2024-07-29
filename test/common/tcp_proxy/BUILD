@@ -78,6 +78,7 @@ envoy_cc_test(
     srcs = ["upstream_test.cc"],
     deps = [
         "//source/common/tcp_proxy",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_filter_interface",
         "//test/mocks/router:upstream_request",

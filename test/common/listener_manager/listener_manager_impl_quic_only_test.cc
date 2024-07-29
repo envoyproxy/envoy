@@ -404,7 +404,7 @@ listener_filters:
   manager_->listeners()[0].get().filterChainFactory().createQuicListenerFilterChain(filter_manager);
   ASSERT_NE(nullptr, listener_filter);
   Network::MockListenerFilterCallbacks callbacks;
-  EXPECT_CALL(callbacks, filterState());
+  EXPECT_CALL(callbacks, filterState()).Times(2);
   EXPECT_CALL(callbacks, dispatcher()).WillOnce(ReturnRef(server_.dispatcher_));
   listener_filter->onAccept(callbacks);
   auto* added_filter_state =

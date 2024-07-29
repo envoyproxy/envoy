@@ -50,6 +50,8 @@ template <class RequestType, class ResponseType>
 class GrpcMuxFailover : public GrpcStreamInterface<RequestType, ResponseType>,
                         public Logger::Loggable<Logger::Id::config> {
 public:
+  static constexpr uint32_t DefaultFailoverBackoffMilliseconds = 500;
+
   // A GrpcStream creator function that receives the stream callbacks and returns a
   // GrpcStream object. This is introduced to facilitate dependency injection for
   // testing and will be used to create the primary and failover streams.

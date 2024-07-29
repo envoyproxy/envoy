@@ -41,8 +41,8 @@ public:
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(
-            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt)) {}
+        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false,
+                                                                            absl::nullopt, {})) {}
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);

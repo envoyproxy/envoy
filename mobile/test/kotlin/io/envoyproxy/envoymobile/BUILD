@@ -23,6 +23,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.EngineBuilderTest",
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -34,6 +35,7 @@ envoy_mobile_android_test(
     srcs = [
         "GRPCRequestHeadersBuilderTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.GRPCRequestHeadersBuilderTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -44,6 +46,7 @@ envoy_mobile_android_test(
     srcs = [
         "GRPCStreamTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.GRPCStreamTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
@@ -55,6 +58,7 @@ envoy_mobile_android_test(
     srcs = [
         "HeadersBuilderTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.HeadersBuilderTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -69,6 +73,7 @@ envoy_mobile_android_test(
         # TODO(lfpino): Remove this once the JVM paths are allow-listed in the sandbox.
         "sandboxAllowed": "False",
     },
+    test_class = "io.envoyproxy.envoymobile.PulseClientImplTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -79,6 +84,7 @@ envoy_mobile_android_test(
     srcs = [
         "RequestHeadersBuilderTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.RequestHeadersBuilderTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -89,6 +95,7 @@ envoy_mobile_android_test(
     srcs = [
         "ResponseHeadersTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.ResponseHeadersTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -99,6 +106,7 @@ envoy_mobile_android_test(
     srcs = [
         "RetryPolicyMapperTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.RetryPolicyMapperTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -109,6 +117,7 @@ envoy_mobile_android_test(
     srcs = [
         "HeadersContainerTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.HeadersContainerTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],

@@ -89,6 +89,19 @@ absl::string_view getDomainSuffix(const absl::string_view name) {
   return name.substr(pos + 1);
 }
 
+absl::string_view getVirtualDomainName(const absl::string_view domain_name) {
+  // We can use names started with '.' as wildcard records in virtual domain name config
+  // since these are not valid domain names and in this way we optimize for future search against
+  // them. We expect only names like *.foo.com as a valid wildcard records because any other
+  // wildcard usages are not considered as valid ones, i.e. **.foo.com, *foo.bar.com, foo*.bar.com
+  // are all invalid.
+  if (domain_name.starts_with("*.")) {
+    return domain_name.substr(1);
+  }
+
+  return domain_name;
+}
+
 } // namespace Utils
 } // namespace DnsFilter
 } // namespace UdpFilters

@@ -46,6 +46,18 @@ public:
   }
 };
 
+class EnvoyGrpcClientIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  static std::string
+  protocolTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& p) {
+    return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param), "EnvoyGrpc");
+  }
+  Network::Address::IpVersion ipVersion() const override { return GetParam(); }
+  ClientType clientType() const override { return ClientType::EnvoyGrpc; }
+};
+
 class GrpcClientIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {

@@ -60,7 +60,7 @@ absl::StatusOr<Address::InstanceConstSharedPtr> Utility::resolveUrl(const std::s
   } else if (urlIsUdpScheme(url)) {
     address = parseInternetAddressAndPortNoThrow(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
-    return std::make_shared<Address::PipeInstance>(url.substr(UNIX_SCHEME.size()));
+    return Address::PipeInstance::create(url.substr(UNIX_SCHEME.size()));
   } else {
     return absl::InvalidArgumentError(absl::StrCat("unknown protocol scheme: ", url));
   }
@@ -442,9 +442,14 @@ Utility::protobufAddressToAddressNoThrow(const envoy::config::core::v3::Address&
     return Utility::parseInternetAddressNoThrow(proto_address.socket_address().address(),
                                                 proto_address.socket_address().port_value(),
                                                 !proto_address.socket_address().ipv4_compat());
-  case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
-                                                   proto_address.pipe().mode());
+  case envoy::config::core::v3::Address::AddressCase::kPipe: {
+    auto ret_or_error =
+        Address::PipeInstance::create(proto_address.pipe().path(), proto_address.pipe().mode());
+    if (ret_or_error.status().ok()) {
+      return std::move(*ret_or_error);
+    }
+    return nullptr;
+  }
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
     return std::make_shared<Address::EnvoyInternalInstance>(
         proto_address.envoy_internal_address().server_listener_name(),

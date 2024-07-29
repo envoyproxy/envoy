@@ -174,9 +174,9 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   uint64_t counter_value = 0UL;
   uint64_t* counter_value_ptr = &counter_value;
   absl::Notification counter_value_set;
-  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
-  engine->dispatcher().post([&] {
-    Stats::CounterSharedPtr counter = TestUtility::findCounter(engine->getStatsStore(), name);
+  internalEngine()->dispatcher().post([&] {
+    Stats::CounterSharedPtr counter =
+        TestUtility::findCounter(internalEngine()->getStatsStore(), name);
     if (counter != nullptr) {
       *counter_value_ptr = counter->value();
     }
@@ -205,9 +205,8 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t gauge_value = 0UL;
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
-  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
-  engine->dispatcher().post([&] {
-    Stats::GaugeSharedPtr gauge = TestUtility::findGauge(engine->getStatsStore(), name);
+  internalEngine()->dispatcher().post([&] {
+    Stats::GaugeSharedPtr gauge = TestUtility::findGauge(internalEngine()->getStatsStore(), name);
     if (gauge != nullptr) {
       *gauge_value_ptr = gauge->value();
     }

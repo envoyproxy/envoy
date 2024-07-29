@@ -80,12 +80,16 @@ TEST_F(LuaClusterSpecifierPluginTest, NormalLuaCode) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("fake_service", route->routeEntry()->clusterName());
+    // Force the runtime to gc and destroy all the userdata.
+    config_->perLuaCodeSetup()->runtimeGC();
   }
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("web_service", route->routeEntry()->clusterName());
+    // Force the runtime to gc and destroy all the userdata.
+    config_->perLuaCodeSetup()->runtimeGC();
   }
 }
 
@@ -98,12 +102,16 @@ TEST_F(LuaClusterSpecifierPluginTest, ErrorLuaCode) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
+    // Force the runtime to gc and destroy all the userdata.
+    config_->perLuaCodeSetup()->runtimeGC();
   }
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
+    // Force the runtime to gc and destroy all the userdata.
+    config_->perLuaCodeSetup()->runtimeGC();
   }
 }
 
@@ -116,12 +124,16 @@ TEST_F(LuaClusterSpecifierPluginTest, ReturnTypeNotStringLuaCode) {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("fake_service", route->routeEntry()->clusterName());
+    // Force the runtime to gc and destroy all the userdata.
+    config_->perLuaCodeSetup()->runtimeGC();
   }
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
     auto route = plugin_->route(mock_route, headers);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
+    // Force the runtime to gc and destroy all the userdata.
+    config_->perLuaCodeSetup()->runtimeGC();
   }
 }
 

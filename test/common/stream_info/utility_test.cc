@@ -116,8 +116,8 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
 TEST(UtilityTest, formatDownstreamAddressNoPort) {
   EXPECT_EQ("1.2.3.4",
             Utility::formatDownstreamAddressNoPort(Network::Address::Ipv4Instance("1.2.3.4")));
-  EXPECT_EQ("/hello",
-            Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
+  EXPECT_EQ("/hello", Utility::formatDownstreamAddressNoPort(
+                          **Network::Address::PipeInstance::create("/hello")));
 }
 
 TEST(UtilityTest, formatDownstreamAddressJustPort) {

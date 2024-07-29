@@ -12,34 +12,14 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     register_test_extensions()
   }
 
-  // https://github.com/envoyproxy/envoy/issues/33014
-  func skipped_testHTTPRequestUsingProxy() throws {
-    EnvoyTestServer.startHttpProxyServer()
-    let port = EnvoyTestServer.getEnvoyPort()
-
-    let engineExpectation = self.expectation(description: "Run started engine")
+  private func executeRequest(engine: Engine, scheme: String, authority: String) -> String? {
     let responseHeadersExpectation =
         self.expectation(description: "Successful response headers received")
     let responseTrailersExpectation =
         self.expectation(description: "Successful response trailers received")
 
-    let engine = EngineBuilder()
-      .setLogLevel(.debug)
-      .setLogger { _, msg in
-        print(msg, terminator: "")
-      }
-      .setOnEngineRunning {
-        engineExpectation.fulfill()
-      }
-      .respectSystemProxySettings(true)
-      .build()
-
-    EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: false)
-
-    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
-
-    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
-                                               authority: "neverssl.com", path: "/")
+    let requestHeaders = RequestHeadersBuilder(method: .get, scheme: scheme,
+                                               authority: authority, path: "/")
       .build()
 
     var responseBuffer = Data()
@@ -61,8 +41,32 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     let expectations = [responseHeadersExpectation, responseTrailersExpectation]
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
-    if let responseBody = String(data: responseBuffer, encoding: .utf8) {
-      XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
+    return String(data: responseBuffer, encoding: .utf8)
+  }
+
+  func testHTTPRequestUsingProxy() throws {
+    EnvoyTestServer.startHttpProxyServer()
+    let port = EnvoyTestServer.getEnvoyPort()
+
+    let engineExpectation = self.expectation(description: "Run started engine")
+
+    let engine = EngineBuilder()
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
+      .setOnEngineRunning {
+        engineExpectation.fulfill()
+      }
+      .respectSystemProxySettings(true)
+      .build()
+
+    EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: false)
+
+    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
+
+    if let respBody = executeRequest(engine: engine, scheme: "http", authority: "neverssl.com") {
+      XCTAssertGreaterThanOrEqual(respBody.utf8.count, 3900)
     }
 
     engine.terminate()
@@ -187,8 +191,39 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     EnvoyTestServer.shutdownTestServer()
   }
 
-  // https://github.com/envoyproxy/envoy/issues/33014
-  func skipped_testHTTPRequestUsingProxyCancelStream() throws {
+  func testTwoHTTPRequestsUsingProxy() throws {
+    EnvoyTestServer.startHttpProxyServer()
+    let port = EnvoyTestServer.getEnvoyPort()
+
+    let engineExpectation = self.expectation(description: "Run started engine")
+
+    let engine = EngineBuilder()
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
+      .setOnEngineRunning {
+        engineExpectation.fulfill()
+      }
+      .respectSystemProxySettings(true)
+      .build()
+
+    EnvoyTestApi.registerTestProxyResolver("127.0.0.1", port: port, usePacResolver: false)
+
+    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
+
+    if let resp1 = executeRequest(engine: engine, scheme: "http", authority: "neverssl.com") {
+      XCTAssertGreaterThanOrEqual(resp1.utf8.count, 3900)
+    }
+    if let resp2 = executeRequest(engine: engine, scheme: "http", authority: "neverssl.com") {
+      XCTAssertGreaterThanOrEqual(resp2.utf8.count, 3900)
+    }
+
+    engine.terminate()
+    EnvoyTestServer.shutdownTestServer()
+  }
+
+  func testHTTPRequestUsingProxyCancelStream() throws {
     EnvoyTestServer.startHttpProxyServer()
     let port = EnvoyTestServer.getEnvoyPort()
 

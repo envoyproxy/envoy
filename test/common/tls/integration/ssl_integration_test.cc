@@ -275,6 +275,44 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   checkStats();
 }
 
+// Test server preference of cipher suites. Server order is ECDHE-RSA-AES128-GCM-SHA256
+// followed by ECDHE-RSA-AES256-GCM-SHA384. "ECDHE-RSA-AES128-GCM-SHA256" should be used based on
+// server preference.
+TEST_P(SslIntegrationTest, TestServerCipherPreference) {
+  server_ciphers_.push_back("ECDHE-RSA-AES128-GCM-SHA256");
+  server_ciphers_.push_back("ECDHE-RSA-AES256-GCM-SHA384");
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"})));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  const std::string counter_name = listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  EXPECT_EQ(1, test_server_->counter(counter_name)->value());
+}
+
+// Test client preference of cipher suites. Same server preference is followed as in the previous.
+// "ECDHE-RSA-AES256-GCM-SHA384" should be used based on client preference.
+TEST_P(SslIntegrationTest, ClientCipherPreference) {
+  prefer_client_ciphers_ = true;
+  server_ciphers_.push_back("ECDHE-RSA-AES128-GCM-SHA256");
+  server_ciphers_.push_back("ECDHE-RSA-AES256-GCM-SHA384");
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions{}
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"})));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  const std::string counter_name = listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  EXPECT_EQ(1, test_server_->counter(counter_name)->value());
+}
+
 // This test must be here vs integration_admin_test so that it tests a server with loaded certs.
 TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   DISABLE_IF_ADMIN_DISABLED; // Admin functionality.
@@ -752,8 +790,6 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
 // Test the access log.
 TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ssl_transport_failure_reason_format", "true"}});
   useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
                        "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
   server_rsa_cert_ = false;
@@ -765,38 +801,13 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLog) {
 
   auto log_result = waitForAccessLog(listener_access_log_name_);
   if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
-    EXPECT_THAT(log_result,
-                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435709:SSL_routines:"
-                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS:TLS_error_end"));
+    EXPECT_EQ(log_result,
+              "DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435709:SSL_routines:"
+              "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS:TLS_error_end FILTER_CHAIN_NAME=-");
   } else {
-    EXPECT_THAT(log_result,
-                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435640:"
-                           "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end"));
-  }
-}
-
-// Server has only an ECDSA certificate, client is only RSA capable, leads to a connection fail.
-TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnlyWithAccessLogOriginalFormat) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.ssl_transport_failure_reason_format", "false"}});
-  useListenerAccessLog("DOWNSTREAM_TRANSPORT_FAILURE_REASON=%DOWNSTREAM_TRANSPORT_FAILURE_REASON% "
-                       "FILTER_CHAIN_NAME=%FILTER_CHAIN_NAME%");
-  server_rsa_cert_ = false;
-  server_ecdsa_cert_ = true;
-  initialize();
-  auto codec_client =
-      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
-  EXPECT_FALSE(codec_client->connected());
-
-  auto log_result = waitForAccessLog(listener_access_log_name_);
-  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
-    EXPECT_THAT(log_result,
-                StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435709:SSL_routines:"
-                           "OPENSSL_internal:NO_COMMON_SIGNATURE_ALGORITHMS"));
-  } else {
-    EXPECT_THAT(log_result, StartsWith("DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:_268435640:"
-                                       "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER"));
+    EXPECT_EQ(log_result,
+              "DOWNSTREAM_TRANSPORT_FAILURE_REASON=TLS_error:|268435640:"
+              "SSL_routines:OPENSSL_internal:NO_SHARED_CIPHER:TLS_error_end FILTER_CHAIN_NAME=-");
   }
 }
 
@@ -1163,6 +1174,119 @@ TEST_P(SslKeyLogTest, SetMultipleIps) {
   auto result = codec_client_->startRequest(request_headers);
   codec_client_->close();
   logCheck();
+}
+
+TEST_P(SslIntegrationTest, SyncCertSelectorSucceeds) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sync
+  )EOF";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
+  checkStats();
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sync")->value(), 1);
+}
+
+TEST_P(SslIntegrationTest, AsyncCertSelectorSucceeds) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: async
+  )EOF";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
+  checkStats();
+
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_async")->value(), 1);
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_async_finished")->value(),
+            1);
+}
+
+TEST_P(SslIntegrationTest, AsyncSleepCertSelectorSucceeds) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sleep
+  )EOF";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, false, &creator);
+  checkStats();
+
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sleep")->value(), 1);
+  EXPECT_EQ(test_server_->counter("aysnc_cert_selection.cert_selection_sleep_finished")->value(),
+            1);
+}
+
+TEST_P(SslIntegrationTest, AsyncSleepCertSelectionAfterTearDown) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sleep
+  )EOF";
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+
+  // wait for the server tls handshake into sleep state.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  ENVOY_LOG_MISC(debug, "debug: closing connection");
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  connection.reset();
+
+  // wait the sleep timer in cert selector is triggered.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+}
+
+TEST_P(SslIntegrationTest, AsyncCertSelectionAfterSslShutdown) {
+  tls_cert_selector_yaml_ = R"EOF(
+name: test-tls-context-provider
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.StringValue
+  value: sleep
+  )EOF";
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      connection->ssl().get());
+  ASSERT(socket);
+
+  // wait for the server tls handshake into sleep state.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+
+  // wait the sleep timer in cert selector is triggered.
+  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+
+  connection.reset();
 }
 
 } // namespace Ssl

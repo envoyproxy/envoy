@@ -700,10 +700,10 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
-  Network::Address::PipeInstance unixAddress{"/foo"};
+  auto unix_address = *Network::Address::PipeInstance::create("/foo");
   Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0, nullptr};
   Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0, nullptr};
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(*unix_address));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
@@ -738,12 +738,12 @@ TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   Network::Address::Ipv4Instance external_ip_address{"90.60.0.10", 0, nullptr};
   // This test validates that unix address is not treated as internal since unix_sockets is set to
   // false.
-  Network::Address::PipeInstance unix_address{"/foo"};
+  auto unix_address = *Network::Address::PipeInstance::create("/foo");
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(first_internal_ip_address));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(second_internal_ip_address));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(external_ip_address));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(unix_address));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(*unix_address));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {

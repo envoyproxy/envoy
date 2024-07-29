@@ -82,13 +82,13 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
   a.reset();
   // Release interval was configured to default value (1 second).
   step(std::chrono::milliseconds(1000));
-  TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 1UL,
-                                time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(
+      stats_, "memory_release_test.tcmalloc.released_by_timer", 1UL, time_system_));
   auto released_bytes_before_next_run = Stats::totalPageHeapUnmapped();
   b.reset();
   step(std::chrono::milliseconds(1000));
-  TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL,
-                                time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(
+      stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL, time_system_));
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LT(released_bytes_before_next_run, final_released_bytes);
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
@@ -131,8 +131,8 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
   step(std::chrono::milliseconds(2000));
   b.reset();
   step(std::chrono::milliseconds(2000));
-  TestUtility::waitForCounterEq(stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL,
-                                time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(
+      stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL, time_system_));
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
 #endif

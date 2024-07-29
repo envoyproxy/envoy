@@ -225,7 +225,8 @@ IoHandlePtr IoUringSocketHandleImpl::duplicate() {
                  fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                              errorDetails(result.errno_)));
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_, &io_uring_worker_factory_);
+                                                         domain_, Network::SocketCreationOptions{},
+                                                         &io_uring_worker_factory_);
 }
 
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,

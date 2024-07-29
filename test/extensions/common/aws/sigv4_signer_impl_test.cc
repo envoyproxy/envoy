@@ -129,6 +129,46 @@ TEST_F(SigV4SignerImplTest, MissingPath) {
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 
+// Verify that we replace, not duplicate or append to existing headers
+TEST_F(SigV4SignerImplTest, DontDuplicateHeaders) {
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(token_credentials_));
+  addMethod("GET");
+  addPath("/");
+
+  addHeader("authorization", "existing_value");
+  addHeader("x-amz-security-token", "existing_value_2");
+  addHeader("x-amz-date", "existing_value_3");
+
+  auto status = signer_.sign(*message_);
+  EXPECT_EQ(message_->headers().get(Http::CustomHeaders::get().Authorization).size(), 1);
+  ENVOY_LOG_MISC(info, "authorization {}",
+                 message_->headers()
+                     .get(Http::CustomHeaders::get().Authorization)[0]
+                     ->value()
+                     .getStringView());
+  ENVOY_LOG_MISC(info, "date {}",
+                 message_->headers()
+                     .get(Envoy::Http::LowerCaseString("x-amz-date"))[0]
+                     ->value()
+                     .getStringView());
+  EXPECT_FALSE(absl::StrContains(
+      message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
+      "existing_value"));
+  EXPECT_EQ(message_->headers().get(Envoy::Http::LowerCaseString("x-amz-security-token")).size(),
+            1);
+  EXPECT_FALSE(absl::StrContains(message_->headers()
+                                     .get(Envoy::Http::LowerCaseString("x-amz-security-token"))[0]
+                                     ->value()
+                                     .getStringView(),
+                                 "existing_value_2"));
+  EXPECT_EQ(message_->headers().get(Envoy::Http::LowerCaseString("x-amz-date")).size(), 1);
+  EXPECT_FALSE(absl::StrContains(message_->headers()
+                                     .get(Envoy::Http::LowerCaseString("x-amz-date"))[0]
+                                     ->value()
+                                     .getStringView(),
+                                 "existing_value_3"));
+}
+
 // Verify we sign the date header
 TEST_F(SigV4SignerImplTest, SignDateHeader) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));

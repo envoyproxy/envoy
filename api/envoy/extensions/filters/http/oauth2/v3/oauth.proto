@@ -74,7 +74,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -155,6 +155,12 @@ message OAuth2Config {
   // in a week.
   // This setting is only considered if ``use_refresh_token`` is set to true, otherwise the authorization server expiration or ``defaul_expires_in`` is used.
   google.protobuf.Duration default_refresh_token_expires_in = 15;
+
+  // If set to true, Envoy will not set a cookie for ID Token even if one is received from the Identity Provider. This may be useful in cases where the ID
+  // Token is too large for HTTP cookies (longer than 4096 characters). Enabling this option will only disable setting the cookie response header, the filter
+  // will still process incoming ID Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+  // sessions would not set the IdToken cookie header.
+  bool disable_id_token_set_cookie = 17;
 }
 
 // Filter config.

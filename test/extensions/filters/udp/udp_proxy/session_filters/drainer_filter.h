@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 

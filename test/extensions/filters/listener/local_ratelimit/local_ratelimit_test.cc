@@ -56,14 +56,9 @@ public:
     NiceMock<Network::MockIoHandle> io_handle_;
   };
 
-  uint64_t initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
+  uint64_t initialize(const std::string& filter_yaml) {
     envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYaml(filter_yaml, proto_config);
-    fill_timer_ = new Event::MockTimer(&dispatcher_);
-    if (expect_timer_create) {
-      EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
-      EXPECT_CALL(*fill_timer_, disableTimer());
-    }
     config_ = std::make_shared<FilterConfig>(proto_config, dispatcher_, *stats_store_.rootScope(),
                                              runtime_);
     return proto_config.token_bucket().max_tokens();
@@ -72,7 +67,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Event::MockTimer* fill_timer_{};
   FilterConfigSharedPtr config_;
 };
 
@@ -116,8 +110,7 @@ token_bucket:
                    ->value());
 
   // Refill the bucket.
-  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(3000), nullptr));
-  fill_timer_->invokeCallback();
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(3000));
 
   // Third socket is allowed after refill.
   ActiveFilter active_filter3(config_);

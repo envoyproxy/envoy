@@ -25,6 +25,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
   stream_info_->protocol(Http::Protocol::Http3);
+  network_connection_->connectionSocket()->connectionInfoProvider().setConnectionID(id());
   network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
   fix_quic_lifetime_issues_ =

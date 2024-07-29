@@ -191,7 +191,7 @@ message JwtProvider {
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
   // not removed in the request. Default value is false.
-  // caveat: only works for from_header & has no effect for JWTs extracted through from_params & from_cookies.
+  // caveat: only works for from_header/from_params & has no effect for JWTs extracted through from_cookies.
   bool forward = 5;
 
   // Two fields below define where to extract the JWT from an HTTP request.
@@ -395,7 +395,7 @@ message RemoteJwks {
   //      cluster: jwt.www.googleapis.com|443
   //      timeout: 1s
   //
-  config.core.v3.HttpUri http_uri = 1;
+  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 10 minutes.
@@ -729,7 +729,7 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message JwtAuthentication {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtAuthentication";
@@ -802,6 +802,11 @@ message JwtAuthentication {
   // :ref:`requirement_name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.PerRouteConfig.requirement_name>`
   // in ``PerRouteConfig`` uses this map to specify a JwtRequirement.
   map<string, JwtRequirement> requirement_map = 5;
+
+  // A request failing the verification process will receive a 401 downstream with the failure response details
+  // in the body along with WWWAuthenticate header value set with "invalid token". If this value is set to true,
+  // the response details will be stripped and only a 401 response code will be returned. Default value is false
+  bool strip_failure_response = 6;
 }
 
 // Specify per-route config.

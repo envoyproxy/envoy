@@ -1,6 +1,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/http2/protocol_constraints.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
@@ -212,9 +213,9 @@ TEST_F(ProtocolConstraintsTest, DumpsStateWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ProtocolConstraints constraints(http2CodecStats(), options_);
 
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   constraints.dumpState(ostream, 0);
-  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   EXPECT_THAT(ostream.contents(), HasSubstr("ProtocolConstraints "));
   EXPECT_THAT(
       ostream.contents(),

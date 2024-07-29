@@ -3,6 +3,7 @@
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/filters/repick_cluster_filter.h"
@@ -46,7 +47,11 @@ public:
                 (*cluster->mutable_typed_extension_protocol_options())
                     ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
         protocol_options.add_http_filters()->set_name(filter_name_);
-        protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+        auto* upstream_codec = protocol_options.add_http_filters();
+        upstream_codec->set_name("envoy.filters.http.upstream_codec");
+        upstream_codec->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
+                default_instance());
         (*cluster->mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
                 .PackFrom(protocol_options);
@@ -797,16 +802,18 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
 // Test request mirroring / shadowing with upstream HTTP filters in the router.
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters) {
   initialConfigSetup("cluster_1", "");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
-        envoy::extensions::filters::http::router::v3::Router router_filter;
-        router_filter_config->typed_config().UnpackTo(&router_filter);
-        router_filter.add_upstream_http_filters()->set_name("add-body-filter");
-        router_filter.add_upstream_http_filters()->set_name("envoy.filters.http.upstream_codec");
-        router_filter_config->mutable_typed_config()->PackFrom(router_filter);
-      });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
+    envoy::extensions::filters::http::router::v3::Router router_filter;
+    router_filter_config->typed_config().UnpackTo(&router_filter);
+    router_filter.add_upstream_http_filters()->set_name("add-body-filter");
+    auto* upstream_codec = router_filter.add_upstream_http_filters();
+    upstream_codec->set_name("envoy.filters.http.upstream_codec");
+    upstream_codec->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+  });
   filter_name_ = "add-body-filter";
   initialize();
   sendRequestAndValidateResponse();

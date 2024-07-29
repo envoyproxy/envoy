@@ -33,12 +33,17 @@ class EdsClusterImpl
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>,
       private Config::EdsResourceRemovalCallback {
 public:
-  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                 ClusterFactoryContext& cluster_context);
+  static absl::StatusOr<std::unique_ptr<EdsClusterImpl>>
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         ClusterFactoryContext& cluster_context);
   ~EdsClusterImpl() override;
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
+
+protected:
+  EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                 ClusterFactoryContext& cluster_context, absl::Status& creation_status);
 
 private:
   // Config::SubscriptionCallbacks

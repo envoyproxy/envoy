@@ -234,7 +234,9 @@ HttpServerPropertiesCacheImpl::addOriginData(const Origin& origin, OriginData&& 
   ASSERT(protocols_.find(origin) == protocols_.end());
   while (protocols_.size() >= max_entries_) {
     auto iter = protocols_.begin();
-    key_value_store_->remove(originToString(iter->first));
+    if (key_value_store_) {
+      key_value_store_->remove(originToString(iter->first));
+    }
     protocols_.erase(iter);
   }
   protocols_[origin] = std::move(origin_data);

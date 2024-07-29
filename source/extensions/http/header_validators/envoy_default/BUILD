@@ -157,11 +157,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = [
-        "//source/exe:__subpackages__",
-        "//source/extensions/filters/network/http_connection_manager:__subpackages__",
+    extra_visibility = [
         "//source/server/admin:__subpackages__",
-        "//test:__subpackages__",
     ],
     deps = [
         ":header_validator_factory",

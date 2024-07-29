@@ -146,7 +146,7 @@ public:
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
                     OptRef<PoolConnectResultCallback> connect_callback,
-                    Http::PersistentQuicInfo& quic_info);
+                    Http::PersistentQuicInfo& quic_info, bool attempt_happy_eyeballs = false);
 
   ~Http3ConnPoolImpl() override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
@@ -178,6 +178,11 @@ private:
 
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
+
+  // Make a best effort attempt to find an address family other than the initial
+  // address. This fails over to using the primary address if the second address
+  // in the list isn't of a different address family.
+  bool attempt_happy_eyeballs_;
 };
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -188,7 +193,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
-                 Http::PersistentQuicInfo& quic_info);
+                 Http::PersistentQuicInfo& quic_info, bool attempt_happy_eyeballs = false);
 
 } // namespace Http3
 } // namespace Http

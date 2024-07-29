@@ -225,7 +225,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
-        std::make_shared<Network::Address::PipeInstance>("unix://foo"));
+        *Network::Address::PipeInstance::create("unix://foo"));
 
     OriginalDstCluster::LoadBalancer lb(handle_);
     EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
@@ -868,7 +868,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   // Downstream connection over Unix Domain Socket, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection3;
   connection3.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      std::make_shared<Network::Address::PipeInstance>("unix://foo"));
+      *Network::Address::PipeInstance::create("unix://foo"));
   TestLoadBalancerContext lb_context3(&connection3, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
 

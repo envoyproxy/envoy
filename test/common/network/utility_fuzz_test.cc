@@ -43,12 +43,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
   }
 
-  try {
-    envoy::config::core::v3::Address proto_address;
-    Network::Address::PipeInstance address(string_buffer);
-    Network::Utility::addressToProtobufAddress(address, proto_address);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+  envoy::config::core::v3::Address proto_address;
+  auto address_or_error = Network::Address::PipeInstance::create(string_buffer);
+  if (address_or_error.status().ok()) {
+    Network::Utility::addressToProtobufAddress(*(address_or_error.value()), proto_address);
   }
 }
 

@@ -5,6 +5,7 @@
 #include "source/common/memory/stats.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -753,7 +754,7 @@ TEST_F(StatNameTest, SupportsAbslHash) {
 TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
-    TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     TestUtil::forEachSampleStat(1000, true, fn);
     return memory_test.consumedBytes();
   };

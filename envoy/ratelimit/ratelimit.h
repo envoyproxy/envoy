@@ -50,22 +50,37 @@ struct Descriptor {
 };
 
 /**
- * A single token bucket. See token_bucket.proto.
- */
-struct TokenBucket {
-  uint32_t max_tokens_;
-  uint32_t tokens_per_fill_;
-  absl::Duration fill_interval_;
-};
-
-/**
  * A single rate limit request descriptor. See ratelimit.proto.
  */
 struct LocalDescriptor {
   std::vector<DescriptorEntry> entries_;
-  friend bool operator==(const LocalDescriptor& lhs, const LocalDescriptor& rhs) {
-    return lhs.entries_ == rhs.entries_;
+
+  friend bool operator==(const LocalDescriptor& a, const LocalDescriptor& b) {
+    return a.entries_ == b.entries_;
   }
+  struct Hash {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    size_t operator()(const LocalDescriptor& d) const {
+      return absl::Hash<std::vector<DescriptorEntry>>()(d.entries_);
+    }
+  };
+  struct Equal {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    size_t operator()(const LocalDescriptor& a, const LocalDescriptor& b) const {
+      return a.entries_ == b.entries_;
+    }
+  };
+
+  std::string toString() const {
+    return absl::StrJoin(entries_, ", ", [](std::string* out, const auto& e) {
+      absl::StrAppend(out, e.key_, "=", e.value_);
+    });
+  }
+
+  /**
+   * Local descriptor map.
+   */
+  template <class V> using Map = absl::flat_hash_map<LocalDescriptor, V, Hash, Equal>;
 };
 
 /*
