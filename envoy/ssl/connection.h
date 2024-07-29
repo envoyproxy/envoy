@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/ssl/parsed_x509_name.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -94,6 +95,11 @@ public:
    *         there is no peer certificate, or no subject.
    **/
   virtual const std::string& subjectPeerCertificate() const PURE;
+
+  /**
+   * @return the well-known attribute values parsed from subject field of the peer certificate.
+   **/
+  virtual const ParsedX509NameConstSharedPtr& parsedSubjectPeerCertificate() const PURE;
 
   /**
    * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.

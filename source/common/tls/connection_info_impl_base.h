@@ -28,6 +28,7 @@ public:
   absl::Span<const std::string> serialNumbersPeerCertificates() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
+  const Ssl::ParsedX509NameConstSharedPtr& parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;

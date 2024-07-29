@@ -136,6 +136,60 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
   return {reinterpret_cast<const char*>(data), data_len};
 }
 
+/**
+ * Parse well-known attribute values from a X509 distinguished name in certificate
+ * @param cert the certificate.
+ * @param desired_name the desired name (Issuer or Subject) to parse from the certificate.
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr returns the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NameConstSharedPtr parseX509NameFromCertificate(X509& cert,
+                                                                      CertName desired_name) {
+  X509_NAME* name = nullptr;
+  switch (desired_name) {
+  case CertName::Issuer:
+    name = X509_get_issuer_name(&cert);
+    break;
+  case CertName::Subject:
+    name = X509_get_subject_name(&cert);
+    break;
+  }
+
+  auto parsed = std::make_shared<Envoy::Ssl::ParsedX509Name>();
+  int cnt = X509_NAME_entry_count(name);
+  for (int i = 0; i < cnt; i++) {
+    const X509_NAME_ENTRY *ent;
+    ent = X509_NAME_get_entry(name, i);
+
+    const ASN1_OBJECT *fn = X509_NAME_ENTRY_get_object(ent);
+    int fn_nid = OBJ_obj2nid(fn);
+    // ignore unknown attribute
+    if (fn_nid != NID_commonName && fn_nid != NID_organizationName) {
+      continue;
+    }
+
+    // put the value into utf8 string
+    const ASN1_STRING *val = X509_NAME_ENTRY_get_data(ent);
+    unsigned char *text = nullptr;
+    int len = ASN1_STRING_to_UTF8(&text, val);
+    // Len < 0 means we could not encode as UTF-8, just ignore it
+    // len = 0 is empty string already, also ignore it
+    if (len > 0) {
+      auto str = std::string(reinterpret_cast<const char*>(text), len);
+      switch (fn_nid) {
+      case NID_commonName:
+        parsed->commonName_ = std::move(str);
+        break;
+      case NID_organizationName:
+        parsed->organizationName_.push_back(std::move(str));
+        break;
+      }
+    }
+    // make sure free the memory allocated by openssl
+    OPENSSL_free(text);
+  }
+  return parsed;
+}
+
 } // namespace
 
 const ASN1_TIME& epochASN1Time() {
@@ -359,6 +413,10 @@ std::string Utility::getIssuerFromCertificate(X509& cert) {
 
 std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
+}
+
+Envoy::Ssl::ParsedX509NameConstSharedPtr Utility::parseSubjectFromCertificate(X509& cert) {
+  return parseX509NameFromCertificate(cert, CertName::Subject);
 }
 
 absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
