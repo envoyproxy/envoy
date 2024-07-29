@@ -140,7 +140,7 @@ private:
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
-  int stream_idle_timeout_seconds_ = 15;
+  int stream_idle_timeout_seconds_ = 60;
   int per_try_idle_timeout_seconds_ = 15;
   bool gzip_decompression_filter_ = true;
   bool brotli_decompression_filter_ = false;

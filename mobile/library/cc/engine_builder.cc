@@ -738,6 +738,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     udp_snd_buf_sock_opt->mutable_type()->mutable_datagram();
     udp_snd_buf_sock_opt->set_description(
         absl::StrCat("UDP SO_SNDBUF = ", udp_socket_send_buffer_size_, " bytes"));
+
+    envoy::config::core::v3::SocketOption* tcp_snd_buf_sock_opt =
+    base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    tcp_snd_buf_sock_opt->set_name(SO_SNDBUF);
+    tcp_snd_buf_sock_opt->set_level(SOL_SOCKET);
+    tcp_snd_buf_sock_opt->set_int_value(udp_socket_send_buffer_size_);
+    // Only apply the socket option to the stream socket.
+    tcp_snd_buf_sock_opt->mutable_type()->mutable_stream();
+    // Use the same value as UDP send buffer size.
+    tcp_snd_buf_sock_opt->set_description(
+        absl::StrCat("TCP SO_SNDBUF = ", udp_socket_send_buffer_size_, " bytes"));
     // Set the network service type on iOS, if supplied.
 #if defined(__APPLE__)
     if (ios_network_service_type_ > 0) {
