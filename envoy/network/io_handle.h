@@ -163,9 +163,12 @@ public:
     absl::FixedArray<RecvMsgPerPacketInfo> msg_;
   };
 
+  // Struct representation of QuicProtocolOptions::SaveCmsgConfig config proto.
   struct UdpSaveCmsgConfig {
-    int level;
-    int optname;
+    absl::optional<int> level;
+    absl::optional<int> type;
+
+    bool hasConfig() const { return (level.has_value() && type.has_value()); }
   };
 
   /**

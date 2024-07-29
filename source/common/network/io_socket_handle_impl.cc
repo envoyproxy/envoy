@@ -336,8 +336,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      if (cmsg->cmsg_type == save_cmsg_config.optname &&
-          cmsg->cmsg_level == save_cmsg_config.level) {
+      if (save_cmsg_config.hasConfig() && cmsg->cmsg_type == save_cmsg_config.type.value() &&
+          cmsg->cmsg_level == save_cmsg_config.level.value()) {
         Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
         output.msg_[0].saved_cmsg_ = cmsg_slice;
       }
@@ -446,8 +446,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        if (cmsg->cmsg_type == save_cmsg_config.optname &&
-            cmsg->cmsg_level == save_cmsg_config.level) {
+        if (save_cmsg_config.hasConfig() && cmsg->cmsg_type == save_cmsg_config.type.value() &&
+            cmsg->cmsg_level == save_cmsg_config.level.value()) {
           Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
           output.msg_[0].saved_cmsg_ = cmsg_slice;
         }

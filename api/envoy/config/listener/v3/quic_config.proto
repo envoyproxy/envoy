@@ -29,10 +29,12 @@ message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
 
+  // Configuration for UDP cmsg to pass to listener filters via QuicReceivedPacket.
+  // Both level and type must be specified for cmsg to be saved.
   message SaveCmsgConfig {
-    int32 level = 1;
+    optional int32 level = 1;
 
-    int32 optname = 2;
+    optional int32 type = 2;
   }
 
   core.v3.QuicProtocolOptions quic_protocol_options = 1;
