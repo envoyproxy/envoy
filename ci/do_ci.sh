@@ -591,6 +591,7 @@ case $CI_TARGET in
         else
             ENVOY_RELEASE_TARBALL="/build/release/arm64/bin/release.tar.zst"
         fi
+
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/zstd \
               -- --stdout \
@@ -609,8 +610,10 @@ case $CI_TARGET in
               --//distribution:envoy-contrib-binary=//distribution:custom/envoy-contrib \
               //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+            echo "Packages created: ${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
         else
+            echo "Packages created: ${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.arm64.tar.gz"
         fi
         ;;
@@ -899,7 +902,9 @@ case $CI_TARGET in
 
         # Build
         echo "Building with:"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+        echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -939,12 +944,6 @@ case $CI_TARGET in
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              "${BUILD_DIR}/envoy" \
-              "release" \
-              "${GCS_REDIRECT_PATH}"
         ;;
 
     sizeopt)
