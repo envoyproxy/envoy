@@ -101,9 +101,10 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 
 template <class T>
 std::unique_ptr<T>
-http2HeaderBlockToEnvoyTrailers(const quiche::HttpHeaderBlock& header_block, uint32_t max_headers_kb,
-                                uint32_t max_headers_allowed, HeaderValidator& validator,
-                                absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+http2HeaderBlockToEnvoyTrailers(const quiche::HttpHeaderBlock& header_block,
+                                uint32_t max_headers_kb, uint32_t max_headers_allowed,
+                                HeaderValidator& validator, absl::string_view& details,
+                                quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create(max_headers_kb, max_headers_allowed);
   if (header_block.size() > max_headers_allowed) {
     details = Http3ResponseCodeDetailValues::too_many_trailers;
