@@ -818,6 +818,10 @@ private:
   FieldExtractor field_extractor_;
 };
 
+using StreamInfoFormatterProviderLookupTable =
+    absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
+                                                     StreamInfoFormatterProviderCreateFunc>>;
+
 const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders() {
   CONSTRUCT_ON_FIRST_USE(
       StreamInfoFormatterProviderLookupTable,
@@ -1750,6 +1754,41 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
       });
 }
+
+class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
+public:
+  BuiltInStreamInfoCommandParser() = default;
+
+  // StreamInfoCommandParser
+  StreamInfoFormatterProviderPtr parse(const std::string& command, const std::string& sub_command,
+                                       absl::optional<size_t>& max_length) const override {
+
+    auto it = getKnownStreamInfoFormatterProviders().find(command);
+
+    // No throw because the stream info command parser may not be the last parser and other
+    // formatter parsers may be tried.
+    if (it == getKnownStreamInfoFormatterProviders().end()) {
+      return nullptr;
+    }
+    // Check flags for the command.
+    THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
+        (*it).second.first, command, sub_command, max_length));
+
+    return (*it).second.second(sub_command, max_length);
+  }
+};
+
+std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
+  return "envoy.built_in_formatters.stream_info.default";
+}
+
+StreamInfoCommandParserPtr
+DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
+  return std::make_unique<BuiltInStreamInfoCommandParser>();
+}
+
+REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
+                 BuiltInStreamInfoCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

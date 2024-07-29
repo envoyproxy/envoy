@@ -19,15 +19,6 @@
 namespace Envoy {
 namespace Formatter {
 
-class StreamInfoFormatterProvider {
-public:
-  virtual ~StreamInfoFormatterProvider() = default;
-
-  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo&) const PURE;
-  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const PURE;
-};
-
-using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
 using StreamInfoFormatterProviderCreateFunc =
     std::function<StreamInfoFormatterProviderPtr(const std::string&, absl::optional<size_t>)>;
 
@@ -248,106 +239,13 @@ private:
   ProtobufWkt::Value str_;
 };
 
-using StreamInfoFormatterProviderLookupTable =
-    absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
-                                                     StreamInfoFormatterProviderCreateFunc>>;
-const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders();
-
-/**
- * FormatterProvider for string literals. It ignores headers and stream info and returns string by
- * which it was initialized.
- */
-template <class FormatterContext>
-class PlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
+class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInStreamInfoCommandParserFactory {
 public:
-  PlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
-
-  // FormatterProviderBase
-  absl::optional<std::string> formatWithContext(const FormatterContext&,
-                                                const StreamInfo::StreamInfo&) const override {
-    return str_.string_value();
-  }
-  ProtobufWkt::Value formatValueWithContext(const FormatterContext&,
-                                            const StreamInfo::StreamInfo&) const override {
-    return str_;
-  }
-
-private:
-  ProtobufWkt::Value str_;
+  std::string name() const override;
+  StreamInfoCommandParserPtr createCommandParser() const override;
 };
 
-/**
- * FormatterProvider for numbers.
- */
-template <class FormatterContext>
-class PlainNumberFormatterBase : public FormatterProviderBase<FormatterContext> {
-public:
-  PlainNumberFormatterBase(double num) { num_.set_number_value(num); }
-
-  // FormatterProviderBase
-  absl::optional<std::string> formatWithContext(const FormatterContext&,
-                                                const StreamInfo::StreamInfo&) const override {
-    std::string str = absl::StrFormat("%g", num_.number_value());
-    return str;
-  }
-  ProtobufWkt::Value formatValueWithContext(const FormatterContext&,
-                                            const StreamInfo::StreamInfo&) const override {
-    return num_;
-  }
-
-private:
-  ProtobufWkt::Value num_;
-};
-
-/**
- * FormatterProvider based on StreamInfo fields.
- */
-template <class FormatterContext>
-class StreamInfoFormatterBase : public FormatterProviderBase<FormatterContext> {
-public:
-  StreamInfoFormatterBase(const std::string& command, const std::string& sub_command = "",
-                          absl::optional<size_t> max_length = absl::nullopt) {
-
-    const auto& formatters = getKnownStreamInfoFormatterProviders();
-
-    auto it = formatters.find(command);
-
-    if (it == formatters.end()) {
-      throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
-    }
-
-    // Check flags for the command.
-    THROW_IF_NOT_OK(
-        CommandSyntaxChecker::verifySyntax((*it).second.first, command, sub_command, max_length));
-
-    // Create a pointer to the formatter by calling a function
-    // associated with formatter's name.
-    formatter_ = (*it).second.second(sub_command, max_length);
-  }
-
-  StreamInfoFormatterBase(StreamInfoFormatterProviderPtr formatter)
-      : formatter_(std::move(formatter)) {}
-
-  // FormatterProvider
-  absl::optional<std::string>
-  formatWithContext(const FormatterContext&,
-                    const StreamInfo::StreamInfo& stream_info) const override {
-    return formatter_->format(stream_info);
-  }
-  ProtobufWkt::Value
-  formatValueWithContext(const FormatterContext&,
-                         const StreamInfo::StreamInfo& stream_info) const override {
-    return formatter_->formatValue(stream_info);
-  }
-
-private:
-  StreamInfoFormatterProviderPtr formatter_;
-};
-
-// Aliases for backward compatibility.
-using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
-using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
-using StreamInfoFormatter = StreamInfoFormatterBase<HttpFormatterContext>;
+DECLARE_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

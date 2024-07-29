@@ -18,9 +18,7 @@ namespace LocalReply {
 
 class BodyFormatter {
 public:
-  BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%", false)),
-        content_type_(Http::Headers::get().ContentTypeValues.Text) {}
+  BodyFormatter() : content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
                 Server::Configuration::GenericFactoryContext& context)
@@ -37,8 +35,13 @@ public:
               const Http::ResponseTrailerMap& response_trailers,
               const StreamInfo::StreamInfo& stream_info, std::string& body,
               absl::string_view& content_type) const {
-    body = formatter_->formatWithContext(
-        {&request_headers, &response_headers, &response_trailers, body}, stream_info);
+    // No specific formatter is provided and the default formatter %LOCAL_REPLY_BODY% will
+    // be used. That means the body will be the same as the original body and we don't need
+    // to format it.
+    if (formatter_ != nullptr) {
+      body = formatter_->formatWithContext(
+          {&request_headers, &response_headers, &response_trailers, body}, stream_info);
+    }
     content_type = content_type_;
   }
 
