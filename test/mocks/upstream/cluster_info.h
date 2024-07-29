@@ -166,7 +166,7 @@ public:
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
-               Http::FilterChainManager& manager),
+               Http::FilterChainManager& manager, const Http::FilterChainOptions&),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
   MOCK_METHOD(const absl::optional<
