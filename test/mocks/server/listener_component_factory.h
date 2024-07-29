@@ -27,19 +27,21 @@ public:
   MOCK_METHOD(LdsApi*, createLdsApi_,
               (const envoy::config::core::v3::ConfigSource&,
                const xds::core::v3::ResourceLocator*));
-  MOCK_METHOD(Filter::NetworkFilterFactoriesList, createNetworkFilterFactoryList,
+  MOCK_METHOD(absl::StatusOr<Filter::NetworkFilterFactoriesList>, createNetworkFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Configuration::FilterChainFactoryContext& filter_chain_factory_context));
-  MOCK_METHOD(Filter::ListenerFilterFactoriesList, createListenerFilterFactoryList,
+  MOCK_METHOD(absl::StatusOr<Filter::ListenerFilterFactoriesList>, createListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD(std::vector<Network::UdpListenerFilterFactoryCb>, createUdpListenerFilterFactoryList,
+  MOCK_METHOD(absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>,
+              createUdpListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD(Filter::QuicListenerFilterFactoriesList, createQuicListenerFilterFactoryList,
+  MOCK_METHOD(absl::StatusOr<Filter::QuicListenerFilterFactoriesList>,
+              createQuicListenerFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
+  MOCK_METHOD(absl::StatusOr<Network::SocketSharedPtr>, createListenSocket,
               (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
                const Network::SocketCreationOptions& creation_options, uint32_t worker_index));
