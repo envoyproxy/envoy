@@ -149,6 +149,7 @@ public:
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   const envoy::config::route::v3::RetryPolicy& retryPolicy() const { return retry_policy_; }
+
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
