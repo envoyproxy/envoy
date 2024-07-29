@@ -209,6 +209,8 @@ envoy_cc_fuzz_test(
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
         "//source/common/common:empty_string",
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",

@@ -127,6 +127,8 @@ public:
    */
   const Tracing::Span& activeSpan() const;
 
+  static constexpr absl::string_view category() { return "http"; }
+
 private:
   const Http::RequestHeaderMap* request_headers_{};
   const Http::ResponseHeaderMap* response_headers_{};

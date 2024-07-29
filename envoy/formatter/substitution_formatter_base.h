@@ -112,6 +112,14 @@ using CommandParserBasePtr = std::unique_ptr<CommandParserBase<FormatterContext>
 using StreamInfoCommandParser = CommandParserBase<void>;
 using StreamInfoCommandParserPtr = CommandParserBasePtr<void>;
 
+template <class FormatterContext> constexpr absl::string_view formatterContextCategory() {
+  if constexpr (std::is_same_v<FormatterContext, void>) {
+    return "stream_info"; // Support for StreamInfo.
+  } else {
+    return FormatterContext::category();
+  }
+}
+
 template <class FormatterContext> class CommandParserFactoryBase : public Config::TypedFactory {
 public:
   /**
@@ -126,13 +134,23 @@ public:
   createCommandParserFromProto(const Protobuf::Message& config,
                                Server::Configuration::GenericFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.formatter"; }
+  std::string category() const override {
+    static constexpr absl::string_view HttpContextCategory = "http";
+    if constexpr (formatterContextCategory<FormatterContext>() == HttpContextCategory) {
+      return "envoy.formatter"; // Backward compatibility for HTTP.
+    } else {
+      return fmt::format("envoy.formatters.{}", formatterContextCategory<FormatterContext>());
+    }
+  }
 };
 
 template <class FormatterContext>
 class BuiltInCommandParserFactoryBase : public Config::UntypedFactory {
 public:
-  std::string category() const override { return "envoy.built_in_formatters"; }
+  std::string category() const override {
+    return fmt::format("envoy.built_in_formatters.{}",
+                       formatterContextCategory<FormatterContext>());
+  }
 
   /**
    * Creates a particular CommandParser implementation.

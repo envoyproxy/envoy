@@ -457,6 +457,8 @@ envoy_cc_test(
     srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
         "//source/common/router:header_parser_lib",

@@ -18,6 +18,8 @@ envoy_cc_test(
     srcs = ["async_client_impl_test.cc"],
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/grpc:async_client_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -110,6 +112,8 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tracing:http_tracer_lib",
