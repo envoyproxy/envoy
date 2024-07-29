@@ -1779,7 +1779,7 @@ public:
 };
 
 std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
-  return "envoy.built_in_formatter.stream_info";
+  return "envoy.built_in_formatters.stream_info.default";
 }
 
 StreamInfoCommandParserPtr

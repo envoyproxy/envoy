@@ -156,7 +156,7 @@ private:
 
 class DefaultBuiltInCommandParserFactory : public BuiltInCommandParserFactory {
 public:
-  std::string name() const override { return "envoy.built_in_formatters.generic_poxy_specific"; }
+  std::string name() const override { return "envoy.built_in_formatters.generic_poxy.default"; }
 
   // BuiltInCommandParserFactory
   CommandParserPtr createCommandParser() const override {

@@ -407,7 +407,7 @@ FormatterProviderPtr BuiltInHttpCommandParser::parse(const std::string& command,
 }
 
 std::string DefaultBuiltInHttpCommandParserFactory::name() const {
-  return "envoy.built_in_formatters.http_specific";
+  return "envoy.built_in_formatters.http.default";
 }
 
 CommandParserPtr DefaultBuiltInHttpCommandParserFactory::createCommandParser() const {
