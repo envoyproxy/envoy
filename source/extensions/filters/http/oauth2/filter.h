@@ -148,7 +148,7 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
-
+  const envoy::config::route::v3::RetryPolicy& retryPolicy() const { return retry_policy_; }
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -175,6 +175,7 @@ private:
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
+  envoy::config::route::v3::RetryPolicy retry_policy_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
