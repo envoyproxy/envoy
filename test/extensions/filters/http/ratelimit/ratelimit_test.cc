@@ -1716,8 +1716,6 @@ TEST_F(HttpRateLimitFilterTest, StatsWithPrefix) {
   EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
 }
 
-} // namespace
-
 TEST(ObjectFactory, HitsAddend) {
   const std::string name = "envoy.ratelimit.hits_addend";
   auto* factory =
@@ -1730,6 +1728,7 @@ TEST(ObjectFactory, HitsAddend) {
   EXPECT_EQ(hits_addend, object->serializeAsString());
 }
 
+} // namespace
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
