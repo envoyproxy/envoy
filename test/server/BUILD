@@ -53,6 +53,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/access_loggers/file:config",
