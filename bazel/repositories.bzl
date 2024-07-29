@@ -363,6 +363,7 @@ def envoy_dependencies(skip_targets = []):
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:flatbuffers.patch"],
     )
+    external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive(name = "envoy_examples")
