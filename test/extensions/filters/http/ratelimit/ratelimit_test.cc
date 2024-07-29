@@ -1717,6 +1717,19 @@ TEST_F(HttpRateLimitFilterTest, StatsWithPrefix) {
 }
 
 } // namespace
+
+TEST(ObjectFactory, HitsAddend) {
+  const std::string name = "envoy.ratelimit.hits_addend";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string hits_addend = std::to_string(1234);
+  auto object = factory->createFromBytes(hits_addend);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(hits_addend, object->serializeAsString());
+}
+
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

@@ -88,7 +88,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   const StreamInfo::UInt32Accessor* hits_addend_filter_state =
       callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
-          "envoy.ratelimit.hits_addend");
+          HitsAddendFilterStateKey);
   double hits_addend = 0;
   if (hits_addend_filter_state != nullptr) {
     hits_addend = hits_addend_filter_state->value();
