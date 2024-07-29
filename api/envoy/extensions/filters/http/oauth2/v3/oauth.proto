@@ -89,6 +89,9 @@ message OAuth2Config {
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
 
+  // Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 18;
+
   // The endpoint redirect to for authorization in response to unauthorized requests.
   string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];
 
@@ -162,9 +165,6 @@ message OAuth2Config {
   // will still process incoming ID Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the IdToken cookie header.
   bool disable_id_token_set_cookie = 17;
-
-  // Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.
-  config.core.v3.RetryPolicy retry_policy = 18;
 }
 
 // Filter config.
