@@ -115,9 +115,9 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_http2_deframer_lib",
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
-        ":spdy_core_http2_deframer_lib",
     ],
 )
 
@@ -128,9 +128,9 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":http2_adapter_event_forwarder",
+        ":http2_core_protocol_lib",
+        ":http2_test_tools_mock_spdy_framer_visitor_lib",
         ":quiche_common_platform_test",
-        ":spdy_core_protocol_lib",
-        ":spdy_test_tools_mock_spdy_framer_visitor_lib",
     ],
 )
 
@@ -190,8 +190,8 @@ envoy_cc_library(
     deps = [
         ":http2_adapter_http2_protocol",
         ":http2_adapter_http2_visitor_interface",
+        ":http2_core_protocol_lib",
         ":quiche_common_platform_export",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -448,15 +448,15 @@ envoy_cc_library(
         ":http2_adapter_interface_lib",
         ":http2_adapter_oghttp2_util",
         ":http2_adapter_window_manager",
+        ":http2_core_framer_lib",
+        ":http2_core_http2_deframer_lib",
         ":http2_core_http2_trace_logging_lib",
         ":http2_core_priority_write_scheduler_lib",
+        ":http2_core_protocol_lib",
+        ":http2_header_byte_listener_interface_lib",
+        ":http2_no_op_headers_handler_lib",
         ":quiche_common_callbacks",
-        ":spdy_core_framer_lib",
-        ":spdy_core_http2_deframer_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_core_protocol_lib",
-        ":spdy_header_byte_listener_interface_lib",
-        ":spdy_no_op_headers_handler_lib",
         "@com_google_absl//absl/cleanup",
     ],
 )
@@ -558,10 +558,10 @@ envoy_cc_test_library(
         ":http2_adapter_http2_protocol",
         ":http2_adapter_http2_util",
         ":http2_adapter_oghttp2_util",
+        ":http2_core_framer_lib",
+        ":http2_core_protocol_lib",
+        ":http2_hpack_hpack_lib",
         ":quiche_common_platform_export",
-        ":spdy_core_framer_lib",
-        ":spdy_core_hpack_hpack_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -577,10 +577,10 @@ envoy_cc_test_library(
         ":http2_adapter_http2_protocol",
         ":http2_adapter_http2_visitor_interface",
         ":http2_adapter_mock_http2_visitor",
+        ":http2_core_protocol_lib",
+        ":http2_hpack_hpack_lib",
         ":quiche_common_platform_test",
-        ":spdy_core_hpack_hpack_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -591,8 +591,8 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":http2_adapter_test_utils",
+        ":http2_core_framer_lib",
         ":quiche_common_platform_test",
-        ":spdy_core_framer_lib",
     ],
 )
 
@@ -636,26 +636,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http2_core_http2_priority_write_scheduler_lib",
-    hdrs = ["quiche/http2/core/http2_priority_write_scheduler.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform",
-        ":spdy_core_intrusive_list_lib",
-        ":spdy_core_protocol_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "http2_core_priority_write_scheduler_lib",
     hdrs = ["quiche/http2/core/priority_write_scheduler.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_protocol_lib",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -666,11 +654,11 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_headers_handler_interface_lib",
+        ":http2_core_http2_deframer_lib",
+        ":http2_core_protocol_lib",
+        ":http2_core_recording_headers_handler_lib",
         ":quiche_common_platform",
-        ":spdy_core_headers_handler_interface_lib",
-        ":spdy_core_http2_deframer_lib",
-        ":spdy_core_protocol_lib",
-        ":spdy_core_recording_headers_handler_lib",
     ],
 )
 
@@ -1309,30 +1297,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_no_op_headers_handler_lib",
-    hdrs = ["quiche/spdy/core/no_op_headers_handler.h"],
+    name = "http2_no_op_headers_handler_lib",
+    hdrs = ["quiche/http2/core/no_op_headers_handler.h"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_common_platform",
-        ":spdy_header_byte_listener_interface_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_header_byte_listener_interface_lib",
-    hdrs = ["quiche/spdy/core/header_byte_listener_interface.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = [
+        ":http2_header_byte_listener_interface_lib",
         ":quiche_common_platform",
     ],
 )
 
 envoy_cc_library(
-    name = "spdy_core_alt_svc_wire_format_lib",
-    srcs = ["quiche/spdy/core/spdy_alt_svc_wire_format.cc"],
-    hdrs = ["quiche/spdy/core/spdy_alt_svc_wire_format.h"],
+    name = "http2_header_byte_listener_interface_lib",
+    hdrs = ["quiche/http2/core/header_byte_listener_interface.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_core_alt_svc_wire_format_lib",
+    srcs = ["quiche/http2/core/spdy_alt_svc_wire_format.cc"],
+    hdrs = [
+        "quiche/http2/core/spdy_alt_svc_wire_format.h",
+        "quiche/spdy/core/spdy_alt_svc_wire_format.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     visibility = ["//visibility:public"],
@@ -1340,25 +1331,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_core_framer_lib",
+    name = "http2_core_framer_lib",
     srcs = [
-        "quiche/spdy/core/spdy_frame_builder.cc",
-        "quiche/spdy/core/spdy_framer.cc",
+        "quiche/http2/core/spdy_frame_builder.cc",
+        "quiche/http2/core/spdy_framer.cc",
     ],
     hdrs = [
+        "quiche/http2/core/spdy_frame_builder.h",
+        "quiche/http2/core/spdy_framer.h",
         "quiche/spdy/core/spdy_frame_builder.h",
         "quiche/spdy/core/spdy_framer.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_alt_svc_wire_format_lib",
+        ":http2_core_headers_handler_interface_lib",
+        ":http2_core_protocol_lib",
+        ":http2_core_zero_copy_output_buffer_lib",
+        ":http2_hpack_hpack_lib",
         ":quiche_common_platform",
-        ":spdy_core_alt_svc_wire_format_lib",
-        ":spdy_core_headers_handler_interface_lib",
-        ":spdy_core_hpack_hpack_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_core_protocol_lib",
-        ":spdy_core_zero_copy_output_buffer_lib",
     ],
 )
 
@@ -1377,8 +1370,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_core_headers_handler_interface_lib",
-    hdrs = ["quiche/spdy/core/spdy_headers_handler_interface.h"],
+    name = "http2_core_headers_handler_interface_lib",
+    hdrs = [
+        "quiche/http2/core/spdy_headers_handler_interface.h",
+        "quiche/spdy/core/spdy_headers_handler_interface.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     visibility = ["//visibility:public"],
@@ -1386,61 +1382,65 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "spdy_core_http2_deframer_lib",
-    srcs = ["quiche/spdy/core/http2_frame_decoder_adapter.cc"],
-    hdrs = ["quiche/spdy/core/http2_frame_decoder_adapter.h"],
+    name = "http2_core_http2_deframer_lib",
+    srcs = ["quiche/http2/core/http2_frame_decoder_adapter.cc"],
+    hdrs = [
+        "quiche/http2/core/http2_frame_decoder_adapter.h",
+        "quiche/spdy/core/http2_frame_decoder_adapter.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
         ":http2_constants_lib",
+        ":http2_core_alt_svc_wire_format_lib",
+        ":http2_core_headers_handler_interface_lib",
+        ":http2_core_protocol_lib",
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",
         ":http2_decoder_frame_decoder_lib",
         ":http2_decoder_frame_decoder_listener_lib",
+        ":http2_hpack_hpack_lib",
         ":http2_structures_lib",
         ":quiche_common_platform",
-        ":spdy_core_alt_svc_wire_format_lib",
-        ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_hpack_hpack_decoder_adapter_lib",
-        ":spdy_core_hpack_hpack_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "spdy_core_intrusive_list_lib",
-    hdrs = ["quiche/spdy/core/spdy_intrusive_list.h"],
+    name = "quiche_common_intrusive_list_lib",
+    hdrs = ["quiche/common/quiche_intrusive_list.h"],
     repository = "@envoy",
 )
 
 envoy_cc_library(
-    name = "spdy_core_hpack_hpack_lib",
+    name = "http2_hpack_hpack_lib",
     srcs = [
-        "quiche/spdy/core/hpack/hpack_constants.cc",
-        "quiche/spdy/core/hpack/hpack_encoder.cc",
-        "quiche/spdy/core/hpack/hpack_entry.cc",
-        "quiche/spdy/core/hpack/hpack_header_table.cc",
-        "quiche/spdy/core/hpack/hpack_output_stream.cc",
-        "quiche/spdy/core/hpack/hpack_static_table.cc",
+        "quiche/http2/hpack/hpack_constants.cc",
+        "quiche/http2/hpack/hpack_encoder.cc",
+        "quiche/http2/hpack/hpack_entry.cc",
+        "quiche/http2/hpack/hpack_header_table.cc",
+        "quiche/http2/hpack/hpack_output_stream.cc",
+        "quiche/http2/hpack/hpack_static_table.cc",
     ],
     hdrs = [
-        "quiche/spdy/core/hpack/hpack_constants.h",
+        "quiche/http2/hpack/hpack_constants.h",
+        "quiche/http2/hpack/hpack_encoder.h",
+        "quiche/http2/hpack/hpack_entry.h",
+        "quiche/http2/hpack/hpack_header_table.h",
+        "quiche/http2/hpack/hpack_output_stream.h",
+        "quiche/http2/hpack/hpack_static_table.h",
         "quiche/spdy/core/hpack/hpack_encoder.h",
-        "quiche/spdy/core/hpack/hpack_entry.h",
-        "quiche/spdy/core/hpack/hpack_header_table.h",
-        "quiche/spdy/core/hpack/hpack_output_stream.h",
-        "quiche/spdy/core/hpack/hpack_static_table.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":http2_core_protocol_lib",
         ":http2_hpack_huffman_hpack_huffman_encoder_lib",
         ":quiche_common_callbacks",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -1451,38 +1451,40 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_headers_handler_interface_lib",
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",
         ":http2_hpack_decoder_hpack_decoder_lib",
         ":http2_hpack_decoder_hpack_decoder_listener_lib",
         ":http2_hpack_decoder_hpack_decoder_tables_lib",
         ":http2_hpack_hpack_constants_lib",
+        ":http2_hpack_hpack_lib",
+        ":http2_no_op_headers_handler_lib",
         ":quiche_common_platform",
-        ":spdy_core_headers_handler_interface_lib",
-        ":spdy_core_hpack_hpack_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_no_op_headers_handler_lib",
     ],
 )
 
 envoy_cc_test_library(
-    name = "spdy_test_tools_mock_spdy_framer_visitor_lib",
-    srcs = ["quiche/spdy/test_tools/mock_spdy_framer_visitor.cc"],
-    hdrs = ["quiche/spdy/test_tools/mock_spdy_framer_visitor.h"],
+    name = "http2_test_tools_mock_spdy_framer_visitor_lib",
+    srcs = ["quiche/http2/test_tools/mock_spdy_framer_visitor.cc"],
+    hdrs = ["quiche/http2/test_tools/mock_spdy_framer_visitor.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_http2_deframer_lib",
+        ":http2_core_recording_headers_handler_lib",
+        ":http2_test_tools_test_utils_lib",
         ":quiche_common_platform_test",
-        ":spdy_core_http2_deframer_lib",
-        ":spdy_core_recording_headers_handler_lib",
-        ":spdy_test_tools_test_utils_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "spdy_core_protocol_lib",
-    srcs = ["quiche/spdy/core/spdy_protocol.cc"],
+    name = "http2_core_protocol_lib",
+    srcs = ["quiche/http2/core/spdy_protocol.cc"],
     hdrs = [
+        "quiche/http2/core/spdy_bitmasks.h",
+        "quiche/http2/core/spdy_protocol.h",
         "quiche/spdy/core/spdy_bitmasks.h",
         "quiche/spdy/core/spdy_protocol.h",
     ],
@@ -1490,51 +1492,41 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":http2_core_alt_svc_wire_format_lib",
         ":quiche_common_platform",
-        ":spdy_core_alt_svc_wire_format_lib",
         ":spdy_core_http2_header_block_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "spdy_core_recording_headers_handler_lib",
-    srcs = ["quiche/spdy/core/recording_headers_handler.cc"],
-    hdrs = ["quiche/spdy/core/recording_headers_handler.h"],
+    name = "http2_core_recording_headers_handler_lib",
+    srcs = ["quiche/http2/core/recording_headers_handler.cc"],
+    hdrs = ["quiche/http2/core/recording_headers_handler.h"],
     repository = "@envoy",
     deps = [
-        ":spdy_core_headers_handler_interface_lib",
+        ":http2_core_headers_handler_interface_lib",
         ":spdy_core_http2_header_block_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "spdy_core_write_scheduler_lib",
-    hdrs = ["quiche/spdy/core/write_scheduler.h"],
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform",
-        ":spdy_core_protocol_lib",
     ],
 )
 
 envoy_cc_test_library(
-    name = "spdy_test_tools_test_utils_lib",
-    srcs = ["quiche/spdy/test_tools/spdy_test_utils.cc"],
-    hdrs = ["quiche/spdy/test_tools/spdy_test_utils.h"],
+    name = "http2_test_tools_test_utils_lib",
+    srcs = ["quiche/http2/test_tools/spdy_test_utils.cc"],
+    hdrs = ["quiche/http2/test_tools/spdy_test_utils.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_core_headers_handler_interface_lib",
+        ":http2_core_protocol_lib",
         ":quiche_common_platform",
         ":quiche_common_test_tools_test_utils_lib",
-        ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "spdy_core_zero_copy_output_buffer_lib",
-    hdrs = ["quiche/spdy/core/zero_copy_output_buffer.h"],
+    name = "http2_core_zero_copy_output_buffer_lib",
+    hdrs = ["quiche/http2/core/zero_copy_output_buffer.h"],
     copts = quiche_copts,
     repository = "@envoy",
 )
@@ -1715,13 +1707,6 @@ envoy_cc_library(
         ":quic_platform_export",
         ":quic_platform_ip_address_family",
     ],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_port_utils",
-    hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
-    repository = "@envoy",
-    tags = ["nofips"],
 )
 
 envoy_cc_library(
@@ -2888,8 +2873,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_flags_list_lib",
-    hdrs = ["quiche/quic/core/quic_flags_list.h"],
+    name = "quiche_feature_flags_list_lib",
+    hdrs = ["quiche/common/quiche_feature_flags_list.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -3074,6 +3059,8 @@ envoy_quic_cc_library(
         "quiche/quic/core/http/quic_spdy_client_stream.h",
     ],
     deps = [
+        ":http2_core_framer_lib",
+        ":http2_core_protocol_lib",
         ":quic_client_session_lib",
         ":quic_core_alarm_lib",
         ":quic_core_crypto_encryption_lib",
@@ -3085,8 +3072,6 @@ envoy_quic_cc_library(
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
         ":quic_platform_base",
-        ":spdy_core_framer_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -3095,13 +3080,13 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/http/quic_header_list.cc"],
     hdrs = ["quiche/quic/core/http/quic_header_list.h"],
     deps = [
+        ":http2_core_headers_handler_interface_lib",
+        ":http2_core_protocol_lib",
         ":quic_core_packets_lib",
         ":quic_core_qpack_qpack_header_table_lib",
         ":quic_platform_base",
         ":quiche_common_circular_deque_lib",
-        ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_http2_header_block_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -3137,10 +3122,10 @@ envoy_quic_cc_library(
     name = "quic_core_http_http_frames_lib",
     hdrs = ["quiche/quic/core/http/http_frames.h"],
     deps = [
+        ":http2_core_framer_lib",
         ":quic_core_http_http_constants_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
-        ":spdy_core_framer_lib",
     ],
 )
 
@@ -3190,6 +3175,9 @@ envoy_quic_cc_library(
     ],
     deps = [
         ":http2_adapter_header_validator",
+        ":http2_core_framer_lib",
+        ":http2_core_http2_deframer_lib",
+        ":http2_core_protocol_lib",
         ":quic_core_connection_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_error_codes_lib",
@@ -3215,9 +3203,6 @@ envoy_quic_cc_library(
         ":quiche_common_capsule_lib",
         ":quiche_common_mem_slice_storage",
         ":quiche_common_structured_headers_lib",
-        ":spdy_core_framer_lib",
-        ":spdy_core_http2_deframer_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -3253,12 +3238,12 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/http/spdy_utils.cc"],
     hdrs = ["quiche/quic/core/http/spdy_utils.h"],
     deps = [
+        ":http2_core_framer_lib",
+        ":http2_core_protocol_lib",
         ":quic_core_http_header_list_lib",
         ":quic_core_http_http_constants_lib",
         ":quic_core_packets_lib",
         ":quic_platform_base",
-        ":spdy_core_framer_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -3550,6 +3535,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":http2_core_priority_write_scheduler_lib",
         ":quic_core_ack_listener_interface_lib",
@@ -3656,10 +3642,10 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/qpack/qpack_header_table.cc"],
     hdrs = ["quiche/quic/core/qpack/qpack_header_table.h"],
     deps = [
+        ":http2_hpack_hpack_lib",
         ":quic_core_qpack_qpack_static_table_lib",
         ":quic_platform_base",
         ":quiche_common_circular_deque_lib",
-        ":spdy_core_hpack_hpack_lib",
     ],
 )
 
@@ -3789,8 +3775,8 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/qpack/qpack_static_table.cc"],
     hdrs = ["quiche/quic/core/qpack/qpack_static_table.h"],
     deps = [
+        ":http2_hpack_hpack_lib",
         ":quic_platform_base",
-        ":spdy_core_hpack_hpack_lib",
     ],
 )
 
@@ -4006,6 +3992,7 @@ envoy_quic_cc_library(
     ],
     external_deps = ["ssl"],
     deps = [
+        ":http2_core_protocol_lib",
         ":quic_client_crypto_crypto_handshake_lib",
         ":quic_core_config_lib",
         ":quic_core_connection_lib",
@@ -4032,7 +4019,6 @@ envoy_quic_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_structured_headers_lib",
         ":quiche_common_text_utils_lib",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -4561,6 +4547,7 @@ envoy_quic_cc_test_library(
     ],
     external_deps = ["ssl"],
     deps = [
+        ":http2_core_framer_lib",
         ":quic_client_session_lib",
         ":quic_core_congestion_control_congestion_control_interface_lib",
         ":quic_core_connection_lib",
@@ -4600,7 +4587,6 @@ envoy_quic_cc_test_library(
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_callbacks",
         ":quiche_common_test_tools_test_utils_lib",
-        ":spdy_core_framer_lib",
     ],
 )
 
@@ -5211,9 +5197,9 @@ envoy_cc_test(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":http2_test_tools_test_utils_lib",
         ":quiche_common_platform_test",
         ":quiche_http_header_block_lib",
-        ":spdy_test_tools_test_utils_lib",
     ],
 )
 

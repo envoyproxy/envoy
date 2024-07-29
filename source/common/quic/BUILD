@@ -368,6 +368,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
+        "@com_github_google_quiche//:quic_core_packets_lib",
     ],
 )
 

@@ -1260,6 +1260,7 @@ servercert
 setenv
 setsockopt
 sfixed
+sidestream
 sig
 sigaction
 sigactions
@@ -1521,3 +1522,4 @@ CNAME
 NAT
 NXDOMAIN
 DNAT
+RSP

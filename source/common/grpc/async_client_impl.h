@@ -88,7 +88,7 @@ public:
   bool hasResetStream() const { return http_reset_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
 
-  void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks& callbacks) override {
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) override {
     stream_->setWatermarkCallbacks(callbacks);
   }
 

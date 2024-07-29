@@ -136,8 +136,13 @@ public:
   const std::string& responseBody() const override { return EMPTY_STRING; }
 };
 
+class CommonVirtualHostImpl;
+using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
+
 class SslRedirectRoute : public Route {
 public:
+  SslRedirectRoute(CommonVirtualHostSharedPtr virtual_host) : virtual_host_(virtual_host) {}
+
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
@@ -153,8 +158,11 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
+  const VirtualHost& virtualHost() const override;
 
 private:
+  CommonVirtualHostSharedPtr virtual_host_;
+
   static const SslRedirector SSL_REDIRECTOR;
   static const envoy::config::core::v3::Metadata metadata_;
   static const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
@@ -306,6 +314,9 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
+    return virtualClusterFromEntries(headers);
+  }
 
 private:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
@@ -376,8 +387,6 @@ private:
   const bool include_is_timeout_retry_header_ : 1;
 };
 
-using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
-
 /**
  * Virtual host that holds a collection of routes.
  */
@@ -404,10 +413,9 @@ public:
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
-  static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
-
   CommonVirtualHostSharedPtr shared_virtual_host_;
 
+  std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
@@ -461,7 +469,8 @@ private:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
                   Upstream::RetryExtensionFactoryContext& factory_context,
-                  Server::Configuration::CommonFactoryContext& common_context);
+                  Server::Configuration::CommonFactoryContext& common_context,
+                  absl::Status& creation_status);
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
@@ -744,9 +753,6 @@ public:
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-    return vhost_->virtualClusterFromEntries(headers);
-  }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
 
@@ -913,10 +919,6 @@ public:
       return parent_->tlsContextMatchCriteria();
     }
 
-    const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
-      return parent_->virtualCluster(headers);
-    }
-
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
       return parent_->opaqueConfig();
     }
@@ -991,10 +993,11 @@ public:
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
+    static absl::StatusOr<std::unique_ptr<WeightedClusterEntry>>
+    create(const RouteEntryImplBase* parent, const std::string& rutime_key,
+           Server::Configuration::ServerFactoryContext& factory_context,
+           ProtobufMessage::ValidationVisitor& validator,
+           const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
@@ -1063,6 +1066,11 @@ public:
     const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
 
   private:
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         ProtobufMessage::ValidationVisitor& validator,
+                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
+
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
