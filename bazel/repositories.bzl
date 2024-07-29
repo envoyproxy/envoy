@@ -244,12 +244,7 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
-        external_http_archive(
-            name = "io_bazel_rules_go",
-            # TODO(wrowe, sunjayBhatia): remove when Windows RBE supports batch file invocation
-            patch_args = ["-p1"],
-            patches = ["@envoy//bazel:rules_go.patch"],
-        )
+        external_http_archive(name = "io_bazel_rules_go")
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
@@ -363,6 +358,7 @@ def envoy_dependencies(skip_targets = []):
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:flatbuffers.patch"],
     )
+    external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
