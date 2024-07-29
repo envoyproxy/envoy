@@ -248,8 +248,8 @@ public:
     return true;
   }
 
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
-                                Http::FilterChainManager&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
