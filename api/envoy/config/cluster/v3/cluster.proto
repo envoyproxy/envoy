@@ -159,12 +159,14 @@ message Cluster {
     USE_DOWNSTREAM_PROTOCOL = 1;
   }
 
-  // Refer to :ref:`on_demand_dns_mode <envoy_v3_api_field_config.cluster.v3.Cluster.on_demand_dns_mode>` for an explanation of each type.
+  // Refer to :ref:`on_demand_dns_mode <envoy_v3_api_field_config.cluster.v3.Cluster.on_demand_dns_mode>`
+  // for an explanation of each type.
   enum OnDemandDNSMode {
     // On-demand DNS resolution is disabled.
     DISABLED = 0;
 
-    // Refer to :ref:`on_demand_dns_mode <envoy_v3_api_field_config.cluster.v3.Cluster.on_demand_dns_mode>` for an explanation of this type.
+    // Refer to :ref:`on_demand_dns_mode <envoy_v3_api_field_config.cluster.v3.Cluster.on_demand_dns_mode>`
+    // for an explanation of this type.
     DELAYED = 1;
   }
 
@@ -1026,15 +1028,15 @@ message Cluster {
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
   // Optionally configures on-demand DNS resolution configuration. Note that this field controls the behavior of the cluster,
-  // not the DNS resolver itself
-  // (use :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`for those use-cases).
-  // At present there are 2 modes: DISABLED and DELAYED. DISABLED mode persists the background, asynchronous DNS resolution
-  // behavior that, at time of writing, is the default for STRICT_DNS and LOGICAL_DNS clusters. DELAYED mode will delay
-  // async DNS resolution until the first connection is made to the cluster in question. Once DNS resolution is complete, async
-  // resolution will continue periodically in the background as usual. Note that the latency of the DNS resolution will affect
-  // the first connection's RTT. Consequently, failure to resolve DNS before the connection's idle timeout will result in a connection reset.
-  // This mode is useful for scenarios where large numbers of clusters must be sent to Envoy for config practicality reasons,
-  // but traffic distribution is not uniform across all clusters.
+  // not the DNS resolver itself (use
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
+  // for those use-cases). At present there are 2 modes: DISABLED and DELAYED. DISABLED mode persists the background,
+  // asynchronous DNS resolution behavior that, at time of writing, is the default for STRICT_DNS and LOGICAL_DNS clusters.
+  // DELAYED mode will delay async DNS resolution until the first connection is made to the cluster in question.
+  // Once DNS resolution is complete, async resolution will continue periodically in the background as usual. Note that the latency of
+  // the DNS resolution will affect the first connection's RTT. Consequently, failure to resolve DNS before the connection's idle timeout
+  // will result in a connection reset. This mode is useful for scenarios where large numbers of clusters must be sent to Envoy for config
+  // practicality reasons, but traffic distribution is not uniform across all clusters.
   OnDemandDNSMode on_demand_dns_mode = 58;
 
   // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
