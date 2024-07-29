@@ -104,6 +104,15 @@ TEST(UtilityTest, TestGetSubject) {
             Utility::getSubjectFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestParseSubject) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  Envoy::Ssl::ParsedX509NameConstSharedPtr subject = Utility::parseSubjectFromCertificate(*cert);
+  EXPECT_EQ("Test Server", subject->commonName_);
+  EXPECT_EQ(1, subject->organizationName_.size());
+  EXPECT_EQ("Lyft", subject->organizationName_[0]);
+}
+
 TEST(UtilityTest, TestGetIssuer) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));

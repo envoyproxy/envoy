@@ -10,7 +10,10 @@ envoy_package()
 
 envoy_cc_library(
     name = "connection_interface",
-    hdrs = ["connection.h"],
+    hdrs = [
+        "connection.h",
+        "parsed_x509_name.h",
+    ],
     deps = [
         ":ssl_socket_state",
         "//envoy/common:time_interface",

@@ -32,6 +32,9 @@ public:
   const std::string& serialNumberPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& issuerPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& subjectPeerCertificate() const override { return EMPTY_STRING; }
+  const Ssl::ParsedX509NameConstSharedPtr& parsedSubjectPeerCertificate() const override {
+    return null_subject_names;
+  }
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override {
     return EMPTY_STRING;
@@ -50,6 +53,7 @@ public:
 private:
   quic::QuicSession& session_;
   bool cert_validated_{false};
+  Ssl::ParsedX509NameConstSharedPtr null_subject_names;
 };
 
 } // namespace Quic
