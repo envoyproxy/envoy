@@ -169,9 +169,9 @@ public:
                Http::FilterChainManager& manager, const Http::FilterChainOptions&),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
-  MOCK_METHOD(const absl::optional<
-                  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
-              happyEyeballsConfig, (), (const));
+  MOCK_METHOD(
+      OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
+      happyEyeballsConfig, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
