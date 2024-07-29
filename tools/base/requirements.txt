@@ -1273,9 +1273,9 @@ sphinxcontrib-applehelp==2.0.0 \
     # via
     #   -r requirements.in
     #   sphinx
-sphinxcontrib-devhelp==1.0.6 \
-    --hash=sha256:6485d09629944511c893fa11355bda18b742b83a2b181f9a009f7e500595c90f \
-    --hash=sha256:9893fd3f90506bc4b97bdb977ceb8fbd823989f4316b28c3841ec128544372d3
+sphinxcontrib-devhelp==2.0.0 \
+    --hash=sha256:411f5d96d445d1d73bb5d52133377b4248ec79db5c793ce7dbe59e074b4dd1ad \
+    --hash=sha256:aefb8b83854e4b0998877524d1029fd3e6879210422ee3780459e28a1f03a8a2
     # via
     #   -r requirements.in
     #   sphinx
