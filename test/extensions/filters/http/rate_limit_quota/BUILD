@@ -111,6 +111,7 @@ envoy_extension_cc_test(
     ],
     deps = [
         ":test_utils",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/rate_limit_quota",
         "//source/extensions/filters/http/rate_limit_quota:config",

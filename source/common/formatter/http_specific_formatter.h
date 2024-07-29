@@ -200,17 +200,13 @@ public:
                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
-class HttpBuiltInCommandParser : public CommandParser {
+class BuiltInHttpCommandParser : public CommandParser {
 public:
-  HttpBuiltInCommandParser() = default;
+  BuiltInHttpCommandParser() = default;
 
   // CommandParser
   FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
                              absl::optional<size_t>& max_length) const override;
-
-  static const CommandParser& builtInCommandParser() {
-    CONSTRUCT_ON_FIRST_USE(HttpBuiltInCommandParser);
-  }
 
 private:
   using FormatterProviderCreateFunc =
@@ -222,13 +218,14 @@ private:
   static const FormatterProviderLookupTbl& getKnownFormatters();
 };
 
-/**
- * Util class for HTTP access log format.
- */
-class HttpSubstitutionFormatUtils {
+using BuiltInHttpCommandParserFactory = BuiltInCommandParserFactoryBase<HttpFormatterContext>;
+class DefaultBuiltInHttpCommandParserFactory : public BuiltInHttpCommandParserFactory {
 public:
-  static FormatterPtr defaultSubstitutionFormatter();
+  std::string name() const override;
+  CommandParserPtr createCommandParser() const override;
 };
+
+DECLARE_FACTORY(DefaultBuiltInHttpCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy
