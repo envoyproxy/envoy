@@ -159,14 +159,15 @@ public:
   }
 };
 
-const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeightedClusterSpecifier(
+absl::Status validateWeightedClusterSpecifier(
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
   if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
-    throwEnvoyExceptionOrPanic("Only one of name or cluster_header can be specified");
+    return absl::InvalidArgumentError("Only one of name or cluster_header can be specified");
   } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
-    throwEnvoyExceptionOrPanic("At least one of name or cluster_header need to be specified");
+    return absl::InvalidArgumentError(
+        "At least one of name or cluster_header need to be specified");
   }
-  return cluster;
+  return absl::OkStatus();
 }
 
 // Returns a vector of header parsers, sorted by specificity. The `specificity_ascend` parameter
@@ -261,13 +262,17 @@ RetryPolicyImpl::create(const envoy::config::route::v3::RetryPolicy& retry_polic
                         ProtobufMessage::ValidationVisitor& validation_visitor,
                         Upstream::RetryExtensionFactoryContext& factory_context,
                         Server::Configuration::CommonFactoryContext& common_context) {
-  return std::unique_ptr<RetryPolicyImpl>(
-      new RetryPolicyImpl(retry_policy, validation_visitor, factory_context, common_context));
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<RetryPolicyImpl>(new RetryPolicyImpl(
+      retry_policy, validation_visitor, factory_context, common_context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  Upstream::RetryExtensionFactoryContext& factory_context,
-                                 Server::Configuration::CommonFactoryContext& common_context)
+                                 Server::Configuration::CommonFactoryContext& common_context,
+                                 absl::Status& creation_status)
     : retriable_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
           retry_policy.retriable_headers(), common_context)),
       retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
@@ -332,8 +337,9 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
       }
 
       if ((*max_interval_).count() < (*base_interval_).count()) {
-        throwEnvoyExceptionOrPanic(
+        creation_status = absl::InvalidArgumentError(
             "retry_policy.max_interval must greater than or equal to the base_interval");
+        return;
       }
     }
   }
@@ -644,8 +650,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     std::vector<WeightedClusterEntrySharedPtr> weighted_clusters;
     weighted_clusters.reserve(route.route().weighted_clusters().clusters().size());
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      auto cluster_entry = std::make_unique<WeightedClusterEntry>(
-          this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster);
+      auto cluster_entry = THROW_OR_RETURN_VALUE(
+          WeightedClusterEntry::create(this, runtime_key_prefix + "." + cluster.name(),
+                                       factory_context, validator, cluster),
+          std::unique_ptr<WeightedClusterEntry>);
       weighted_clusters.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters.back()->clusterWeight();
       if (total_weight > std::numeric_limits<uint32_t>::max()) {
@@ -1475,13 +1483,24 @@ const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
                               : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
+absl::StatusOr<std::unique_ptr<RouteEntryImplBase::WeightedClusterEntry>>
+RouteEntryImplBase::WeightedClusterEntry::create(
+    const RouteEntryImplBase* parent, const std::string& runtime_key,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator,
+    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
+  RETURN_IF_NOT_OK(validateWeightedClusterSpecifier(cluster));
+  return std::unique_ptr<WeightedClusterEntry>(
+      new WeightedClusterEntry(parent, runtime_key, factory_context, validator, cluster));
+}
+
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster)
-    : DynamicRouteEntry(parent, nullptr, validateWeightedClusterSpecifier(cluster).name()),
-      runtime_key_(runtime_key), loader_(factory_context.runtime()),
+    : DynamicRouteEntry(parent, nullptr, cluster.name()), runtime_key_(runtime_key),
+      loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       per_filter_configs_(THROW_OR_RETURN_VALUE(
           PerFilterConfigs::create(cluster.typed_per_filter_config(), factory_context, validator),
@@ -1909,6 +1928,7 @@ VirtualHostImpl::VirtualHostImpl(
     ssl_requirements_ = SslRequirements::All;
     break;
   }
+  ssl_redirect_route_ = std::make_shared<SslRedirectRoute>(shared_virtual_host_);
 
   if (virtual_host.has_matcher()) {
     RouteActionContext context{shared_virtual_host_, factory_context};
@@ -1935,8 +1955,7 @@ VirtualHostImpl::VirtualHostImpl(
   }
 }
 
-const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
-    new SslRedirectRoute()};
+const VirtualHost& SslRedirectRoute::virtualHost() const { return *virtual_host_; }
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const Http::RequestHeaderMap& headers,
@@ -1992,10 +2011,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
-    return SSL_REDIRECT_ROUTE;
+    return ssl_redirect_route_;
   } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
-    return SSL_REDIRECT_ROUTE;
+    return ssl_redirect_route_;
   }
 
   if (matcher_) {

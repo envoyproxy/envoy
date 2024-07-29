@@ -100,7 +100,6 @@ paths:
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/listener_manager/listener_impl.cc
     - source/common/listener_manager/listener_manager_impl.cc
-    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
@@ -130,7 +129,6 @@ paths:
     - source/common/common/regex.h
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
-    - source/server/overload_manager_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
     - source/server/admin/runtime_handler.cc
@@ -411,6 +409,7 @@ visibility_excludes:
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
+- source/extensions/filters/network/generic_proxy/interface/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/transport_sockets/tap/BUILD

@@ -1128,6 +1128,22 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                : absl::make_optional<std::string>(upstream_cluster_name);
                   });
             }}},
+          {"UPSTREAM_CLUSTER_RAW",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const std::string&, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    std::string upstream_cluster_name;
+                    if (stream_info.upstreamClusterInfo().has_value() &&
+                        stream_info.upstreamClusterInfo().value() != nullptr) {
+                      upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
+                    }
+
+                    return upstream_cluster_name.empty()
+                               ? absl::nullopt
+                               : absl::make_optional<std::string>(upstream_cluster_name);
+                  });
+            }}},
           {"UPSTREAM_LOCAL_ADDRESS",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](const std::string&, absl::optional<size_t>) {

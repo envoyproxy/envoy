@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.generic_proxy.router.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.router.v3";
+option java_outer_classname = "RouterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/generic_proxy/router/v3;routerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Router for generic proxy]
+// [#extension: envoy.filters.generic.router]
+
+message Router {
+  // Set to true if the upstream connection should be bound to the downstream connection, false
+  // otherwise.
+  //
+  // By default, one random upstream connection will be selected from the upstream connection pool
+  // and used for every request. And after the request is finished, the upstream connection will be
+  // released back to the upstream connection pool.
+  //
+  // If this option is true, the upstream connection will be bound to the downstream connection and
+  // have same lifetime as the downstream connection. The same upstream connection will be used for
+  // all requests from the same downstream connection.
+  //
+  // And if this options is true, one of the following requirements must be met:
+  //
+  // 1. The request must be handled one by one. That is, the next request can not be sent to the
+  //    upstream until the previous request is finished.
+  // 2. Unique request id must be provided for each request and response. The request id must be
+  //    unique for each request and response pair in same connection pair. And the request id must
+  //    be the same for the corresponding request and response.
+  //
+  // This could be useful for some protocols that require the same upstream connection to be used
+  // for all requests from the same downstream connection. For example, the protocol using stateful
+  // connection.
+  bool bind_upstream_connection = 1;
+}

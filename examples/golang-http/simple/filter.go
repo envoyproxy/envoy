@@ -41,11 +41,11 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		// we need to run the code in a background goroutine
 		// and suspend & resume the filter
 		go func() {
-			defer f.callbacks.RecoverPanic()
+			defer f.callbacks.DecoderFilterCallbacks().RecoverPanic()
 			// do time-consuming jobs
 
 			// resume the filter
-			f.callbacks.Continue(status)
+			f.callbacks.DecoderFilterCallbacks().Continue(status)
 		}()
 
 		// suspend the filter
