@@ -14,8 +14,7 @@ envoy_cc_test(
     srcs = ["stdout_config_test.cc"],
     deps = [
         ":stream_test_base",
-        "//source/common/formatter:http_speicific_formatter_extension_lib",
-        "//source/common/formatter:stream_info_formatter_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",
     ],
 )
@@ -25,8 +24,7 @@ envoy_cc_test(
     srcs = ["stderr_config_test.cc"],
     deps = [
         ":stream_test_base",
-        "//source/common/formatter:http_speicific_formatter_extension_lib",
-        "//source/common/formatter:stream_info_formatter_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",
     ],
 )
@@ -35,8 +33,7 @@ envoy_cc_test_library(
     name = "stream_test_base",
     hdrs = ["stream_test_base.h"],
     deps = [
-        "//source/common/formatter:http_speicific_formatter_extension_lib",
-        "//source/common/formatter:stream_info_formatter_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/stream:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",

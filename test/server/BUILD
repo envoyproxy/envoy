@@ -21,6 +21,7 @@ envoy_cc_test(
     srcs = ["api_listener_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/network:network_mocks",

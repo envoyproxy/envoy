@@ -20,8 +20,6 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_str_format"],
     deps = [
-        ":http_speicific_formatter_extension_lib",
-        ":stream_info_formatter_extension_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -102,6 +100,15 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+    ],
+    alwayslink = 1,  # has factory registration
+)
+
+envoy_cc_library(
+    name = "formatter_extension_lib",
+    deps = [
+        ":http_speicific_formatter_extension_lib",
+        ":stream_info_formatter_extension_lib",
     ],
     alwayslink = 1,  # has factory registration
 )
