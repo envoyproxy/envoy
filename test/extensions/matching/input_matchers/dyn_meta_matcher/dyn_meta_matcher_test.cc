@@ -139,6 +139,22 @@ TEST_F(MetadataMatcherTest, DynamicMetadataNotMatchedWithInvert) {
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
+TEST_F(MetadataMatcherTest, BadData) {
+  envoy::extensions::matching::input_matchers::metadata::v3::Metadata meta_matcher;
+  meta_matcher.mutable_value()->mutable_string_match()->set_exact(kMetadataValue);
+  const auto& matcher_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::matching::input_matchers::metadata::v3::Metadata&>(
+      meta_matcher, factory_context_.messageValidationVisitor());
+  const auto& v = matcher_config.value();
+  auto value_matcher = Envoy::Matchers::ValueMatcher::create(v, factory_context_);
+
+  ::Envoy::Matcher::MatchingDataType data = absl::monostate();
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data));
+
+  ::Envoy::Matcher::MatchingDataType data2 = std::string("test");
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data2));
+}
+
 } // namespace Metadata
 } // namespace InputMatchers
 } // namespace Matching
