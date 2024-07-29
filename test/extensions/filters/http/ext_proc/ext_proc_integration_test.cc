@@ -97,10 +97,6 @@ protected:
         [&total_cluster_endpoints](const auto& item) { total_cluster_endpoints += item.second; });
     ASSERT_EQ(total_cluster_endpoints, grpc_upstream_count_);
 
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.immediate_response_use_filter_mutation_rule",
-          filter_mutation_rule_}});
-
     config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
@@ -645,6 +641,45 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
+  void testSendDyanmicMetadata() {
+    ProtobufWkt::Struct test_md_struct;
+    (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
+
+    ProtobufWkt::Value md_val;
+    *(md_val.mutable_struct_value()) = test_md_struct;
+
+    processGenericMessage(
+        *grpc_upstreams_[0], true,
+        [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
+          // Verify the processing request contains the untyped metadata we injected.
+          EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+          const ProtobufWkt::Struct& fwd_metadata =
+              req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
+          EXPECT_EQ(1, fwd_metadata.fields_size());
+          EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
+          EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
+
+          // Verify the processing request contains the typed metadata we injected.
+          EXPECT_TRUE(
+              req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+          const ProtobufWkt::Any& fwd_typed_metadata =
+              req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
+          EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
+                    fwd_typed_metadata.type_url());
+          envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
+          fwd_typed_metadata.UnpackTo(&typed_md_from_req);
+          EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
+
+          // Spoof the response to contain receiving metadata.
+          HeadersResponse headers_resp;
+          (*resp.mutable_request_headers()) = headers_resp;
+          auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
+          (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
+
+          return true;
+        });
+  }
+
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control) {
     config_helper_.setBufferLimits(1024, 1024);
 
@@ -680,7 +715,6 @@ protected:
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
-  std::string filter_mutation_rule_{"false"};
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
 };
@@ -2150,7 +2184,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
 // Test the filter using an ext_proc server that responds to the request_header message
 // by sending back an immediate_response message with system header mutation.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
   // Disallow system header in the mutation rule config.
   proto_config_.mutable_mutation_rules()->mutable_disallow_system()->set_value(true);
@@ -2172,7 +2205,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
 // Test the filter using an ext_proc server that responds to the request_header message
 // by sending back an immediate_response message with x-envoy header mutation.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
   initializeConfig();
@@ -2190,7 +2222,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
-  filter_mutation_rule_ = "true";
   proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(true);
   proto_config_.mutable_mutation_rules()->mutable_allow_all_routing()->set_value(true);
 
@@ -2210,28 +2241,6 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
   verifyDownstreamResponse(*response, 401);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("host", "test"));
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-envoy-foo", "bar"));
-}
-
-// Test the filter using an ext_proc server that responds to the request_header message
-// by sending back an immediate_response message with x-envoy header mutation.
-// The deprecated default checker allows x-envoy headers to be mutated and should
-// override config-level checkers if the runtime guard is disabled.
-TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithDefaultHeaderMutationChecker) {
-  // this is default, but setting explicitly for test clarity
-  filter_mutation_rule_ = "false";
-  proto_config_.mutable_mutation_rules()->mutable_allow_envoy()->set_value(false);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
-    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
-    auto* hdr = immediate.mutable_headers()->add_set_headers();
-    // Adding x-envoy header is allowed since default overrides config.
-    hdr->mutable_header()->set_key("x-envoy-foo");
-    hdr->mutable_header()->set_raw_value("bar");
-  });
-  verifyDownstreamResponse(*response, 401);
-  EXPECT_FALSE(response->headers().get(LowerCaseString("x-envoy-foo")).empty());
 }
 
 // Test the filter with request body buffering enabled using
@@ -3780,40 +3789,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  ProtobufWkt::Struct test_md_struct;
-  (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
-
-  ProtobufWkt::Value md_val;
-  *(md_val.mutable_struct_value()) = test_md_struct;
-
-  processGenericMessage(
-      *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
-        // Verify the processing request contains the untyped metadata we injected.
-        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
-        const ProtobufWkt::Struct& fwd_metadata =
-            req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ(1, fwd_metadata.fields_size());
-        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
-        EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
-
-        // Verify the processing request contains the typed metadata we injected.
-        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
-        const ProtobufWkt::Any& fwd_typed_metadata =
-            req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
-        EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
-                  fwd_typed_metadata.type_url());
-        envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_from_req;
-        fwd_typed_metadata.UnpackTo(&typed_md_from_req);
-        EXPECT_EQ("typed_value from set_metadata", typed_md_from_req.metadata_namespace());
-
-        // Spoof the response to contain receiving metadata.
-        HeadersResponse headers_resp;
-        (*resp.mutable_request_headers()) = headers_resp;
-        auto mut_md_fields = resp.mutable_dynamic_metadata()->mutable_fields();
-        (*mut_md_fields).emplace("receiving_ns_untyped", md_val);
-
-        return true;
-      });
+  testSendDyanmicMetadata();
 
   handleUpstreamRequest();
 
@@ -3827,6 +3803,34 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
   ASSERT_EQ(1, md_header_result.size());
   EXPECT_EQ("value from ext_proc", md_header_result[0]->value().getStringView());
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
+  proto_config_.set_observability_mode(true);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_forwarding_namespaces()->add_untyped("forwarding_ns_untyped");
+  md_opts->mutable_forwarding_namespaces()->add_typed("forwarding_ns_typed");
+  md_opts->mutable_receiving_namespaces()->add_untyped("receiving_ns_untyped");
+
+  ConfigOptions config_option = {};
+  config_option.add_metadata = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  testSendDyanmicMetadata();
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  // No headers from dynamic metadata response as the response is ignored in observability mode.
+  EXPECT_THAT(response->headers(), HasNoHeader(Http::LowerCaseString("receiving_ns_untyped.foo")));
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -4178,14 +4182,17 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithBody) {
   const std::string original_body_str = "Hello";
   auto response = sendDownstreamRequestWithBody(original_body_str, absl::nullopt);
 
-  processRequestBodyMessage(
-      *grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
-        // Try to mutate the body.
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
+  processRequestBodyMessage(*grpc_upstreams_[0], true,
+                            [&original_body_str](const HttpBody& body, BodyResponse& body_resp) {
+                              // Verify the received body message.
+                              EXPECT_EQ(body.body(), original_body_str);
+                              EXPECT_TRUE(body.end_of_stream());
+                              // Try to mutate the body.
+                              auto* body_mut =
+                                  body_resp.mutable_response()->mutable_body_mutation();
+                              body_mut->set_body("Hello, World!");
+                              return true;
+                            });
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -4470,9 +4477,6 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
-  // EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-new-header", "new"));
-
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
@@ -4528,6 +4532,103 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
       {{"envoy.reloadable_features.grpc_side_stream_flow_control", "false"}});
 
   testSidestreamPushbackDownstream(1030, false);
+}
+
+TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
+  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+    return;
+  }
+
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("hello world", absl::nullopt);
+
+  // Response from upstream server.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(32 * 1024, true);
+
+  std::string body_str = std::string(64 * 1024, 'a');
+
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+    processResponseBodyMessage(
+        *grpc_upstreams_[0], count == 0 ? true : false,
+        [&end_stream, &body_str](const HttpBody& body, BodyResponse& body_resp) {
+          end_stream = body.end_of_stream();
+          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(body_str);
+          return true;
+        });
+    count++;
+  }
+
+  // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
+  // to be triggered in sidestream cluster.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
+                                 "paused_reading_total",
+                                 1);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
+  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+    return;
+  }
+
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.set_observability_mode(true);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("hello world", absl::nullopt);
+
+  // Response from upstream server.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(32 * 1024, true);
+
+  std::string body_str = std::string(64 * 1024, 'a');
+
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+    processResponseBodyMessage(
+        *grpc_upstreams_[0], count == 0 ? true : false,
+        [&end_stream, &body_str](const HttpBody& body, BodyResponse& body_resp) {
+          end_stream = body.end_of_stream();
+          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(body_str);
+          return true;
+        });
+    count++;
+  }
+
+  // Large body is sent from sidestream server to downstream client. Thus, flow control is expected
+  // to be triggered in sidestream cluster.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
+                                 "paused_reading_total",
+                                 2);
+
+  verifyDownstreamResponse(*response, 200);
 }
 
 } // namespace Envoy

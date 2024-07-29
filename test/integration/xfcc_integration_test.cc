@@ -112,8 +112,8 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
   tls_cert->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
-                                                                                 factory_context_);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context_, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()),

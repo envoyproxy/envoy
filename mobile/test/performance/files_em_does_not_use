@@ -17,3 +17,4 @@ source/common/router/vhds.h
 source/common/tls/server_context_config_impl.h
 source/common/tls/server_context_impl.h
 source/common/tls/ocsp/ocsp.h
+source/common/tls/default_tls_certificate_selector.h

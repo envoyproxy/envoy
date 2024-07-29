@@ -96,27 +96,17 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      absl::Status& creation_status)
     : ContextImpl(scope, config, factory_context, additional_init, creation_status),
       session_ticket_keys_(config.sessionTicketKeys()),
-      ocsp_staple_policy_(config.ocspStaplePolicy()),
-      full_scan_certs_on_sni_mismatch_(config.fullScanCertsOnSNIMismatch()) {
+      ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (!creation_status.ok()) {
     return;
   }
+  // If creation failed, do not create the selector.
+  tls_certificate_selector_ = config.tlsCertificateSelectorFactory()(config, *this);
+
   if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     creation_status =
         absl::InvalidArgumentError("Server TlsCertificates must have a certificate specified");
     return;
-  }
-
-  for (auto& ctx : tls_contexts_) {
-    if (ctx.cert_chain_ == nullptr) {
-      continue;
-    }
-    bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-    const int pkey_id = EVP_PKEY_id(public_key.get());
-    // Load DNS SAN entries and Subject Common Name as server name patterns after certificate
-    // chain loaded, and populate ServerNamesMap which will be used to match SNI.
-    has_rsa_ |= (pkey_id == EVP_PKEY_RSA);
-    populateServerNamesMap(ctx, pkey_id);
   }
 
   // Compute the session context ID hash. We use all the certificate identities,
@@ -217,63 +207,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
         return;
       }
       ctx.ocsp_response_ = std::move(response_or_error.value());
-    }
-  }
-}
-
-void ServerContextImpl::populateServerNamesMap(Ssl::TlsContext& ctx, int pkey_id) {
-  if (ctx.cert_chain_ == nullptr) {
-    return;
-  }
-
-  auto populate = [&](const std::string& sn) {
-    std::string sn_pattern = sn;
-    if (absl::StartsWith(sn, "*.")) {
-      sn_pattern = sn.substr(1);
-    }
-    PkeyTypesMap pkey_types_map;
-    // Multiple certs with different key type are allowed for one server name pattern.
-    auto sn_match = server_names_map_.try_emplace(sn_pattern, pkey_types_map).first;
-    auto pt_match = sn_match->second.find(pkey_id);
-    if (pt_match != sn_match->second.end()) {
-      // When there are duplicate names, prefer the earlier one.
-      //
-      // If all of the SANs in a certificate are unused due to duplicates, it could be useful
-      // to issue a warning, but that would require additional tracking that hasn't been
-      // implemented.
-      return;
-    }
-    sn_match->second.emplace(std::pair<int, std::reference_wrapper<Ssl::TlsContext>>(pkey_id, ctx));
-  };
-
-  bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
-      X509_get_ext_d2i(ctx.cert_chain_.get(), NID_subject_alt_name, nullptr, nullptr)));
-  if (san_names != nullptr) {
-    auto dns_sans = Utility::getSubjectAltNames(*ctx.cert_chain_, GEN_DNS);
-    // https://www.rfc-editor.org/rfc/rfc6066#section-3
-    // Currently, the only server names supported are DNS hostnames, so we
-    // only save dns san entries to match SNI.
-    for (const auto& san : dns_sans) {
-      populate(san);
-    }
-  } else {
-    // https://www.rfc-editor.org/rfc/rfc6125#section-6.4.4
-    // As noted, a client MUST NOT seek a match for a reference identifier
-    // of CN-ID if the presented identifiers include a DNS-ID, SRV-ID,
-    // URI-ID, or any application-specific identifier types supported by the
-    // client.
-    X509_NAME* cert_subject = X509_get_subject_name(ctx.cert_chain_.get());
-    const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
-    if (cn_index >= 0) {
-      X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-      if (cn_entry) {
-        ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-        if (ASN1_STRING_length(cn_asn1) > 0) {
-          std::string subject_cn(reinterpret_cast<const char*>(ASN1_STRING_data(cn_asn1)),
-                                 ASN1_STRING_length(cn_asn1));
-          populate(subject_cn);
-        }
-      }
     }
   }
 }
@@ -443,23 +376,23 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   }
 }
 
-bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello) {
+bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
   CBS client_hello;
-  CBS_init(&client_hello, ssl_client_hello->client_hello, ssl_client_hello->client_hello_len);
+  CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
 
   // This is the TLSv1.3 case (TLSv1.2 on the wire and the supported_versions extensions present).
   // We just need to look at signature algorithms.
-  const uint16_t client_version = ssl_client_hello->version;
+  const uint16_t client_version = ssl_client_hello.version;
   if (client_version == TLS1_2_VERSION && tls_max_version_ == TLS1_3_VERSION) {
     // If the supported_versions extension is found then we assume that the client is competent
     // enough that just checking the signature_algorithms is sufficient.
     const uint8_t* supported_versions_data;
     size_t supported_versions_len;
-    if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_versions,
+    if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_versions,
                                              &supported_versions_data, &supported_versions_len)) {
       const uint8_t* signature_algorithms_data;
       size_t signature_algorithms_len;
-      if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_signature_algorithms,
+      if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_signature_algorithms,
                                                &signature_algorithms_data,
                                                &signature_algorithms_len)) {
         CBS signature_algorithms_ext, signature_algorithms;
@@ -481,7 +414,7 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   // ECDSA and also for a compatible cipher suite. https://tools.ietf.org/html/rfc4492#section-5.1.1
   const uint8_t* curvelist_data;
   size_t curvelist_len;
-  if (!SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
+  if (!SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_groups,
                                             &curvelist_data, &curvelist_len)) {
     return false;
   }
@@ -496,7 +429,7 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
 
   // The client must have offered an ECDSA ciphersuite that we like.
   CBS cipher_suites;
-  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+  CBS_init(&cipher_suites, ssl_client_hello.cipher_suites, ssl_client_hello.cipher_suites_len);
 
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher_id;
@@ -513,10 +446,10 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   return false;
 }
 
-bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello) {
+bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
   const uint8_t* status_request_data;
   size_t status_request_len;
-  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_status_request,
+  if (SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_status_request,
                                            &status_request_data, &status_request_len)) {
     return true;
   }
@@ -524,190 +457,66 @@ bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_h
   return false;
 }
 
-OcspStapleAction ServerContextImpl::ocspStapleAction(const Ssl::TlsContext& ctx,
-                                                     bool client_ocsp_capable) {
-  if (!client_ocsp_capable) {
-    return OcspStapleAction::ClientNotCapable;
-  }
-
-  auto& response = ctx.ocsp_response_;
-
-  auto policy = ocsp_staple_policy_;
-  if (ctx.is_must_staple_) {
-    // The certificate has the must-staple extension, so upgrade the policy to match.
-    policy = Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
-  }
-
-  const bool valid_response = response && !response->isExpired();
-
-  switch (policy) {
-  case Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling:
-    if (!valid_response) {
-      return OcspStapleAction::NoStaple;
-    }
-    return OcspStapleAction::Staple;
-
-  case Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling:
-    if (valid_response) {
-      return OcspStapleAction::Staple;
-    }
-    if (response) {
-      // Expired response.
-      return OcspStapleAction::Fail;
-    }
-    return OcspStapleAction::NoStaple;
-
-  case Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple:
-    if (!valid_response) {
-      return OcspStapleAction::Fail;
-    }
-    return OcspStapleAction::Staple;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
-std::pair<const Ssl::TlsContext&, OcspStapleAction>
+std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
 ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capable,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
-  bool unused = false;
-  if (cert_matched_sni == nullptr) {
-    // Avoid need for nullptr checks when this is set.
-    cert_matched_sni = &unused;
-  }
-
-  // selected_ctx represents the final selected certificate, it should meet all requirements or pick
-  // a candidate.
-  const Ssl::TlsContext* selected_ctx = nullptr;
-  const Ssl::TlsContext* candidate_ctx = nullptr;
-  OcspStapleAction ocsp_staple_action;
-
-  auto selected = [&](const Ssl::TlsContext& ctx) -> bool {
-    auto action = ocspStapleAction(ctx, client_ocsp_capable);
-    if (action == OcspStapleAction::Fail) {
-      // The selected ctx must adhere to OCSP policy
-      return false;
-    }
-
-    if (client_ecdsa_capable == ctx.is_ecdsa_) {
-      selected_ctx = &ctx;
-      ocsp_staple_action = action;
-      return true;
-    }
-
-    if (client_ecdsa_capable && !ctx.is_ecdsa_ && candidate_ctx == nullptr) {
-      // ECDSA cert is preferred if client is ECDSA capable, so RSA cert is marked as a candidate,
-      // searching will continue until exhausting all certs or find a exact match.
-      candidate_ctx = &ctx;
-      ocsp_staple_action = action;
-      return false;
-    }
-
-    return false;
-  };
-
-  auto select_from_map = [this, &selected](absl::string_view server_name) -> void {
-    auto it = server_names_map_.find(server_name);
-    if (it == server_names_map_.end()) {
-      return;
-    }
-    const auto& pkey_types_map = it->second;
-    for (const auto& entry : pkey_types_map) {
-      if (selected(entry.second.get())) {
-        break;
-      }
-    }
-  };
-
-  auto tail_select = [&](bool go_to_next_phase) {
-    if (selected_ctx == nullptr) {
-      selected_ctx = candidate_ctx;
-    }
-
-    if (selected_ctx == nullptr && !go_to_next_phase) {
-      selected_ctx = &tls_contexts_[0];
-      ocsp_staple_action = ocspStapleAction(*selected_ctx, client_ocsp_capable);
-    }
-  };
-
-  // Select cert based on SNI if SNI is provided by client.
-  if (!sni.empty()) {
-    // Match on exact server name, i.e. "www.example.com" for "www.example.com".
-    select_from_map(sni);
-    tail_select(true);
-
-    if (selected_ctx == nullptr) {
-      // Match on wildcard domain, i.e. ".example.com" for "www.example.com".
-      // https://datatracker.ietf.org/doc/html/rfc6125#section-6.4
-      size_t pos = sni.find('.', 1);
-      if (pos < sni.size() - 1 && pos != std::string::npos) {
-        absl::string_view wildcard = sni.substr(pos);
-        select_from_map(wildcard);
-      }
-    }
-    *cert_matched_sni = (selected_ctx != nullptr || candidate_ctx != nullptr);
-    tail_select(full_scan_certs_on_sni_mismatch_);
-  }
-  // Full scan certs if SNI is not provided by client;
-  // Full scan certs if client provides SNI but no cert matches to it,
-  // it requires full_scan_certs_on_sni_mismatch is enabled.
-  if (selected_ctx == nullptr) {
-    candidate_ctx = nullptr;
-    // Skip loop when there is no cert compatible to key type
-    if (client_ecdsa_capable || (!client_ecdsa_capable && has_rsa_)) {
-      for (const auto& ctx : tls_contexts_) {
-        if (selected(ctx)) {
-          break;
-        }
-      }
-    }
-    tail_select(false);
-  }
-
-  ASSERT(selected_ctx != nullptr);
-  return {*selected_ctx, ocsp_staple_action};
+  return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable,
+                                                   cert_matched_sni);
 }
 
 enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  absl::string_view sni = absl::NullSafeStringView(
-      SSL_get_servername(ssl_client_hello->ssl, TLSEXT_NAMETYPE_host_name));
-  const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
-  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
+  ASSERT(tls_certificate_selector_ != nullptr);
 
-  auto [selected_ctx, ocsp_staple_action] =
-      findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable, nullptr);
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl_client_hello->ssl, ContextImpl::sslExtendedSocketInfoIndex()));
 
-  // Apply the selected context. This must be done before OCSP stapling below
-  // since applying the context can remove the previously-set OCSP response.
-  // This will only return NULL if memory allocation fails.
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx.ssl_ctx_.get()) != nullptr,
-                 "");
-
-  if (client_ocsp_capable) {
-    stats_.ocsp_staple_requests_.inc();
-  }
-
-  switch (ocsp_staple_action) {
-  case OcspStapleAction::Staple: {
-    // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
-    RELEASE_ASSERT(selected_ctx.ocsp_response_,
-                   "OCSP response must be present under OcspStapleAction::Staple");
-    auto& resp_bytes = selected_ctx.ocsp_response_->rawBytes();
-    int rc = SSL_set_ocsp_response(ssl_client_hello->ssl, resp_bytes.data(), resp_bytes.size());
-    RELEASE_ASSERT(rc != 0, "");
-    stats_.ocsp_staple_responses_.inc();
-  } break;
-  case OcspStapleAction::NoStaple:
-    stats_.ocsp_staple_omitted_.inc();
+  auto selection_result = extended_socket_info->certificateSelectionResult();
+  switch (selection_result) {
+  case Ssl::CertificateSelectionStatus::NotStarted:
+    // continue
     break;
-  case OcspStapleAction::Fail:
-    stats_.ocsp_staple_failed_.inc();
+
+  case Ssl::CertificateSelectionStatus::Pending:
+    ENVOY_LOG(trace, "already waiting certificate");
+    return ssl_select_cert_retry;
+
+  case Ssl::CertificateSelectionStatus::Successful:
+    ENVOY_LOG(trace, "wait certificate success");
+    return ssl_select_cert_success;
+
+  default:
+    ENVOY_LOG(trace, "wait certificate failed");
     return ssl_select_cert_error;
-  case OcspStapleAction::ClientNotCapable:
-    break;
   }
 
-  return ssl_select_cert_success;
+  ENVOY_LOG(trace, "TLS context selection result: {}, before selectTlsContext",
+            static_cast<int>(selection_result));
+
+  const auto result = tls_certificate_selector_->selectTlsContext(
+      *ssl_client_hello, extended_socket_info->createCertificateSelectionCallback());
+
+  ENVOY_LOG(trace,
+            "TLS context selection result: {}, after selectTlsContext, selection result status: {}",
+            static_cast<int>(extended_socket_info->certificateSelectionResult()),
+            static_cast<int>(result.status));
+  ASSERT(extended_socket_info->certificateSelectionResult() ==
+             Ssl::CertificateSelectionStatus::Pending,
+         "invalid selection result");
+
+  switch (result.status) {
+  case Ssl::SelectionResult::SelectionStatus::Success:
+    extended_socket_info->onCertificateSelectionCompleted(*result.selected_ctx, result.staple,
+                                                          false);
+    return ssl_select_cert_success;
+  case Ssl::SelectionResult::SelectionStatus::Pending:
+    return ssl_select_cert_retry;
+  case Ssl::SelectionResult::SelectionStatus::Failed:
+    extended_socket_info->onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext>(), false,
+                                                          false);
+    return ssl_select_cert_error;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::StatusOr<Ssl::ServerContextSharedPtr> ServerContextFactoryImpl::createServerContext(
