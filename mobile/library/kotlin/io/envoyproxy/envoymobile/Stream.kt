@@ -18,7 +18,7 @@ open class Stream(
    * @param headers Headers to send over the stream.
    * @param endStream Whether this is a headers-only request.
    * @param idempotent indicates that the request is idempotent. When idempotent is set to true
-   *   Envoy Mobile may perform retry on failures. By default, it is set to false.
+   *   Envoy Mobile will retry on HTTP/3 post-handshake failures. By default, it is set to false.
    * @return This stream, for chaining syntax.
    */
   open fun sendHeaders(

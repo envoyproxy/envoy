@@ -78,7 +78,7 @@ public class JniLibrary {
    * @param headers    the headers to send.
    * @param endStream  supplies whether this is headers only.
    * @param idempotent indicates that the request is idempotent. When idempotent is set to true
-   *                   Envoy Mobile may perform retry on failures. By default, it is set to false.
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
    * @return the resulting status of the operation.
    */
   protected static native int sendHeaders(long engine, long stream,

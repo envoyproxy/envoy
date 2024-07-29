@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.chromium.net.BidirectionalStream;
 import org.chromium.net.ExperimentalBidirectionalStream;
+import org.chromium.net.ExperimentalUrlRequest;
 import org.chromium.net.NetworkQualityRttListener;
 import org.chromium.net.NetworkQualityThroughputListener;
 import org.chromium.net.RequestFinishedInfo;
@@ -133,7 +134,7 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
       return new CronvoyUrlRequest(this, url, callback, executor, mUserAgent, allowDirectExecutor,
                                    requestAnnotations, trafficStatsTagSet, trafficStatsTag,
                                    trafficStatsUidSet, trafficStatsUid, requestFinishedListener,
-                                   idempotency == 1);
+                                   idempotency == ExperimentalUrlRequest.Builder.IDEMPOTENT);
     }
   }
 

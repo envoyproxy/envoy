@@ -41,7 +41,7 @@ public class EnvoyHTTPStream {
    * @param headers    the headers to send.
    * @param endStream  supplies whether this is headers only.
    * @param idempotent indicates that the request is idempotent. When idempotent is set to true
-   *                   Envoy Mobile may perform retry on failures. By default, it is set to false.
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
    */
   public void sendHeaders(Map<String, List<String>> headers, boolean endStream,
                           boolean idempotent) {

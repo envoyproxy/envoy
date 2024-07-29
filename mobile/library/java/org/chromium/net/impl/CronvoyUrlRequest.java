@@ -180,7 +180,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
   private String mCurrentUrl;
   private volatile CronvoyUrlResponseInfoImpl mUrlResponseInfo;
   private String mPendingRedirectUrl;
-  private boolean mIempotent;
+  private boolean mIdempotent;
 
   /**
    * @param executor The executor for orchestrating tasks between envoy-mobile callbacks
@@ -211,7 +211,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     mCurrentUrl = url;
     mUserAgent = userAgent;
     mRequestAnnotations = connectionAnnotations;
-    mIempotent = idempotent;
+    mIdempotent = idempotent;
   }
 
   @Override
@@ -540,7 +540,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
                                                              /* explicitFlowControl= */ true));
-    mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null, mIempotent);
+    mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null, mIdempotent);
     if (mUploadDataStream != null && mUrlChain.size() == 1) {
       mUploadDataStream.initializeWithRequest();
     }
