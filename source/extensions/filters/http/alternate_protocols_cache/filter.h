@@ -18,15 +18,15 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
                    proto_config,
-               HttpServerPropertiesCacheManager& cache_manager, TimeSource& time_source);
+               Http::HttpServerPropertiesCacheManager& cache_manager, TimeSource& time_source);
 
   TimeSource& timeSource() { return time_source_; }
-  const Http::HttpServerPropertiesCacheManager& alternateProtocolCacheManager() {
+  Http::HttpServerPropertiesCacheManager& alternateProtocolCacheManager() {
     return alternate_protocol_cache_manager_;
   }
 
 private:
-  const Http::HttpServerPropertiesCacheManager& alternate_protocol_cache_manager_;
+  Http::HttpServerPropertiesCacheManager& alternate_protocol_cache_manager_;
   TimeSource& time_source_;
 };
 

@@ -18,9 +18,9 @@ Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryF
 
   auto& server_context = context.serverFactoryContext();
 
-  FilterConfigSharedPtr filter_config(
-      std::make_shared<FilterConfig>(proto_config, context.httpServerPropertiesCacheManager(),
-                                     server_context.mainThreadDispatcher().timeSource()));
+  FilterConfigSharedPtr filter_config(std::make_shared<FilterConfig>(
+      proto_config, context.serverFactoryContext().httpServerPropertiesCacheManager(),
+      server_context.mainThreadDispatcher().timeSource()));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamEncoderFilter(
