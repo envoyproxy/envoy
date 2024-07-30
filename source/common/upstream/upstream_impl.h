@@ -223,6 +223,7 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   const envoy::config::core::v3::Locality& locality() const override { return locality_; }
+  const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
   }
@@ -428,6 +429,9 @@ protected:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                    HostDescriptionConstSharedPtr host);
+  static absl::optional<Network::Address::InstanceConstSharedPtr> maybeGetProxyRedirectAddress(
+      const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      HostDescriptionConstSharedPtr host);
 
 private:
   // Helper function to check multiple health flags at once.
@@ -720,7 +724,10 @@ protected:
                                          overprovisioning_factor);
   }
 
-protected:
+  absl::optional<Network::Address::InstanceConstSharedPtr>
+  maybeGetHttpProxyAddr(Network::TransportSocketOptionsConstSharedPtr transport_socket_opts,
+                        const MetadataConstSharedPtr locality_metadata);
+
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed));
   }
