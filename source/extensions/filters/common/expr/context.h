@@ -9,7 +9,17 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "eval/public/cel_value.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "eval/public/containers/container_backed_list_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
 
