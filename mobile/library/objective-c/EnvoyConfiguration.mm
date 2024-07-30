@@ -138,6 +138,7 @@
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
+  NSLog("initWithConnectTimeoutSeconds: %d", streamIdleTimeoutSeconds);
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
   self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
   self.appVersion = appVersion;
@@ -208,6 +209,7 @@
       self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
   builder.addH2ConnectionKeepaliveTimeoutSeconds(self.h2ConnectionKeepaliveTimeoutSeconds);
   builder.addMaxConnectionsPerHost(self.maxConnectionsPerHost);
+  NSLog(@"Setting stream idle timeout in Obj-C: %d", self.streamIdleTimeoutSeconds);
   builder.setStreamIdleTimeoutSeconds(self.streamIdleTimeoutSeconds);
   builder.setPerTryIdleTimeoutSeconds(self.perTryIdleTimeoutSeconds);
   builder.setAppVersion([self.appVersion toCXXString]);
