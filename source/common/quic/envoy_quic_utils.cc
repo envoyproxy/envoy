@@ -90,6 +90,8 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::RemoteReset:
     IS_ENVOY_BUG("Remote reset shouldn't be initiated by self.");
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
   }
 
   ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
