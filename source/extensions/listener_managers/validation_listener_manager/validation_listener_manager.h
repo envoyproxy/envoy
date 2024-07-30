@@ -18,30 +18,31 @@ public:
         *parent_.stats().rootScope(), parent_.listenerManager(),
         parent_.messageValidationContext().dynamicValidationVisitor());
   }
-  Filter::NetworkFilterFactoriesList createNetworkFilterFactoryList(
+  absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
         filters, filter_chain_factory_context, network_config_provider_manager_);
   }
-  Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
+  absl::StatusOr<Filter::ListenerFilterFactoriesList> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         filters, context, tcp_listener_config_provider_manager_);
   }
-  std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+  absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>
+  createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters, context);
   }
-  Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+  absl::StatusOr<Filter::QuicListenerFilterFactoriesList> createQuicListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
         filters, context, quic_listener_config_provider_manager_);
   }
-  Network::SocketSharedPtr
+  absl::StatusOr<Network::SocketSharedPtr>
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                      const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
                      const Network::SocketCreationOptions&, uint32_t) override {

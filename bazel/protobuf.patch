@@ -90,7 +90,7 @@ index e7555ee10..a93beb1c5 100644
 @@ -8,3 +8,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
 
- __version__ = '4.25.3'
+ __version__ = '5.26.1'
 +
 +
 +if __name__ != '__main__':
@@ -128,12 +128,12 @@ diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/comp
 @@ -306,7 +306,7 @@
      srcs = ["retention.cc"],
      hdrs = ["retention.h"],
-     include_prefix = "google/protobuf/compiler",
+     strip_include_prefix = "/src",
 -    visibility = ["//src/google/protobuf:__subpackages__"],
 +    visibility = ["//visibility:public"],
      deps = [
-         "//src/google/protobuf:protobuf_nowkt",
-         "@com_google_absl//absl/container:flat_hash_set",
+         "//src/google/protobuf",
+         "//src/google/protobuf:port",
 
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
 index 1c6a24945..c27d0bf2a 100644
@@ -149,15 +149,3 @@ index 1c6a24945..c27d0bf2a 100644
  #if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
  #define PROTOBUF_DEBUG true
  #else
-diff --git a/src/google/protobuf/message_lite.cc b/src/google/protobuf/message_lite.cc
---- a/src/google/protobuf/message_lite.cc	2024-04-19 15:49:01.333322873 +0000
-+++ b/src/google/protobuf/message_lite.cc	2024-04-19 15:50:41.065136525 +0000
-@@ -66,7 +66,7 @@
- 
- int MessageLite::GetCachedSize() const {
-   auto* cached_size = AccessCachedSize();
--  if (PROTOBUF_PREDICT_FALSE(cached_size == nullptr)) return ByteSize();
-+  if (PROTOBUF_PREDICT_FALSE(cached_size == nullptr)) return (int)ByteSizeLong();
-   return cached_size->Get();
- }
- 

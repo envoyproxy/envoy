@@ -41,12 +41,14 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
+protected:
+  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
+                    absl::Status& creation_status);
+
 private:
   friend class LogicalDnsClusterFactory;
   friend class LogicalDnsClusterTest;
-
-  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
   const envoy::config::endpoint::v3::LocalityLbEndpoints& localityLbEndpoint() const {
     // This is checked in the constructor, i.e. at config load time.

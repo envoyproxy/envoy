@@ -1,6 +1,11 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpGenericBodyMatch.GenericTextMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -17,19 +22,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-
-private const val ASSERTION_FILTER_TEXT_PROTO =
-  """
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-  match_config {
-    http_request_generic_body_match: {
-      patterns: {
-        string_match: 'request body'
-      }
-    }
-  }
-}
-"""
 
 @RunWith(RobolectricTestRunner::class)
 class SendDataTest {
@@ -58,12 +50,26 @@ class SendDataTest {
   @Test
   fun `successful sending data`() {
     val expectation = CountDownLatch(1)
+
+    val stringMatch = GenericTextMatch.newBuilder().setStringMatch("request body").build()
+    val match = HttpGenericBodyMatch.newBuilder().addPatterns(stringMatch).build()
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestGenericBodyMatch(match).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
+        .setValue(configProto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
+        .addNativeFilter(
+          "envoy.filters.http.assertion",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     val client = engine.streamClient()

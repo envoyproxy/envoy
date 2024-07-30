@@ -29,7 +29,7 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  Network::DrainableFilterChainSharedPtr
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
@@ -233,8 +233,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
-    filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
-                                         filter_chain_manager);
+    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
+                                                         dummy_builder_, filter_chain_manager));
   }
 }
 
@@ -257,8 +257,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
   FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
 
-  filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
-                                       filter_chain_manager);
+  THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
+                                                       dummy_builder_, filter_chain_manager));
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

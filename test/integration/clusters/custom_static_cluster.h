@@ -26,9 +26,11 @@ class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
   CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster,
                       Upstream::ClusterFactoryContext& context, uint32_t priority,
-                      std::string address, uint32_t port)
-      : ClusterImplBase(cluster, context), priority_(priority), address_(std::move(address)),
-        port_(port), host_(makeHost()) {}
+                      std::string address, uint32_t port, absl::Status& creation_status)
+      : ClusterImplBase(cluster, context, creation_status), priority_(priority),
+        address_(std::move(address)), port_(port), host_(makeHost()) {
+    THROW_IF_NOT_OK(creation_status);
+  }
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
@@ -60,9 +62,11 @@ private:
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const test::integration::clusters::CustomStaticConfig& proto_config,
                           Upstream::ClusterFactoryContext& context) override {
-    auto new_cluster =
-        std::make_shared<CustomStaticCluster>(cluster, context, proto_config.priority(),
-                                              proto_config.address(), proto_config.port_value());
+    absl::Status creation_status = absl::OkStatus();
+    auto new_cluster = std::make_shared<CustomStaticCluster>(
+        cluster, context, proto_config.priority(), proto_config.address(),
+        proto_config.port_value(), creation_status);
+    THROW_IF_NOT_OK(creation_status);
     return std::make_pair(new_cluster, create_lb_ ? new_cluster->threadAwareLb() : nullptr);
   }
 

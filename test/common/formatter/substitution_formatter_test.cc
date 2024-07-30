@@ -11,6 +11,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
@@ -47,6 +48,26 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Formatter {
 namespace {
+
+using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
+using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
+
+// Helper class to test StreamInfoFormatter.
+class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+public:
+  StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
+                      absl::optional<size_t> max_length = absl::nullopt)
+      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
+    for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
+      auto formatter = cmd->parse(command, sub_command, max_length);
+      if (formatter) {
+        formatter_ = std::move(formatter);
+        return;
+      }
+    }
+    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
+  }
+};
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
@@ -780,6 +801,27 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
+    const std::string raw_cluster_name = "raw_name";
+    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(raw_cluster_name));
+    EXPECT_EQ("raw_name", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("raw_name")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
@@ -4804,6 +4846,37 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
                                                    std::get<1>(test_case), std::get<2>(test_case))
                     .ok());
   }
+}
+
+TEST(SubstitutionFormatterTest, UniqueIdFormatterTest) {
+  StreamInfo::MockStreamInfo stream_info;
+
+  // Simulate initial parsing of configuration
+  auto providers1 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  ASSERT_EQ(providers1.size(), 1);
+
+  // Generate first unique ID with the initial configuration
+  auto id1 = providers1[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id1.has_value());
+
+  // Generate second unique ID with the same initial configuration
+  auto id2 = providers1[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id2.has_value());
+
+  // Check the two generated IDs are unique
+  EXPECT_NE(id1, id2);
+
+  // Simulate configuration reload
+  auto providers2 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  ASSERT_EQ(providers2.size(), 1);
+
+  // Generate another unique ID after the simulated reload
+  auto id3 = providers2[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id3.has_value());
+
+  // Check the new ID is also unique compared to the previous ones
+  EXPECT_NE(id1, id3);
+  EXPECT_NE(id2, id3);
 }
 } // namespace
 } // namespace Formatter

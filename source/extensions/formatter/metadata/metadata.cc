@@ -3,6 +3,7 @@
 #include <string>
 
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/stream_info_formatter.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -46,6 +47,24 @@ public:
             }) {}
 };
 
+// Metadata formatter for virtual host metadata.
+class VirtualHostMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
+public:
+  VirtualHostMetadataFormatter(const std::string& filter_namespace,
+                               const std::vector<std::string>& path,
+                               absl::optional<size_t> max_length)
+      : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
+                                              [](const StreamInfo::StreamInfo& stream_info)
+                                                  -> const envoy::config::core::v3::Metadata* {
+                                                Router::RouteConstSharedPtr route =
+                                                    stream_info.route();
+                                                if (route == nullptr) {
+                                                  return nullptr;
+                                                }
+                                                return &route->virtualHost().metadata();
+                                              }) {}
+};
+
 // Constructor registers all types of supported metadata along with the
 // handlers accessing the required metadata type.
 MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
@@ -78,6 +97,12 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
                                                  absl::optional<size_t> max_length) {
     return std::make_unique<ListenerMetadataFormatter>(filter_namespace, path, max_length);
   };
+
+  metadata_formatter_providers_["VIRTUAL_HOST"] = [](const std::string& filter_namespace,
+                                                     const std::vector<std::string>& path,
+                                                     absl::optional<size_t> max_length) {
+    return std::make_unique<VirtualHostMetadataFormatter>(filter_namespace, path, max_length);
+  };
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
@@ -97,7 +122,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     }
 
     // Return a pointer to formatter provider.
-    return std::make_unique<Envoy::Formatter::StreamInfoFormatter>(
+    return std::make_unique<
+        Envoy::Formatter::StreamInfoFormatterWrapper<Envoy::Formatter::HttpFormatterContext>>(
         provider->second(filter_namespace, path, max_length));
   }
   return nullptr;
