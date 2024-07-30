@@ -769,7 +769,6 @@ public:
    * @param trailers the trailers to decode.
    */
   void decodeTrailers(RequestTrailerMap& trailers) {
-    state_.remote_decode_complete_ = true;
     decodeTrailers(nullptr, trailers);
     checkAndCloseStreamIfFullyClosed();
   }

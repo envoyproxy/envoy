@@ -1466,7 +1466,6 @@ void FilterManager::maybeEndEncode(bool end_stream) {
     if (filter_manager_callbacks_.isHalfCloseEnabled()) {
       checkAndCloseStreamIfFullyClosed();
     } else {
-      state_.stream_closed_ = true;
       filter_manager_callbacks_.endStream();
     }
   }
@@ -1486,7 +1485,7 @@ void FilterManager::checkAndCloseStreamIfFullyClosed() {
   // is set (i.e local reply) or when both server and client half closed.
   if (state_.remote_encode_complete_ &&
       (state_.remote_decode_complete_ || state_.should_stop_decoding_)) {
-    state_.stream_closed_ = true;
+    //state_.stream_closed_ = true;
     ENVOY_STREAM_LOG(trace, "closing stream", *this);
     filter_manager_callbacks_.endStream();
   }
