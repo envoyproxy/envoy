@@ -1589,13 +1589,14 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
       response.decoder_->decodeData(buffer, true);
     }
 
-    if (force_reset_on_premature_upstream_half_close_) {
+    if (force_reset_on_premature_upstream_half_close_ && !encode_complete_) {
       // H/1 connections are always reset if upstream is done before downstream.
       // When the allow_multiplexed_upstream_half_close is enabled the router filter does not
       // reset streams where upstream half closed before downstream. In this case the H/1 codec
       // has to reset the stream.
       ENVOY_CONN_LOG(trace, "Resetting stream due to premature H/1 upstream close.", connection_);
-      response.encoder_.runResetCallbacks(StreamResetReason::Http1PrematureUpstreamHalfClose);
+      response.encoder_.runResetCallbacks(StreamResetReason::Http1PrematureUpstreamHalfClose,
+                                          absl::string_view());
     }
 
     // Reset to ensure no information from one requests persists to the next.

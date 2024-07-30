@@ -1547,7 +1547,7 @@ public:
    * will not fully close the connection. This is off by default.
    * @param enabled Whether to set half-close semantics as enabled or disabled.
    */
-  virtual void enableHalfClose() PURE;
+  virtual void enableTcpTunneling() PURE;
   /**
    * Enable/disable further data from this stream.
    */

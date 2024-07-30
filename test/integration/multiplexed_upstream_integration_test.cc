@@ -75,6 +75,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRespo
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 

@@ -600,9 +600,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
-  if (enable_half_close_) {
-    upstream_->enableHalfClose();
-  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 

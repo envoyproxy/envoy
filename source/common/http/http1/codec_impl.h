@@ -618,7 +618,7 @@ private:
   Status onStatusBase(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
-  void onEncodeComplete() override {}
+  void onEncodeComplete() override { encode_complete_ = true; }
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (pending_response_.has_value()) {
       return *(pending_response_->encoder_.getStream().bytesMeter());
@@ -688,6 +688,7 @@ private:
   bool passing_through_proxy_ = false;
 
   const bool force_reset_on_premature_upstream_half_close_{};
+  bool encode_complete_{false};
 };
 
 } // namespace Http1

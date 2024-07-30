@@ -4788,6 +4788,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
       // reset.
       request_encoder_->getStream().readDisable(false);
       ASSERT_TRUE(response->waitForEndStream());
+      codec_client_->close();
     }
   } else if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP2 ||
              fake_upstreams_[0]->httpType() == Http::CodecType::HTTP3) {
