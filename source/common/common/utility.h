@@ -44,8 +44,7 @@ const std::string errorDetails(int error_code);
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : DateFormatter(format_string, false) {}
-  DateFormatter(const std::string& format_string, bool local_time)
+  DateFormatter(const std::string& format_string, bool local_time = false)
       : raw_format_string_(format_string), local_time_(local_time) {
     parse(format_string);
   }
@@ -117,7 +116,7 @@ private:
  */
 class AccessLogDateTimeFormatter {
 public:
-  static std::string fromTime(const SystemTime& time, bool local_time);
+  static std::string fromTime(const SystemTime& time, bool local_time = false);
 };
 
 /**

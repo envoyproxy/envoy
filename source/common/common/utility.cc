@@ -74,8 +74,6 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // is 10.
     size_t seconds_length;
 
-    using CacheKey = std::pair<std::string, bool>;
-
     // A container object to hold a absl::FormatTime string, its timestamp (in seconds) and a list
     // of position offsets for each specifier found in a format string.
     struct Formatted {
@@ -92,9 +90,10 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
-    absl::node_hash_map<CacheKey, const Formatted> formatted;
+    absl::node_hash_map<std::string, const Formatted> formatted;
   };
-  static thread_local CachedTime cached_time;
+  static thread_local CachedTime cached_time_utc;
+  static thread_local CachedTime cached_time_local;
 
   const std::chrono::nanoseconds epoch_time_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch());
@@ -102,7 +101,8 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
 
-  const auto& item = cached_time.formatted.find(std::make_pair(raw_format_string_, local_time_));
+  CachedTime& cached_time = local_time_ ? cached_time_local : cached_time_utc;
+  const auto& item = cached_time.formatted.find(raw_format_string_);
   if (item == cached_time.formatted.end() ||
       item->second.epoch_time_seconds != epoch_time_seconds) {
     // Remove all the expired cached items.
@@ -127,11 +127,10 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
     // Stamp the formatted string using the current epoch time in seconds, and then cache it in.
     formatted.epoch_time_seconds = epoch_time_seconds;
-    cached_time.formatted.emplace(
-        std::make_pair(std::make_pair(raw_format_string_, local_time_), formatted));
+    cached_time.formatted.emplace(std::make_pair(raw_format_string_, formatted));
   }
 
-  const auto& formatted = cached_time.formatted.at(std::make_pair(raw_format_string_, local_time_));
+  const auto& formatted = cached_time.formatted.at(raw_format_string_);
   ASSERT(specifiers_.size() == formatted.specifier_offsets.size());
 
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
@@ -520,7 +519,7 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time, 
   static thread_local CachedTime cached_time_utc;
   static thread_local CachedTime cached_time_local;
 
-  CachedTime* cached_time = local_time ? &cached_time_local : &cached_time_utc;
+  CachedTime& cached_time = local_time ? cached_time_local : cached_time_utc;
 
   const std::chrono::milliseconds epoch_time_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch());
@@ -528,26 +527,25 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time, 
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
-  if (cached_time->formatted_time.empty() ||
-      cached_time->epoch_time_seconds != epoch_time_seconds) {
-    cached_time->formatted_time =
+  if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
+    cached_time.formatted_time =
         absl::FormatTime(getDefaultDateFormat(local_time), absl::FromChrono(system_time),
                          local_time ? absl::LocalTimeZone() : absl::UTCTimeZone());
-    cached_time->epoch_time_seconds = epoch_time_seconds;
+    cached_time.epoch_time_seconds = epoch_time_seconds;
   } else {
     // Overwrite the digits in the ".000Z" or ".000%z" at the end of the string with the
     // millisecond count from the input time.
-    ASSERT(cached_time->formatted_time.length() >= 23);
+    ASSERT(cached_time.formatted_time.length() >= 23);
     size_t offset = 20;
     uint32_t msec = epoch_time_ms.count() % 1000;
-    cached_time->formatted_time[offset++] = ('0' + (msec / 100));
+    cached_time.formatted_time[offset++] = ('0' + (msec / 100));
     msec %= 100;
-    cached_time->formatted_time[offset++] = ('0' + (msec / 10));
+    cached_time.formatted_time[offset++] = ('0' + (msec / 10));
     msec %= 10;
-    cached_time->formatted_time[offset++] = ('0' + msec);
+    cached_time.formatted_time[offset++] = ('0' + msec);
   }
 
-  return cached_time->formatted_time;
+  return cached_time.formatted_time;
 }
 
 const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,

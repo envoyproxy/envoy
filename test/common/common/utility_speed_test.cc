@@ -40,7 +40,7 @@ static void bmAccessLogDateTimeFormatter(benchmark::State& state) {
     // overhead won't obscure changes in the speed of the code being benchmarked.
     UNREFERENCED_PARAMETER(_);
     time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
-    outputBytes += Envoy::AccessLogDateTimeFormatter::fromTime(time, false).length();
+    outputBytes += Envoy::AccessLogDateTimeFormatter::fromTime(time).length();
   }
   benchmark::DoNotOptimize(outputBytes);
 }
