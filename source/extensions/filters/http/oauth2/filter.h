@@ -146,7 +146,7 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
-  OptRef<const RouteRetryPolicy> retryPolicy() const { return retry_policy_; }
+  OptRef<const RouteRetryPolicy> retryPolicy() const { return makeOptRef(retry_policy_.value()); }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -174,7 +174,7 @@ private:
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
-  absl::optional<const RouteRetryPolicy> retry_policy_;
+  absl::optional<RouteRetryPolicy> retry_policy_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

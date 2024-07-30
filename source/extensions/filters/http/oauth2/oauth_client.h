@@ -18,8 +18,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
-using RouteRetryPolicy envoy::config::route::v3::RetryPolicy;
-using HttpUri envoy::config::core::v3::HttpUri;
+using RouteRetryPolicy = envoy::config::route::v3::RetryPolicy;
+using HttpUri = envoy::config::core::v3::HttpUri;
 
 /**
  * An OAuth client abstracts away everything regarding how to communicate with
