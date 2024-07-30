@@ -76,10 +76,6 @@ BENCHMARK(BM_AccessLogFormatterSetup);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
-  ON_CALL(time_system, systemTime())
-      .WillByDefault(testing::Return(SystemTime(std::chrono::seconds(1234567890))));
-  ON_CALL(time_system, monotonicTime())
-      .WillByDefault(testing::Return(MonotonicTime(std::chrono::seconds(1234567890))));
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   static const char* LogFormat =
@@ -102,10 +98,6 @@ BENCHMARK(BM_AccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StructAccessLogFormatter(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
-  ON_CALL(time_system, systemTime())
-      .WillByDefault(testing::Return(SystemTime(std::chrono::seconds(1234567890))));
-  ON_CALL(time_system, monotonicTime())
-      .WillByDefault(testing::Return(MonotonicTime(std::chrono::seconds(1234567890))));
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> struct_formatter = makeStructFormatter(false);
@@ -121,10 +113,6 @@ BENCHMARK(BM_StructAccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
-  ON_CALL(time_system, systemTime())
-      .WillByDefault(testing::Return(SystemTime(std::chrono::seconds(1234567890))));
-  ON_CALL(time_system, monotonicTime())
-      .WillByDefault(testing::Return(MonotonicTime(std::chrono::seconds(1234567890))));
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> typed_struct_formatter =
@@ -141,10 +129,6 @@ BENCHMARK(BM_TypedStructAccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
-  ON_CALL(time_system, systemTime())
-      .WillByDefault(testing::Return(SystemTime(std::chrono::seconds(1234567890))));
-  ON_CALL(time_system, monotonicTime())
-      .WillByDefault(testing::Return(MonotonicTime(std::chrono::seconds(1234567890))));
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
@@ -160,10 +144,6 @@ BENCHMARK(BM_JsonAccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
-  ON_CALL(time_system, systemTime())
-      .WillByDefault(testing::Return(SystemTime(std::chrono::seconds(1234567890))));
-  ON_CALL(time_system, monotonicTime())
-      .WillByDefault(testing::Return(MonotonicTime(std::chrono::seconds(1234567890))));
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> typed_json_formatter =
