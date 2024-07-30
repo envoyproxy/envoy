@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 
 message OAuth2Credentials {
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message CookieNames {
     // Cookie name to hold OAuth bearer token value. When the authentication server validates the
     // client and returns an authorization token back to the OAuth filter, no matter what format
@@ -70,6 +70,10 @@ message OAuth2Credentials {
 
   // The cookie names used in OAuth filters flow.
   CookieNames cookie_names = 4;
+
+  // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
+  // This is useful when token cookies need to be shared across multiple subdomains.
+  string cookie_domain = 6;
 }
 
 // OAuth config
