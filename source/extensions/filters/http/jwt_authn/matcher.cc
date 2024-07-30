@@ -209,7 +209,7 @@ public:
 private:
   const Router::PathMatcherSharedPtr uri_template_matcher_;
 
-  Router::PathMatcherSharedPtr createUriTemplateMatcher(const RequirementRule& rule) {
+  static Router::PathMatcherSharedPtr createUriTemplateMatcher(const RequirementRule& rule) {
     auto& factory = Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(
         rule.match().path_match_policy());
     ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
