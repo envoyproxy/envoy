@@ -188,7 +188,7 @@ FilterConfig::FilterConfig(
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
-      cookie_domain_(proto_config.cookie_domain()),
+      cookie_domain_(proto_config.credentials().cookie_domain()),
       auth_type_(getAuthType(proto_config.auth_type())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
@@ -691,7 +691,6 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
   }
-  absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
 
   const CookieNames& cookie_names = config_->cookieNames();
 
