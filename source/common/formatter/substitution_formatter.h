@@ -29,7 +29,7 @@ namespace Formatter {
 template <class FormatterContext>
 class PlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  PlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
+  PlainStringFormatterBase(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProviderBase
   absl::optional<std::string> formatWithContext(const FormatterContext&,
@@ -102,11 +102,13 @@ public:
   static std::vector<FormatterProviderBasePtr<FormatterContext>>
   parse(absl::string_view format,
         const std::vector<CommandParserBasePtr<FormatterContext>>& command_parsers = {}) {
-    size_t consumed_size = 0;
+    std::string current_token;
+    current_token.reserve(32);
     std::vector<FormatterProviderBasePtr<FormatterContext>> formatters;
 
     for (size_t pos = 0; pos < format.size();) {
       if (format[pos] != '%') {
+        current_token.push_back(format[pos]);
         pos++;
         continue;
       }
@@ -114,19 +116,19 @@ public:
       // escape '%%'
       if (format.size() > pos + 1) {
         if (format[pos + 1] == '%') {
+          current_token.push_back('%');
           pos += 2;
           continue;
         }
       }
 
-      if (pos > consumed_size) {
+      if (!current_token.empty()) {
         formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{
-            new PlainStringFormatterBase<FormatterContext>(
-                format.substr(consumed_size, pos - consumed_size))});
-        consumed_size = pos;
+            new PlainStringFormatterBase<FormatterContext>(current_token)});
+        current_token.clear();
       }
 
-      absl::string_view sub_format = format.substr(consumed_size);
+      absl::string_view sub_format = format.substr(pos);
       const size_t sub_format_size = sub_format.size();
 
       absl::string_view command, command_arg;
@@ -185,14 +187,13 @@ public:
       }
 
       pos += (sub_format_size - sub_format.size());
-      consumed_size = pos;
     }
 
-    if (consumed_size < format.size()) {
+    if (!current_token.empty() || format.empty()) {
       // Create a PlainStringFormatter with the final string literal. If the format string
       // was empty, this creates a PlainStringFormatter with an empty string.
       formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{
-          new PlainStringFormatterBase<FormatterContext>(format.substr(consumed_size))});
+          new PlainStringFormatterBase<FormatterContext>(current_token)});
     }
 
     return formatters;
@@ -243,9 +244,7 @@ private:
 };
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
-template <class... Ts> struct StructFormatMapVisitorHelper : Ts... {
-  using Ts::operator()...;
-};
+template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
 template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
 /**

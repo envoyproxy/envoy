@@ -8,7 +8,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
-#include "substitution_format_utility.h"
 
 namespace Envoy {
 namespace Formatter {

@@ -16,17 +16,9 @@ namespace Formatter {
 class MetadataFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   MetadataFormatterCommandParser();
-  ::Envoy::Formatter::FormatterProviderPtr parse(const std::string& command,
-                                                 const std::string& subcommand,
-                                                 absl::optional<size_t>& max_length) const override;
-
-private:
-  // Map used to dispatch types of metadata to individual handlers which will
-  // access required metadata object.
-  using FormatterProviderFunc = std::function<::Envoy::Formatter::StreamInfoFormatterProviderPtr(
-      const std::string& filter_namespace, const std::vector<std::string>& path,
-      absl::optional<size_t> max_length)>;
-  std::map<std::string, FormatterProviderFunc> metadata_formatter_providers_;
+  ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
+                                                 absl::string_view subcommand,
+                                                 absl::optional<size_t> max_length) const override;
 };
 
 } // namespace Formatter

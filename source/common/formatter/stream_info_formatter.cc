@@ -1759,8 +1759,8 @@ public:
   BuiltInStreamInfoCommandParser() = default;
 
   // StreamInfoCommandParser
-  StreamInfoFormatterProviderPtr parse(const std::string& command, const std::string& sub_command,
-                                       absl::optional<size_t>& max_length) const override {
+  StreamInfoFormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
+                                       absl::optional<size_t> max_length) const override {
 
     auto it = getKnownStreamInfoFormatterProviders().find(command);
 
