@@ -83,7 +83,6 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
         continueFilterChain(false);
       },
       [this](Network::ListenerFilterBufferImpl& filter_buffer) {
-        ASSERT((*iter_)->maxReadBytes() != 0);
         Network::FilterStatus status = (*iter_)->onData(filter_buffer);
         if (status == Network::FilterStatus::StopIteration) {
           if (socket_->ioHandle().isOpen()) {
@@ -131,15 +130,14 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           // There are two cases for returning StopIteration. One is listener filter
           // needs to wait for data. The other is listener filter with 0 maxReadBytes()
           // doesn't inspect data, but needs to wait for some asynchronous callback.
-          if ((*iter_)->maxReadBytes() > 0) {
-            if (listener_filter_buffer_ == nullptr) {
+          if (listener_filter_buffer_ == nullptr) {
               createListenerFilterBuffer();
-            } else {
-              // If the current filter expect more data than previous filters, then
-              // increase the filter buffer's capacity.
-              if (listener_filter_buffer_->capacity() < (*iter_)->maxReadBytes()) {
-                listener_filter_buffer_->resetCapacity((*iter_)->maxReadBytes());
-              }
+          }
+          if ((*iter_)->maxReadBytes() > 0) {
+            // If the current filter expect more data than previous filters, then
+            // increase the filter buffer's capacity.
+            if (listener_filter_buffer_->capacity() < (*iter_)->maxReadBytes()) {
+              listener_filter_buffer_->resetCapacity((*iter_)->maxReadBytes());
             }
             if (listener_filter_buffer_ != nullptr) {
               // There are two cases for activate event manually: One is

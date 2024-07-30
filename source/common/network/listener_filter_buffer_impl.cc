@@ -14,7 +14,6 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
       on_data_cb_(on_data_cb), buffer_(std::make_unique<uint8_t[]>(buffer_size)),
       base_(buffer_.get()), buffer_size_(buffer_size) {
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
-  ASSERT(buffer_size > 0);
 
   io_handle_.initializeFileEvent(
       dispatcher_, [this](uint32_t events) { return onFileEvent(events); },
