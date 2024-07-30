@@ -355,6 +355,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   route->mutable_match()->set_prefix("/");
   route->add_request_headers_to_remove("x-forwarded-proto");
   route->add_request_headers_to_remove("x-envoy-mobile-cluster");
+  route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
   auto* route_to = route->mutable_route();
   route_to->set_cluster_header("x-envoy-mobile-cluster");
   route_to->mutable_timeout()->set_seconds(0);

@@ -167,8 +167,10 @@ absl::Status FilterChainManagerImpl::addFilterChains(
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
-      filter_chain_impl =
+      auto filter_chain_or_error =
           filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
+      RETURN_IF_NOT_OK(filter_chain_or_error.status());
+      filter_chain_impl = filter_chain_or_error.value();
       ++new_filter_chain_size;
     }
 
@@ -241,8 +243,8 @@ absl::Status FilterChainManagerImpl::addFilterChains(
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   RETURN_IF_NOT_OK(convertIPsToTries());
-  copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
-                                  context_creator);
+  RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
+                                                   filter_chain_factory_builder, context_creator));
   // Construct matcher if it is present in the listener configuration.
   if (filter_chain_matcher) {
     filter_chains_by_name_ = filter_chains_by_name;
@@ -257,7 +259,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
+absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
@@ -266,16 +268,18 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
 
   // Save the default filter chain message. This message could be used in next listener update.
   if (default_filter_chain == nullptr) {
-    return;
+    return absl::OkStatus();
   }
   default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
 
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
-    default_filter_chain_ =
+    auto filter_chain_or_error =
         filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
-    return;
+    RETURN_IF_NOT_OK(filter_chain_or_error.status());
+    default_filter_chain_ = *filter_chain_or_error;
+    return absl::OkStatus();
   }
 
   // Copy from original filter chain manager, or build new filter chain if the default filter chain
@@ -285,9 +289,12 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
       eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
     default_filter_chain_ = origin->default_filter_chain_;
   } else {
-    default_filter_chain_ =
+    auto filter_chain_or_error =
         filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    RETURN_IF_NOT_OK(filter_chain_or_error.status());
+    default_filter_chain_ = *filter_chain_or_error;
   }
+  return absl::OkStatus();
 }
 
 absl::Status FilterChainManagerImpl::addFilterChainForDestinationPorts(

@@ -2133,6 +2133,10 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }
+
+  // Close connections before `SocketInterfaceSwap` goes out of scope to ensure packets aren't
+  // processed while it is being swapped back.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
