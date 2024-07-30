@@ -15,7 +15,7 @@ namespace Formatter {
 // Access log handler for METADATA() command.
 class MetadataFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
-  MetadataFormatterCommandParser();
+  MetadataFormatterCommandParser() = default;
   ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                  absl::string_view subcommand,
                                                  absl::optional<size_t> max_length) const override;
