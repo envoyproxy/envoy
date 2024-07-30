@@ -1516,12 +1516,17 @@ bool FilterManager::createFilterChain() {
     }
   }
 
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
+  FilterChainOptionsImpl options(
+      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
+
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
 
     if (filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this)) {
+                                                       upgrade_map, *this, options)) {
       filter_manager_callbacks_.upgradeFilterChainCreated();
       return true;
     } else {
@@ -1531,10 +1536,6 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
-  // to set valid initial route only when the downstream callbacks is available.
-  FilterChainOptionsImpl options(
-      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);
   return !upgrade_rejected;
 }
@@ -1743,15 +1744,12 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
 
 void FilterManager::resetStream(StreamResetReason reason,
                                 absl::string_view transport_failure_reason) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.abort_filter_chain_on_stream_reset")) {
-    // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
-    // are running.
-    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
-      state_.decoder_filter_chain_aborted_ = true;
-    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
-      state_.encoder_filter_chain_aborted_ = true;
-    }
+  // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
+  // are running.
+  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    state_.decoder_filter_chain_aborted_ = true;
+  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+    state_.encoder_filter_chain_aborted_ = true;
   }
 
   filter_manager_callbacks_.resetStream(reason, transport_failure_reason);
