@@ -126,9 +126,7 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
-  const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
-    return oauth_token_endpoint_;
-  }
+  const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
@@ -148,12 +146,12 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
-  const envoy::config::route::v3::RetryPolicy& retryPolicy() const { return retry_policy_; }
+  OptRef<const RouteRetryPolicy> retryPolicy() const { return retry_policy_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
+  const HttpUri oauth_token_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
@@ -176,7 +174,7 @@ private:
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
-  envoy::config::route::v3::RetryPolicy retry_policy_;
+  absl::optional<const RouteRetryPolicy> retry_policy_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
