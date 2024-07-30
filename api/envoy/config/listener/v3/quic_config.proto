@@ -31,6 +31,7 @@ message QuicProtocolOptions {
 
   // Configuration for UDP cmsg to pass to listener filters via QuicReceivedPacket.
   // Both level and type must be specified for cmsg to be saved.
+  // More info about CMSG: https://man7.org/linux/man-pages/man3/cmsg.3.html
   message SaveCmsgConfig {
     optional int32 level = 1;
 
