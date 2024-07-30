@@ -24,6 +24,7 @@
 #include "absl/strings/strip.h"
 
 using ::Envoy::Http::HeaderMap;
+using ::Envoy::Http::LowerCaseString;
 using xds::data::orca::v3::OrcaLoadReport;
 
 namespace Envoy {
@@ -126,51 +127,35 @@ absl::Status tryParseNativeHttpEncoded(const HeaderMap::GetResult& header,
 absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& headers) {
   OrcaLoadReport load_report;
 
-  const auto load_metrics_native_http =
-      headers.get(Envoy::Http::LowerCaseString(kEndpointLoadMetricsHeader));
-  const auto load_metrics_json =
-      headers.get(Envoy::Http::LowerCaseString(kEndpointLoadMetricsHeaderJson));
-  const auto load_metrics_bin =
-      headers.get(Envoy::Http::LowerCaseString(kEndpointLoadMetricsHeaderBin));
-
-  if (load_metrics_native_http.empty() && load_metrics_json.empty() && load_metrics_bin.empty()) {
-    return absl::NotFoundError("no ORCA data sent from the backend");
-  }
-
-  if ((!load_metrics_native_http.empty() && !load_metrics_json.empty()) ||
-      (!load_metrics_native_http.empty() && !load_metrics_bin.empty()) ||
-      (!load_metrics_json.empty() && !load_metrics_bin.empty())) {
-    // If more than one ORCA header format is found, we will be
-    // unable to determine which header to use.
-    return absl::InvalidArgumentError("more than one ORCA header found");
-  }
-
-  // Native HTTP format.
-  if (!load_metrics_native_http.empty()) {
-    RETURN_IF_NOT_OK(tryParseNativeHttpEncoded(load_metrics_native_http, load_report));
-  }
-
-  // JSON format.
-  if (!load_metrics_json.empty()) {
-#if defined(ENVOY_ENABLE_FULL_PROTOS) && defined(ENVOY_ENABLE_YAML)
-    bool has_unknown_field = false;
-    const std::string json_string = std::string(load_metrics_json[0]->value().getStringView());
-    RETURN_IF_ERROR(
-        Envoy::MessageUtil::loadFromJsonNoThrow(json_string, load_report, has_unknown_field));
-#else
-    IS_ENVOY_BUG("JSON formatted ORCA header support not implemented for this build");
-#endif // !ENVOY_ENABLE_FULL_PROTOS || !ENVOY_ENABLE_YAML
-  }
-
   // Binary protobuf format.
-  if (!load_metrics_bin.empty()) {
-    const auto header_value = load_metrics_bin[0]->value().getStringView();
+  if (const auto header_bin = headers.get(LowerCaseString(kEndpointLoadMetricsHeaderBin));
+      !header_bin.empty()) {
+    const auto header_value = header_bin[0]->value().getStringView();
     const std::string decoded_value = Envoy::Base64::decode(header_value);
     if (!load_report.ParseFromString(decoded_value)) {
       return absl::InvalidArgumentError(
           fmt::format("unable to parse binaryheader to OrcaLoadReport: {}", header_value));
     }
+  } else if (const auto header_native_http =
+                 headers.get(LowerCaseString(kEndpointLoadMetricsHeader));
+             !header_native_http.empty()) {
+    // Native HTTP format.
+    RETURN_IF_NOT_OK(tryParseNativeHttpEncoded(header_native_http, load_report));
+  } else if (const auto header_json = headers.get(LowerCaseString(kEndpointLoadMetricsHeaderJson));
+             !header_json.empty()) {
+    // JSON format.
+#if defined(ENVOY_ENABLE_FULL_PROTOS) && defined(ENVOY_ENABLE_YAML)
+    bool has_unknown_field = false;
+    const std::string json_string = std::string(header_json[0]->value().getStringView());
+    RETURN_IF_ERROR(
+        Envoy::MessageUtil::loadFromJsonNoThrow(json_string, load_report, has_unknown_field));
+#else
+    IS_ENVOY_BUG("JSON formatted ORCA header support not implemented for this build");
+#endif // !ENVOY_ENABLE_FULL_PROTOS || !ENVOY_ENABLE_YAML
+  } else {
+    return absl::NotFoundError("no ORCA data sent from the backend");
   }
+
   return load_report;
 }
 

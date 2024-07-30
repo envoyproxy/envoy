@@ -9,17 +9,17 @@ namespace Envoy {
 namespace Orca {
 
 // Headers used to send ORCA load metrics from the backend.
-static constexpr char kEndpointLoadMetricsHeader[] = "endpoint-load-metrics";
-static constexpr char kEndpointLoadMetricsHeaderBin[] = "endpoint-load-metrics-bin";
-static constexpr char kEndpointLoadMetricsHeaderJson[] = "endpoint-load-metrics-json";
+static constexpr absl::string_view kEndpointLoadMetricsHeader = "endpoint-load-metrics";
+static constexpr absl::string_view kEndpointLoadMetricsHeaderBin = "endpoint-load-metrics-bin";
+static constexpr absl::string_view kEndpointLoadMetricsHeaderJson = "endpoint-load-metrics-json";
 // The following fields are the names of the metrics tracked in the ORCA load
 // report proto.
-static constexpr char kApplicationUtilizationField[] = "application_utilization";
-static constexpr char kCpuUtilizationField[] = "cpu_utilization";
-static constexpr char kMemUtilizationField[] = "mem_utilization";
-static constexpr char kEpsField[] = "eps";
-static constexpr char kRpsFractionalField[] = "rps_fractional";
-static constexpr char kNamedMetricsFieldPrefix[] = "named_metrics.";
+static constexpr absl::string_view kApplicationUtilizationField = "application_utilization";
+static constexpr absl::string_view kCpuUtilizationField = "cpu_utilization";
+static constexpr absl::string_view kMemUtilizationField = "mem_utilization";
+static constexpr absl::string_view kEpsField = "eps";
+static constexpr absl::string_view kRpsFractionalField = "rps_fractional";
+static constexpr absl::string_view kNamedMetricsFieldPrefix = "named_metrics.";
 
 // Parses ORCA load metrics from a header map into an OrcaLoadReport proto.
 // Supports native HTTP, JSON and serialized binary formats.

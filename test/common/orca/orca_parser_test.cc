@@ -43,17 +43,9 @@ TEST(OrcaParserUtilTest, MissingOrcaHeaders) {
               StatusHelpers::HasStatus(absl::NotFoundError("no ORCA data sent from the backend")));
 }
 
-TEST(OrcaParserUtilTest, MultipleOrcaHeaders) {
-  Http::TestRequestHeaderMapImpl headers{{kEndpointLoadMetricsHeader, "value-not-processed"},
-                                         {kEndpointLoadMetricsHeaderBin, "value-not-processed"}};
-  EXPECT_THAT(
-      parseOrcaLoadReportHeaders(headers),
-      StatusHelpers::HasStatus(absl::InvalidArgumentError("more than one ORCA header found")));
-}
-
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeader,
+      {std::string(kEndpointLoadMetricsHeader),
        "cpu_utilization:0.7,application_utilization:0.8,mem_utilization:0.9,"
        "rps_fractional:1000,eps:2,"
        "named_metrics.foo:123,named_metrics.bar:0.2"}};
@@ -62,7 +54,8 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderIncorrectFieldType) {
-  Http::TestRequestHeaderMapImpl headers{{kEndpointLoadMetricsHeader, "cpu_utilization:\"0.7\""}};
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader), "cpu_utilization:\"0.7\""}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(
                   absl::InvalidArgumentError("unable to parse custom backend load metric "
@@ -71,7 +64,7 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderIncorrectFieldType) {
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderNanMetricValue) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeader,
+      {std::string(kEndpointLoadMetricsHeader),
        absl::StrCat("cpu_utilization:", std::numeric_limits<double>::quiet_NaN())}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::InvalidArgumentError(
@@ -80,7 +73,7 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderNanMetricValue) {
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderInfinityMetricValue) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeader,
+      {std::string(kEndpointLoadMetricsHeader),
        absl::StrCat("cpu_utilization:", std::numeric_limits<double>::infinity())}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::InvalidArgumentError(
@@ -90,7 +83,7 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderInfinityMetricValue) {
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateMetric) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeader, "cpu_utilization:0.7,cpu_utilization:0.8"}};
+      {std::string(kEndpointLoadMetricsHeader), "cpu_utilization:0.7,cpu_utilization:0.8"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::AlreadyExistsError(absl::StrCat(
                   kEndpointLoadMetricsHeader, " contains duplicate metric: cpu_utilization"))));
@@ -98,14 +91,14 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateMetric) {
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderUnsupportedMetric) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeader, "cpu_utilization:0.7,unsupported_metric:0.8"}};
+      {std::string(kEndpointLoadMetricsHeader), "cpu_utilization:0.7,unsupported_metric:0.8"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(
                   absl::InvalidArgumentError("unsupported metric name: unsupported_metric")));
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateNamedMetric) {
-  Http::TestRequestHeaderMapImpl headers{{kEndpointLoadMetricsHeader,
+  Http::TestRequestHeaderMapImpl headers{{std::string(kEndpointLoadMetricsHeader),
                                           "named_metrics.foo:123,named_metrics.duplicate:123,"
                                           "named_metrics.duplicate:0.2"}};
   EXPECT_THAT(
@@ -115,14 +108,15 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateNamedMetric) {
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsEmptyNamedMetricKey) {
-  Http::TestRequestHeaderMapImpl headers{{kEndpointLoadMetricsHeader, "named_metrics.:123"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader), "named_metrics.:123"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::InvalidArgumentError("named metric key is empty.")));
 }
 
 TEST(OrcaParserUtilTest, InvalidNativeHttpEncodedHeader) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeader, "not-a-list-of-key-value-pairs"}};
+      {std::string(kEndpointLoadMetricsHeader), "not-a-list-of-key-value-pairs"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(
                   absl::InvalidArgumentError("metric values cannot be empty strings")));
@@ -130,7 +124,7 @@ TEST(OrcaParserUtilTest, InvalidNativeHttpEncodedHeader) {
 
 TEST(OrcaParserUtilTest, JsonHeader) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeaderJson,
+      {std::string(kEndpointLoadMetricsHeaderJson),
        "{\"cpu_utilization\": 0.7, \"application_utilization\": 0.8, "
        "\"mem_utilization\": 0.9, \"rps_fractional\": 1000, \"eps\": 2, "
        "\"named_metrics\": {\"foo\": 123,\"bar\": 0.2}}"}};
@@ -140,7 +134,7 @@ TEST(OrcaParserUtilTest, JsonHeader) {
 
 TEST(OrcaParserUtilTest, InvalidJsonHeader) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeaderJson, "not-a-valid-json-string"}};
+      {std::string(kEndpointLoadMetricsHeaderJson), "not-a-valid-json-string"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
                                        testing::HasSubstr("invalid JSON")));
@@ -148,7 +142,7 @@ TEST(OrcaParserUtilTest, InvalidJsonHeader) {
 
 TEST(OrcaParserUtilTest, JsonHeaderUnknownField) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeaderJson,
+      {std::string(kEndpointLoadMetricsHeaderJson),
        "{\"cpu_utilization\": 0.7, \"application_utilization\": 0.8, "
        "\"mem_utilization\": 0.9, \"rps_fractional\": 1000, \"eps\": 2,  "
        "\"unknown_field\": 2,"
@@ -160,35 +154,62 @@ TEST(OrcaParserUtilTest, JsonHeaderUnknownField) {
 
 TEST(OrcaParserUtilTest, JsonHeaderIncorrectFieldType) {
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeaderJson, "{\"cpu_utilization\": \"0.7\""}};
+      {std::string(kEndpointLoadMetricsHeaderJson), "{\"cpu_utilization\": \"0.7\""}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
                                        testing::HasSubstr("invalid JSON")));
 }
 
 TEST(OrcaParserUtilTest, BinaryHeader) {
-  std::string proto_string =
+  const std::string proto_string =
       TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
-  auto orca_load_report_header_bin =
+  const auto orca_load_report_header_bin =
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeaderBin, orca_load_report_header_bin}};
+      {std::string(kEndpointLoadMetricsHeaderBin), orca_load_report_header_bin}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::IsOkAndHolds(ProtoEq(ExampleOrcaLoadReport())));
 }
 
 TEST(OrcaParserUtilTest, InvalidBinaryHeader) {
-  std::string proto_string =
+  const std::string proto_string =
       TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
   // Force a bad base64 encoding by shortening the length of the output.
-  auto orca_load_report_header_bin =
+  const auto orca_load_report_header_bin =
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length() / 2);
   Http::TestRequestHeaderMapImpl headers{
-      {kEndpointLoadMetricsHeaderBin, orca_load_report_header_bin}};
+      {std::string(kEndpointLoadMetricsHeaderBin), orca_load_report_header_bin}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::HasStatus(
                   absl::StatusCode::kInvalidArgument,
                   testing::HasSubstr("unable to parse binaryheader to OrcaLoadReport")));
+}
+
+TEST(OrcaParserUtilTest, BinHeaderPrecedence) {
+  // Verifies that the order of precedence (binary proto over native http
+  // format) is observed when multiple ORCA headers are sent from the backend.
+  const std::string proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
+  const auto orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader), "cpu_utilization:0.7"},
+      {std::string(kEndpointLoadMetricsHeaderBin), orca_load_report_header_bin}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::IsOkAndHolds(ProtoEq(ExampleOrcaLoadReport())));
+}
+
+TEST(OrcaParserUtilTest, NativeHttpHeaderPrecedence) {
+  // Verifies that the order of precedence (native http over JSON format) is
+  // observed when multiple ORCA headers are sent from the backend.
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader),
+       "cpu_utilization:0.7,application_utilization:0.8,mem_utilization:0.9,"
+       "rps_fractional:1000,eps:2,"
+       "named_metrics.foo:123,named_metrics.bar:0.2"},
+      {std::string(kEndpointLoadMetricsHeaderJson), "{\"cpu_utilization\": 0.7}"}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::IsOkAndHolds(ProtoEq(ExampleOrcaLoadReport())));
 }
 
 } // namespace
