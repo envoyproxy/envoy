@@ -131,7 +131,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           // needs to wait for data. The other is listener filter with 0 maxReadBytes()
           // doesn't inspect data, but needs to wait for some asynchronous callback.
           if (listener_filter_buffer_ == nullptr) {
-              createListenerFilterBuffer();
+            createListenerFilterBuffer();
           }
           if ((*iter_)->maxReadBytes() > 0) {
             // If the current filter expect more data than previous filters, then
