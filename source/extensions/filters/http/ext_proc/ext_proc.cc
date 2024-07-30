@@ -1216,7 +1216,11 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
+
+    errorResponse.mutable_status()->set_code(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_timeout_error")
+            ? StatusCode::GatewayTimeout
+            : StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
