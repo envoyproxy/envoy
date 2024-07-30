@@ -61,6 +61,27 @@ public:
   virtual const std::string& serialNumberPeerCertificate() const PURE;
 
   /**
+   * @return std::string the SHA256 digest of all peer certificates (delimited by a ",").
+   *         Returns "" if there is no peer certificate which can happen in
+   *         TLS (non mTLS) connections.
+   */
+  virtual const std::string& sha256PeerCertificateChainDigests() const PURE;
+
+  /**
+   * @return std::string the SHA1 digest of all peer certificates (delimited by a ",").
+   *         Returns "" if there is no peer certificate which can happen in
+   *         TLS (non mTLS) connections.
+   */
+  virtual const std::string& sha1PeerCertificateChainDigests() const PURE;
+
+  /**
+   * @return std::string the comma-delineated serial number fields of all peer certificates.
+   *         Returns "" if there are no peer certificates and for
+   *         each certificate with no serial number.
+   **/
+  virtual const std::string& serialNumbersPeerCertificates() const PURE;
+
+  /**
    * @return std::string the issuer field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no issuer.
    **/

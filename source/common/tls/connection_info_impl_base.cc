@@ -1,9 +1,12 @@
 #include "source/common/tls/connection_info_impl_base.h"
 
+#include <openssl/stack.h>
+
 #include "source/common/common/hex.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
+#include "openssl/safestack.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
@@ -77,6 +80,39 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   return cached_sha_256_peer_certificate_digest_;
 }
 
+const std::string& ConnectionInfoImplBase::sha256PeerCertificateChainDigests() const {
+  if (!cached_sha_256_peer_certificate_digests_.empty()) {
+    return cached_sha_256_peer_certificate_digests_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_sha_256_peer_certificate_digests_.empty());
+    return cached_sha_256_peer_certificate_digests_;
+  }
+
+  auto stack_len = sk_X509_num(cert_chain);
+  for (uint64_t i = 0; i < stack_len; i++) {
+    X509* cert = sk_X509_value(cert_chain, i);
+    if (!cert) {
+      cached_sha_256_peer_certificate_digests_ = cached_sha_256_peer_certificate_digests_ + ",";
+      continue;
+    }
+
+    std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+    unsigned int n;
+    X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
+    RELEASE_ASSERT(n == computed_hash.size(), "");
+    cached_sha_256_peer_certificate_digests_ =
+        absl::StrCat(cached_sha_256_peer_certificate_digests_, Hex::encode(computed_hash));
+    if (i < stack_len - 1) {
+      cached_sha_256_peer_certificate_digests_ = cached_sha_256_peer_certificate_digests_ + ",";
+    }
+  }
+
+  return cached_sha_256_peer_certificate_digests_;
+}
+
 const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
   if (!cached_sha_1_peer_certificate_digest_.empty()) {
     return cached_sha_1_peer_certificate_digest_;
@@ -93,6 +129,39 @@ const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
   RELEASE_ASSERT(n == computed_hash.size(), "");
   cached_sha_1_peer_certificate_digest_ = Hex::encode(computed_hash);
   return cached_sha_1_peer_certificate_digest_;
+}
+
+const std::string& ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
+  if (!cached_sha_1_peer_certificate_digests_.empty()) {
+    return cached_sha_1_peer_certificate_digests_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_sha_1_peer_certificate_digests_.empty());
+    return cached_sha_1_peer_certificate_digests_;
+  }
+
+  auto stack_len = sk_X509_num(cert_chain);
+  for (uint64_t i = 0; i < stack_len; i++) {
+    X509* cert = sk_X509_value(cert_chain, i);
+    if (!cert) {
+      cached_sha_1_peer_certificate_digests_ = cached_sha_1_peer_certificate_digests_ + ",";
+      continue;
+    }
+
+    std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+    unsigned int n;
+    X509_digest(cert, EVP_sha1(), computed_hash.data(), &n);
+    RELEASE_ASSERT(n == computed_hash.size(), "");
+    cached_sha_1_peer_certificate_digests_ =
+        absl::StrCat(cached_sha_1_peer_certificate_digests_, Hex::encode(computed_hash));
+    if (i < stack_len - 1) {
+      cached_sha_1_peer_certificate_digests_ = cached_sha_1_peer_certificate_digests_ + ",";
+    }
+  }
+
+  return cached_sha_1_peer_certificate_digests_;
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate() const {
@@ -251,6 +320,35 @@ const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   }
   cached_serial_number_peer_certificate_ = Utility::getSerialNumberFromCertificate(*cert.get());
   return cached_serial_number_peer_certificate_;
+}
+
+const std::string& ConnectionInfoImplBase::serialNumbersPeerCertificates() const {
+  if (!cached_serial_numbers_peer_certificates_.empty()) {
+    return cached_serial_numbers_peer_certificates_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_serial_numbers_peer_certificates_.empty());
+    return cached_serial_numbers_peer_certificates_;
+  }
+
+  auto stack_len = sk_X509_num(cert_chain);
+  for (uint64_t i = 0; i < stack_len; i++) {
+    X509* cert = sk_X509_value(cert_chain, i);
+    if (!cert) {
+      cached_serial_numbers_peer_certificates_ = cached_serial_numbers_peer_certificates_ + ",";
+      continue;
+    }
+
+    cached_serial_numbers_peer_certificates_ = absl::StrCat(
+        cached_serial_numbers_peer_certificates_, Utility::getSerialNumberFromCertificate(*cert));
+    if (i < stack_len - 1) {
+      cached_serial_numbers_peer_certificates_ = cached_serial_numbers_peer_certificates_ + ",";
+    }
+  }
+
+  return cached_serial_numbers_peer_certificates_;
 }
 
 const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
