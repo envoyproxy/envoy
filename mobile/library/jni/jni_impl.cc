@@ -565,8 +565,8 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
     headers_length = static_cast<jlong>(headers->length);
     passHeaders("passHeader", *headers, j_context);
   }
-  Envoy::JNI::LocalRefUniquePtr<jobject> j_in_data = Envoy::JNI::LocalRefUniquePtr<jobject>(
-      nullptr, Envoy::JNI::LocalRefDeleter(jni_helper.getEnv()));
+  Envoy::JNI::LocalRefUniquePtr<jobject> j_in_data =
+      Envoy::JNI::LocalRefUniquePtr<jobject>(nullptr, Envoy::JNI::LocalRefDeleter());
   if (data) {
     j_in_data = Envoy::JNI::envoyDataToJavaByteBuffer(jni_helper, *data);
   }
