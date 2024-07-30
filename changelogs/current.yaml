@@ -28,9 +28,6 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: http_11_proxy
-  change: |
-    Added the option to configure the transport socket via locality or endpoint metadata.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.avoid_zombie_streams`` and legacy code paths.
@@ -57,6 +54,9 @@ removed_config_or_runtime:
     code path.
 
 new_features:
+- area: http_11_proxy
+  change: |
+    Added the option to configure the transport socket via locality or endpoint metadata.
 - area: tls
   change: |
     Added :ref:`prefer_client_ciphers
