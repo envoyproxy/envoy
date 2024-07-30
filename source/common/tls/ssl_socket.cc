@@ -376,6 +376,15 @@ void SslSocket::onAsynchronousCertValidationComplete() {
   }
 }
 
+void SslSocket::onAsynchronousCertificateSelectionComplete() {
+  ENVOY_CONN_LOG(debug, "Async cert selection completed", callbacks_->connection());
+  if (info_->state() != Ssl::SocketState::HandshakeInProgress) {
+    IS_ENVOY_BUG(fmt::format("unexpected handshake state: {}", static_cast<int>(info_->state())));
+    return;
+  }
+  resumeHandshake();
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

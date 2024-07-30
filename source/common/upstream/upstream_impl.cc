@@ -550,7 +550,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = cluster.happyEyeballsConfig();
+        happy_eyeballs_config = *cluster.happyEyeballsConfig();
       } else {
         envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
         default_config.set_first_address_family_version(
@@ -1134,6 +1134,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
+      happy_eyeballs_config_(
+          config.upstream_connection_options().has_happy_eyeballs_config()
+              ? std::make_unique<
+                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
+                    config.upstream_connection_options().happy_eyeballs_config())
+              : nullptr),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1150,13 +1156,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
-                          config.track_cluster_stats().per_endpoint_stats()),
-      happy_eyeballs_config_(
-          config.upstream_connection_options().has_happy_eyeballs_config()
-              ? absl::make_optional<
-                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
-                    config.upstream_connection_options().happy_eyeballs_config())
-              : absl::nullopt) {
+                          config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(

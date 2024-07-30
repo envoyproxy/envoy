@@ -44,7 +44,7 @@ public:
     return stream_->isAboveWriteBufferHighWatermark();
   }
 
-  void setWatermarkCallbacks(Envoy::Http::DecoderFilterWatermarkCallbacks& callbacks) {
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) {
     stream_->setWatermarkCallbacks(callbacks);
   }
 

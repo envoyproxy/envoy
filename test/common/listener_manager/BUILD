@@ -42,6 +42,7 @@ envoy_cc_test_library(
     data = ["//test/common/tls/test_data:certs"],
     deps = [
         ":config_cc_proto",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/init:manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/tls:server_context_lib",
@@ -109,6 +110,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
