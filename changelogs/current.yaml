@@ -26,6 +26,9 @@ bug_fixes:
 - area: quic
   change: |
     Fixes access log formatter %CONNECTION_ID% for QUIC connections.
+- area: c-ares
+  change: |
+    Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
 - area: ext_authz
   change: |
     Fixed fail-open behavior of the :ref:`failure_mode_allow config option
