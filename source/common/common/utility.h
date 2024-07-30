@@ -107,7 +107,7 @@ private:
   // This is the format string as supplied in configuration, e.g. "foo %3f bar".
   const std::string raw_format_string_;
 
-  // If use local time zone.
+  // Whether use local time zone.
   const bool local_time_;
 };
 
