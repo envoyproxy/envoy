@@ -146,7 +146,12 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
-  OptRef<const RouteRetryPolicy> retryPolicy() const { return makeOptRef(retry_policy_.value()); }
+  OptRef<const RouteRetryPolicy> retryPolicy() const {
+    if (!retry_policy_.has_value()) {
+      return absl::nullopt;
+    }
+    return makeOptRef(retry_policy_.value());
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
