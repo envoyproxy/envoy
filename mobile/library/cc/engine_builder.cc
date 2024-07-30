@@ -168,6 +168,7 @@ EngineBuilder& EngineBuilder::setDeviceOs(std::string device_os) {
 }
 
 EngineBuilder& EngineBuilder::setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds) {
+  std::cerr << "setStreamIdleTimeoutSeconds: " << stream_idle_timeout_seconds << "\n";
   stream_idle_timeout_seconds_ = stream_idle_timeout_seconds;
   return *this;
 }
@@ -343,7 +344,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           PASS_THROUGH);
   std::cerr << "STREAM IDLE TIMEOUT In SECONDS: " << stream_idle_timeout_seconds_ << "\n";
-  hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
+  hcm->mutable_stream_idle_timeout()->set_seconds(60);
   auto* route_config = hcm->mutable_route_config();
   route_config->set_name("api_router");
 
@@ -360,7 +361,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   route_to->set_cluster_header("x-envoy-mobile-cluster");
   route_to->mutable_timeout()->set_seconds(0);
   route_to->mutable_retry_policy()->mutable_per_try_idle_timeout()->set_seconds(
-      per_try_idle_timeout_seconds_);
+      60);
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
