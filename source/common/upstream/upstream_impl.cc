@@ -420,20 +420,21 @@ absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create
     uint32_t priority, TimeSource& time_source, const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<HostDescriptionImpl>(new HostDescriptionImpl(
-      creation_status, cluster, hostname, dest_address, endpoint_metadata, locality_metadata, locality, health_check_config, priority, time_source, address_list));
+      creation_status, cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
+      locality, health_check_config, priority, time_source, address_list));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 HostDescriptionImpl::HostDescriptionImpl(
-    absl::Status& creation_status,
-    ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+    absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
-                              locality, health_check_config, priority, time_source, creation_status),
+                              locality, health_check_config, priority, time_source,
+                              creation_status),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
@@ -443,8 +444,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source,
-    absl::Status& creation_status)
+    uint32_t priority, TimeSource& time_source, absl::Status& creation_status)
     : cluster_(cluster), hostname_(hostname),
       health_checks_hostname_(health_check_config.hostname()),
       canary_(Config::Metadata::metadataValue(endpoint_metadata.get(),
@@ -467,7 +467,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
 
 HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressListOrNull(
     const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list) {
-  if (address_list.empty()) {
+  if (!address || address_list.empty()) {
     return {};
   }
   ASSERT(*address_list.front() == *address);
@@ -599,15 +599,18 @@ Host::CreateConnectionData HostImplBase::createConnection(
 void HostImplBase::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
 
 absl::StatusOr<std::unique_ptr<HostImpl>> HostImpl::create(
-     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address,
-           MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-           uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
-           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-           uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           TimeSource& time_source, const AddressVector& address_list) {
+    ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+    Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
+    MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
+    const envoy::config::core::v3::Locality& locality,
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
+    TimeSource& time_source, const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<HostImpl>(new HostImpl(creation_status, cluster, hostname, address, endpoint_metadata, locality_metadata, initial_weight, locality, health_check_config, priority, health_status, time_source, address_list));
+  auto ret = std::unique_ptr<HostImpl>(
+      new HostImpl(creation_status, cluster, hostname, address, endpoint_metadata,
+                   locality_metadata, initial_weight, locality, health_check_config, priority,
+                   health_status, time_source, address_list));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -2094,11 +2097,13 @@ void PriorityStateManager::registerHostForPriority(
       locality_lb_endpoint.has_metadata()
           ? parent_.constMetadataSharedPool()->getObject(locality_lb_endpoint.metadata())
           : nullptr;
-  const auto host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(HostImpl::create(
-      parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
-      lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-      lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
-      lb_endpoint.health_status(), time_source, address_list), std::unique_ptr<HostImpl>));
+  const auto host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+      HostImpl::create(parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
+                       lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                       lb_endpoint.endpoint().health_check_config(),
+                       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source,
+                       address_list),
+      std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
@@ -2494,7 +2499,7 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
     auto address = address_or_error.value();
     health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
-  } else {
+  } else if (host_address && host_address->ip()) {
     health_check_address = port_value == 0
                                ? host_address
                                : Network::Utility::getAddressWithPort(*host_address, port_value);

@@ -17,13 +17,13 @@ namespace Upstream {
  */
 class LogicalHost : public HostImplBase, public HostDescriptionImplBase {
 public:
- static absl::StatusOr<std::unique_ptr<LogicalHost>> create(
-      const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
-      const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
-      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-      const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-      TimeSource& time_source);
+  static absl::StatusOr<std::unique_ptr<LogicalHost>>
+  create(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+         const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
+         const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+         const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
+         TimeSource& time_source);
 
   /**
    * Sets new addresses. This can be called dynamically during operation, and

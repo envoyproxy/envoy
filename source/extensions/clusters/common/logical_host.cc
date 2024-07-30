@@ -4,14 +4,16 @@ namespace Envoy {
 namespace Upstream {
 
 absl::StatusOr<std::unique_ptr<LogicalHost>> LogicalHost::create(
-      const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
-      const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
-      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-      const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-      TimeSource& time_source) {
+    const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+    const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+    const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
+    TimeSource& time_source) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<LogicalHost>(new LogicalHost(cluster, hostname, address, address_list, locality_lb_endpoint, lb_endpoint, override_transport_socket_options, time_source, creation_status));
+  auto ret = std::unique_ptr<LogicalHost>(
+      new LogicalHost(cluster, hostname, address, address_list, locality_lb_endpoint, lb_endpoint,
+                      override_transport_socket_options, time_source, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -26,13 +28,13 @@ LogicalHost::LogicalHost(
     : HostImplBase(lb_endpoint.load_balancing_weight().value(),
                    lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
       HostDescriptionImplBase(
-          creation_status, cluster, hostname, address,
+          cluster, hostname, address,
           // TODO(zyfjeff): Created through metadata shared pool
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
           std::make_shared<const envoy::config::core::v3::Metadata>(
               locality_lb_endpoint.metadata()),
           locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-          locality_lb_endpoint.priority(), time_source),
+          locality_lb_endpoint.priority(), time_source, creation_status),
       override_transport_socket_options_(override_transport_socket_options), address_(address),
       address_list_or_null_(makeAddressListOrNull(address, address_list)) {
   health_check_address_ =

@@ -14,14 +14,30 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
-  static absl::StatusOr<std::unique_ptr<RedisHost>> create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              TimeSource& time_source) {
-    absl::Status creation_status = absl::OkStatus();
-    auto ret = RedisHost::create(cluster, hostname, address, primary, time_source, creation_status);
-    RETURN_IF_NOT_OK(creation_status);
-    return ret;
-  }
+absl::StatusOr<std::unique_ptr<RedisCluster::RedisHost>>
+RedisCluster::RedisHost::create(Upstream::ClusterInfoConstSharedPtr cluster,
+                                const std::string& hostname,
+                                Network::Address::InstanceConstSharedPtr address,
+                                RedisCluster& parent, bool primary, TimeSource& time_source) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<RedisCluster::RedisHost>(new RedisCluster::RedisHost(
+      cluster, hostname, address, parent, primary, time_source, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+absl::StatusOr<std::unique_ptr<RedisCluster>> RedisCluster::create(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
+    Upstream::ClusterFactoryContext& context,
+    NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+    Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr factory) {
+  absl::Status creation_status = absl::OkStatus();
+  std::unique_ptr<RedisCluster> ret = absl::WrapUnique(new RedisCluster(
+      cluster, redis_cluster, context, client_factory, dns_resolver, factory, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
 
 RedisCluster::RedisCluster(
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -108,13 +124,16 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots) {
 
   for (const ClusterSlot& slot : *slots) {
     if (all_new_hosts.count(slot.primary()->asString()) == 0) {
-      new_hosts.emplace_back(THROW_OR_RETURN_VALUE(RedisHost::create(info(), "", slot.primary(), *this, true, time_source_), std::unique_ptr<RedisHost>));
+      new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
+          RedisHost::create(info(), "", slot.primary(), *this, true, time_source_),
+          std::unique_ptr<RedisHost>));
       all_new_hosts.emplace(slot.primary()->asString());
     }
     for (auto const& replica : slot.replicas()) {
       if (all_new_hosts.count(replica.first) == 0) {
-        new_hosts.emplace_back(
-            THROW_OR_RETURN_VALUE(RedisHost::create(info(), "", replica.second, *this, false, time_source_), std::unique_ptr<RedisHost>));
+        new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
+            RedisHost::create(info(), "", replica.second, *this, false, time_source_),
+            std::unique_ptr<RedisHost>));
         all_new_hosts.emplace(replica.first);
       }
     }
@@ -295,9 +314,9 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (parent_.hosts_.empty()) {
     const int rand_idx = parent_.random_.random() % discovery_address_list_.size();
     auto it = std::next(discovery_address_list_.begin(), rand_idx);
-    host = Upstream::HostSharedPtr{
-        THROW_OR_RETURN_VALUE(RedisHost::create(parent_.info(), "", *it, parent_, true, parent_.timeSource()),
-                              std::unique_ptr<RedisHost>)};
+    host = Upstream::HostSharedPtr{THROW_OR_RETURN_VALUE(
+        RedisHost::create(parent_.info(), "", *it, parent_, true, parent_.timeSource()),
+        std::unique_ptr<RedisHost>)};
   } else {
     const int rand_idx = parent_.random_.random() % parent_.hosts_.size();
     host = parent_.hosts_[rand_idx];
