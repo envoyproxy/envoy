@@ -281,8 +281,8 @@ message ExternalProcessor {
 
 // ExtProcHttpService is used for raw HTTP communication between the filter and the external processing service.
 message ExtProcHttpService {
-  // Sets the HTTP server URI which the external processing requests must be sent to.
-  config.core.v3.HttpService server_uri = 1;
+  // Sets the HTTP service which the external processing requests must be sent to.
+  config.core.v3.HttpService http_service = 1;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of
