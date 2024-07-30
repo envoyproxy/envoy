@@ -208,8 +208,9 @@ FilterConfig::FilterConfig(
   }
 
   if (proto_config.has_retry_policy()) {
-    retry_policy_ = absl::optional<const RouteRetryPolicy>(Http::Utility::convertCoreToRouteRetryPolicy(
-        proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset"));
+    retry_policy_ =
+        absl::optional<const RouteRetryPolicy>(Http::Utility::convertCoreToRouteRetryPolicy(
+            proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset"));
   }
 }
 
