@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.ext_proc.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/config/core/v3/http_uri.proto";
+import "envoy/config/core/v3/http_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/matcher/v3/string.proto";
 
@@ -126,9 +126,8 @@ message ExternalProcessor {
 
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
-  // Only one of ``grpc_service`` or
-  // :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.http_service>`.
-  // can be set. It is required that one of them must be set.
+  // Only one of ``grpc_service`` or ``http_service`` can be set.
+  // It is required that one of them must be set.
   config.core.v3.GrpcService grpc_service = 1 [
       (udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"
   ];
@@ -138,7 +137,7 @@ message ExternalProcessor {
   // Only one of ``http_service`` or
   // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
   // can be set. It is required that one of them must be set.
-  HttpService http_service = 20 [
+  ExtProcHttpService http_service = 20 [
       (udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"
   ];
 
@@ -280,10 +279,10 @@ message ExternalProcessor {
   google.protobuf.Duration deferred_close_timeout = 19;
 }
 
-// HttpService is used for raw HTTP communication between the filter and the external processing service.
-message HttpService {
+// ExtProcHttpService is used for raw HTTP communication between the filter and the external processing service.
+message ExtProcHttpService {
   // Sets the HTTP server URI which the external processing requests must be sent to.
-  config.core.v3.HttpUri server_uri = 1;
+  config.core.v3.HttpService server_uri = 1;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of
