@@ -33,9 +33,10 @@ message QuicProtocolOptions {
   // Both level and type must be specified for cmsg to be saved.
   // More info about CMSG: https://man7.org/linux/man-pages/man3/cmsg.3.html
   message SaveCmsgConfig {
-    optional int32 level = 1;
-
-    optional int32 type = 2;
+    // cmsg level to save if matched. Default is unset and no cmsg will be saved.
+    google.protobuf.Int32Value level = 1;
+    // cmsg type to save if matched. Default is unset and no cmsg will be saved.
+    google.protobuf.Int32Value type = 2;
   }
 
   core.v3.QuicProtocolOptions quic_protocol_options = 1;

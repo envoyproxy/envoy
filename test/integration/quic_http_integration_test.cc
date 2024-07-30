@@ -2468,11 +2468,13 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     listener->mutable_udp_listener_config()
         ->mutable_quic_options()
         ->mutable_save_cmsg_config()
-        ->set_level(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
+        ->mutable_level()
+        ->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
     listener->mutable_udp_listener_config()
         ->mutable_quic_options()
         ->mutable_save_cmsg_config()
-        ->set_type(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+        ->mutable_type()
+        ->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
     auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
