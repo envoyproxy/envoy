@@ -133,6 +133,7 @@ message ExternalProcessor {
       (udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"
   ];
 
+  // [#not-implemented-hide:]
   // Configuration for the HTTP service that the filter will communicate with.
   // Only one of ``http_service`` or
   // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
