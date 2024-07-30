@@ -37,6 +37,8 @@ message QuicProtocolOptions {
     google.protobuf.Int32Value level = 1;
     // cmsg type to save if matched. Default is unset and no cmsg will be saved.
     google.protobuf.Int32Value type = 2;
+    // expected size of cmsg value; if not set, cmsg may be truncated or omitted. Default is zero.
+    int32 expected_size = 3;
   }
 
   core.v3.QuicProtocolOptions quic_protocol_options = 1;

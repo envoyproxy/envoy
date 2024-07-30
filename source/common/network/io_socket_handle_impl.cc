@@ -287,8 +287,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     RecvMsgOutput& output) {
   ASSERT(!output.msg_.empty());
 
-  absl::FixedArray<char> cbuf(cmsg_space_);
-  memset(cbuf.begin(), 0, cmsg_space_);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
+  absl::FixedArray<char> cbuf(cmsg_space);
+  memset(cbuf.begin(), 0, cmsg_space);
 
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_for_read = 0;
@@ -388,8 +389,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   absl::FixedArray<absl::FixedArray<struct iovec>> iovs(
       num_packets_per_mmsg_call, absl::FixedArray<struct iovec>(slices[0].size()));
   absl::FixedArray<sockaddr_storage> raw_addresses(num_packets_per_mmsg_call);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
   absl::FixedArray<absl::FixedArray<char>> cbufs(num_packets_per_mmsg_call,
-                                                 absl::FixedArray<char>(cmsg_space_));
+                                                 absl::FixedArray<char>(cmsg_space));
 
   for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
     memset(&raw_addresses[i], 0, sizeof(sockaddr_storage));

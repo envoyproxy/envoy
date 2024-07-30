@@ -2475,6 +2475,10 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
         ->mutable_save_cmsg_config()
         ->mutable_type()
         ->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    listener->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_save_cmsg_config()
+        ->set_expected_size(128);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
     auto configuration = test::integration::filters::TestQuicListenerFilterConfig();

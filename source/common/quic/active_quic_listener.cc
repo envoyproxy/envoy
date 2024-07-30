@@ -118,6 +118,7 @@ ActiveQuicListener::ActiveQuicListener(
     if (save_cmsg_config.has_type()) {
       udp_save_cmsg_config_.type = save_cmsg_config.type().value();
     }
+    udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
   }
 }
 
