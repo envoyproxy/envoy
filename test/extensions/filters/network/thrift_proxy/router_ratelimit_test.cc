@@ -368,8 +368,8 @@ actions:
 
   initialize(yaml);
 
-  Network::Address::PipeInstance pipe_address("/hello");
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", metadata_, pipe_address);
+  auto pipe_address = *Network::Address::PipeInstance::create("/hello");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", metadata_, *pipe_address);
   EXPECT_TRUE(descriptors_.empty());
 }
 

@@ -384,7 +384,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         config_->empty_stat_name_,
         response_status_code,
         internal_request,
-        route_entry_->virtualHost().statName(),
+        route_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -516,7 +516,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_entry_->virtualCluster(headers);
+  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -755,8 +755,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ =
-      route_entry_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
@@ -806,7 +805,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           shadow_streams_.insert(shadow_stream);
           shadow_stream->setDestructorCallback(
               [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
-          shadow_stream->setWatermarkCallbacks(*callbacks_);
+          shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
         }
       }
     }
@@ -836,8 +835,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {
     auto method = downstream_headers_->getMethodValue();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-        Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
+    if (Http::HeaderUtility::isConnectUdpRequest(*downstream_headers_)) {
       upstream_protocol = UpstreamProtocol::UDP;
     } else if (method == Http::Headers::get().MethodValues.Connect ||
                (route_entry_->connectConfig()->allow_post() &&
@@ -995,6 +993,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   if (callbacks_->decoderBufferLimit() != 0) {
     retry_shadow_buffer_limit_ = callbacks_->decoderBufferLimit();
   }
+
+  watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
 
 void Filter::cleanup() {
@@ -1330,6 +1330,14 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                           ? RetryState::Http3Used::Yes
                           : RetryState::Http3Used::No;
   }
+
+  // If the current request in this router has sent data to the upstream, we consider the request
+  // started.
+  upstream_request_started_ |= upstream_request.streamInfo()
+                                   .upstreamInfo()
+                                   ->upstreamTiming()
+                                   .first_upstream_tx_byte_sent_.has_value();
+
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_http3,
       [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
@@ -1339,7 +1347,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
         // the original request is retried with the same can_send_early_data setting, it will not be
         // sent as early data by the underlying connection pool grid.
         doRetry(can_send_early_data, disable_http3 ? false : can_use_http3, is_timeout_retry);
-      });
+      },
+      upstream_request_started_);
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
@@ -1415,7 +1424,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
   const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
+      transport_failure_reason.empty() ? "" : absl::StrCat("|", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 
@@ -1760,7 +1769,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         response_time,
         upstream_request.upstreamCanary(),
         internal_request,
-        route_entry_->virtualHost().statName(),
+        route_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,

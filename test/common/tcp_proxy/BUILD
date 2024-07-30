@@ -17,6 +17,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:transport_socket_options_lib",
@@ -77,7 +78,9 @@ envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/tcp_proxy",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_filter_interface",
         "//test/mocks/router:upstream_request",

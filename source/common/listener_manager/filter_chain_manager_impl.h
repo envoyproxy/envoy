@@ -33,9 +33,9 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   /**
    * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
-   * chain. Throw exception if failed.
+   * chain or an error status.
    */
-  virtual Network::DrainableFilterChainSharedPtr
+  virtual absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
@@ -149,7 +149,7 @@ public:
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
-  void addFilterChains(
+  absl::Status addFilterChains(
       const xds::type::matcher::v3::Matcher* filter_chain_matcher,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
@@ -170,14 +170,14 @@ public:
   }
 
 private:
-  void convertIPsToTries();
+  absl::Status convertIPsToTries();
   const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
                                                           const StreamInfo::StreamInfo& info) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
   // filter chain manager. Called by addFilterChains().
-  void copyOrRebuildDefaultFilterChain(
+  absl::Status copyOrRebuildDefaultFilterChain(
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);
@@ -214,7 +214,7 @@ private:
   using DestinationPortsMap =
       absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
 
-  void addFilterChainForDestinationPorts(
+  absl::Status addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
@@ -224,7 +224,7 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForDestinationIPs(
+  absl::Status addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
@@ -233,7 +233,7 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForServerNames(
+  absl::Status addFilterChainForServerNames(
       ServerNamesMapSharedPtr& server_names_map_ptr,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
@@ -242,7 +242,7 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForApplicationProtocols(
+  absl::Status addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const absl::Span<const std::string* const> application_protocols,
       const std::vector<std::string>& direct_source_ips,
@@ -250,24 +250,25 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForDirectSourceIPs(
+  absl::Status addFilterChainForDirectSourceIPs(
       DirectSourceIPsMap& direct_source_ips_map, const std::vector<std::string>& direct_source_ips,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourceTypes(
+  absl::Status addFilterChainForSourceTypes(
       SourceTypesArraySharedPtr& source_types_array_ptr,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourceIPs(SourceIPsMap& source_ips_map, const std::string& source_ip,
-                                  const absl::Span<const Protobuf::uint32> source_ports,
-                                  const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
-                                    uint32_t source_port,
-                                    const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourceIPs(SourceIPsMap& source_ips_map,
+                                          const std::string& source_ip,
+                                          const absl::Span<const Protobuf::uint32> source_ports,
+                                          const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
+                                            uint32_t source_port,
+                                            const Network::FilterChainSharedPtr& filter_chain);
 
   const Network::FilterChain*
   findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,

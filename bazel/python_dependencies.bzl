@@ -1,5 +1,6 @@
+load("@com_google_protobuf//bazel:system_python.bzl", "system_python")
 load("@envoy_toolshed//:packages.bzl", "load_packages")
-load("@python3_11//:defs.bzl", "interpreter")
+load("@python3_12//:defs.bzl", "interpreter")
 load("@rules_python//python:pip.bzl", "pip_parse")
 
 def envoy_python_dependencies():
@@ -24,4 +25,9 @@ def envoy_python_dependencies():
         python_interpreter_target = interpreter,
         requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
         extra_pip_args = ["--require-hashes"],
+    )
+
+    system_python(
+        name = "system_python",
+        minimum_python_version = "3.7",
     )

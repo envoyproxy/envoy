@@ -14,6 +14,40 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EnvoyGrpcFlowControlTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
+  // Configure the connection buffer limit to 1KB
+  connection_buffer_limits_ = 1024;
+  // Create large request string that will trigger watermark given buffer limit above.
+  std::string large_request = std::string(64 * 1024, 'a');
+
+  initialize();
+  auto stream = createStream(empty_metadata_);
+
+  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+
+  // Registering the new watermark callback.
+  stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
+  // Expect that flow control kicks in and watermark calls are triggered.
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+
+  // Create send request with large request string.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(large_request);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,
@@ -21,6 +55,37 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
 
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
+// are removed due to grpc service configuration.
+TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeaders) {
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  skip_envoy_headers_ = true;
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
+// are removed due to per stream options which overrides the gRPC service configuration.
+TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeadersWithStreamOption) {
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  send_internal_header_stream_option_ = false;
+  send_xff_header_stream_option_ = false;
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();

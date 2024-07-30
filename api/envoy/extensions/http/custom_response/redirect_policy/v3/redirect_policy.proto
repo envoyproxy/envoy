@@ -54,7 +54,7 @@ message RedirectPolicy {
 
   // The new response status code if specified. This is used to override the
   // status code of the response from the new upstream if it is not an error status.
-  google.protobuf.UInt32Value status_code = 3 [(validate.rules).uint32 = {lte: 999 gte: 100}];
+  google.protobuf.UInt32Value status_code = 3 [(validate.rules).uint32 = {lte: 999 gte: 200}];
 
   // HTTP headers to add to the response. This allows the
   // response policy to append, to add or to override headers of

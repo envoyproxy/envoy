@@ -43,7 +43,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
@@ -97,7 +96,6 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       dispatcher_(api_->allocateDispatcher("main_thread")),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -621,7 +619,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = createOverloadManager();
+  auto overload_manager_or_error = createOverloadManager();
+  RETURN_IF_NOT_OK(overload_manager_or_error.status());
+  overload_manager_ = std::move(*overload_manager_or_error);
   null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
@@ -768,7 +768,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // We have to defer RTDS initialization until after the cluster manager is
   // instantiated (which in turn relies on runtime...).
-  runtime().initialize(clusterManager());
+  RETURN_IF_NOT_OK(runtime().initialize(clusterManager()));
 
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
@@ -820,8 +820,9 @@ void InstanceBase::onRuntimeReady() {
         bootstrap_.grpc_async_client_manager_config());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
+      // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
@@ -839,7 +840,7 @@ void InstanceBase::onRuntimeReady() {
   if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.downstream_connections` instead."
+              "`envoy.resource_monitors.global_downstream_max_connections` instead."
               "This runtime key will be removed in future.",
               Runtime::Keys::GlobalMaxCxRuntimeKey);
   }
@@ -932,9 +933,11 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
-    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
-                    "connections. Configure a "
-                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+    ENVOY_LOG(
+        warn,
+        "There is no configured limit to the number of allowed active downstream "
+        "connections. Configure a "
+        "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.");
   }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until

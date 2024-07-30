@@ -73,7 +73,6 @@ public:
     return out_protos;
   }
 
-  std::string getConfigVersion() const override { return ""; }
   ConfigConstSharedPtr getConfig() const override { return config_; }
 
 private:
@@ -284,12 +283,6 @@ public:
                           Server::Configuration::ServerFactoryContext& factory_context,
                           Init::Manager& init_manager, const std::string& stat_prefix,
                           const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
-  Envoy::Config::ConfigProviderPtr
-  createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
-                             const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
-    PANIC("SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
-          "overload that accepts a config proto set as an argument.");
-  }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
       Server::Configuration::ServerFactoryContext& factory_context,

@@ -10,10 +10,6 @@ envoy_mobile_android_test(
     srcs = [
         "AndroidEngineStartUpTest.java",
     ],
-    exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -23,6 +19,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineStartUpTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
@@ -33,10 +30,6 @@ envoy_mobile_android_test(
     srcs = [
         "AndroidEngineFlowTest.java",
     ],
-    exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -46,6 +39,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineFlowTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
@@ -57,10 +51,6 @@ envoy_mobile_android_test(
     srcs = [
         "AndroidEngineExplicitFlowTest.java",
     ],
-    exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -70,6 +60,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineExplicitFlowTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
@@ -81,10 +72,6 @@ envoy_mobile_android_test(
     srcs = [
         "AndroidEngineSocketTagTest.java",
     ],
-    exec_properties = {
-        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -94,6 +81,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "test.java.integration.AndroidEngineSocketTagTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",

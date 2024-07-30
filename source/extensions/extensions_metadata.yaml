@@ -526,7 +526,7 @@ envoy.filters.http.rbac:
 envoy.filters.http.router:
   categories:
   - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.http.router.v3.Router
@@ -554,8 +554,10 @@ envoy.filters.http.thrift_to_metadata:
 envoy.filters.http.wasm:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.wasm.v3.Wasm
 envoy.filters.http.stateful_session:
@@ -1012,6 +1014,13 @@ envoy.quic.server_preferred_address.fixed:
   status: alpha
   type_urls:
   - envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
+envoy.quic.server_preferred_address.datasource:
+  categories:
+  - envoy.quic.server_preferred_address
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig
 envoy.udp_packet_writer.default:
   categories:
   - envoy.udp_packet_writer
@@ -1061,7 +1070,7 @@ envoy.request_id.uuid:
   status: stable
   type_urls:
   - envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
-envoy.resource_monitors.downstream_connections:
+envoy.resource_monitors.global_downstream_max_connections:
   categories:
   - envoy.resource_monitors
   security_posture: data_plane_agnostic
@@ -1192,13 +1201,6 @@ envoy.tracers.datadog:
   status: stable
   type_urls:
   - envoy.config.trace.v3.DatadogConfig
-envoy.tracers.dynamic_ot:
-  categories:
-  - envoy.tracers
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.trace.v3.DynamicOtConfig
 envoy.tracers.opencensus:
   categories:
   - envoy.tracers
@@ -1776,6 +1778,13 @@ envoy.tracers.opentelemetry.resource_detectors.dynatrace:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig
+envoy.tracers.opentelemetry.resource_detectors.static_config:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig
 envoy.quic.connection_debug_visitor.basic:
   categories:
   - envoy.quic.connection_debug_visitor
@@ -1783,3 +1792,31 @@ envoy.quic.connection_debug_visitor.basic:
   status: alpha
   type_urls:
   - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig
+envoy.filters.network.generic_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.v3.GenericProxy
+envoy.filters.generic.router:
+  categories:
+  - envoy.generic_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.router.v3.Router
+envoy.generic_proxy.codecs.dubbo:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
+envoy.generic_proxy.codecs.http1:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.http1.v3.Http1CodecConfig

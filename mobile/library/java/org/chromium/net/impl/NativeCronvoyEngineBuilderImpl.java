@@ -2,6 +2,7 @@ package org.chromium.net.impl;
 
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
 
+import java.nio.charset.StandardCharsets;
 import android.content.Context;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
+import com.google.protobuf.Any;
 
 /**
  * Implementation of {@link ICronetEngineBuilder} that builds native Cronvoy engine.
@@ -55,16 +57,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private final int mMaxConnectionsPerHost = 7;
   private int mStreamIdleTimeoutSeconds = 15;
-  private final int mPerTryIdleTimeoutSeconds = 15;
+  private int mPerTryIdleTimeoutSeconds = 15;
   private final String mAppVersion = "unspecified";
   private final String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
-  private final String mNodeId = "";
-  private final String mNodeRegion = "";
-  private final String mNodeZone = "";
-  private final String mNodeSubZone = "";
+
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
   /**
@@ -158,16 +157,30 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
-   * Sets the boolean value for the reloadable runtime feature flag value. For example, to set the
-   * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
-   * call `setRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
+   * Set the per-try stream idle timeout, in seconds, which is defined as the period in which
+   * there are no active requests. When the idle timeout is reached, the connection is closed.
+   * This setting is the same as the stream idle timeout, except it's applied per-retry attempt.
+   * See
+   * https://github.com/envoyproxy/envoy/blob/f15ec821d6a70a1d132f53f50970595efd1b84ee/api/envoy/config/route/v3/route_components.proto#L1570.
    *
-   * TODO(abeyad): Change the name to setRuntimeFeature here and in the C++ APIs.
+   * The default is 15s.
+   *
+   * @param timeout The per-try idle timeout, in seconds.
+   */
+  public NativeCronvoyEngineBuilderImpl setPerTryIdleTimeoutSeconds(int timeout) {
+    mPerTryIdleTimeoutSeconds = timeout;
+    return this;
+  }
+
+  /**
+   * Adds the boolean value for the reloadable runtime feature flag value. For example, to set the
+   * Envoy runtime flag `envoy.reloadable_features.http_allow_partial_urls_in_referer` to true,
+   * call `addRuntimeGuard("http_allow_partial_urls_in_referer", true)`.
    *
    * @param feature The reloadable runtime feature flag name.
    * @param value The Boolean value to set the runtime feature flag to.
    */
-  public NativeCronvoyEngineBuilderImpl setRuntimeGuard(String feature, boolean value) {
+  public NativeCronvoyEngineBuilderImpl addRuntimeGuard(String feature, boolean value) {
     mRuntimeGuards.put(feature, value);
     return this;
   }
@@ -200,9 +213,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   @VisibleForTesting
   public CronvoyEngineBuilderImpl addUrlInterceptorsForTesting() {
-    nativeFilterChain.add(new EnvoyNativeFilterConfig(
-        "envoy.filters.http.test_read",
-        "[type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead] {}"));
+    Any anyProto =
+        Any.newBuilder()
+            .setTypeUrl(
+                "type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead")
+            .setValue(com.google.protobuf.ByteString.empty())
+            .build();
+    String config = new String(anyProto.toByteArray(), StandardCharsets.UTF_8);
+    nativeFilterChain.add(new EnvoyNativeFilterConfig("envoy.filters.http.test_read", config));
     return this;
   }
 
@@ -239,11 +257,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        /*rtdsResourceName=*/"", /*rtdsTimeoutSeconds=*/0, /*xdsAddress=*/"",
-        /*xdsPort=*/0, /*xdsGrpcInitialMetadata=*/Collections.emptyMap(),
-        /*xdsSslRootCerts=*/"", mNodeId, mNodeRegion, mNodeZone, mNodeSubZone,
-        Struct.getDefaultInstance(), /*cdsResourcesLocator=*/"", /*cdsTimeoutSeconds=*/0,
-        /*enableCds=*/false);
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni);
   }
 }

@@ -18,6 +18,7 @@
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/real_thread_test_base.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -935,7 +936,7 @@ public:
     });
 
     {
-      TestUtil::MemoryTest memory_test;
+      Memory::TestUtil::MemoryTest memory_test;
       for (StatName stat_name : stat_names) {
         scope_.counterFromStatName(stat_name);
       }
@@ -1543,7 +1544,7 @@ protected:
 
 // Tests how much memory is consumed allocating 100k stats.
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
-  TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
@@ -1552,7 +1553,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   initThreading();
-  TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020

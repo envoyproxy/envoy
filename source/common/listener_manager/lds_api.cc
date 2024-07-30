@@ -32,11 +32,15 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
-    subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                              lds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }
@@ -106,9 +110,7 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
       }
     }
     END_TRY
-    catch (const EnvoyException& e) {
-      onError(e.what());
-    }
+    CATCH(EnvoyException & e, { onError(e.what()); })
   }
   listener_manager_.endListenerUpdate(std::move(failure_state));
 

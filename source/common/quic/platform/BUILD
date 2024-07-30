@@ -40,7 +40,12 @@ envoy_package()
 envoy_cc_library(
     name = "quiche_flags_constants",
     hdrs = ["quiche_flags_constants.h"],
-    deps = ["//source/common/http:utility_lib"],
+    external_deps = [
+        "abseil_base",
+    ],
+    deps = [
+        "//source/common/http:http_option_limits_lib",
+    ],
 )
 
 envoy_quiche_platform_impl_cc_library(
@@ -54,8 +59,7 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         ":quiche_flags_constants",
         "//source/common/common:assert_lib",
-        "//source/common/http:utility_lib",
-        "@com_github_google_quiche//:quic_core_flags_list_lib",
+        "@com_github_google_quiche//:quiche_feature_flags_list_lib",
         "@com_github_google_quiche//:quiche_protocol_flags_list_lib",
         "@com_google_absl//absl/flags:flag",
     ],

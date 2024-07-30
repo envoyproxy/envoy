@@ -21,7 +21,7 @@ type filter struct {
 
 func (f *filter) sendLocalReplyInternal() api.StatusType {
 	body := fmt.Sprintf("%s, path: %s\r\n", f.config.echoBody, f.path)
-	f.callbacks.SendLocalReply(200, body, nil, 0, "")
+	f.callbacks.DecoderFilterCallbacks().SendLocalReply(200, body, nil, 0, "")
 	// Remember to return LocalReply when the request is replied locally
 	return api.LocalReply
 }
@@ -41,11 +41,11 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		// we need to run the code in a background goroutine
 		// and suspend & resume the filter
 		go func() {
-			defer f.callbacks.RecoverPanic()
+			defer f.callbacks.DecoderFilterCallbacks().RecoverPanic()
 			// do time-consuming jobs
 
 			// resume the filter
-			f.callbacks.Continue(status)
+			f.callbacks.DecoderFilterCallbacks().Continue(status)
 		}()
 
 		// suspend the filter

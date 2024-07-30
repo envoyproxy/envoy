@@ -300,6 +300,25 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
+
+  /**
+   * Base interface for attaching LbPolicy-specific data to individual hosts.
+   */
+  class HostLbPolicyData {
+  public:
+    virtual ~HostLbPolicyData() = default;
+  };
+  using HostLbPolicyDataPtr = std::shared_ptr<HostLbPolicyData>;
+
+  /* Takes ownership of lb_policy_data and attaches it to the host.
+   * Must be called before the host is used across threads.
+   */
+  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
+
+  /*
+   * @return a reference to the LbPolicyData attached to the host.
+   */
+  virtual const HostLbPolicyDataPtr& lbPolicyData() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -1210,11 +1229,10 @@ public:
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
   /**
-   * @return absl::optional<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+   * @return OptRef<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
    * an optional value of the configuration for happy eyeballs for this cluster.
    */
-  virtual const absl::optional<
-      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  virtual OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const PURE;
 
 protected:

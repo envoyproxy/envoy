@@ -58,8 +58,10 @@ public:
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
     auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
-    cluster_.reset(
-        new Cluster(cluster_config, std::move(cache), config, factory_context, this->get()));
+    absl::Status creation_status = absl::OkStatus();
+    cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
+                               this->get(), creation_status));
+    THROW_IF_NOT_OK(creation_status);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -98,7 +100,7 @@ public:
   void makeTestHost(const std::string& host, const std::string& address) {
     EXPECT_TRUE(host_map_.find(host) == host_map_.end());
     host_map_[host] = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-    host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
+    host_map_[host]->address_ = Network::Utility::parseInternetAddressNoThrow(address);
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
@@ -109,7 +111,7 @@ public:
 
   void updateTestHostAddress(const std::string& host, const std::string& address) {
     EXPECT_FALSE(host_map_.find(host) == host_map_.end());
-    host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
+    host_map_[host]->address_ = Network::Utility::parseInternetAddressNoThrow(address);
   }
 
   void refreshLb() { lb_ = lb_factory_->create(lb_params_); }

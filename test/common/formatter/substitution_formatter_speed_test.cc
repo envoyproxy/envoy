@@ -1,3 +1,4 @@
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 

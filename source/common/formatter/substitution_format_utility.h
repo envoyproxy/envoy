@@ -40,7 +40,6 @@ public:
   static const std::string&
   protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
   static const absl::optional<std::string> getHostname();
-  static const std::string getHostnameOrDefault();
 
   /**
    * Unspecified value for protobuf.
@@ -67,8 +66,9 @@ public:
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
-  static void parseSubcommandHeaders(const std::string& subcommand, std::string& main_header,
-                                     std::string& alternative_header);
+  static absl::Status parseSubcommandHeaders(const std::string& subcommand,
+                                             std::string& main_header,
+                                             std::string& alternative_header);
 
   /* Variadic function template to parse the
      subcommand and assign found tokens to sequence of params.

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/generic_proxy/interface/codec.h"
 
 #include "contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3/kafka.pb.h"
-#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/kafka/filters/network/source/request_codec.h"
 #include "contrib/kafka/filters/network/source/response_codec.h"
 
@@ -28,8 +28,7 @@ public:
     if (request_ == nullptr) {
       return FrameFlags{};
     }
-    return FrameFlags{
-        StreamFlags{static_cast<uint64_t>(request_->request_header_.correlation_id_)}};
+    return FrameFlags{static_cast<uint64_t>(request_->request_header_.correlation_id_)};
   }
 
   absl::string_view protocol() const override { return "kafka"; }
@@ -46,7 +45,7 @@ public:
     if (response_ == nullptr) {
       return FrameFlags{};
     }
-    return FrameFlags{StreamFlags{static_cast<uint64_t>(response_->metadata_.correlation_id_)}};
+    return FrameFlags{static_cast<uint64_t>(response_->metadata_.correlation_id_)};
   }
 
   absl::string_view protocol() const override { return "kafka"; }
