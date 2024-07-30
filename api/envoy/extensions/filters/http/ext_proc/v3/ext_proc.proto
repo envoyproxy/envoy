@@ -128,18 +128,16 @@ message ExternalProcessor {
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   // Only one of ``grpc_service`` or ``http_service`` can be set.
   // It is required that one of them must be set.
-  config.core.v3.GrpcService grpc_service = 1 [
-      (udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"
-  ];
+  config.core.v3.GrpcService grpc_service = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
 
   // [#not-implemented-hide:]
   // Configuration for the HTTP service that the filter will communicate with.
   // Only one of ``http_service`` or
   // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
   // can be set. It is required that one of them must be set.
-  ExtProcHttpService http_service = 20 [
-      (udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"
-  ];
+  ExtProcHttpService http_service = 20
+      [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
 
   // By default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the
