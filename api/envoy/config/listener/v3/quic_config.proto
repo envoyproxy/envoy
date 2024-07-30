@@ -96,5 +96,6 @@ message QuicProtocolOptions {
   core.v3.TypedExtensionConfig connection_debug_visitor_config = 11;
 
   // Configure a type of UDP cmsg to pass to listener filters via QuicReceivedPacket.
+  // If not specified, no cmsg will be saved to QuicReceivedPacket.
   SaveCmsgConfig save_cmsg_config = 12;
 }
