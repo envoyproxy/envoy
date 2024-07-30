@@ -47,7 +47,7 @@ public:
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const HttpUri& uri,
-                   OptRef<const RouteRetryPolicy> retry_policy,
+                   const OptRef<const RouteRetryPolicy> retry_policy,
                    const std::chrono::seconds default_expires_in)
       : cm_(cm), uri_(uri), retry_policy_(retry_policy), default_expires_in_(default_expires_in) {}
 
@@ -84,7 +84,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   const HttpUri uri_;
-  OptRef<const RouteRetryPolicy> retry_policy_;
+  const OptRef<const RouteRetryPolicy> retry_policy_;
   const std::chrono::seconds default_expires_in_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request

@@ -146,7 +146,7 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
-  OptRef<const RouteRetryPolicy> retryPolicy() const {
+  const OptRef<const RouteRetryPolicy> retryPolicy() const {
     if (!retry_policy_.has_value()) {
       return absl::nullopt;
     }
