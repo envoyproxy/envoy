@@ -277,7 +277,7 @@ message ExternalProcessor {
   google.protobuf.Duration deferred_close_timeout = 19;
 }
 
-// ExtProcHttpService is used for raw HTTP communication between the filter and the external processing service.
+// ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
 message ExtProcHttpService {
   // Sets the HTTP service which the external processing requests must be sent to.
   config.core.v3.HttpService http_service = 1;
