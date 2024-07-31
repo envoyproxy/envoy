@@ -71,6 +71,55 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
           proto_config, context, validation_visitor, action_validation_visitor_)) {}
 
+std::string RoleBasedAccessControlFilterConfig::shadowEffectivePolicyIdField(
+    const Http::StreamFilterCallbacks* callbacks) const {
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
+  std::string shadow_rules_stat_prefix = shadow_rules_stat_prefix_;
+  if (route_local) {
+    shadow_rules_stat_prefix = route_local->shadowRulesStatPrefix();
+  }
+  return shadow_rules_stat_prefix +
+         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField;
+}
+std::string RoleBasedAccessControlFilterConfig::shadowEngineResultField(
+    const Http::StreamFilterCallbacks* callbacks) const {
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
+
+  std::string shadow_rules_stat_prefix = shadow_rules_stat_prefix_;
+  if (route_local) {
+    shadow_rules_stat_prefix = route_local->shadowRulesStatPrefix();
+  }
+  return shadow_rules_stat_prefix +
+         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
+}
+
+std::string RoleBasedAccessControlFilterConfig::enforcedEffectivePolicyIdField(
+    const Http::StreamFilterCallbacks* callbacks) const {
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
+
+  std::string rules_stat_prefix = rules_stat_prefix_;
+  if (route_local) {
+    rules_stat_prefix = route_local->rulesStatPrefix();
+  }
+  return rules_stat_prefix +
+         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EnforcedEffectivePolicyIdField;
+}
+std::string RoleBasedAccessControlFilterConfig::enforcedEngineResultField(
+    const Http::StreamFilterCallbacks* callbacks) const {
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
+
+  std::string rules_stat_prefix = rules_stat_prefix_;
+  if (route_local) {
+    rules_stat_prefix = route_local->rulesStatPrefix();
+  }
+  return rules_stat_prefix +
+         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EnforcedEngineResultField;
+}
+
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
 RoleBasedAccessControlFilterConfig::engine(const Http::StreamFilterCallbacks* callbacks,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
@@ -100,7 +149,9 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
-    : per_rule_stats_(per_route_config.rbac().track_per_rule_stats()) {
+    : rules_stat_prefix_(per_route_config.rbac().rules_stat_prefix()),
+      shadow_rules_stat_prefix_(per_route_config.rbac().shadow_rules_stat_prefix()),
+      per_rule_stats_(per_route_config.rbac().track_per_rule_stats()) {
   // Moved from member initializer to ctor body to overcome clang false warning about memory
   // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).
   // Potentially https://lists.llvm.org/pipermail/llvm-bugs/2018-July/066769.html
@@ -162,10 +213,11 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     }
 
     if (!effective_policy_id.empty()) {
-      *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = effective_policy_id;
+      *fields[config_->shadowEffectivePolicyIdField(callbacks_)].mutable_string_value() =
+          effective_policy_id;
     }
 
-    *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_resp_code;
+    *fields[config_->shadowEngineResultField(callbacks_)].mutable_string_value() = shadow_resp_code;
   }
 
   const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
@@ -175,7 +227,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                                         callbacks_->streamInfo(), &effective_policy_id);
     const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
     if (!effective_policy_id.empty()) {
-      *fields[config_->enforcedEffectivePolicyIdField()].mutable_string_value() =
+      *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
           effective_policy_id;
     }
     if (allowed) {
@@ -185,7 +237,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
         config_->stats().incPolicyAllowed(effective_policy_id);
       }
 
-      *fields[config_->enforcedEngineResultField()].mutable_string_value() =
+      *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
       callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
 
@@ -200,7 +252,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
         config_->stats().incPolicyDenied(effective_policy_id);
       }
 
-      *fields[config_->enforcedEngineResultField()].mutable_string_value() =
+      *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
       callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
 
