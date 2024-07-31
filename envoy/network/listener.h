@@ -448,6 +448,9 @@ public:
    */
   virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 
+  /**
+   * Information about which cmsg to save to QuicReceivedPacket, if any.
+   */
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
