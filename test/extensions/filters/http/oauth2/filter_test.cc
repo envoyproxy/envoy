@@ -115,7 +115,7 @@ public:
                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                     OAuth2Config_AuthType_URL_ENCODED_BODY,
             int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
-            bool disable_id_token_set_cookie = false) {
+            bool disable_id_token_set_cookie = false, bool set_cookie_domain = false) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -156,6 +156,9 @@ public:
     credentials->mutable_hmac_secret()->set_name("hmac");
     // Skipping setting credentials.cookie_names field should give default cookie names:
     // BearerToken, OauthHMAC, and OauthExpires.
+    if (set_cookie_domain) {
+      p.set_cookie_domain("example.com");
+    }
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
