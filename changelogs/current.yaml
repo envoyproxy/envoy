@@ -113,7 +113,7 @@ new_features:
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
 - area: quic
   change: |
-    Added QUIC protocol option :ref:save_cmsg_config`
+    Added QUIC protocol option :ref:`save_cmsg_config
     <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.save_cmsg_config>` to optionally specify a CMSG header type to be
     propagated from the first packet on the connection to QuicListenerFilter.
 
