@@ -12,9 +12,6 @@ envoy_cc_extension(
     name = "metadata_input_lib",
     srcs = ["meta_input.cc"],
     hdrs = ["meta_input.h"],
-    extra_visibility = [
-    ],
-    tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",

@@ -24,12 +24,8 @@ class DynamicMetadataInput : public Matcher::DataInput<MatchingDataType> {
 public:
   DynamicMetadataInput(
       const envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput&
-          inputConfig)
-      : filter_(inputConfig.filter()) {
-    for (const auto& seg : inputConfig.path()) {
-      path_.push_back(seg.key());
-    }
-  }
+          input_config)
+      : filter_(input_config.filter()), path_(initializePath(input_config.path())) {}
 
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -38,9 +34,19 @@ public:
   }
 
 private:
+  static std::vector<std::string> initializePath(
+      const google::protobuf::RepeatedPtrField<envoy::extensions::matching::common_inputs::network::
+                                                   v3::DynamicMetadataInput::PathSegment>&
+          segments) {
+    std::vector<std::string> path;
+    for (const auto& seg : segments) {
+      path.push_back(seg.key());
+    }
+    return path;
+  }
+
   const std::string filter_;
-  const std::string metadata_key_;
-  std::vector<std::string> path_;
+  const std::vector<std::string> path_;
 };
 
 template <class MatchingDataType>
@@ -54,9 +60,11 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput&>(
         message, validation_visitor);
-
-    return [input = typed_config] {
-      return std::make_unique<DynamicMetadataInput<MatchingDataType>>(input);
+    auto config_ptr = std::make_shared<
+        envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput>(
+        typed_config);
+    return [config_ptr] {
+      return std::make_unique<DynamicMetadataInput<MatchingDataType>>(*config_ptr);
     };
   };
 

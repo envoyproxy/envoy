@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "dyn_meta_matcher_test",
     srcs = ["dyn_meta_matcher_test.cc"],
     extension_names = ["envoy.matching.matchers.metadata_matcher"],
-    tags = ["skip_on_windows"],
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/matching/http/metadata_input:metadata_input_lib",
