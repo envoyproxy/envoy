@@ -165,7 +165,10 @@ void GeoipProvider::lookupInCityDb(
     auto city_db_ptr = getCityDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(CITY_DB_TYPE).append("_lookup_pre_complete"));
-    RELEASE_ASSERT(city_db_ptr, "Maxmind city database must be initialised for performing lookups");
+    if (!city_db_ptr) {
+      IS_ENVOY_BUG("Maxmind city database must be initialised for performing lookups");
+      return;
+    }
     auto city_db = city_db_ptr.get();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         city_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
@@ -211,7 +214,10 @@ void GeoipProvider::lookupInAsnDb(
     auto isp_db_ptr = getIspDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
-    RELEASE_ASSERT(isp_db_ptr, "Maxmind asn database must be initialised for performing lookups");
+    if (!isp_db_ptr) {
+      IS_ENVOY_BUG("Maxmind asn database must be initialised for performing lookups");
+      return;
+    }
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         isp_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
         &mmdb_error);
@@ -242,7 +248,10 @@ void GeoipProvider::lookupInAnonDb(
     auto anon_db_ptr = getAnonDb();
     // Used for testing.
     synchronizer_.syncPoint(std::string(ANON_DB_TYPE).append("_lookup_pre_complete"));
-    RELEASE_ASSERT(anon_db_ptr, "Maxmind anon database must be initialised for performing lookups");
+    if (!anon_db_ptr) {
+      IS_ENVOY_BUG("Maxmind anon database must be initialised for performing lookups");
+      return;
+    }
     auto anon_db = anon_db_ptr.get();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         anon_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
@@ -284,21 +293,26 @@ void GeoipProvider::lookupInAnonDb(
   }
 }
 
+// TBD Figure out the flow
 MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
                                                 const absl::string_view& db_type, bool reload) {
   MMDB_s maxmind_db;
   int result_code = MMDB_open(db_path.c_str(), MMDB_MODE_MMAP, &maxmind_db);
+
   if (reload && MMDB_SUCCESS != result_code) {
     ENVOY_LOG(error, "Failed to reload Maxmind database {} from file {}. Error {}", db_type,
               db_path, std::string(MMDB_strerror(result_code)));
     return nullptr;
-  } else {
+  } else if (MMDB_SUCCESS != result_code) {
+    // Crash if this is a failure during initial load.
     RELEASE_ASSERT(MMDB_SUCCESS == result_code,
                    fmt::format("Unable to open Maxmind database file {}. Error {}", db_path,
                                std::string(MMDB_strerror(result_code))));
-    ENVOY_LOG(info, "Succeeded to reload Maxmind database {} from file {}.", db_type, db_path);
-    return std::make_shared<MaxmindDb>(std::move(maxmind_db));
+    return nullptr;
   }
+
+  ENVOY_LOG(info, "Succeeded to reload Maxmind database {} from file {}.", db_type, db_path);
+  return std::make_shared<MaxmindDb>(std::move(maxmind_db));
 }
 
 absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,

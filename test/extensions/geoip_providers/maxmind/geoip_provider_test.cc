@@ -463,9 +463,10 @@ TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
   testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  EXPECT_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
-               "assert failure: isp_db_ptr. Details: Maxmind asn database must be initialised for "
-               "performing lookups");
+  EXPECT_ENVOY_BUG(
+      provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
+      "envoy bug failure: false. Details: Maxmind asn database must be initialised for "
+      "performing lookups");
 }
 
 TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
