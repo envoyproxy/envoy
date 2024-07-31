@@ -724,10 +724,6 @@ protected:
                                          overprovisioning_factor);
   }
 
-  absl::optional<Network::Address::InstanceConstSharedPtr>
-  maybeGetHttpProxyAddr(Network::TransportSocketOptionsConstSharedPtr transport_socket_opts,
-                        const MetadataConstSharedPtr locality_metadata);
-
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed));
   }
