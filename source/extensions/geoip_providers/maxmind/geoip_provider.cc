@@ -293,7 +293,6 @@ void GeoipProvider::lookupInAnonDb(
   }
 }
 
-// TBD Figure out the flow
 MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
                                                 const absl::string_view& db_type, bool reload) {
   MMDB_s maxmind_db;
