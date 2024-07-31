@@ -58,10 +58,11 @@ envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
 }
 
 envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
-                                           bool end_stream) {
-  return dispatcher_->post([this, stream, headers = std::move(headers), end_stream]() mutable {
-    http_client_->sendHeaders(stream, std::move(headers), end_stream);
-  });
+                                           bool end_stream, bool idempotent) {
+  return dispatcher_->post(
+      [this, stream, headers = std::move(headers), end_stream, idempotent]() mutable {
+        http_client_->sendHeaders(stream, std::move(headers), end_stream, idempotent);
+      });
   return ENVOY_SUCCESS;
 }
 

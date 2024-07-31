@@ -26,6 +26,9 @@ bug_fixes:
 - area: quic
   change: |
     Fixes access log formatter %CONNECTION_ID% for QUIC connections.
+- area: c-ares
+  change: |
+    Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
 - area: ext_authz
   change: |
     Fixed fail-open behavior of the :ref:`failure_mode_allow config option
@@ -77,6 +80,10 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: upstream flow control
+  change: |
+    Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
+    and legacy code paths.
 
 new_features:
 - area: tls
