@@ -525,62 +525,44 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
     const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     HostDescriptionConstSharedPtr host) {
-  auto tallen = [](std::string info) {
-    std::cout << "@tallen " << __func__ << ": " << info << " \n";
-  };
-  tallen("entered");
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
-    tallen("proxy has value");
     return transport_socket_options->http11ProxyInfo()->proxy_address;
   }
 
   // See if host metadata contains a proxy address and only check locality metadata if host
   // metadata did not have the relevant key.
-  tallen("see if hots metadata has the addr");
   for (const auto& metadata : {host->metadata(), host->localityMetadata()}) {
     if (metadata == nullptr) {
-      tallen("metadata is null");
       continue;
     }
 
-    tallen("addr iter");
     auto addr_it = metadata->typed_filter_metadata().find(
         Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
     if (addr_it == metadata->typed_filter_metadata().end()) {
-      tallen("addr iter @ end");
       continue;
     }
-    tallen("addr iter exists, making the proto");
 
     // Parse an address from the metadata.
     envoy::config::core::v3::Address proxy_addr;
     auto status = MessageUtil::unpackTo(addr_it->second, proxy_addr);
     if (!status.ok()) {
-      tallen("failed to parse proto");
-      /*
-        ENVOY_LOG_EVERY_POW_2(
-            error, "failed to parse proto from endpoint/locality metadata field {}, host={}",
-            Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
-            host->hostname());
-            */
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to parse proto from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
       return absl::nullopt;
     }
-    tallen("parsed proto");
 
     // Resolve the parsed address proto.
     auto resolve_status = Network::Address::resolveProtoAddress(proxy_addr);
     if (!resolve_status.ok()) {
-      tallen("unable to resolve address");
-      /*
       ENVOY_LOG_EVERY_POW_2(
           error, "failed to resolve address from endpoint/locality metadata field {}, host={}",
           Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
           host->hostname());
-          */
       return absl::nullopt;
     }
 
-    tallen("address resolved");
     // We successfully resolved, so return the instance ptr.
     return resolve_status.value();
   }
