@@ -1397,11 +1397,13 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
     // state and method of the original request, including the query string parameters.
     Http::TestRequestHeaderMapImpl second_response_headers{
         {Http::Headers::get().Status.get(), "302"},
-        {Http::Headers::get().SetCookie.get(), "OauthHMAC="
-                                               "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                               "path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
-        {Http::Headers::get().SetCookie.get(), "BearerToken=;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthHMAC=fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
+         "domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "OauthExpires=;domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
+        {Http::Headers::get().SetCookie.get(),
+         "BearerToken=;domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().Location.get(),
          "https://traffic.example.com/test?name=admin&level=trace"},
     };
