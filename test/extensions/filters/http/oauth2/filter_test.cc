@@ -157,7 +157,7 @@ public:
     // Skipping setting credentials.cookie_names field should give default cookie names:
     // BearerToken, OauthHMAC, and OauthExpires.
     if (set_cookie_domain) {
-      p.set_cookie_domain("example.com");
+      credentials->set_cookie_domain("example.com");
     }
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
