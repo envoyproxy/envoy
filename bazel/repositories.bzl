@@ -700,11 +700,7 @@ def _com_github_facebook_zstd():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive(
-        "com_google_cel_cpp",
-        patches = ["@envoy//bazel:cel-cpp.patch"],
-        patch_args = ["-p1"],
-    )
+    external_http_archive("com_google_cel_cpp")
 
 def _com_github_google_perfetto():
     external_http_archive(
