@@ -33,6 +33,10 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+namespace proto {
+using namespace envoy::extensions::filters::http::oauth2;
+}
+
 static const std::string TEST_CALLBACK = "/_oauth";
 static const std::string TEST_CLIENT_ID = "1";
 static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
@@ -85,7 +89,9 @@ public:
 
 class OAuth2Test : public testing::TestWithParam<int> {
 public:
-  OAuth2Test(bool run_init = true) : request_(&cm_.thread_local_cluster_.async_client_) {
+  OAuth2Test(bool run_init = true)
+      : request_(&cm_.thread_local_cluster_.async_client_),
+        secret_reader_(std::make_shared<MockSecretReader>()) {
     factory_context_.server_factory_context_.cluster_manager_.initializeClusters(
         {"auth.example.com"}, {});
     if (run_init) {
@@ -108,14 +114,17 @@ public:
     filter_->validator_ = validator_;
   }
 
-  // Set up proto fields with standard config.
-  FilterConfigSharedPtr
-  getConfig(bool forward_bearer_token = true, bool use_refresh_token = false,
-            ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type =
-                ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                    OAuth2Config_AuthType_URL_ENCODED_BODY,
-            int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
-            bool disable_id_token_set_cookie = false) {
+  /**
+   * @return a mutable default proto object. Overrides on specific values can be applied by
+   * callers, prior to passing the proto to createFilterConfig.
+   */
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config defaultProtoConfig(
+      bool forward_bearer_token = true, bool use_refresh_token = false,
+      ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type =
+          ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+              OAuth2Config_AuthType_URL_ENCODED_BODY,
+      int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
+      bool disable_id_token_set_cookie = false) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -158,13 +167,29 @@ public:
     // BearerToken, OauthHMAC, and OauthExpires.
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+    return p;
+  }
 
-    // Create filter config.
-    auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr c = std::make_shared<FilterConfig>(
-        p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
+  FilterConfigSharedPtr
+  createFilterConfig(envoy::extensions::filters::http::oauth2::v3::OAuth2Config p) {
+    return std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                          secret_reader_, scope_, "test.");
+  }
 
-    return c;
+  // Set up proto fields with standard config.
+  FilterConfigSharedPtr
+  getConfig(bool forward_bearer_token = true, bool use_refresh_token = false,
+            ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type =
+                ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                    OAuth2Config_AuthType_URL_ENCODED_BODY,
+            int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
+            bool disable_id_token_set_cookie = false) {
+
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p = defaultProtoConfig(
+        forward_bearer_token, use_refresh_token, auth_type, default_refresh_token_expires_in,
+        preserve_authorization_header, disable_id_token_set_cookie);
+
+    return createFilterConfig(p);
   }
 
   // Validates the behavior of the cookie validator.
@@ -216,6 +241,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Stats::Scope& scope_{*store_.rootScope()};
   Event::SimulatedTimeSystem test_time_;
+  std::shared_ptr<MockSecretReader> secret_reader_;
 };
 
 // Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
@@ -294,6 +320,7 @@ generic_secret:
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
   EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
 }
+
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, clusters())
@@ -1398,12 +1425,6 @@ TEST_F(DisabledIdTokenTests, SetCookieIgnoresIdTokenWhenDisabledRefreshToken) {
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_headers_));
 }
 
-/**
- * Testing oauth response after tokens are set.
- *
- * Expected behavior: cookies are set.
- */
-
 std::string oauthHMAC;
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
@@ -2317,6 +2338,100 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_EQ(cookies.at("BearerToken"), "accessToken");
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
   EXPECT_EQ(cookies.at("RefreshToken"), "refreshToken");
+}
+
+class SameSiteAttributeTest : public OAuth2Test {
+public:
+  void setupConfig(proto::v3::CookieSettings_SameSiteValues value) {
+    auto cookie_settings = proto::v3::CookieSettings::default_instance().New();
+    cookie_settings->set_same_site_attribute_value(value);
+    auto proto_config = defaultProtoConfig();
+    proto_config.set_allocated_cookie_settings(cookie_settings);
+    init(createFilterConfig(proto_config));
+  }
+
+  void expectResponseHeaders(Http::TestResponseHeaderMapImpl response_headers) {
+    TestScopedRuntime scoped_runtime;
+    test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+    };
+    filter_->decodeHeaders(request_headers, false);
+
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+    filter_->onGetAccessTokenSuccess("access_code", id_token_, "refresh-token",
+                                     std::chrono::seconds(600));
+  }
+
+  std::string id_token_{
+      "eyJhbGciOiJIUzI1NiJ9."
+      "eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImlhdCI6MTcwODA2"
+      "NDcyOH0.92H-X2Oa4ECNmFLZBWBHP0BJyEHDprLkEIc2JBJYwkI"};
+  std::string oauth_hmac_{"6CyS8TiamKlAVtPpHANqYOwS59gOTCIRXV9j1GtGwqA=;"};
+};
+
+TEST_F(SameSiteAttributeTest, NoneSameSiteCookieAttribute) {
+  setupConfig(proto::v3::CookieSettings_SameSiteValues_NONE);
+
+  Http::TestResponseHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauth_hmac_ + "path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + id_token_ + ";path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refresh-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+  expectResponseHeaders(expected_headers);
+}
+
+TEST_F(SameSiteAttributeTest, LaxSameSiteCookieAttribute) {
+  setupConfig(proto::v3::CookieSettings_SameSiteValues_LAX);
+
+  Http::TestResponseHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauth_hmac_ + "path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + id_token_ + ";path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refresh-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+  expectResponseHeaders(expected_headers);
+}
+
+TEST_F(SameSiteAttributeTest, StrictSameSiteCookieAttribute) {
+  setupConfig(proto::v3::CookieSettings_SameSiteValues_STRICT);
+
+  Http::TestResponseHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauth_hmac_ + "path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + id_token_ + ";path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refresh-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+  expectResponseHeaders(expected_headers);
 }
 
 } // namespace Oauth2
