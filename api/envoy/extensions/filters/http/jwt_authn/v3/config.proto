@@ -358,8 +358,8 @@ message JwtProvider {
   // .. code-block:: yaml
   //
   //   claim_to_headers:
-  //     - name: x-jwt-claim-nested-claim
-  //       claim: claim.nested.key
+  //     - header_name: x-jwt-claim-nested-claim
+  //       claim_name: claim.nested.key
   //
   // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
