@@ -387,6 +387,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
 
+  // RDS.
   Tag rds_hcm;
   rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
   rds_hcm.value_ = "rds_connection_manager";
@@ -398,6 +399,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
                          "http.rds.update_success", {rds_hcm, rds_route_config});
 
+  // SRDS.
   Tag scoped_rds_hcm;
   scoped_rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
   scoped_rds_hcm.value_ = "scoped_rds_connection_manager";

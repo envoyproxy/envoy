@@ -144,7 +144,7 @@ public:
   // Route config name for RDS updates
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
   // Scoped route config name for RDS updates
-  const std::string SCOPED_RDS_ROUTE_CONFIG = "envoy.scoped_rds_route_config";
+  const std::string SCOPED_RDS_CONFIG = "envoy.scoped_rds_config";
   // Request route given by the Router http filter
   const std::string ROUTE = "envoy.route";
   // Stats prefix for the ext_authz HTTP filter
