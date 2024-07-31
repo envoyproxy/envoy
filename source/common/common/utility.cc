@@ -247,7 +247,7 @@ std::string DateFormatter::Specifier::subsecondsToString(SystemTime time) const 
   // subseconds part.
   if (specifier_ == SpecifierType::AbslSubsecondS) {
     if (width == 0) {
-      // No subseconds and dot for %E*S and %E0S in this case.
+      // No subseconds and dot for %E*S in this case.
       return {};
     }
 
