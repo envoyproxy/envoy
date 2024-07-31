@@ -29,7 +29,7 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  Network::DrainableFilterChainSharedPtr
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found

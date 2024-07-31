@@ -72,9 +72,9 @@ public:
    * @param bind_type supplies the bind type of the listen socket.
    * @param creation_options additional options for how to create the socket.
    * @param worker_index supplies the socket/worker index of the new socket.
-   * @return Network::SocketSharedPtr an initialized and potentially bound socket.
+   * @return Network::SocketSharedPtr an initialized and potentially bound socket or error status.
    */
-  virtual Network::SocketSharedPtr createListenSocket(
+  virtual absl::StatusOr<Network::SocketSharedPtr> createListenSocket(
       Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
       const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
       const Network::SocketCreationOptions& creation_options, uint32_t worker_index) PURE;
@@ -83,9 +83,10 @@ public:
    * Creates a list of filter factories.
    * @param filters supplies the proto configuration.
    * @param context supplies the factory creation context.
-   * @return Filter::NetworkFilterFactoriesList the list of filter factories.
+   * @return Filter::NetworkFilterFactoriesList the list of filter factories or
+   * error status.
    */
-  virtual Filter::NetworkFilterFactoriesList createNetworkFilterFactoryList(
+  virtual absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
@@ -95,7 +96,7 @@ public:
    * @param context supplies the factory creation context.
    * @return Filter::ListenerFilterFactoriesList the list of filter factories.
    */
-  virtual Filter::ListenerFilterFactoriesList createListenerFilterFactoryList(
+  virtual absl::StatusOr<Filter::ListenerFilterFactoriesList> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
@@ -105,7 +106,8 @@ public:
    * @param context supplies the factory creation context.
    * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
    */
-  virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+  virtual absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>
+  createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
@@ -115,7 +117,8 @@ public:
    * @param context supplies the factory creation context.
    * @return Filter::ListenerFilterFactoriesList the list of filter factories.
    */
-  virtual Filter::QuicListenerFilterFactoriesList createQuicListenerFilterFactoryList(
+  virtual absl::StatusOr<Filter::QuicListenerFilterFactoriesList>
+  createQuicListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 

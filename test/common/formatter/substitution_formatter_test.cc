@@ -11,6 +11,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
@@ -47,6 +48,26 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Formatter {
 namespace {
+
+using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
+using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
+
+// Helper class to test StreamInfoFormatter.
+class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+public:
+  StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
+                      absl::optional<size_t> max_length = absl::nullopt)
+      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
+    for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
+      auto formatter = cmd->parse(command, sub_command, max_length);
+      if (formatter) {
+        formatter_ = std::move(formatter);
+        return;
+      }
+    }
+    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
+  }
+};
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
@@ -780,6 +801,27 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
+    const std::string raw_cluster_name = "raw_name";
+    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(raw_cluster_name));
+    EXPECT_EQ("raw_name", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("raw_name")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
