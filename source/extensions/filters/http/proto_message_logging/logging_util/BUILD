@@ -39,3 +39,24 @@ envoy_cc_library(
         "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
     ],
 )
+
+envoy_cc_library(
+    name = "audit_proto_scrubber",
+    srcs = [
+        "audit_proto_scrubber.cc",
+    ],
+    hdrs = [
+        "audit_proto_scrubber.h",
+    ],
+    deps = [
+        ":logging_util",
+        ":proto_scrubber_interface",
+        "//source/common/common:regex_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:cc_wkt_protos",
+        "@com_google_protoconverter//:all",
+        "@com_google_protofieldextraction//:all_libs",
+        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
+        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:cloud_audit_log_field_checker",
+    ],
+)
