@@ -59,8 +59,7 @@ using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::ProtobufWkt::Value;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 
-constexpr LazyRE2 kLocationRegionExtractorPattern = {R"((?:^|/)(?:locations|regions)/([^/]+))",
-                                                     re2::RE2::CannedOptions()};
+std::string kLocationRegionExtractorPattern = R"((?:^|/)(?:locations|regions)/([^/]+))";
 
 } // namespace
 
@@ -238,7 +237,7 @@ int64_t ExtractRepeatedFieldSize(const Type& type,
 
 absl::string_view ExtractLocationIdFromResourceName(absl::string_view resource_name) {
   absl::string_view location;
-  RE2::PartialMatch(resource_name, *kLocationRegionExtractorPattern, &location);
+  RE2::PartialMatch(resource_name, kLocationRegionExtractorPattern, &location);
   return location;
 }
 
