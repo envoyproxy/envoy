@@ -2,6 +2,10 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tracing
+  change: |
+    Removed support for (long deprecated) opentracing.  See `issue 27401
+    <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -19,12 +23,25 @@ bug_fixes:
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
+- area: quic
+  change: |
+    Fixes access log formatter %CONNECTION_ID% for QUIC connections.
+- area: c-ares
+  change: |
+    Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
 - area: ext_authz
   change: |
-    Fixed fail-open behaviour of the :ref:`failure_mode_allow config option
+    Fixed fail-open behavior of the :ref:`failure_mode_allow config option
     <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
     when a grpc external authz server is used.
-    The behaviour can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
+    The behavior can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
+- area: websocket
+  change: |
+    Fixed a bug where the websocket upgrade filter would not take into account per-filter configs.
+- area: ext_proc
+  change: |
+    Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
+    ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -56,6 +73,17 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` runtime
     flag and legacy code paths.
+- area: grpc reverse bridge
+  change: |
+    Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status`` runtime flag
+    and legacy code paths.
+- area: stateful_session
+  change: |
+    Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: upstream flow control
+  change: |
+    Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
+    and legacy code paths.
 
 new_features:
 - area: tls
@@ -70,15 +98,27 @@ new_features:
     for injecting arbitrary data to the filter state for logging.
 - area: access_log
   change: |
-    added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
+    added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regardless of whether
     ``alt_stat_name`` is set.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
     <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied to all socket
     types.
+- area: tls
+  change: |
+    Added an extension point :ref:`custom_tls_certificate_selector
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
+    to allow overriding TLS certificate selection behavior.
+    An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: access_log
+  change: |
+    Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
+    similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
+
+
 
 deprecated:

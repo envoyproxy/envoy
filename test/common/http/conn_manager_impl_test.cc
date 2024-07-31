@@ -2568,9 +2568,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnTunnelEstablished) {
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _))
       .WillOnce(Invoke([&](absl::string_view, const FilterChainFactory::UpgradeMap*,
-                           FilterChainManager& manager) -> bool {
+                           FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
         FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
         FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
         manager.applyFilterFactoryCb({}, filter_factory);
@@ -4078,13 +4078,14 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
-      .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                 FilterChainManager& manager) -> bool {
-        auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
-        return true;
-      }));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
+      .WillRepeatedly(
+          Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                     FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
+            auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
+            manager.applyFilterFactoryCb({}, factory);
+            return true;
+          }));
 
   // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
   // only request into it. Then we respond into the filter.
@@ -4121,7 +4122,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
   setup(false, "envoy-custom-server", false);
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _))
       .WillRepeatedly(Return(true));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -4145,7 +4146,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
 TEST_F(HttpConnectionManagerImplTest, ConnectWithEmptyPath) {
   setup(false, "envoy-custom-server", false);
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _))
       .WillRepeatedly(Return(true));
 
   EXPECT_CALL(*codec_, dispatch(_))

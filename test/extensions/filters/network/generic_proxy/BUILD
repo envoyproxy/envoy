@@ -48,6 +48,7 @@ envoy_cc_test(
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/network/generic_proxy:proxy_lib",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
