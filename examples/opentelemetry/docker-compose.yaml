@@ -69,3 +69,4 @@ services:
     command: ["--config=/etc/otel-collector-config.yaml"]
     ports:
     - "${PORT_UI:-55679}:55679"
+
