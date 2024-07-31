@@ -51,7 +51,7 @@ public:
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time,
-   * or local zone time when local_time is true.
+   * or local zone time when local_time_ is true.
    */
   std::string fromTime(const SystemTime& time) const;
 
