@@ -57,3 +57,14 @@ envoy_extension_cc_test(
         "@com_google_absl//absl/strings:str_format",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "query_params_evaluator_test",
+    srcs = ["query_params_evaluator_test.cc"],
+    extension_names = ["envoy.filters.http.header_mutation"],
+    deps = [
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/header_mutation:query_params_evaluator_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)

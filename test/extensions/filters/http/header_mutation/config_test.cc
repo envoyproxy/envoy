@@ -40,6 +40,13 @@ TEST(FactoryTest, FactoryTest) {
           key: "flag-header"
           value: "%REQ(ANOTHER-FLAG-HEADER)%"
         append_action: APPEND_IF_EXISTS_OR_ADD
+    query_parameter_mutations:
+    - remove: remove-me
+    - append:
+        action: APPEND_IF_EXISTS_OR_ADD
+        entry:
+          key: foo
+          value: bar
   )EOF";
 
   PerRouteProtoConfig per_route_proto_config;

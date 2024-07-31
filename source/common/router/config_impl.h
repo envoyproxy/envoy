@@ -643,7 +643,7 @@ private:
 using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
 
 /**
- * Base implementation for all route entries.q
+ * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
