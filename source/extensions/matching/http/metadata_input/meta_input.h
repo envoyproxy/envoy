@@ -35,9 +35,8 @@ public:
 
 private:
   static std::vector<std::string> initializePath(
-      const google::protobuf::RepeatedPtrField<envoy::extensions::matching::common_inputs::network::
-                                                   v3::DynamicMetadataInput::PathSegment>&
-          segments) {
+      const Protobuf::RepeatedPtrField<envoy::extensions::matching::common_inputs::network::v3::
+                                           DynamicMetadataInput::PathSegment>& segments) {
     std::vector<std::string> path;
     for (const auto& seg : segments) {
       path.push_back(seg.key());
