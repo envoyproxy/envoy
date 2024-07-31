@@ -112,11 +112,11 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
-    Config::Utility::validateTerminalFilters(
+    RETURN_IF_NOT_OK(Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.serverFactoryContext()),
-        is_terminal);
+        is_terminal));
     auto callback_or_error =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     RETURN_IF_NOT_OK(callback_or_error.status());
