@@ -187,7 +187,8 @@ TagNameValues::TagNameValues() {
 
   // http.[<stat_prefix>.]scoped_rds.(<scoped_route_config_name>.)<base_stat>
   addRe2(SCOPED_RDS_CONFIG,
-         R"(^http\.<TAG_VALUE>\.scoped_rds\.((<SCOPED_ROUTE_CONFIG_NAME>)\.)\w+?$)", ".scoped_rds.");
+         R"(^http\.<TAG_VALUE>\.scoped_rds\.((<SCOPED_ROUTE_CONFIG_NAME>)\.)\w+?$)",
+         ".scoped_rds.");
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");
