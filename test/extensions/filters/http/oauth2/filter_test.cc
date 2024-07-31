@@ -1326,7 +1326,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
     scoped_runtime.mergeValues({
         {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
     });
-    init();
+    init(getConfig(true, false,
+                   ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                       OAuth2Config_AuthType_URL_ENCODED_BODY,
+                   0, false, false, true /* set_cookie_domain */));
     // First construct the initial request to the oauth filter with URI parameters.
     Http::TestRequestHeaderMapImpl first_request_headers{
         {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
