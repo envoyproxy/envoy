@@ -59,7 +59,8 @@ using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::ProtobufWkt::Value;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 
-constexpr LazyRE2 kLocationRegionExtractorPattern = {R"((?:^|/)(?:locations|regions)/([^/]+))", re2::RE2::CannedOptions()};
+constexpr LazyRE2 kLocationRegionExtractorPattern = {R"((?:^|/)(?:locations|regions)/([^/]+))",
+                                                     re2::RE2::CannedOptions()};
 
 } // namespace
 
