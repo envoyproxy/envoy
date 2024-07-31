@@ -39,24 +39,108 @@ namespace {
 
 using ::Envoy::Protobuf::FieldMask;
 using ::google::protobuf::Type;
+using ::google::protobuf::util::converter::TypeInfo;
 using ::proto2::util::FieldMaskUtil;
 using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::FieldCheckerInterface;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::proto_processing_lib::proto_scrubber::UnknownFieldChecker;
 
+bool ScrubToStruct(
+    const ProtoScrubber* scrubber, const google::protobuf::Type& type,
+    const TypeInfo& type_info,
+    const std::function<const google::protobuf::Type*(const std::string&)>&
+        type_finder,
+    google::protobuf::field_extraction::MessageData* message,
+    google::protobuf::Struct* message_struct) {
+  message_struct->Clear();
+
+  // When scrubber or message is nullptr, it indicates that there's nothing to
+  // scrub and the whole message should be filtered.
+  if (scrubber == nullptr || message == nullptr) {
+    return false;
+  }
+
+  // Scrub the message.
+  absl::Status status = scrubber->Scrub(message);
+  if (!status.ok()) {
+    LOG(WARNING) << absl::Substitute(
+        "Failed to scrub '$0' proto for cloud audit logging: $1", type.name(),
+        status.ToString());
+    return false;
+  }
+
+  // Convert the scrubbed message to proto.
+  status = ConvertToStruct(*message, type, type_info, message_struct);
+  if (!status.ok()) {
+    LOG(WARNING) << absl::Substitute(
+        "Failed to convert '$0' proto to google.protobuf.Struct for cloud "
+        "audit logging: $1",
+        type.name(), status.ToString());
+    return false;
+  }
+
+  return !IsEmptyStruct(*message_struct);
+}
+
+bool ScrubToStruct(
+    const ProtoScrubber* scrubber, const google::protobuf::Type& type,
+    const TypeInfo& type_info,
+    const std::function<const google::protobuf::Type*(const std::string&)>&
+        type_finder,
+    const google::protobuf::FieldMask* redact_message_field_mask,
+    google::protobuf::field_extraction::MessageData* message,
+    Struct* message_struct) {
+  // Collect the present redact field paths before scrubbing the message.
+  std::vector<std::string> present_redact_fields;
+  if (redact_message_field_mask != nullptr) {
+    for (const std::string& path : redact_message_field_mask->paths()) {
+      absl::StatusOr<bool> is_present_status =
+          IsMessageFieldPathPresent(type, type_finder, path, *message);
+      if (!is_present_status.ok()) {
+        LOG(WARNING) << absl::Substitute(
+            "Failed to determine message field path '$0' for cloud audit "
+            "logging: $1",
+            path, is_present_status.status().ToString());
+        return false;
+      }
+      if (is_present_status.ValueOrDie()) {
+        present_redact_fields.push_back(path);
+      }
+    }
+  }
+
+  // Scrub the message.
+  if (!ScrubToStruct(scrubber, type, type_info, type_finder, message,
+                     message_struct)) {
+    return false;
+  }
+
+  // Add empty Struct to the redact field paths (camel case).
+  for (const std::string& path : present_redact_fields) {
+    std::vector<std::string> path_pieces =
+        absl::StrSplit(proto2::util::converter::ToCamelCase(path), '.');
+    absl::Status status = RedactStructRecursively(
+        path_pieces.begin(), path_pieces.end(), message_struct);
+    if (!status.ok()) {
+      LOG(WARNING) << absl::Substitute(
+          "Failed to redact $0 message field for cloud audit logging: $1", path,
+          status.ToString());
+      return false;
+    }
+  }
+
+  return true;
+}
 }  // namespace
 
 AuditProtoScrubber::AuditProtoScrubber(
-    ScrubberContext scrubber_context,
-    const proto2::util::converter::TypeInfo* type_info,
+    ScrubberContext scrubber_context, const TypeInfo* type_info,
     const Type* message_type, const FieldPathToScrubType& field_policies)
 // : type_info_(*service_type_info), message_type_(*message_type) {
 {
-  LOG(INFO) << "Divya 1B\n";
   type_info_ = type_info;
   message_type_ = message_type;
-  LOG(INFO) << "Divya 1\n";
   for (const auto& field_policy : field_policies) {
     for (const auto& directive : field_policy.second) {
       directives_mapping_[directive].add_paths(field_policy.first);
@@ -100,28 +184,23 @@ AuditProtoScrubber::AuditProtoScrubber(
           std::vector<std::string>(audit_field_mask.paths().begin(),
                                    audit_field_mask.paths().end()));
       if (!status.ok()) {
-        LOG(INFO) << "Divya 2\n";
         LOG(WARNING) << "Failed to create proto scrubber for message '"
                      << message_type_->name()
                      << "' for audit logging: " << status;
       }
     }
-    LOG(INFO) << "Divya 3\n";
     scrubber_ =
         std::make_unique<proto_processing_lib::proto_scrubber::ProtoScrubber>(
             message_type_, type_finder_,
             std::vector<const FieldCheckerInterface*>{
                 field_checker_.get(), UnknownFieldChecker::GetDefault()},
             scrubber_context);
-    LOG(INFO) << "Divya 4\n";
   }
 }
 
 std::unique_ptr<AuditProtoScrubberInterface> AuditProtoScrubber::Create(
-    ScrubberContext scrubber_context,
-    const proto2::util::converter::TypeInfo* type_info,
+    ScrubberContext scrubber_context, const TypeInfo* type_info,
     const Type* message_type, const FieldPathToScrubType& field_policies) {
-  LOG(INFO) << "Divya 1A\n";
   return absl::WrapUnique(new AuditProtoScrubber(scrubber_context, type_info,
                                                  message_type, field_policies));
 }

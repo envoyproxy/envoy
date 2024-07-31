@@ -30,7 +30,7 @@ class AuditProtoScrubber : public ProtoScrubberInterface {
  public:
   static std::unique_ptr<ProtoScrubberInterface> Create(
       proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
-      const proto2::util::converter::TypeInfo* type_info,
+      const ::google::protobuf::util::converter::TypeInfo* type_info,
       const google::protobuf::Type* message_type,
       const FieldPathToScrubType& field_policies);
 
@@ -45,10 +45,11 @@ class AuditProtoScrubber : public ProtoScrubberInterface {
 
  private:
   // Initializes an instance of ProtoScrubber using FieldPolicies. All other
-  // relevant info can be obtained from proto2::util::converter::TypeInfo.
+  // relevant info can be obtained from
+  // ::google::protobuf::util::converter::TypeInfo.
   AuditProtoScrubber(
       proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
-      const proto2::util::converter::TypeInfo* type_info,
+      const ::google::protobuf::util::converter::TypeInfo* type_info,
       const google::protobuf::Type* message_type,
       const FieldPathToScrubType& field_policies);
 
@@ -66,7 +67,7 @@ class AuditProtoScrubber : public ProtoScrubberInterface {
       const google::protobuf::field_extraction::MessageData& raw_message,
       AuditMetadata* result) const;
 
-  const proto2::util::converter::TypeInfo* type_info_;
+  const ::google::protobuf::util::converter::TypeInfo* type_info_;
   // std::unique_ptr<google::protobuf::field_extraction::testing::TypeHelper>
   //     type_helper_;
   const google::protobuf::Type* message_type_;
