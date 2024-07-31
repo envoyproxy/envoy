@@ -2927,8 +2927,6 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read", "true");
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
