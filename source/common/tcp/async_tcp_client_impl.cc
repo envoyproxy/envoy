@@ -77,7 +77,8 @@ void AsyncTcpClientImpl::onConnectTimeout() {
 }
 
 void AsyncTcpClientImpl::close(Network::ConnectionCloseType type) {
-  if (connection_) {
+  if (connection_ && !closing_) {
+    closing_ = true;
     connection_->close(type);
   }
 }
@@ -135,6 +136,7 @@ void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
       detected_close_ = connection_->detectedCloseType();
     }
 
+    closing_ = false;
     dispatcher_.deferredDelete(std::move(connection_));
     if (callbacks_) {
       callbacks_->onEvent(event);

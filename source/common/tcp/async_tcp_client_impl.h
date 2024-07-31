@@ -107,6 +107,7 @@ private:
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
   Network::DetectedCloseType detected_close_{Network::DetectedCloseType::Normal};
+  bool closing_{false};
   bool connected_{false};
   bool enable_half_close_{false};
 };
