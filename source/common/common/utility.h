@@ -53,7 +53,8 @@ public:
   }
 
   /**
-   * @return std::string representing the GMT/UTC time based on the input time.
+   * @return std::string representing the GMT/UTC time based on the input time,
+   * or local zone time when local_time_ is true.
    */
   std::string fromTime(SystemTime time) const;
 
@@ -171,7 +172,7 @@ private:
  */
 class AccessLogDateTimeFormatter {
 public:
-  static std::string fromTime(const SystemTime& time);
+  static std::string fromTime(const SystemTime& time, bool local_time = false);
 };
 
 /**
