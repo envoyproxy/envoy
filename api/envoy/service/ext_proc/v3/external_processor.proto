@@ -206,12 +206,8 @@ message ProcessingResponse {
 message HttpHeaders {
   // The HTTP request headers. All header keys will be
   // lower-cased, because HTTP header keys are case-insensitive.
-  // The ``headers`` encoding is based on the runtime guard
-  // envoy_reloadable_features_send_header_raw_value setting.
-  // When it is true, the header value is encoded in the
+  // The header value is encoded in the
   // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
-  // When it is false, the header value is encoded in the
-  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap headers = 1;
 
   // [#not-implemented-hide:]
@@ -235,12 +231,8 @@ message HttpBody {
 
 // This message contains the trailers.
 message HttpTrailers {
-  // The ``trailers`` encoding is based on the runtime guard
-  // envoy_reloadable_features_send_header_raw_value setting.
-  // When it is true, the header value is encoded in the
+  // The header value is encoded in the
   // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
-  // When it is false, the header value is encoded in the
-  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap trailers = 1;
 }
 
@@ -308,12 +300,8 @@ message CommonResponse {
   // Add new trailers to the message. This may be used when responding to either a
   // HttpHeaders or HttpBody message, but only if this message is returned
   // along with the CONTINUE_AND_REPLACE status.
-  // The ``trailers`` encoding is based on the runtime guard
-  // envoy_reloadable_features_send_header_raw_value setting.
-  // When it is true, the header value is encoded in the
+  // The header value is encoded in the
   // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
-  // When it is false, the header value is encoded in the
-  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   config.core.v3.HeaderMap trailers = 4;
 
   // Clear the route cache for the current client request. This is necessary
@@ -362,12 +350,8 @@ message HeaderMutation {
   // Add or replace HTTP headers. Attempts to set the value of
   // any ``x-envoy`` header, and attempts to set the ``:method``,
   // ``:authority``, ``:scheme``, or ``host`` headers will be ignored.
-  // The ``set_headers`` encoding is based on the runtime guard
-  // envoy_reloadable_features_send_header_raw_value setting.
-  // When it is true, the header value is encoded in the
+  // The header value is encoded in the
   // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
-  // When it is false, the header value is encoded in the
-  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` field.
   repeated config.core.v3.HeaderValueOption set_headers = 1;
 
   // Remove these HTTP headers. Attempts to remove system headers --

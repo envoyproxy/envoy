@@ -90,29 +90,45 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       ENVOY_LOG(error, "The received response is not matched to any quota cache entry: ",
                 response->ShortDebugString());
     } else {
-      quota_buckets_[bucket_id]->bucket_action = action;
-      if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
-        auto rate_limit_strategy = quota_buckets_[bucket_id]
-                                       ->bucket_action.quota_assignment_action()
-                                       .rate_limit_strategy();
+      switch (action.bucket_action_case()) {
+      case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
+          kQuotaAssignmentAction: {
+        quota_buckets_[bucket_id]->bucket_action = action;
+        if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
+          auto rate_limit_strategy = quota_buckets_[bucket_id]
+                                         ->bucket_action.quota_assignment_action()
+                                         .rate_limit_strategy();
 
-        if (rate_limit_strategy.has_token_bucket()) {
-          const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
-          // Convert absl::duration to int64_t seconds
-          int64_t fill_interval_sec = absl::ToInt64Seconds(
-              absl::Seconds(interval_proto.seconds()) + absl::Nanoseconds(interval_proto.nanos()));
-          double fill_rate_per_sec =
-              static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
-              fill_interval_sec;
-          uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
-          ENVOY_LOG(
-              trace,
-              "Created the token bucket limiter for hashed bucket id: {}, with max_tokens: {}; "
-              "fill_interval_sec: {}; fill_rate_per_sec: {}.",
-              bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
-          quota_buckets_[bucket_id]->token_bucket_limiter =
-              std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
+          if (rate_limit_strategy.has_token_bucket()) {
+            const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
+            // Convert absl::duration to int64_t seconds
+            int64_t fill_interval_sec =
+                absl::ToInt64Seconds(absl::Seconds(interval_proto.seconds()) +
+                                     absl::Nanoseconds(interval_proto.nanos()));
+            double fill_rate_per_sec =
+                static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
+                fill_interval_sec;
+            uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
+            ENVOY_LOG(trace,
+                      "Created the token bucket limiter for hashed bucket "
+                      "id: {}, with max_tokens: {}; "
+                      "fill_interval_sec: {}; fill_rate_per_sec: {}.",
+                      bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
+            quota_buckets_[bucket_id]->token_bucket_limiter =
+                std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
+          }
         }
+        break;
+      }
+      case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
+          kAbandonAction: {
+        quota_buckets_.erase(bucket_id);
+        break;
+      }
+      default: {
+        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}", action.bucket_action_case());
+        break;
+      }
       }
     }
   }

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/stream_info_formatter.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -60,12 +61,7 @@ public:
                                                 if (route == nullptr) {
                                                   return nullptr;
                                                 }
-                                                const Router::RouteEntry* route_entry =
-                                                    route->routeEntry();
-                                                if (route_entry == nullptr) {
-                                                  return nullptr;
-                                                }
-                                                return &route_entry->virtualHost().metadata();
+                                                return &route->virtualHost().metadata();
                                               }) {}
 };
 
@@ -126,7 +122,8 @@ MetadataFormatterCommandParser::parse(const std::string& command, const std::str
     }
 
     // Return a pointer to formatter provider.
-    return std::make_unique<Envoy::Formatter::StreamInfoFormatter>(
+    return std::make_unique<
+        Envoy::Formatter::StreamInfoFormatterWrapper<Envoy::Formatter::HttpFormatterContext>>(
         provider->second(filter_namespace, path, max_length));
   }
   return nullptr;

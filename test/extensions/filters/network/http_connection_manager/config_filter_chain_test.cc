@@ -186,6 +186,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
+  Http::EmptyFilterChainOptions option;
   ;
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should create an upgrade filter chain for
@@ -193,7 +194,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   {
     EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
     EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, option));
   }
 
   // Check the case where WebSockets are configured in the HCM, and no router
@@ -201,7 +202,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   {
     EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(0);
     EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)).Times(0);
-    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, manager));
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, manager, option));
   }
 
   // Now override the HCM with a route-specific disabling of WebSocket to
@@ -209,7 +210,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, option));
   }
 
   // For paranoia's sake make sure route-specific enabling doesn't break
@@ -219,7 +220,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
     EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, option));
   }
 }
 
@@ -236,22 +237,23 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
-  ;
+  Http::EmptyFilterChainOptions option;
+
   // Check the case where WebSockets are off in the HCM, and no router config is present.
-  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager)); }
+  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, option)); }
 
   // Check the case where WebSockets are off in the HCM and in router config.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, option));
   }
 
   // With a route-specific enabling for WebSocket, WebSocket should work.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, option));
   }
 
   // With only a route-config we should do what the route config says.
@@ -259,9 +261,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("foo", true));
     upgrade_map.emplace(std::make_pair("bar", false));
-    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, manager));
-    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, manager));
-    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, manager));
+    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, manager, option));
+    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, manager, option));
+    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, manager, option));
   }
 }
 
@@ -292,6 +294,8 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
+  Http::EmptyFilterChainOptions option;
+
   {
     NiceMock<Http::MockFilterChainManager> manager;
     EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
@@ -302,14 +306,14 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
   {
     NiceMock<Http::MockFilterChainManager> manager;
     EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
-    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, manager));
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, manager, option));
   }
 
   {
     NiceMock<Http::MockFilterChainManager> manager;
     EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
     EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(2); // Buffer
-    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, manager));
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, manager, option));
   }
 }
 
