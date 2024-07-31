@@ -2830,11 +2830,7 @@ public:
       eds_cluster_config:
         service_name: fare
         eds_config:
-          api_config_source:
-            api_type: REST
-            cluster_names:
-            - eds
-            refresh_delay: 1s
+          ads: {}
     )EOF",
                  Cluster::InitializePhase::Secondary);
   }
@@ -2854,9 +2850,11 @@ public:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    ON_CALL(server_context_.cluster_manager_, edsResourcesCache())
+    auto mux = std::make_shared<testing::NiceMock<Envoy::Config::MockGrpcMux>>();
+    ON_CALL(*mux, edsResourcesCache())
         .WillByDefault(
             Invoke([this]() -> Config::EdsResourcesCacheOptRef { return eds_resources_cache_; }));
+    ON_CALL(server_context_.cluster_manager_, adsMux(_)).WillByDefault(Return(mux));
     cluster_pre_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_pre_->initializePhase());
     eds_callbacks_pre_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;

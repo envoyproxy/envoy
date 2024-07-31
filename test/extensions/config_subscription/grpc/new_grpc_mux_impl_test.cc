@@ -88,7 +88,7 @@ public:
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
     if (isUnifiedMuxTest()) {
-      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
+      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(std::move(grpc_mux_context), false);
       return;
     }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);

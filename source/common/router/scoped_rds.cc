@@ -29,7 +29,7 @@ using Envoy::Config::ConfigProvider;
 using Envoy::Config::ConfigProviderInstanceType;
 using Envoy::Config::ConfigProviderManager;
 using Envoy::Config::ConfigProviderPtr;
-using Envoy::Config::ScopedResume;
+using Envoy::Config::ScopedResumes;
 
 namespace Envoy {
 namespace Router {
@@ -369,7 +369,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // Destruction of resume_rds will lift the floodgate for new RDS subscriptions.
   // Note in the case of partial acceptance, accepted RDS subscriptions should be started
   // despite of any error.
-  ScopedResume resume_rds;
+  ScopedResumes resume_rds;
   // If new route config sources come after the local init manager's initialize() been
   // called, the init manager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
@@ -383,9 +383,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
   // In the case that localInitManager is uninitialized, RDS is already paused
   // either by Server init or LDS init.
-  if (factory_context_.clusterManager().adsMux()) {
-    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_url);
-  }
+  resume_rds = factory_context_.clusterManager().pauseAdsMuxes(type_url);
+
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     srds_init_mgr =

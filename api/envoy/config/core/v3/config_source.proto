@@ -126,6 +126,11 @@ message ApiConfigSource {
 message AggregatedConfigSource {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.AggregatedConfigSource";
+
+  // Use the specified ads instance instead of the default one from the bootstrap configuration,
+  // as specified in :ref:`api_type_field_config.bootstrap.v3.DynamicResources.additional_ads_configs>`.
+  // By default the main instance set at :ref:`api_type_field_config.bootstrap.v3.DynamicResources.ads_config>` is used.
+  string instance = 1;
 }
 
 // [#not-implemented-hide:]

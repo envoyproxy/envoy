@@ -30,11 +30,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     : BaseDynamicClusterImpl(cluster, cluster_context, creation_status),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           cluster_context.messageValidationVisitor(), "cluster_name"),
-      local_info_(cluster_context.serverFactoryContext().localInfo()),
-      eds_resources_cache_(
-          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
-              ? cluster_context.clusterManager().edsResourcesCache()
-              : absl::nullopt) {
+      local_info_(cluster_context.serverFactoryContext().localInfo()) {
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -44,6 +40,14 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
+  // If using ADS, setup the EDS resource cache to the one of the used ADS instance.
+  if (eds_config.has_ads() && Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")) {
+    auto ads_mux = cluster_context.clusterManager().adsMux(eds_config.ads().instance());
+    if (ads_mux) {
+      eds_resources_cache_ = ads_mux->edsResourcesCache();
+    }
+  }
+  
   const auto resource_name = getResourceName();
   subscription_ = THROW_OR_RETURN_VALUE(
       cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
@@ -239,11 +243,8 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   }
 
   // Pause LEDS messages until the EDS config is finished processing.
-  Config::ScopedResume maybe_resume_leds;
-  if (transport_factory_context_->clusterManager().adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
-  }
+  const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+  auto maybe_resume_leds = transport_factory_context_->clusterManager().pauseAdsMuxes(type_url);
 
   update(cluster_load_assignment);
   // If previously used a cached version, remove the subscription from the cache's

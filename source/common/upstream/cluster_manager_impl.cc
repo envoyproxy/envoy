@@ -86,27 +86,29 @@ getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostCons
   return {{"https", sni, host->address()->ip()->port()}};
 }
 
-bool isBlockingAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          absl::string_view cluster_name) {
-  bool blocking_ads_cluster = false;
-  if (bootstrap.dynamic_resources().has_ads_config()) {
-    const auto& ads_config_source = bootstrap.dynamic_resources().ads_config();
+void extractEnvoyClusters(const envoy::config::core::v3::ApiConfigSource& config, ClusterManager::ClusterSet& required_clusters) {
     // We only care about EnvoyGrpc, not GoogleGrpc, because we only need to delay ADS mux
     // initialization if it uses an Envoy cluster that needs to be initialized first. We don't
     // depend on the same cluster initialization when opening a gRPC stream for GoogleGrpc.
-    blocking_ads_cluster =
-        (ads_config_source.grpc_services_size() > 0 &&
-         ads_config_source.grpc_services(0).has_envoy_grpc() &&
-         ads_config_source.grpc_services(0).envoy_grpc().cluster_name() == cluster_name);
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-      // Validate the failover server if there is one.
-      blocking_ads_cluster |=
-          (ads_config_source.grpc_services_size() == 2 &&
-           ads_config_source.grpc_services(1).has_envoy_grpc() &&
-           ads_config_source.grpc_services(1).envoy_grpc().cluster_name() == cluster_name);
+    if  (config.grpc_services_size() > 0 &&
+      config.grpc_services(0).has_envoy_grpc()) {
+      required_clusters.insert(config.grpc_services(0).envoy_grpc().cluster_name());
     }
+    if (config.grpc_services_size() == 2 && config.grpc_services(1).has_envoy_grpc() && Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      // Add the failover server if there is one.
+      required_clusters.insert(config.grpc_services(1).envoy_grpc().cluster_name());
+    }
+}
+
+ClusterManager::ClusterSet adsRequiredClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  ClusterManager::ClusterSet required_clusters;
+  if (bootstrap.dynamic_resources().has_ads_config()) {
+    extractEnvoyClusters(bootstrap.dynamic_resources().ads_config(), required_clusters);
   }
-  return blocking_ads_cluster;
+  for (const auto& additional_ads_config: bootstrap.dynamic_resources().additional_ads_configs()) {
+    extractEnvoyClusters(additional_ads_config.second, required_clusters);
+  }
+  return required_clusters;
 }
 
 } // namespace
@@ -224,14 +226,11 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds_leds_sds;
-      if (cm_.adsMux()) {
-        const std::vector<std::string> paused_xds_types{
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
-      }
+      const std::vector<std::string> paused_xds_types{
+          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+      auto maybe_resume_eds_leds_sds = cm_.pauseAdsMuxes(paused_xds_types);
       initializeSecondaryClusters();
     }
     return;
@@ -397,131 +396,71 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
             Config::SubscriptionFactory::isPathBasedConfigSource(
                 cluster.eds_cluster_config().eds_config().config_source_specifier_case()));
   };
+
   // Build book-keeping for which clusters are primary. This is useful when we
-  // invoke loadCluster() below and it needs the complete set of primaries.
+  // invoke loadCluster() below as it needs the complete set of primaries.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     if (is_primary_cluster(cluster)) {
       primary_clusters_.insert(cluster.name());
     }
   }
 
+  // Track whether we encountered the necessary cluster for ADS startup.
   bool has_ads_cluster = false;
-  // Load all the primary clusters.
+  auto ads_required_clusters = adsRequiredClusters(bootstrap);
+
+  // Load all primary clusters.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    if (is_primary_cluster(cluster)) {
-      const bool required_for_ads = isBlockingAdsCluster(bootstrap, cluster.name());
-      has_ads_cluster |= required_for_ads;
-      // TODO(abeyad): Consider passing a lambda for a "post-cluster-init" callback, which would
-      // include a conditional ads_mux_->start() call, if other uses cases for "post-cluster-init"
-      // functionality pops up.
-      auto status_or_cluster =
-          loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
-                      required_for_ads, active_clusters_);
-      RETURN_IF_STATUS_NOT_OK(status_or_cluster);
+    if (primary_clusters_.find(cluster.name()) == primary_clusters_.end()) {
+      continue;
     }
+    const bool required_for_ads = ads_required_clusters.find(cluster.name()) != ads_required_clusters.end();
+    has_ads_cluster |= required_for_ads;
+
+    // TODO(abeyad): Consider passing a lambda for a "post-cluster-init" callback, which would
+    // include a conditional ads_mux_->start() call, if other uses cases for "post-cluster-init"
+    // functionality pops up.
+    // Load all the primary clusters.
+    auto status_or_cluster =
+        loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
+                    required_for_ads, active_clusters_);
+    RETURN_IF_STATUS_NOT_OK(status_or_cluster);
   }
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
   // Now setup ADS if needed, this might rely on a primary cluster.
-  // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
-  // After here, we just have a GrpcMux interface held in ads_mux_, which hides
-  // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
-    Config::CustomConfigValidatorsPtr custom_config_validators =
-        std::make_unique<Config::CustomConfigValidatorsImpl>(
-            validation_context_.dynamicValidationVisitor(), server_,
-            dyn_resources.ads_config().config_validators());
-
-    auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
-        dyn_resources.ads_config(), random_,
-        Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
-        Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
-    RETURN_IF_STATUS_NOT_OK(strategy_or_error);
-    JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
-
-    const bool use_eds_cache =
-        Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
-    if (dyn_resources.ads_config().api_type() ==
-        envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      RETURN_IF_NOT_OK(status);
-      std::string name;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
-        name = "envoy.config_mux.delta_grpc_mux_factory";
-      } else {
-        name = "envoy.config_mux.new_grpc_mux_factory";
-      }
-      auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
-      if (!factory) {
-        return absl::InvalidArgumentError(fmt::format("{} not found", name));
-      }
-      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 0);
-      RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
-      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-            *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 1);
-        RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
-        factory_failover = std::move(factory_failover_or_error.value());
-      }
-      ads_mux_ = factory->create(
-          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
-          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
-    } else {
-      absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      RETURN_IF_NOT_OK(status);
-      auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
-      std::string name;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
-        name = "envoy.config_mux.sotw_grpc_mux_factory";
-      } else {
-        name = "envoy.config_mux.grpc_mux_factory";
-      }
-
-      auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
-      if (!factory) {
-        return absl::InvalidArgumentError(fmt::format("{} not found", name));
-      }
-      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 0);
-      RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
-      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-            *async_client_manager_, dyn_resources.ads_config(), *stats_.rootScope(), false, 1);
-        RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
-        factory_failover = std::move(factory_failover_or_error.value());
-      }
-      ads_mux_ = factory->create(
-          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
-          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
-    }
+    auto ads_bootstrap = bootstrapAdsMux("", dyn_resources.ads_config(), ads_mux_);
+    RETURN_IF_NOT_OK(ads_bootstrap);
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
+  }
+
+  if (dyn_resources.additional_ads_configs_size() > 0) {
+    additional_ads_muxes_.reserve(dyn_resources.additional_ads_configs_size());
+    for (const auto& additional_ads_config: dyn_resources.additional_ads_configs()) {
+      Config::GrpcMuxSharedPtr mux;
+      auto ads_bootstrap = bootstrapAdsMux(additional_ads_config.first, additional_ads_config.second, mux);
+      RETURN_IF_NOT_OK(ads_bootstrap);
+      additional_ads_muxes_[additional_ads_config.first] = mux;
+    } 
   }
 
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-        !Config::SubscriptionFactory::isPathBasedConfigSource(
-            cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
-      const bool required_for_ads = isBlockingAdsCluster(bootstrap, cluster.name());
-      has_ads_cluster |= required_for_ads;
-      auto status_or_cluster =
-          loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
-                      required_for_ads, active_clusters_);
-      if (!status_or_cluster.status().ok()) {
-        return status_or_cluster.status();
-      }
+    if (primary_clusters_.find(cluster.name()) != primary_clusters_.end()) {
+      continue;
+    }
+    
+    const bool required_for_ads = ads_required_clusters.find(cluster.name()) != ads_required_clusters.end();
+    has_ads_cluster |= required_for_ads;
+    auto status_or_cluster =
+        loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
+                    required_for_ads, active_clusters_);
+    if (!status_or_cluster.status().ok()) {
+      return status_or_cluster.status();
     }
   }
 
@@ -578,8 +517,139 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
     // There is no ADS cluster, so we won't be starting the ADS mux after a cluster has finished
     // initializing, so we must start ADS here.
     ads_mux_->start();
+    for (const auto& additional_ads_mux: additional_ads_muxes_) {
+      additional_ads_mux.second->start();
+    }
   }
   return absl::OkStatus();
+}
+
+// This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
+// After here, we just have a GrpcMux interface held in ads_mux_ and additional_ads_muxes, which hides
+// whether the backing implementation is delta or SotW.
+absl::Status
+ClusterManagerImpl::bootstrapAdsMux(absl::string_view instance, const envoy::config::core::v3::ApiConfigSource& ads_config, Config::GrpcMuxSharedPtr& mux) const {
+  Config::CustomConfigValidatorsPtr custom_config_validators =
+      std::make_unique<Config::CustomConfigValidatorsImpl>(
+          validation_context_.dynamicValidationVisitor(), server_,
+          ads_config.config_validators());
+
+  auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
+      ads_config, random_,
+      Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
+      Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
+  if (!strategy_or_error.status().ok()) {
+    return {};
+  }
+
+  auto scope = stats_.rootScope();
+  if (!instance.empty()) {
+    scope = scope->createScope("ads.intance.");
+  }
+
+  JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
+
+  const bool use_eds_cache =
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
+  if (ads_config.api_type() ==
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+    absl::Status status = Config::Utility::checkTransportVersion(ads_config);
+    RETURN_IF_NOT_OK(status);
+    std::string name;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+      name = "envoy.config_mux.delta_grpc_mux_factory";
+    } else {
+      name = "envoy.config_mux.new_grpc_mux_factory";
+    }
+    auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
+    if (!factory) {
+      return absl::InvalidArgumentError(fmt::format("{} not found", name));
+    }
+    auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+        *async_client_manager_, ads_config, *scope, false, 0);
+    RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
+    Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, ads_config, *scope, false, 1);
+      RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
+      factory_failover = std::move(factory_failover_or_error.value());
+    }
+    mux = factory->create(
+        factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+        factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
+        dispatcher_, random_, *scope, ads_config, local_info_,
+        std::move(custom_config_validators), std::move(backoff_strategy),
+        makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+  } else {
+    absl::Status status = Config::Utility::checkTransportVersion(ads_config);
+    RETURN_IF_NOT_OK(status);
+    auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
+    std::string name;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+      name = "envoy.config_mux.sotw_grpc_mux_factory";
+    } else {
+      name = "envoy.config_mux.grpc_mux_factory";
+    }
+
+    auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(name);
+    if (!factory) {
+      return absl::InvalidArgumentError(fmt::format("{} not found", name));
+    }
+    auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+        *async_client_manager_, ads_config, *scope, false, 0);
+    RETURN_IF_STATUS_NOT_OK(factory_primary_or_error);
+    Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, ads_config, *scope, false, 1);
+      RETURN_IF_STATUS_NOT_OK(factory_failover_or_error);
+      factory_failover = std::move(factory_failover_or_error.value());
+    }
+    mux = factory->create(
+        factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+        factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
+        dispatcher_, random_, *scope, ads_config, local_info_,
+        std::move(custom_config_validators), std::move(backoff_strategy),
+        makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
+  }
+  return absl::OkStatus();
+}
+
+Config::GrpcMuxSharedPtr ClusterManagerImpl::adsMux(absl::string_view instance) const {
+  if (instance.empty()) {
+    return ads_mux_;
+  }
+
+  auto mux_instance = additional_ads_muxes_.find(instance);
+  if (mux_instance != additional_ads_muxes_.end()) {
+    return mux_instance->second;
+}
+  ExceptionUtil::throwEnvoyException("provided ADS instance must be configured in bootstrap configuration");
+}
+
+Config::ScopedResumes ClusterManagerImpl::pauseAdsMuxes(const std::string& type_url) const {
+  auto cleanup = std::make_unique<std::vector<Config::ScopedResume>>();
+  cleanup->reserve(1 + additional_ads_muxes_.size());
+  // If we're already in the middle of a shutdown, ads_mux_ might have been reset already.
+  if (ads_mux_) cleanup->push_back(ads_mux_->pause(type_url));
+  for (const auto& mux: additional_ads_muxes_) {
+    if (mux.second) cleanup->push_back(mux.second->pause(type_url));
+  }
+
+  return cleanup;
+}
+
+Config::ScopedResumes ClusterManagerImpl::pauseAdsMuxes(const std::vector<std::string>& type_urls) const {
+  auto cleanup = std::make_unique<std::vector<Config::ScopedResume>>();
+  cleanup->reserve(1 + additional_ads_muxes_.size());
+  // If we're already in the middle of a shutdown, ads_mux_ might have been reset already.
+  if (ads_mux_) cleanup->push_back(ads_mux_->pause(type_urls));
+  for (const auto& mux: additional_ads_muxes_) {
+    if (mux.second) cleanup->push_back(mux.second->pause(type_urls));
+  }
+
+  return cleanup;
 }
 
 absl::Status ClusterManagerImpl::initializeSecondaryClusters(
@@ -1035,7 +1105,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   if (all_clusters_initialized && ads_mux_) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = ads_mux_->pause(type_url);
+      resume_cds_ = pauseAdsMuxes(type_url);
     } else if (warming_clusters_.empty()) {
       resume_cds_.reset();
     }
@@ -1330,6 +1400,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   // the ADS mux if the ADS mux is dependent on this cluster's initialization.
   if (cm_cluster.requiredForAds() && !ads_mux_initialized_) {
     ads_mux_->start();
+    for (const auto& additional_ads_mux: additional_ads_muxes_) {
+      additional_ads_mux.second->start();
+    }
     ads_mux_initialized_ = true;
   }
 }
@@ -1700,14 +1773,6 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
             name, enumToInt(status), cluster_manager->thread_local_dispatcher_.name());
         cluster_manager->cdm_.processClusterName(name, status);
       });
-}
-
-Config::EdsResourcesCacheOptRef ClusterManagerImpl::edsResourcesCache() {
-  // EDS caching is only supported for ADS.
-  if (ads_mux_) {
-    return ads_mux_->edsResourcesCache();
-  }
-  return {};
 }
 
 ClusterDiscoveryManager

@@ -23,6 +23,19 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
       validation_visitor_(validation_visitor), api_(api), server_(server),
       xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
 
+
+absl::StatusOr<SubscriptionPtr> createFromFactory(ConfigSubscriptionFactory::SubscriptionData& data,
+                                                  absl::string_view subscription_type) {
+  ConfigSubscriptionFactory* factory =
+      Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Didn't find a registered config subscription factory implementation for name: '{}'",
+        subscription_type));
+  }
+  return factory->create(data);
+}
+
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
@@ -99,26 +112,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
     return absl::InvalidArgumentError(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
-  ConfigSubscriptionFactory* factory =
-      Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
-  if (factory == nullptr) {
-    return absl::InvalidArgumentError(fmt::format(
-        "Didn't find a registered config subscription factory implementation for name: '{}'",
-        subscription_type));
-  }
-  return factory->create(data);
-}
-
-absl::StatusOr<SubscriptionPtr> createFromFactory(ConfigSubscriptionFactory::SubscriptionData& data,
-                                                  absl::string_view subscription_type) {
-  ConfigSubscriptionFactory* factory =
-      Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
-  if (factory == nullptr) {
-    return absl::InvalidArgumentError(fmt::format(
-        "Didn't find a registered config subscription factory implementation for name: '{}'",
-        subscription_type));
-  }
-  return factory->create(data);
+  return createFromFactory(data, subscription_type);
 }
 
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionFromUrl(

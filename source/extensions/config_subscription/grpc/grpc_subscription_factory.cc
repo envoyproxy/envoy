@@ -50,7 +50,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
-        grpc_mux_context, api_config_source.set_node_on_first_message_only());
+        std::move(grpc_mux_context), api_config_source.set_node_on_first_message_only());
   } else {
     mux = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context,
                                                 api_config_source.set_node_on_first_message_only());
@@ -99,7 +99,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
     mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
-        grpc_mux_context, api_config_source.set_node_on_first_message_only());
+        std::move(grpc_mux_context), api_config_source.set_node_on_first_message_only());
   } else {
     mux = std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
@@ -111,8 +111,9 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
 
 SubscriptionPtr
 AdsConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionData& data) {
+  std::string ads_instance = data.config_.ads().instance();
   return std::make_unique<GrpcSubscriptionImpl>(
-      data.cm_.adsMux(), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
+      data.cm_.adsMux(ads_instance), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
       data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_), true,
       data.options_);
 }

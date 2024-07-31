@@ -349,9 +349,23 @@ public:
    * logically to the management of clusters but instead is required early in ClusterManager/server
    * initialization and in various sites that need ClusterManager for xDS API interfacing.
    *
+   * @param instance is the specific ADS mux to provide. If empty returns the default instance.
    * @return GrpcMux& ADS API provider referencee.
    */
-  virtual Config::GrpcMuxSharedPtr adsMux() PURE;
+  virtual Config::GrpcMuxSharedPtr adsMux(absl::string_view instance = {}) const PURE;
+
+  /**
+   * Pause discovery requests for given API types. This is useful when we're processing an update
+   * for LDS or CDS and don't want a flood of updates for RDS or EDS respectively. Discovery
+   * requests will later be resumed when the returned RAII object is destroyed.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v3.Cluster.
+   *
+   * @return a ScopedResumes object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
+   */
+  virtual Config::ScopedResumes pauseAdsMuxes(const std::string& type_url) const PURE;
+  virtual Config::ScopedResumes pauseAdsMuxes(const std::vector<std::string>& type_urls) const PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
@@ -462,11 +476,6 @@ public:
   virtual std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
   getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) PURE;
-
-  /**
-   * Returns an EdsResourcesCache that is unique for the cluster manager.
-   */
-  virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

@@ -541,7 +541,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   auto ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
-  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(cm_, adsMux(_)).WillOnce(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
@@ -566,7 +566,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSotwSu
   const std::string xds_url = "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar";
 
   GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
-  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(cm_, adsMux(_)).WillOnce(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   collectionSubscriptionFromUrl(xds_url, config)->start({});
 }
