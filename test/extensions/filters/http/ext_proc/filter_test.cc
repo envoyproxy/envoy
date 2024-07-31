@@ -1140,7 +1140,6 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesALittleFast) {
   buffered_data.add(req_data_2);
 
   // Now the headers response comes in before we get all the data
-  // EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   processRequestHeaders(true, absl::nullopt);
 
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_3, false));
