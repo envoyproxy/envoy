@@ -178,9 +178,7 @@ public:
       std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
   using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
 
-  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f, bool local_time);
-  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f)
-      : SystemTimeFormatter(format, std::move(f), false){};
+  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f, bool local_time = false);
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
@@ -189,6 +187,7 @@ public:
 private:
   const Envoy::DateFormatter date_formatter_;
   const TimeFieldExtractorPtr time_field_extractor_;
+  // Whether use local time zone.
   const bool local_time_;
 };
 

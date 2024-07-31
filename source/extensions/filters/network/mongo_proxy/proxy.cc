@@ -49,9 +49,9 @@ void AccessLog::logMessage(const Message& message, bool full,
       "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
   SystemTime now = time_source_.systemTime();
-  std::string log_line = fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(now, false),
-                                     message.toString(full),
-                                     upstream_host ? upstream_host->address()->asString() : "-");
+  std::string log_line =
+      fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(now), message.toString(full),
+                  upstream_host ? upstream_host->address()->asString() : "-");
 
   file_->write(log_line);
 }
