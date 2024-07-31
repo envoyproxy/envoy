@@ -498,6 +498,8 @@ void testUtil(const TestUtilOptions& options) {
 
       EXPECT_EQ(options.expectedSerialNumber(),
                 server_connection->ssl()->serialNumberPeerCertificate());
+      EXPECT_EQ(options.expectedSerialNumber(),
+                server_connection->ssl()->serialNumberPeerCertificate());
       if (!options.expectedSerialNumbers().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(options.expectedSerialNumbers(),
