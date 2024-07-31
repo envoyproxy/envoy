@@ -5,6 +5,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -170,6 +171,15 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
               connectivity_manager_->dnsCache()->setIpVersionToRemove(
                   {Network::Address::IpVersion::v6});
             }
+          }
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
+            Http::HttpServerPropertiesCacheManager& cache_manager =
+                server_->httpServerPropertiesCacheManager();
+
+            Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+                [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+            cache_manager.forEachThreadLocalCache(clear_brokenness);
           }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
