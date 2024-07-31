@@ -412,7 +412,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   scoped_rds_hcm.value_ = "scoped_rds_connection_manager";
 
   Tag scoped_rds_route_config;
-  scoped_rds_route_config.name_ = tag_names.SCOPED_RDS_ROUTE_CONFIG;
+  scoped_rds_route_config.name_ = tag_names.SCOPED_RDS_CONFIG;
   scoped_rds_route_config.value_ = "scoped_route_config.123";
 
   regex_tester.testRegex(
