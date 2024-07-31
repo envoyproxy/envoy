@@ -26,11 +26,12 @@ namespace Outlier {
 absl::StatusOr<DetectorSharedPtr> DetectorImplFactory::createForCluster(
     Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger,
-    Random::RandomGenerator& random) {
+    Random::RandomGenerator& random, ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (cluster_config.has_outlier_detection()) {
 
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
-                                dispatcher.timeSource(), std::move(event_logger), random);
+                                dispatcher.timeSource(), std::move(event_logger), random,
+                                validation_visitor);
   } else {
     return nullptr;
   }
@@ -67,12 +68,12 @@ void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   external_origin_sr_monitor_.incTotalReqCounter();
+  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  if (!detector) {
+    // It's possible for the cluster/detector to go away while we still have a host in use.
+    return;
+  }
   if (Http::CodeUtility::is5xx(response_code)) {
-    std::shared_ptr<DetectorImpl> detector = detector_.lock();
-    if (!detector) {
-      // It's possible for the cluster/detector to go away while we still have a host in use.
-      return;
-    }
     if (Http::CodeUtility::isGatewayError(response_code)) {
       if (++consecutive_gateway_failure_ ==
           detector->runtime().snapshot().getInteger(
@@ -92,6 +93,31 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
+
+  if (monitors_set_.empty()) {
+    return;
+  }
+  // Wrap reported HTTP code into outlier detection extension's wrapper and forward
+  // it to configured extensions.
+  monitors_set_.forEach([response_code](const ExtMonitorPtr& monitor) {
+    monitor->putResult(HttpCode(response_code));
+  });
+}
+ExtMonitor::ExtMonitorCallback DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
+  return [this](uint32_t enforce, std::string failed_monitor_name,
+                absl::optional<std::string> extra_info) {
+    std::shared_ptr<DetectorImpl> detector = detector_.lock();
+    if (!detector) {
+      // It's possible for the cluster/detector to go away while we still have a host in use.
+      return;
+    }
+    failed_monitor_name_ = failed_monitor_name;
+    if (extra_info.has_value()) {
+      failed_extra_info_ = extra_info.value();
+    }
+    failed_monitor_enforce_ = enforce;
+    detector->notifyMainThreadConsecutiveError(host_.lock(), envoy::data::cluster::v3::EXTENSION);
+  };
 }
 
 absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
@@ -177,6 +203,17 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
 // config parameter.
 void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
   put_result_func_(this, result, code);
+
+  // Call extensions
+  if (monitors_set_.empty()) {
+    return;
+  }
+
+  // Pass the local origin event to all registered extension monitors.
+  // Only monitors "interested" in local origin event will process the result.
+  // Those not "interested" will ignore the call.
+  monitors_set_.forEach(
+      [result](const ExtMonitorPtr& monitor) { monitor->putResult(LocalOriginEvent(result)); });
 }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
@@ -207,7 +244,8 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
   resetConsecutiveLocalOriginFailure();
 }
 
-DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config)
+DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config,
+                               ProtobufMessage::ValidationVisitor& validation_visitor)
     : interval_ms_(
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, DEFAULT_INTERVAL_MS))),
       base_ejection_time_ms_(static_cast<uint64_t>(
@@ -261,15 +299,47 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       max_ejection_time_jitter_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
           config, max_ejection_time_jitter, DEFAULT_MAX_EJECTION_TIME_JITTER_MS))),
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, successful_active_health_check_uneject_host, true)) {}
+          config, successful_active_health_check_uneject_host, true)) {
+
+  if (config.monitors().empty()) {
+    return;
+  }
+
+  // The following loop passes extensions' configs to factory's validators.
+  // After checking the validity of each config, the factory returns callback function
+  // which is stored and executed later on, when outlier extensions are created for
+  // each host in the cluster.
+  ExtMonitorFactoryContext context(validation_visitor);
+  for (const auto& monitor_config : config.monitors()) {
+    auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
+    auto config =
+        Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor, factory);
+    auto extension_create_fn = factory.createMonitor(monitor_config.name(), *config, context);
+    monitor_create_fns_.push_back(extension_create_fn);
+  }
+}
+
+void DetectorConfig::createMonitorExtensions(ExtMonitorsSet& ext_set,
+                                             ExtMonitor::ExtMonitorCallback callback) {
+
+  // Create each extension by calling a callback function created by factory when the
+  // config was evaluated.
+  for (const auto& create_fn : monitor_create_fns_) {
+    auto extension = create_fn();
+    ASSERT(extension != nullptr);
+    extension->setExtMonitorCallback(callback);
+    ext_set.addMonitor(std::move(extension));
+  }
+}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            TimeSource& time_source, EventLoggerSharedPtr event_logger,
-                           Random::RandomGenerator& random)
-    : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
-      stats_(generateStats(cluster.info()->statsScope())),
+                           Random::RandomGenerator& random,
+                           ProtobufMessage::ValidationVisitor& validation_visitor)
+    : config_(config, validation_visitor), dispatcher_(dispatcher), runtime_(runtime),
+      time_source_(time_source), stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger), random_generator_(random) {
   // Insert success rate initial numbers for each type of SR detector
@@ -290,9 +360,10 @@ absl::StatusOr<std::shared_ptr<DetectorImpl>>
 DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger,
-                     Random::RandomGenerator& random) {
-  std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
+                     Random::RandomGenerator& random,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  std::shared_ptr<DetectorImpl> detector(new DetectorImpl(
+      cluster, config, dispatcher, runtime, time_source, event_logger, random, validation_visitor));
 
   if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
     return absl::InvalidArgumentError(
@@ -347,6 +418,10 @@ void DetectorImpl::initialize(Cluster& cluster) {
 void DetectorImpl::addHostMonitor(HostSharedPtr host) {
   ASSERT(host_monitors_.count(host) == 0);
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
+
+  config_.createMonitorExtensions(monitor->getExtensionMonitors(),
+                                  monitor->getOnFailedExtensioMonitorCallback());
+
   host_monitors_[host] = monitor;
   host->setOutlierDetector(DetectorHostMonitorPtr{monitor});
 }
@@ -383,6 +458,10 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   host_monitors_[host]->resetConsecutiveGatewayFailure();
   host_monitors_[host]->resetConsecutiveLocalOriginFailure();
   host_monitors_[host]->uneject(time_source_.monotonicTime());
+
+  host_monitors_[host]->getExtensionMonitors().forEach(
+      [](const ExtMonitorPtr& monitor) { monitor->reset(); });
+
   runCallbacks(host);
 
   if (event_logger_) {
@@ -390,7 +469,8 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   }
 }
 
-bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type) {
+bool DetectorImpl::enforceEjection(HostSharedPtr host,
+                                   envoy::data::cluster::v3::OutlierEjectionType type) {
   switch (type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
@@ -414,6 +494,11 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
+  case envoy::data::cluster::v3::EXTENSION:
+    return runtime_.snapshot().featureEnabled(
+        std::string(EnforcingExtensionRuntime) + "." +
+            host->outlierDetector().getFailedExtensionMonitorName(),
+        host->outlierDetector().getFailedExtensionMonitorEnforce());
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -444,6 +529,8 @@ void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_failure_percentage_.inc();
     break;
+  case envoy::data::cluster::v3::EXTENSION:
+    break;
   }
 }
 
@@ -471,6 +558,9 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
     break;
+  case envoy::data::cluster::v3::EXTENSION:
+    // TODO(cpakulski) add counter to count total detected ejections by extensions.
+    break;
   }
 }
 
@@ -491,7 +581,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
-    if (enforceEjection(type)) {
+    if (enforceEjection(host, type)) {
       ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
@@ -609,6 +699,9 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
     break;
   case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
     host_monitors_[host]->resetConsecutiveLocalOriginFailure();
+    break;
+  case envoy::data::cluster::v3::EXTENSION:
+    // Extensions' state is reset when the event is reported and when the host is unejected.
     break;
   }
 }
@@ -818,6 +911,11 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
             : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
     event.mutable_eject_failure_percentage_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
+  } else if (type == envoy::data::cluster::v3::EXTENSION) {
+    event.mutable_eject_extension_event()->set_monitor_name(
+        host->outlierDetector().getFailedExtensionMonitorName());
+    event.mutable_eject_extension_event()->set_extra_info(
+        host->outlierDetector().getFailedExtensionMonitorExtraInfo());
   } else {
     event.mutable_eject_consecutive_event();
   }
