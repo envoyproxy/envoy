@@ -1165,7 +1165,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
         release_date = "2022-10-12",
-        cpe = "cpe:2.3:a:google:v8:*",
+        cpe = "cpe:2.3:a:google:chrome:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
         project_name = "Chromium's trace event headers",
