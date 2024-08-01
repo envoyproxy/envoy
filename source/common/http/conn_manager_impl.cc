@@ -243,7 +243,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
-  if (stream.response_encoder_ != nullptr && (!stream.filter_manager_.decoderObservedEndStream() ||
+  if (stream.response_encoder_ != nullptr && (!stream.filter_manager_.remoteDecodeComplete() ||
                                               !stream.state_.codec_saw_local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
@@ -288,7 +288,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
     // fully read, as there's no race condition to avoid.
     const bool connection_close =
         stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
-    const bool request_complete = stream.filter_manager_.decoderObservedEndStream();
+    const bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
     // Don't do delay close for HTTP/1.0 or if the request is complete.
     checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
@@ -923,21 +923,21 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
   filter_manager_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "stream timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "request timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "request header timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
@@ -945,7 +945,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
                  "downstream duration timeout", nullptr,
                  Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                  StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
@@ -1111,7 +1111,7 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
 
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
-  if (end_stream && !filter_manager_.decoderObservedEndStream()) {
+  if (end_stream && !filter_manager_.remoteDecodeComplete()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
@@ -1134,7 +1134,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
                    *headers);
   // We only want to record this when reading the headers the first time, not when recreating
   // a stream.
-  if (!filter_manager_.decoderObservedEndStream()) {
+  if (!filter_manager_.remoteDecodeComplete()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
   }
@@ -1762,7 +1762,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
-  if (!filter_manager_.decoderObservedEndStream()) {
+  if (!filter_manager_.remoteDecodeComplete()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }

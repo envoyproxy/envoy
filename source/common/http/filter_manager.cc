@@ -353,7 +353,7 @@ bool ActiveStreamDecoderFilter::canContinue() {
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent.
-  return !parent_.state_.remote_encode_complete_;
+  return !parent_.state_.encoder_filter_chain_complete_;
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -369,7 +369,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
+bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.remoteDecodeComplete(); }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -860,8 +860,8 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
                    end_stream, filter_manager_callbacks_.isHalfCloseEnabled());
   if (filter == nullptr) {
     if (end_stream) {
-      ASSERT(!state_.encoder_observed_end_stream_);
-      state_.encoder_observed_end_stream_ = true;
+      ASSERT(!state_.observed_encode_end_stream_);
+      state_.observed_encode_end_stream_ = true;
 
       // When half close semantics are disabled, receiving end stream from the upstream causes
       // decoder filter to stop, as neither filters nor upstream is interested in downstream data.
@@ -1446,8 +1446,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
-    ASSERT(!state_.remote_encode_complete_);
-    state_.remote_encode_complete_ = true;
+    ASSERT(!state_.encoder_filter_chain_complete_);
+    state_.encoder_filter_chain_complete_ = true;
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1632,7 +1632,7 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::observedEndStream() {
-  return parent_.state_.encoder_observed_end_stream_;
+  return parent_.state_.observed_encode_end_stream_;
 }
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
