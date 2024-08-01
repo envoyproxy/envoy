@@ -214,11 +214,11 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
   case DnsLookupFamily::All:
     ASSERT(pending_response_.all_responses_.empty());
     pending_response_.all_responses_.insert(pending_response_.all_responses_.end(),
-                                            pending_response_.v4_responses_.begin(),
-                                            pending_response_.v4_responses_.end());
-    pending_response_.all_responses_.insert(pending_response_.all_responses_.end(),
                                             pending_response_.v6_responses_.begin(),
                                             pending_response_.v6_responses_.end());
+    pending_response_.all_responses_.insert(pending_response_.all_responses_.end(),
+                                            pending_response_.v4_responses_.begin(),
+                                            pending_response_.v4_responses_.end());
     return pending_response_.all_responses_;
   }
   IS_ENVOY_BUG("unexpected DnsLookupFamily enum");
