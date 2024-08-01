@@ -20,11 +20,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, context.scope(), stats_prefix, server_context);
   // The callback is created in main thread and executed in worker thread, variables except factory
