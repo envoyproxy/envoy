@@ -424,6 +424,12 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
 TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -441,9 +447,9 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
 
   // First request should go out over HTTP/2. The response includes an Alt-Svc header.
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0,
+  auto response = sendRequestAndWaitForResponse(request_headers, 2048, response_headers, 0,
                                                 /*upstream_index=*/0, timeout);
-  checkSimpleRequestSuccess(0, response_size, response.get());
+  checkSimpleRequestSuccess(2048, response_size, response.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
 
   // Close the connection so the HTTP/2 connection will not be used.
@@ -451,7 +457,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
   fake_upstream_connection_.reset();
   // Second request should go out over HTTP/3 because of the Alt-Svc information.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  auto response2 = codec_client_->makeRequestWithBody(request_headers, 2048);
   waitForNextUpstreamRequest(1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
   // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
@@ -466,7 +472,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 
-  checkSimpleRequestSuccess(0, response_size, response2.get());
+  checkSimpleRequestSuccess(2048, response_size, response2.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
 }
 

@@ -5,6 +5,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {

@@ -345,25 +345,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
   auto* route_config = hcm->mutable_route_config();
   route_config->set_name("api_router");
-  auto* remote_service = route_config->add_virtual_hosts();
-  remote_service->set_name("remote_service");
-  remote_service->add_domains("127.0.0.1");
 
-  auto* route = remote_service->add_routes();
-  route->mutable_match()->set_prefix("/");
-  route->mutable_direct_response()->set_status(404);
-  route->mutable_direct_response()->mutable_body()->set_inline_string("not found");
-  route->add_request_headers_to_remove("x-forwarded-proto");
-  route->add_request_headers_to_remove("x-envoy-mobile-cluster");
   auto* api_service = route_config->add_virtual_hosts();
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
 
-  route = api_service->add_routes();
+  auto* route = api_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->add_request_headers_to_remove("x-forwarded-proto");
   route->add_request_headers_to_remove("x-envoy-mobile-cluster");
+  route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
   auto* route_to = route->mutable_route();
   route_to->set_cluster_header("x-envoy-mobile-cluster");
   route_to->mutable_timeout()->set_seconds(0);
