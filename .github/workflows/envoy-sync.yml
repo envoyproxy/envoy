@@ -70,6 +70,6 @@ jobs:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
         token: ${{ steps.appauth.outputs.token }}
-        workflow: envoy-sync.yaml
+        workflow: envoy-sync-receive.yaml
         inputs: |
           branch: ${{ github.ref_name }}
