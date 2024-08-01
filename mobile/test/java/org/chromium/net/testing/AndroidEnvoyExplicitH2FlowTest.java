@@ -105,7 +105,7 @@ public class AndroidEnvoyExplicitH2FlowTest {
               return null;
             })
             .start(Runnable::run) // direct executor - all the logic runs on the EM Network Thread.
-            .sendHeaders(requestHeaders, false));
+            .sendHeaders(requestHeaders, /* endStream= */ false, /* idempotent= */ false));
     ByteBuffer bf = ByteBuffer.allocateDirect(1);
     bf.put((byte)'a');
     stream.get().sendData(bf);

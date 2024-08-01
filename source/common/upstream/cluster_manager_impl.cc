@@ -2215,8 +2215,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
   if (alternate_protocol_options.has_value()) {
     // If there is configuration for an alternate protocols cache, always create one.
-    alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
-        alternate_protocol_options.value(), dispatcher);
+    alternate_protocols_cache =
+        alternate_protocols_cache_manager_.getCache(alternate_protocol_options.value(), dispatcher);
   } else if (!alternate_protocol_options.has_value() &&
              (protocols.size() == 2 ||
               (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2))) {
@@ -2227,7 +2227,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
     default_options.set_name(host->cluster().name());
     alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+        alternate_protocols_cache_manager_.getCache(default_options, dispatcher);
   }
 
   absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
@@ -2259,7 +2259,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
       default_options.set_name(host->cluster().name());
       alternate_protocols_cache =
-          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+          alternate_protocols_cache_manager_.getCache(default_options, dispatcher);
     }
 
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
