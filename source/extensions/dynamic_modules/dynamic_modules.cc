@@ -11,7 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-DynamicModule::DynamicModule(const absl::string_view object_file_path, const bool do_not_close) {
+absl::StatusOr<DynamicModulesSharedPtr> newDynamicModule(const absl::string_view object_file_path,
+                                                         const bool do_not_close) {
   // RTLD_LOCAL is always needed to avoid collisions between multiple modules.
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.
@@ -21,11 +22,12 @@ DynamicModule::DynamicModule(const absl::string_view object_file_path, const boo
   }
 
   const std::filesystem::path file_path_absolute = std::filesystem::absolute(object_file_path);
-  handle_ = dlopen(file_path_absolute.c_str(), mode);
-  if (handle_ == nullptr) {
-    throw EnvoyException(
-        fmt::format("Failed to load dynamic module: {} : {}", object_file_path, dlerror()));
+  void* handle = dlopen(file_path_absolute.c_str(), mode);
+  if (handle == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load dynamic module: ", object_file_path, " : ", dlerror()));
   }
+  return std::make_shared<DynamicModule>(handle);
 }
 
 DynamicModule::~DynamicModule() {

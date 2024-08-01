@@ -20,39 +20,45 @@ std::string testSharedObjectPath(std::string name) {
          "lib" + name + ".so";
 }
 
-TEST(DynamicModuleTest, InvalidPathException) {
-  EXPECT_THROW_WITH_REGEX(DynamicModule("invalid_name", false), EnvoyException,
-                          "Failed to load dynamic module: invalid_name : ");
+TEST(DynamicModuleTest, InvalidPath) {
+  absl::StatusOr<DynamicModulesSharedPtr> result = newDynamicModule("invalid_name", false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 TEST(DynamicModuleTest, LoadNoOp) {
   using GetSomeVariableFuncType = int (*)();
-  DynamicModulesSharedPtr module =
-      std::make_shared<DynamicModule>(testSharedObjectPath("no_op"), false);
-  const auto getSomeVariable = module->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable");
+  absl::StatusOr<DynamicModulesSharedPtr> module =
+      newDynamicModule(testSharedObjectPath("no_op"), false);
+  EXPECT_TRUE(module.ok());
+  const auto getSomeVariable =
+      module->get()->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_EQ(getSomeVariable(), 1);
   EXPECT_EQ(getSomeVariable(), 2);
   EXPECT_EQ(getSomeVariable(), 3);
 
   // Release the module, and reload it.
-  module.reset();
-  module = std::make_shared<DynamicModule>(testSharedObjectPath("no_op"),
-                                           true); // This time, do not close the module.
+  module->reset();
+  module =
+      newDynamicModule(testSharedObjectPath("no_op"), true); // This time, do not close the module.
+  EXPECT_TRUE(module.ok());
 
   // This module must be reloaded and the variable must be reset.
   const auto getSomeVariable2 =
-      (module->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable"));
+      (module->get()->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable"));
   EXPECT_NE(getSomeVariable2, nullptr);
   EXPECT_EQ(getSomeVariable2(), 1); // Start from 1 again.
   EXPECT_EQ(getSomeVariable2(), 2);
   EXPECT_EQ(getSomeVariable2(), 3);
 
   // Release the module, and reload it.
-  module.reset();
-  module = std::make_shared<DynamicModule>(testSharedObjectPath("no_op"), false);
+  module->reset();
+  module = newDynamicModule(testSharedObjectPath("no_op"), false);
+  EXPECT_TRUE(module.ok());
 
   // This module must be the already loaded one, and the variable must be kept.
-  const auto getSomeVariable3 = module->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable");
+  const auto getSomeVariable3 =
+      module->get()->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_NE(getSomeVariable3, nullptr);
   EXPECT_EQ(getSomeVariable3(), 4); // Start from 4.
 }

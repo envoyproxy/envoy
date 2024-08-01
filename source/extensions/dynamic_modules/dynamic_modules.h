@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -18,17 +19,7 @@ namespace DynamicModules {
  */
 class DynamicModule {
 public:
-  /**
-   * Constructor. This must be called from the main thread. Invalid object_file_path will cause
-   * an exception to be thrown.
-   * @param object_file_path the path to the object file to load.
-   * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
-   * will not be destroyed. This is useful when an object has some global state that should not be
-   * terminated. For example, c-shared objects compiled by Go doesn't support dlclose
-   * https://github.com/golang/go/issues/11100.
-   */
-  DynamicModule(const absl::string_view object_file_path, const bool do_not_close);
-
+  DynamicModule(void* handle) : handle_(handle) {}
   ~DynamicModule();
 
   /**
@@ -53,6 +44,17 @@ private:
 };
 
 using DynamicModulesSharedPtr = std::shared_ptr<DynamicModule>;
+
+/**
+ * Creates a new DynamicModule.
+ * @param object_file_path the path to the object file to load.
+ * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
+ * will not be destroyed. This is useful when an object has some global state that should not be
+ * terminated. For example, c-shared objects compiled by Go doesn't support dlclose
+ * https://github.com/golang/go/issues/11100.
+ */
+absl::StatusOr<DynamicModulesSharedPtr> newDynamicModule(const absl::string_view object_file_path,
+                                                         const bool do_not_close);
 
 } // namespace DynamicModules
 } // namespace Extensions
