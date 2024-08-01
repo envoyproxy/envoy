@@ -856,8 +856,6 @@ public:
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
                                                     absl::string_view bbb,
                                                     std::list<DnsResponse>&& results) -> void {
-                                std::cout << "----------------- " << static_cast<int>(status)
-                                          << ", " << bbb << ", " << results.size() << "\n";
                                 EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
