@@ -83,6 +83,9 @@ removed_config_or_runtime:
 - area: udp
   change: |
     Removed ``envoy.restart_features.udp_read_normalize_addresses`` runtime flag and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` and legacy code paths.
 - area: upstream flow control
   change: |
     Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
@@ -103,6 +106,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regardless of whether
     ``alt_stat_name`` is set.
+- area: formatter
+  change: |
+    Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
+    ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
@@ -114,6 +121,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: ratelimit
+  change: |
+    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
+    by setting by setting filter state value ``envoy.ratelimit.hits_addend`` to the desired value.
 - area: access_log
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
