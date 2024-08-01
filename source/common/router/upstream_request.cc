@@ -94,8 +94,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
-      upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")),
       enable_half_close_(enable_half_close) {
   if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
@@ -717,17 +715,6 @@ void UpstreamRequest::clearRequestEncoder() {
 }
 
 void UpstreamRequest::readDisableOrDefer(bool disable) {
-  if (!upstream_wait_for_response_headers_before_disabling_read_) {
-    if (disable) {
-      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-      upstream_->readDisable(true);
-    } else {
-      parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
-      upstream_->readDisable(false);
-    }
-    return;
-  }
-
   if (disable) {
     // See comments on deferred_read_disabling_count_ for when we do and don't defer.
     if (parent_.downstreamResponseStarted()) {
