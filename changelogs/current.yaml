@@ -6,6 +6,9 @@ behavior_changes:
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
     <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
+- area: stats scoped_rds
+  change: |
+    Added new tag extraction so that scoped rds stats have their scope_route config and stat prefix extracted.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
