@@ -1661,7 +1661,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
           {"START_TIME_LOCAL",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
+            [](absl::string_view format, absl::optional<size_t>) {
               return std::make_unique<SystemTimeFormatter>(
                   format,
                   std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
@@ -1682,7 +1682,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
           {"EMIT_TIME_LOCAL",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,
-            [](const std::string& format, absl::optional<size_t>) {
+            [](absl::string_view format, absl::optional<size_t>) {
               return std::make_unique<SystemTimeFormatter>(
                   format,
                   std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
