@@ -550,8 +550,10 @@ UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(const std::string& 
                                    : absl::optional<SystemTime>();
                       })) {}
 
-SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f)
-    : date_formatter_(format), time_field_extractor_(std::move(f)) {
+SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f,
+                                         bool local_time)
+    : date_formatter_(format, local_time), time_field_extractor_(std::move(f)),
+      local_time_(local_time) {
   // Validate the input specifier here. The formatted string may be destined for a header, and
   // should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(format, getSystemTimeFormatNewlinePattern())) {
@@ -566,7 +568,7 @@ SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
   }
   if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(time_field.value());
+    return AccessLogDateTimeFormatter::fromTime(time_field.value(), local_time_);
   }
   return date_formatter_.fromTime(time_field.value());
 }
@@ -1658,6 +1660,17 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                         return stream_info.startTime();
                       }));
             }}},
+          {"START_TIME_LOCAL",
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](const std::string& format, absl::optional<size_t>) {
+              return std::make_unique<SystemTimeFormatter>(
+                  format,
+                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.startTime();
+                      }),
+                  true);
+            }}},
           {"EMIT_TIME",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,
             [](const std::string& format, absl::optional<size_t>) {
@@ -1667,6 +1680,17 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                         return stream_info.timeSource().systemTime();
                       }));
+            }}},
+          {"EMIT_TIME_LOCAL",
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](const std::string& format, absl::optional<size_t>) {
+              return std::make_unique<SystemTimeFormatter>(
+                  format,
+                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.timeSource().systemTime();
+                      }),
+                  true);
             }}},
           {"DYNAMIC_METADATA",
            {CommandSyntaxChecker::PARAMS_REQUIRED,

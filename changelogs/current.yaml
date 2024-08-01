@@ -26,6 +26,9 @@ bug_fixes:
 - area: quic
   change: |
     Fixes access log formatter %CONNECTION_ID% for QUIC connections.
+- area: c-ares
+  change: |
+    Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
 - area: ext_authz
   change: |
     Fixed fail-open behavior of the :ref:`failure_mode_allow config option
@@ -77,6 +80,10 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: upstream flow control
+  change: |
+    Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
+    and legacy code paths.
 
 new_features:
 - area: tls
@@ -93,6 +100,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regardless of whether
     ``alt_stat_name`` is set.
+- area: formatter
+  change: |
+    Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
+    ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
@@ -108,5 +119,9 @@ new_features:
   change: |
     Added :ref:`cookie_domain <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.credentials.cookie_domain>`
     field to OAuth2 filter to allow setting the domain of cookies.
+- area: access_log
+  change: |
+    Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
+    similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
 
 deprecated:
