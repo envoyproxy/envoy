@@ -71,6 +71,7 @@ def envoy_quic_cc_library(
         defines = defines,
         external_deps = external_deps,
         deps = envoy_select_enable_http3(deps, "@envoy"),
+        alwayslink = True,
     )
 
 def envoy_quic_cc_test_library(
