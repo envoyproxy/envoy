@@ -204,8 +204,8 @@ public:
   using CacheFn = std::function<void(HttpServerPropertiesCache&)>;
 
   /**
-   * Run the supplies function on each HttpServerPropertiesCache on this thread.
-   * @param config supplies the function to run.
+   * Run the supplied function on each HttpServerPropertiesCache on this thread.
+   * @param cache_fn supplies the function to run.
    */
   virtual void forEachThreadLocalCache(CacheFn cache_fn) PURE;
 };

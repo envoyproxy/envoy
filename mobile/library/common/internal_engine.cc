@@ -172,15 +172,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
                   {Network::Address::IpVersion::v6});
             }
           }
-          if (Runtime::runtimeFeatureEnabled(
-                  "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
-            Http::HttpServerPropertiesCacheManager& cache_manager =
-                server_->httpServerPropertiesCacheManager();
-
-            Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
-                [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
-            cache_manager.forEachThreadLocalCache(clear_brokenness);
-          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -303,6 +294,15 @@ envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
       } else {
         connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
       }
+    }
+    if (Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
+      Http::HttpServerPropertiesCacheManager& cache_manager =
+          server_->httpServerPropertiesCacheManager();
+
+      Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+          [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+      cache_manager.forEachThreadLocalCache(clear_brokenness);
     }
     connectivity_manager_->refreshDns(configuration_key, true);
   });
