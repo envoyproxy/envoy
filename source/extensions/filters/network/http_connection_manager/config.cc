@@ -782,7 +782,7 @@ bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& ma
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks) const {
+    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& option) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -807,8 +807,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(
-      callbacks, Http::EmptyFilterChainOptions{}, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, option, *filters_to_use);
   return true;
 }
 

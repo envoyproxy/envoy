@@ -333,7 +333,6 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_googleurl()
     _io_hyperscan()
     _io_vectorscan()
-    _io_opentracing_cpp()
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
@@ -444,6 +443,11 @@ def _com_github_c_ares_c_ares():
     external_http_archive(
         name = "com_github_c_ares_c_ares",
         build_file_content = BUILD_ALL_CONTENT,
+        # Patch c-ares library aith commit
+        # https://github.com/c-ares/c-ares/commit/a070d7835d667b2fae5266fe1b790677dae47d25
+        # This commit fixes an issue when the gRPC library attempts to resolve a domain name.
+        patches = ["@envoy//bazel/foreign_cc:cares.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "ares",
@@ -755,18 +759,6 @@ def _io_vectorscan():
         type = "tar.gz",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
-    )
-
-def _io_opentracing_cpp():
-    external_http_archive(
-        name = "io_opentracing_cpp",
-        patch_args = ["-p1"],
-        # Workaround for LSAN false positive in https://github.com/envoyproxy/envoy/issues/7647
-        patches = ["@envoy//bazel:io_opentracing_cpp.patch"],
-    )
-    native.bind(
-        name = "opentracing",
-        actual = "@io_opentracing_cpp//:opentracing",
     )
 
 def _io_opentelemetry_api_cpp():
@@ -1133,10 +1125,6 @@ def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
-        patches = [
-            "@envoy//bazel/external:quiche_sequencer_fix.patch",
-        ],
-        patch_args = ["-p1"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
