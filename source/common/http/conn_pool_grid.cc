@@ -37,6 +37,7 @@ std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPt
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
     return default_sni;
   }
+  // If there's no configured SNI the hostname is probably an IP address. Return it here.
   return host->hostname();
 }
 
