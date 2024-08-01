@@ -116,15 +116,8 @@ public:
 
   explicit SocketInterfaceSwap(Network::Socket::Type socket_type);
 
-  ~SocketInterfaceSwap() {
-    test_socket_interface_loader_.reset();
-    Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
   std::shared_ptr<IoHandleMatcher> write_matcher_;
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> test_socket_interface_loader_;
 };
 
 } // namespace Envoy

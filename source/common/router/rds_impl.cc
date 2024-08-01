@@ -50,7 +50,7 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
                            resume_rds);
     auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
         config_update_info_, factory_context_, stat_prefix_, route_config_provider_);
-    RETURN_IF_STATUS_NOT_OK(subscription_or_error);
+    RETURN_IF_NOT_OK_REF(subscription_or_error.status());
     vhds_subscription_ = std::move(subscription_or_error.value());
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);

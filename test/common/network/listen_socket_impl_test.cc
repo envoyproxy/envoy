@@ -229,7 +229,7 @@ TEST_P(ListenSocketImplTestTcp, SupportedIpFamilyVirtualSocketIsCreatedWithNoBsd
   auto any_address = version_ == Address::IpVersion::v4 ? Utility::getIpv4AnyAddress()
                                                         : Utility::getIpv6AnyAddress();
 
-  StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<SocketInterface> new_interface(std::move(mock_interface));
 
   {
     EXPECT_CALL(*mock_interface_ptr, socket(_, _, _)).Times(0);
@@ -245,7 +245,7 @@ TEST_P(ListenSocketImplTestTcp, DeathAtUnSupportedIpFamilyListenSocket) {
   auto* mock_interface_ptr = mock_interface.get();
   auto the_other_address = version_ == Address::IpVersion::v4 ? Utility::getIpv6AnyAddress()
                                                               : Utility::getIpv4AnyAddress();
-  StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<SocketInterface> new_interface(std::move(mock_interface));
   {
     EXPECT_CALL(*mock_interface_ptr, socket(_, _, _)).Times(0);
     EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _, _)).Times(0);
