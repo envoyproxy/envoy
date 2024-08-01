@@ -63,7 +63,7 @@ else
   PLATFORM="linux-arm64"
   SHA256=56a91851c97fb4697077abbca38860f735c32b38993ff79b088dac46e4735633
 fi
-echo https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz
+
 curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
   && echo "$SHA256" go"$VERSION"."$PLATFORM".tar.gz | sha256sum --check
 tar xf go"$VERSION"."$PLATFORM".tar.gz
