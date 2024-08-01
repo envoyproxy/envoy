@@ -1516,12 +1516,17 @@ bool FilterManager::createFilterChain() {
     }
   }
 
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
+  FilterChainOptionsImpl options(
+      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
+
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
 
     if (filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this)) {
+                                                       upgrade_map, *this, options)) {
       filter_manager_callbacks_.upgradeFilterChainCreated();
       return true;
     } else {
@@ -1531,10 +1536,6 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
-  // to set valid initial route only when the downstream callbacks is available.
-  FilterChainOptionsImpl options(
-      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);
   return !upgrade_rejected;
 }

@@ -27,7 +27,8 @@ struct AlternateProtocolsData {
 class HttpServerPropertiesCacheManagerImpl : public HttpServerPropertiesCacheManager,
                                              public Singleton::Instance {
 public:
-  HttpServerPropertiesCacheManagerImpl(AlternateProtocolsData& data,
+  HttpServerPropertiesCacheManagerImpl(Server::Configuration::ServerFactoryContext& context,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
                                        ThreadLocal::SlotAllocator& tls);
 
   // HttpServerPropertiesCacheManager
@@ -52,25 +53,10 @@ private:
     absl::flat_hash_map<std::string, CacheWithOptions> caches_;
   };
 
-  AlternateProtocolsData& data_;
+  AlternateProtocolsData data_;
 
   // Thread local state for the cache.
   ThreadLocal::TypedSlot<State> slot_;
-};
-
-class HttpServerPropertiesCacheManagerFactoryImpl : public HttpServerPropertiesCacheManagerFactory {
-public:
-  HttpServerPropertiesCacheManagerFactoryImpl(Singleton::Manager& singleton_manager,
-                                              ThreadLocal::SlotAllocator& tls,
-                                              AlternateProtocolsData data)
-      : singleton_manager_(singleton_manager), tls_(tls), data_(data) {}
-
-  HttpServerPropertiesCacheManagerSharedPtr get() override;
-
-private:
-  Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
-  AlternateProtocolsData data_;
 };
 
 } // namespace Http

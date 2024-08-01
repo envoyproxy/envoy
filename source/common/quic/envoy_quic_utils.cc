@@ -56,8 +56,8 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
   return quic::QuicSocketAddress(ss);
 }
 
-spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
-  spdy::Http2HeaderBlock header_block;
+quiche::HttpHeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
+  quiche::HttpHeaderBlock header_block;
   headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // The key-value pairs are copied.
     header_block.AppendValueOrAddHeader(header.key().getStringView(),

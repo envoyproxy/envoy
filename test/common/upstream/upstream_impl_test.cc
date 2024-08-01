@@ -1761,8 +1761,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   config.mutable_first_address_family_count()->set_value(2);
-  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig())
-      .WillRepeatedly(Return(absl::make_optional(config)));
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(config));
 
   envoy::config::core::v3::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -3724,9 +3723,9 @@ TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
   uint32_t expected_count(1);
   expected_config.mutable_first_address_family_count()->set_value(expected_count);
   EXPECT_TRUE(cluster->info()->happyEyeballsConfig().has_value());
-  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_version(),
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig()->first_address_family_version(),
             envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_count().value(),
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig()->first_address_family_count().value(),
             expected_count);
 }
 
@@ -6119,7 +6118,8 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
 
   auto cluster = makeCluster(yaml);
   Http::MockFilterChainManager manager;
-  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager));
+  Http::EmptyFilterChainOptions options;
+  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
 
   EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
   cluster->info()->createFilterChain(manager);

@@ -99,7 +99,6 @@ paths:
     # StausOr where possible.
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/listener_manager/listener_impl.cc
-    - source/common/listener_manager/listener_manager_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc

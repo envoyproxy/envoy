@@ -16,10 +16,19 @@ constexpr const char* THREAD_NAME = "EnvoyMain";
 // Non-const variables.
 std::atomic<JavaVM*> java_vm_cache_;
 thread_local JNIEnv* jni_env_cache_ = nullptr;
+// `jclass_cache_map` contains `jclass` references that are statically populated. This field is
+// used by `FindClass` to find the `jclass` reference from a given class name.
 absl::flat_hash_map<absl::string_view, jclass> jclass_cache_map;
 // The `jclass_cache_set` is a superset of `jclass_cache_map`. It contains `jclass` objects that are
 // retrieve dynamically via `GetObjectClass`.
-thread_local absl::flat_hash_set<jclass> jclass_cache_set;
+//
+// The `jclass_cache_set` owns the `jclass` global refs, wrapped in `GlobalRefUniquePtr` to allow
+// automatic `GlobalRef` destruction. The other fields, such as `jmethod_id_cache_map`,
+// `static_jmethod_id_cache_map`, `jfield_id_cache_map`, and `static_jfield_id_cache_map` only
+// borrow the `jclass` references.
+//
+// Note: all these fields are `thread_local` to avoid locking.
+thread_local absl::flat_hash_set<GlobalRefUniquePtr<jclass>> jclass_cache_set;
 thread_local absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* method */, absl::string_view /* signature */>,
     jmethodID>
@@ -43,12 +52,36 @@ thread_local absl::flat_hash_map<
 jclass addClassToCacheIfNotExist(JNIEnv* env, jclass clazz) {
   jclass java_class_global_ref = clazz;
   if (auto it = jclass_cache_set.find(clazz); it == jclass_cache_set.end()) {
-    jclass global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
-    jclass_cache_set.emplace(global_ref);
+    java_class_global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
+    jclass_cache_set.emplace(java_class_global_ref, GlobalRefDeleter());
   }
   return java_class_global_ref;
 }
 } // namespace
+
+void GlobalRefDeleter::operator()(jobject object) const {
+  if (object != nullptr) {
+    JniHelper::getThreadLocalEnv()->DeleteGlobalRef(object);
+  }
+}
+
+void LocalRefDeleter::operator()(jobject object) const {
+  if (object != nullptr) {
+    JniHelper::getThreadLocalEnv()->DeleteLocalRef(object);
+  }
+}
+
+void StringUtfDeleter::operator()(const char* c_str) const {
+  if (c_str != nullptr) {
+    JniHelper::getThreadLocalEnv()->ReleaseStringUTFChars(j_str_, c_str);
+  }
+}
+
+void PrimitiveArrayCriticalDeleter::operator()(void* c_array) const {
+  if (c_array != nullptr) {
+    JniHelper::getThreadLocalEnv()->ReleasePrimitiveArrayCritical(array_, c_array, 0);
+  }
+}
 
 jint JniHelper::getVersion() { return JNI_VERSION; }
 
@@ -67,7 +100,7 @@ void JniHelper::finalize() {
   static_jfield_id_cache_map.clear();
   jclass_cache_map.clear();
   for (const auto& clazz : jclass_cache_set) {
-    env->DeleteGlobalRef(clazz);
+    env->DeleteGlobalRef(clazz.get());
   }
   jclass_cache_set.clear();
 }
@@ -80,7 +113,7 @@ void JniHelper::addClassToCache(const char* class_name) {
   ASSERT(java_class != nullptr, absl::StrFormat("Unable to find class '%s'.", class_name));
   jclass java_class_global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(java_class));
   jclass_cache_map.emplace(class_name, java_class_global_ref);
-  jclass_cache_set.emplace(java_class_global_ref);
+  jclass_cache_set.emplace(java_class_global_ref, GlobalRefDeleter());
 }
 
 JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }
@@ -90,18 +123,15 @@ void JniHelper::detachCurrentThread() {
 }
 
 JNIEnv* JniHelper::getThreadLocalEnv() {
-  if (jni_env_cache_ != nullptr) {
-    return jni_env_cache_;
-  }
   JavaVM* java_vm = getJavaVm();
   ASSERT(java_vm != nullptr, "Unable to get JavaVM.");
   jint result = java_vm->GetEnv(reinterpret_cast<void**>(&jni_env_cache_), getVersion());
   if (result == JNI_EDETACHED) {
     JavaVMAttachArgs args = {getVersion(), const_cast<char*>(THREAD_NAME), nullptr};
 #if defined(__ANDROID__)
-    result = java_vm->AttachCurrentThread(&jni_env_cache_, &args);
+    result = java_vm->AttachCurrentThreadAsDaemon(&jni_env_cache_, &args);
 #else
-    result = java_vm->AttachCurrentThread(reinterpret_cast<void**>(&jni_env_cache_), &args);
+    result = java_vm->AttachCurrentThreadAsDaemon(reinterpret_cast<void**>(&jni_env_cache_), &args);
 #endif
   }
   ASSERT(result == JNI_OK, "Unable to get JNIEnv.");
@@ -193,7 +223,7 @@ jclass JniHelper::findClass(const char* class_name) {
 }
 
 LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {
-  return {env_->GetObjectClass(object), LocalRefDeleter(env_)};
+  return {env_->GetObjectClass(object), LocalRefDeleter()};
 }
 
 void JniHelper::throwNew(const char* java_class_name, const char* message) {
@@ -207,34 +237,33 @@ void JniHelper::throwNew(const char* java_class_name, const char* message) {
 jboolean JniHelper::exceptionCheck() { return env_->ExceptionCheck(); }
 
 LocalRefUniquePtr<jthrowable> JniHelper::exceptionOccurred() {
-  return {env_->ExceptionOccurred(), LocalRefDeleter(env_)};
+  return {env_->ExceptionOccurred(), LocalRefDeleter()};
 }
 
 void JniHelper::exceptionCleared() { env_->ExceptionClear(); }
 
 GlobalRefUniquePtr<jobject> JniHelper::newGlobalRef(jobject object) {
-  GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter(env_));
+  GlobalRefUniquePtr<jobject> result(env_->NewGlobalRef(object), GlobalRefDeleter());
   return result;
 }
 
 LocalRefUniquePtr<jobject> JniHelper::newObject(jclass clazz, jmethodID method_id, ...) {
   va_list args;
   va_start(args, method_id);
-  LocalRefUniquePtr<jobject> result(env_->NewObjectV(clazz, method_id, args),
-                                    LocalRefDeleter(env_));
+  LocalRefUniquePtr<jobject> result(env_->NewObjectV(clazz, method_id, args), LocalRefDeleter());
   rethrowException();
   va_end(args);
   return result;
 }
 
 LocalRefUniquePtr<jstring> JniHelper::newStringUtf(const char* str) {
-  LocalRefUniquePtr<jstring> result(env_->NewStringUTF(str), LocalRefDeleter(env_));
+  LocalRefUniquePtr<jstring> result(env_->NewStringUTF(str), LocalRefDeleter());
   rethrowException();
   return result;
 }
 
 StringUtfUniquePtr JniHelper::getStringUtfChars(jstring str, jboolean* is_copy) {
-  StringUtfUniquePtr result(env_->GetStringUTFChars(str, is_copy), StringUtfDeleter(env_, str));
+  StringUtfUniquePtr result(env_->GetStringUTFChars(str, is_copy), StringUtfDeleter(str));
   rethrowException();
   return result;
 }
@@ -243,8 +272,7 @@ jsize JniHelper::getArrayLength(jarray array) { return env_->GetArrayLength(arra
 
 #define DEFINE_NEW_ARRAY(JAVA_TYPE, JNI_TYPE)                                                      \
   LocalRefUniquePtr<JNI_TYPE> JniHelper::new##JAVA_TYPE##Array(jsize length) {                     \
-    LocalRefUniquePtr<JNI_TYPE> result(env_->New##JAVA_TYPE##Array(length),                        \
-                                       LocalRefDeleter(env_));                                     \
+    LocalRefUniquePtr<JNI_TYPE> result(env_->New##JAVA_TYPE##Array(length), LocalRefDeleter());    \
     rethrowException();                                                                            \
     return result;                                                                                 \
   }
@@ -261,7 +289,7 @@ DEFINE_NEW_ARRAY(Boolean, jbooleanArray)
 LocalRefUniquePtr<jobjectArray> JniHelper::newObjectArray(jsize length, jclass element_class,
                                                           jobject initial_element) {
   LocalRefUniquePtr<jobjectArray> result(
-      env_->NewObjectArray(length, element_class, initial_element), LocalRefDeleter(env_));
+      env_->NewObjectArray(length, element_class, initial_element), LocalRefDeleter());
 
   return result;
 }
@@ -362,7 +390,7 @@ void JniHelper::callStaticVoidMethod(jclass clazz, jmethodID method_id, ...) {
 
 LocalRefUniquePtr<jobject> JniHelper::newDirectByteBuffer(void* address, jlong capacity) {
   LocalRefUniquePtr<jobject> result(env_->NewDirectByteBuffer(address, capacity),
-                                    LocalRefDeleter(env_));
+                                    LocalRefDeleter());
   rethrowException();
   return result;
 }

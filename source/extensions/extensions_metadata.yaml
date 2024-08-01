@@ -1201,13 +1201,6 @@ envoy.tracers.datadog:
   status: stable
   type_urls:
   - envoy.config.trace.v3.DatadogConfig
-envoy.tracers.dynamic_ot:
-  categories:
-  - envoy.tracers
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.trace.v3.DynamicOtConfig
 envoy.tracers.opencensus:
   categories:
   - envoy.tracers

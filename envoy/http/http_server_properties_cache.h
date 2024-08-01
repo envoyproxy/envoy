@@ -199,18 +199,5 @@ public:
 
 using HttpServerPropertiesCacheManagerSharedPtr = std::shared_ptr<HttpServerPropertiesCacheManager>;
 
-/**
- * Factory for getting an alternate protocols cache manager.
- */
-class HttpServerPropertiesCacheManagerFactory {
-public:
-  virtual ~HttpServerPropertiesCacheManagerFactory() = default;
-
-  /**
-   * Get the alternate protocols cache manager.
-   */
-  virtual HttpServerPropertiesCacheManagerSharedPtr get() PURE;
-};
-
 } // namespace Http
 } // namespace Envoy

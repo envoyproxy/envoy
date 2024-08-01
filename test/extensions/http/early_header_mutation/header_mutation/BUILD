@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/http/early_header_mutation/header_mutation:header_mutation_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/http/early_header_mutation/header_mutation:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
@@ -47,6 +49,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/http/early_header_mutation/header_mutation:config",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",

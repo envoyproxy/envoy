@@ -550,8 +550,10 @@ UpstreamPeerCertVEndFormatter::UpstreamPeerCertVEndFormatter(const std::string& 
                                    : absl::optional<SystemTime>();
                       })) {}
 
-SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f)
-    : date_formatter_(format), time_field_extractor_(std::move(f)) {
+SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f,
+                                         bool local_time)
+    : date_formatter_(format, local_time), time_field_extractor_(std::move(f)),
+      local_time_(local_time) {
   // Validate the input specifier here. The formatted string may be destined for a header, and
   // should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(format, getSystemTimeFormatNewlinePattern())) {
@@ -566,7 +568,7 @@ SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
     return absl::nullopt;
   }
   if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(time_field.value());
+    return AccessLogDateTimeFormatter::fromTime(time_field.value(), local_time_);
   }
   return date_formatter_.fromTime(time_field.value());
 }
@@ -817,6 +819,10 @@ public:
 private:
   FieldExtractor field_extractor_;
 };
+
+using StreamInfoFormatterProviderLookupTable =
+    absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
+                                                     StreamInfoFormatterProviderCreateFunc>>;
 
 const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders() {
   CONSTRUCT_ON_FIRST_USE(
@@ -1654,6 +1660,17 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                         return stream_info.startTime();
                       }));
             }}},
+          {"START_TIME_LOCAL",
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](const std::string& format, absl::optional<size_t>) {
+              return std::make_unique<SystemTimeFormatter>(
+                  format,
+                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.startTime();
+                      }),
+                  true);
+            }}},
           {"EMIT_TIME",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,
             [](const std::string& format, absl::optional<size_t>) {
@@ -1663,6 +1680,17 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
                         return stream_info.timeSource().systemTime();
                       }));
+            }}},
+          {"EMIT_TIME_LOCAL",
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](const std::string& format, absl::optional<size_t>) {
+              return std::make_unique<SystemTimeFormatter>(
+                  format,
+                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.timeSource().systemTime();
+                      }),
+                  true);
             }}},
           {"DYNAMIC_METADATA",
            {CommandSyntaxChecker::PARAMS_REQUIRED,
@@ -1750,6 +1778,41 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
       });
 }
+
+class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
+public:
+  BuiltInStreamInfoCommandParser() = default;
+
+  // StreamInfoCommandParser
+  StreamInfoFormatterProviderPtr parse(const std::string& command, const std::string& sub_command,
+                                       absl::optional<size_t>& max_length) const override {
+
+    auto it = getKnownStreamInfoFormatterProviders().find(command);
+
+    // No throw because the stream info command parser may not be the last parser and other
+    // formatter parsers may be tried.
+    if (it == getKnownStreamInfoFormatterProviders().end()) {
+      return nullptr;
+    }
+    // Check flags for the command.
+    THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
+        (*it).second.first, command, sub_command, max_length));
+
+    return (*it).second.second(sub_command, max_length);
+  }
+};
+
+std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
+  return "envoy.built_in_formatters.stream_info.default";
+}
+
+StreamInfoCommandParserPtr
+DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
+  return std::make_unique<BuiltInStreamInfoCommandParser>();
+}
+
+REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
+                 BuiltInStreamInfoCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

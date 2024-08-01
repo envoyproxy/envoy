@@ -122,7 +122,8 @@ public class QuicTestServerTest {
                           return null;
                         })
                         .start(Executors.newSingleThreadExecutor())
-                        .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
+                        .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody(),
+                                     /* idempotent= */ false);
     requestScenario.getBodyChunks().forEach(stream::sendData);
     requestScenario.getClosingBodyChunk().ifPresent(stream::close);
     latch.await();

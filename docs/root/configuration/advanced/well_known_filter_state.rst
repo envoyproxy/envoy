@@ -68,6 +68,11 @@ The following lists the filter state object keys used by the Envoy extensions:
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>` override on a per-connection
   basis. Accepts a count of milliseconds number string as a constructor.
 
+``envoy.ratelimit.hits_addend``
+  :ref:`Rate Limit Hits Addend
+  <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
+  Accepts a number string as a constructor.
+
 Filter state object fields
 --------------------------
 

@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "local_reply_test",
     srcs = ["local_reply_test.cc"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/local_reply:local_reply_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",

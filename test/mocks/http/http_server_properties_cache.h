@@ -32,12 +32,5 @@ public:
                Event::Dispatcher& dispatcher));
 };
 
-class MockHttpServerPropertiesCacheManagerFactory : public HttpServerPropertiesCacheManagerFactory {
-public:
-  ~MockHttpServerPropertiesCacheManagerFactory() override;
-
-  MOCK_METHOD(HttpServerPropertiesCacheManagerSharedPtr, get, ());
-};
-
 } // namespace Http
 } // namespace Envoy

@@ -154,20 +154,20 @@ private:
   }
 };
 
-// Register the access log for the FormatterContext.
+class DefaultBuiltInCommandParserFactory : public BuiltInCommandParserFactory {
+public:
+  std::string name() const override { return "envoy.built_in_formatters.generic_poxy.default"; }
+
+  // BuiltInCommandParserFactory
+  CommandParserPtr createCommandParser() const override {
+    return std::make_unique<SimpleCommandParser>();
+  }
+};
+
+REGISTER_FACTORY(DefaultBuiltInCommandParserFactory, BuiltInCommandParserFactory);
 REGISTER_FACTORY(FileAccessLogFactory, AccessLogInstanceFactory);
 
 } // namespace GenericProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-
-namespace Formatter {
-
-using FormatterContext = Extensions::NetworkFilters::GenericProxy::FormatterContext;
-using SimpleCommandParser = Extensions::NetworkFilters::GenericProxy::SimpleCommandParser;
-// Register the built-in command parsers for the FormatterContext.
-REGISTER_BUILT_IN_COMMAND_PARSER(FormatterContext, SimpleCommandParser);
-
-} // namespace Formatter
-
 } // namespace Envoy

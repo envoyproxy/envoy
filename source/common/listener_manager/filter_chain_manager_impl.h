@@ -33,9 +33,9 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   /**
    * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
-   * chain. Throw exception if failed.
+   * chain or an error status.
    */
-  virtual Network::DrainableFilterChainSharedPtr
+  virtual absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
@@ -177,7 +177,7 @@ private:
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
   // filter chain manager. Called by addFilterChains().
-  void copyOrRebuildDefaultFilterChain(
+  absl::Status copyOrRebuildDefaultFilterChain(
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);

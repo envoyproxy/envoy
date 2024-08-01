@@ -11,6 +11,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
@@ -47,6 +48,26 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Formatter {
 namespace {
+
+using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
+using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
+
+// Helper class to test StreamInfoFormatter.
+class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+public:
+  StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
+                      absl::optional<size_t> max_length = absl::nullopt)
+      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
+    for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
+      auto formatter = cmd->parse(command, sub_command, max_length);
+      if (formatter) {
+        formatter_ = std::move(formatter);
+        return;
+      }
+    }
+    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
+  }
+};
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
@@ -4164,16 +4185,21 @@ TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
   absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
       {"test_time", fmt::format("{}", expected_time_in_epoch)},
+      {"test_time_local", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
       {"default", "2018-03-28T23:35:58.000Z"},
+      {"default_local",
+       absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time), absl::LocalTimeZone())},
       {"all_zeroes", "000000000.0.00.000"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     simple_date: '%START_TIME(%Y/%m/%d)%'
     test_time: '%START_TIME(%s)%'
+    test_time_local: '%START_TIME_LOCAL(%s)%'
     bad_format: '%START_TIME(bad_format)%'
     default: '%START_TIME%'
+    default_local: '%START_TIME_LOCAL%'
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);
