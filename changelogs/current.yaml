@@ -100,6 +100,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regardless of whether
     ``alt_stat_name`` is set.
+- area: formatter
+  change: |
+    Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
+    ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption

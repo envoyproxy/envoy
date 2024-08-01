@@ -2604,7 +2604,8 @@ TEST_P(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
-  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
@@ -2643,7 +2644,8 @@ TEST_P(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
   InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
-  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
