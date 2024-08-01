@@ -854,7 +854,7 @@ public:
                                                     bool expected_to_execute) {
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
-                                                    absl::string_view bbb,
+                                                    absl::string_view,
                                                     std::list<DnsResponse>&& results) -> void {
                                 EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
