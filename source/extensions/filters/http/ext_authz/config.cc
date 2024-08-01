@@ -24,7 +24,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.scope(), stats_prefix, server_context);
+      std::make_shared<FilterConfig>(proto_config, server_context.scope(), stats_prefix, server_context);
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
@@ -50,13 +50,12 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
-    callback = [&context, filter_config, timeout_ms,
+    callback = [&server_context, filter_config, timeout_ms,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client_or_error =
-          context.serverFactoryContext()
-              .clusterManager()
+          server_context.clusterManager()
               .grpcAsyncClientManager()
-              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, server_context.scope(), true);
       THROW_IF_STATUS_NOT_OK(client_or_error, throw);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), std::chrono::milliseconds(timeout_ms));
