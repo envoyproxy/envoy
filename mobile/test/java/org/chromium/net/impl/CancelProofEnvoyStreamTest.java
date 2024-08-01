@@ -358,7 +358,8 @@ public class CancelProofEnvoyStreamTest {
     private MockedStream() { super(0, 0, null, false); }
 
     @Override
-    public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
+    public void sendHeaders(Map<String, List<String>> headers, boolean endStream,
+                            boolean idempotent) {
       mSendHeadersInvocationCount.incrementAndGet();
       mStartLatch.countDown();
       mSendHeadersBlock.block();
