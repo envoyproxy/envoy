@@ -1455,7 +1455,6 @@ TEST_F(HttpFilterTest, PostFastRequestPartialBuffering) {
   buffered_data.add(req_data_2);
 
   // Now the headers response comes in and we are all done
-  // EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   processRequestHeaders(true, absl::nullopt);
 
   processRequestBody([](const HttpBody& req_body, ProcessingResponse&, BodyResponse&) {
