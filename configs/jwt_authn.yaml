@@ -74,9 +74,13 @@ static_resources:
     type: STRICT_DNS
     connect_timeout: 2s
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
-    upstream_http_protocol_options:
-      auto_sni: true
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options:
+          auto_sni: true
+        auto_config:
+          http2_protocol_options: {}
     load_assignment:
       cluster_name: www.googleapis.com
       endpoints:
