@@ -56,6 +56,8 @@ public:
 
 private:
   Envoy::Ssl::ClientContextSharedPtr context_;
+  // True if the verifier should accept untrusted certs (see documentation for
+  // envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::ACCEPT_UNTRUSTED)
   bool accept_untrusted_;
 };
 
