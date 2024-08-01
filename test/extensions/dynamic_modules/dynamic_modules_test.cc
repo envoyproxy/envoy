@@ -21,18 +21,18 @@ std::string testSharedObjectPath(std::string name) {
 }
 
 TEST(DynamicModuleTest, InvalidPath) {
-  absl::StatusOr<DynamicModulesSharedPtr> result = newDynamicModule("invalid_name", false);
+  absl::StatusOr<DynamicModuleSharedPtr> result = newDynamicModule("invalid_name", false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 TEST(DynamicModuleTest, LoadNoOp) {
   using GetSomeVariableFuncType = int (*)();
-  absl::StatusOr<DynamicModulesSharedPtr> module =
+  absl::StatusOr<DynamicModuleSharedPtr> module =
       newDynamicModule(testSharedObjectPath("no_op"), false);
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
-      module->get()->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable");
+      module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_EQ(getSomeVariable(), 1);
   EXPECT_EQ(getSomeVariable(), 2);
   EXPECT_EQ(getSomeVariable(), 3);
@@ -45,7 +45,7 @@ TEST(DynamicModuleTest, LoadNoOp) {
 
   // This module must be reloaded and the variable must be reset.
   const auto getSomeVariable2 =
-      (module->get()->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable"));
+      (module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable"));
   EXPECT_NE(getSomeVariable2, nullptr);
   EXPECT_EQ(getSomeVariable2(), 1); // Start from 1 again.
   EXPECT_EQ(getSomeVariable2(), 2);
@@ -58,7 +58,7 @@ TEST(DynamicModuleTest, LoadNoOp) {
 
   // This module must be the already loaded one, and the variable must be kept.
   const auto getSomeVariable3 =
-      module->get()->getTypedSymbol<GetSomeVariableFuncType>("getSomeVariable");
+      module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_NE(getSomeVariable3, nullptr);
   EXPECT_EQ(getSomeVariable3(), 4); // Start from 4.
 }

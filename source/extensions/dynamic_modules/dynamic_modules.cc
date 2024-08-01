@@ -11,8 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-absl::StatusOr<DynamicModulesSharedPtr> newDynamicModule(const absl::string_view object_file_path,
-                                                         const bool do_not_close) {
+absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view object_file_path,
+                                                        const bool do_not_close) {
   // RTLD_LOCAL is always needed to avoid collisions between multiple modules.
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.

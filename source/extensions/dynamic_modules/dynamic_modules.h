@@ -23,11 +23,15 @@ public:
   ~DynamicModule();
 
   /**
-   * Get a symbol from the dynamic module with a specific type.
+   * Get a function pointer from the dynamic module with a specific type.
+   * @tparam T the function pointer type to cast the symbol to.
    * @param symbol_ref the symbol to look up.
    * @return the symbol if found, otherwise nullptr.
    */
-  template <typename T> T getTypedSymbol(const absl::string_view symbol_ref) const {
+  template <typename T> T getFunctionPointer(const absl::string_view symbol_ref) const {
+    static_assert(std::is_pointer<T>::value &&
+                      std::is_function<typename std::remove_pointer<T>::type>::value,
+                  "T must be a function pointer type");
     return reinterpret_cast<T>(getSymbol(symbol_ref));
   }
 
@@ -43,7 +47,7 @@ private:
   void* handle_ = nullptr;
 };
 
-using DynamicModulesSharedPtr = std::shared_ptr<DynamicModule>;
+using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;
 
 /**
  * Creates a new DynamicModule.
@@ -53,8 +57,8 @@ using DynamicModulesSharedPtr = std::shared_ptr<DynamicModule>;
  * terminated. For example, c-shared objects compiled by Go doesn't support dlclose
  * https://github.com/golang/go/issues/11100.
  */
-absl::StatusOr<DynamicModulesSharedPtr> newDynamicModule(const absl::string_view object_file_path,
-                                                         const bool do_not_close);
+absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view object_file_path,
+                                                        const bool do_not_close);
 
 } // namespace DynamicModules
 } // namespace Extensions
