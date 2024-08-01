@@ -358,6 +358,9 @@ message JwtProvider {
   // .. literalinclude:: /_configs/repo/jwt_authn.yaml
   //    :language: yaml
   //    :lines: 44-48
+  //    :linenos
+  //    :lineno-start: 44
+  //    :caption: :download:`jwt_authn.yaml </_configs/repo/jwt_authn.yaml>`
   //
   // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
