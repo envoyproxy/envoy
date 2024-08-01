@@ -690,7 +690,8 @@ def extract_comments(lines):
                     break
 
                 n += 1
-        elif text.strip().startswith(RST_CODE_BLOCK) or text.strip().startswith(RST_LITERAL_INCLUDE):
+        elif text.strip().startswith(RST_CODE_BLOCK) or text.strip().startswith(
+                RST_LITERAL_INCLUDE):
             # Start of a code block.
             indent = len(INDENT.search(text).group(1))
             last_line = comments[n].line
