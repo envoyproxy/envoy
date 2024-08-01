@@ -296,7 +296,7 @@ envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
       }
     }
     if (Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
+            "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
       Http::HttpServerPropertiesCacheManager& cache_manager =
           server_->httpServerPropertiesCacheManager();
 
