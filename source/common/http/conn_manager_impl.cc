@@ -280,17 +280,18 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
     drain_state_ = DrainState::Closing;
   }
 
-  // If HTTP/1.0 has no content length, it is framed by close and won't consider
-  // the request complete until the FIN is read. Don't delay close in this case.
-  bool http_10_sans_cl = (codec_->protocol() == Protocol::Http10) &&
-                         (!stream.response_headers_ || !stream.response_headers_->ContentLength());
-  // We also don't delay-close in the case of HTTP/1.1 where the request is
-  // fully read, as there's no race condition to avoid.
-  const bool connection_close =
-      stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
-  bool request_complete = stream.filter_manager_.remoteDecodeComplete();
-
   if (check_for_deferred_close) {
+    // If HTTP/1.0 has no content length, it is framed by close and won't consider
+    // the request complete until the FIN is read. Don't delay close in this case.
+    const bool http_10_sans_cl =
+        (codec_->protocol() == Protocol::Http10) &&
+        (!stream.response_headers_ || !stream.response_headers_->ContentLength());
+    // We also don't delay-close in the case of HTTP/1.1 where the request is
+    // fully read, as there's no race condition to avoid.
+    const bool connection_close =
+        stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
+    const bool request_complete = stream.filter_manager_.remoteDecodeComplete();
+
     // Don't do delay close for HTTP/1.0 or if the request is complete.
     checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
   }
