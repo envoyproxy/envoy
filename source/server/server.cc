@@ -503,7 +503,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // stats.
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  RETURN_IF_NOT_OK_REF(producer_or_error.status());
   stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
