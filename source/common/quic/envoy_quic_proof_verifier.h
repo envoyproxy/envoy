@@ -39,8 +39,9 @@ using EnvoyQuicProofVerifyContextPtr = std::unique_ptr<EnvoyQuicProofVerifyConte
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
-  explicit EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context)
-      : context_(std::move(context)) {
+  explicit EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context,
+                                  bool accept_untrusted = false)
+      : context_(std::move(context)), accept_untrusted_(accept_untrusted) {
     ASSERT(context_.get());
   }
 
@@ -55,6 +56,7 @@ public:
 
 private:
   Envoy::Ssl::ClientContextSharedPtr context_;
+  bool accept_untrusted_;
 };
 
 } // namespace Quic

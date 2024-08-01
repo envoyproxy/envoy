@@ -27,11 +27,16 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
 std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
+                   Upstream::HostConstSharedPtr& host) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  return std::string(transport_socket_factory.defaultServerNameIndication());
+  std::string transport = std::string(host->transportSocketFactory().defaultServerNameIndication());
+  if (!transport.empty() ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
+    return transport;
+  }
+  return host->hostname();
 }
 
 } // namespace
@@ -297,8 +302,7 @@ ConnectivityGrid::ConnectivityGrid(
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-      origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
-              host_->address()->ip()->port()),
+      origin_("https", getSni(transport_socket_options, host_), host_->address()->ip()->port()),
       quic_info_(quic_info), priority_(priority) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
