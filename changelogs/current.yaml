@@ -80,6 +80,9 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` and legacy code paths.
 - area: upstream flow control
   change: |
     Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
@@ -119,6 +122,10 @@ new_features:
   change: |
     Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
     and :ref:`Dynamic metadata input matcher <extension_envoy.matching.matchers.metadata_matcher>`.
+- area: ratelimit
+  change: |
+    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
+    by setting by setting filter state value ``envoy.ratelimit.hits_addend`` to the desired value.
 - area: access_log
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,

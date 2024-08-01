@@ -896,7 +896,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -1112,7 +1112,7 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public StreamFilterBase {
+class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with supported 1xx headers.
