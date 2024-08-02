@@ -818,6 +818,15 @@ public:
   }
 
   /**
+   * Marks local processing as complete.
+   * TODO(yanvlasov): deprecate and decommission this function.
+   */
+  void setLocalComplete() {
+    state_.observed_encode_end_stream_ = true;
+    state_.decoder_filter_chain_aborted_ = true;
+  }
+
+  /**
    * Whether the filters have been destroyed.
    */
   bool destroyed() const { return state_.destroyed_; }
@@ -825,7 +834,7 @@ public:
   /**
    * Whether remote processing has been marked as complete.
    */
-  virtual bool remoteDecodeComplete() const { return state_.observed_decode_end_stream_; }
+  virtual bool decoderObservedEndStream() const { return state_.observed_decode_end_stream_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
@@ -1148,7 +1157,7 @@ public:
    * For the DownstreamFilterManager rely on external state, to handle the case
    * of internal redirects.
    */
-  bool remoteDecodeComplete() const override {
+  bool decoderObservedEndStream() const override {
     return streamInfo().downstreamTiming() &&
            streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
   }

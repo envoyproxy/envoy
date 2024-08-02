@@ -369,7 +369,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.remoteDecodeComplete(); }
+bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
