@@ -5,19 +5,15 @@
 #include <memory>
 #include <string>
 
-#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
-#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
-// #include "google/api/policy.proto.h"
-// #include "google/protobuf/field_mask.proto.h"
-// #include "google/protobuf/struct.proto.h"
 #include "absl/strings/string_view.h"
+#include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/message_data.h"
-#include "src/google/protobuf/util/converter/type_info.h"
-// #include "proto_field_extraction/test_utils/utils.h"
-// #include
-// "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
+#include "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
+#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
+#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
+#include "src/google/protobuf/util/converter/type_info.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,6 +26,7 @@ class AuditProtoScrubber : public ProtoScrubberInterface {
  public:
   static std::unique_ptr<ProtoScrubberInterface> Create(
       proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
+      const google::grpc::transcoding::TypeHelper* type_helper,
       const ::google::protobuf::util::converter::TypeInfo* type_info,
       const google::protobuf::Type* message_type,
       const FieldPathToScrubType& field_policies);
@@ -49,6 +46,7 @@ class AuditProtoScrubber : public ProtoScrubberInterface {
   // ::google::protobuf::util::converter::TypeInfo.
   AuditProtoScrubber(
       proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
+      const google::grpc::transcoding::TypeHelper* type_helper,
       const ::google::protobuf::util::converter::TypeInfo* type_info,
       const google::protobuf::Type* message_type,
       const FieldPathToScrubType& field_policies);
@@ -67,9 +65,11 @@ class AuditProtoScrubber : public ProtoScrubberInterface {
       const google::protobuf::field_extraction::MessageData& raw_message,
       AuditMetadata* result) const;
 
+  // Function to get the value associated with a key
+  const google::protobuf::FieldMask& FindWithDefault(AuditDirective directive);
+
   const ::google::protobuf::util::converter::TypeInfo* type_info_;
-  // std::unique_ptr<google::protobuf::field_extraction::testing::TypeHelper>
-  //     type_helper_;
+  const google::grpc::transcoding::TypeHelper* type_helper_;
   const google::protobuf::Type* message_type_;
   // We use std::map instead of absl::flat_hash_map because of flat_hash_map's
   // rehash behavior.

@@ -7,10 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
-#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
-// #include "google/api/monitored_resource.proto.h"
-// #include "google/protobuf/struct.proto.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
@@ -18,18 +14,21 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "google/protobuf/util/converter/json_objectwriter.h"
+#include "google/protobuf/util/converter/protostream_objectsource.h"
 #include "google/protobuf/util/converter/type_info.h"
 #include "google/protobuf/util/converter/utility.h"
+#include "google/protobuf/util/type_resolver.h"
+#include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
-// #include "proto_processing_lib/proto_scrubber/esf_audit_proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 #include "proto_processing_lib/proto_scrubber/unknown_field_checker.h"
-// #include "protobuf/util/field_mask_util.h"
-// #include "util/gtl/map_util.h"
+#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
+#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,19 +37,61 @@ namespace ProtoMessageLogging {
 namespace {
 
 using ::Envoy::Protobuf::FieldMask;
+using ::Envoy::Protobuf::io::CodedOutputStream;
+using ::Envoy::Protobuf::io::CordOutputStream;
+using ::Envoy::Protobuf::util::JsonParseOptions;
+using ::Envoy::Protobuf::util::JsonStringToMessage;
+using ::Envoy::ProtobufUtil::FieldMaskUtil;
+using ::Envoy::ProtobufWkt::Struct;
+using ::google::grpc::transcoding::TypeHelper;
 using ::google::protobuf::Type;
+using ::google::protobuf::util::converter::JsonObjectWriter;
+using ::google::protobuf::util::converter::ProtoStreamObjectSource;
 using ::google::protobuf::util::converter::TypeInfo;
-using ::proto2::util::FieldMaskUtil;
 using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::FieldCheckerInterface;
+using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::proto_processing_lib::proto_scrubber::UnknownFieldChecker;
 
+absl::Status ConvertToStruct(
+    const google::protobuf::field_extraction::MessageData& message,
+    const google::protobuf::Type& type, const TypeHelper& type_helper,
+    Struct* message_struct) {
+  // Convert from message data to JSON using absl::Cord.
+  auto in_stream = message.CreateCodedInputStreamWrapper();
+  ProtoStreamObjectSource os(&in_stream->Get(), type_helper.Resolver(), type);
+  os.set_max_recursion_depth(kProtoTranslationMaxRecursionDepth);
+
+  CordOutputStream cord_out_stream;
+  CodedOutputStream out_stream(&cord_out_stream);
+  JsonObjectWriter json_object_writer("", &out_stream);
+
+  if (!os.WriteTo(&json_object_writer).ok()) {
+    return absl::InternalError("Failed to write to JSON object writer.");
+  }
+  out_stream.Trim();
+
+  // Convert from JSON (in absl::Cord) to Struct.
+  JsonParseOptions options;
+  auto status = JsonStringToMessage(cord_out_stream.Consume().Flatten(),
+                                    message_struct, options);
+  if (!status.ok()) {
+    return absl::InternalError(
+        absl::StrCat("Failed to parse Struct from formatted JSON of '",
+                     type.name(), "' message."));
+  }
+
+  (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
+      google::protobuf::util::converter::GetFullTypeWithUrl(type.name()));
+  return absl::OkStatus();
+}
+
 bool ScrubToStruct(
     const ProtoScrubber* scrubber, const google::protobuf::Type& type,
-    const TypeInfo& type_info,
-    const std::function<const google::protobuf::Type*(const std::string&)>&
-        type_finder,
+    const TypeHelper& type_helper,
+    // const std::function<const google::protobuf::Type*(const std::string&)>&
+    //     type_finder,
     google::protobuf::field_extraction::MessageData* message,
     google::protobuf::Struct* message_struct) {
   message_struct->Clear();
@@ -64,82 +105,94 @@ bool ScrubToStruct(
   // Scrub the message.
   absl::Status status = scrubber->Scrub(message);
   if (!status.ok()) {
-    LOG(WARNING) << absl::Substitute(
-        "Failed to scrub '$0' proto for cloud audit logging: $1", type.name(),
-        status.ToString());
+    LOG(WARNING) << "Failed to scrub " << type.name()
+                 << "proto for cloud audit logging: " << status.ToString();
     return false;
   }
 
   // Convert the scrubbed message to proto.
-  status = ConvertToStruct(*message, type, type_info, message_struct);
+  status = ConvertToStruct(*message, type, type_helper, message_struct);
   if (!status.ok()) {
-    LOG(WARNING) << absl::Substitute(
-        "Failed to convert '$0' proto to google.protobuf.Struct for cloud "
-        "audit logging: $1",
-        type.name(), status.ToString());
+    LOG(WARNING) << "Failed to convert " << type.name()
+                 << " proto to google.protobuf.Struct for cloud "
+                    "audit logging: "
+                 << status.ToString();
     return false;
   }
 
   return !IsEmptyStruct(*message_struct);
 }
 
-bool ScrubToStruct(
-    const ProtoScrubber* scrubber, const google::protobuf::Type& type,
-    const TypeInfo& type_info,
-    const std::function<const google::protobuf::Type*(const std::string&)>&
-        type_finder,
-    const google::protobuf::FieldMask* redact_message_field_mask,
-    google::protobuf::field_extraction::MessageData* message,
-    Struct* message_struct) {
-  // Collect the present redact field paths before scrubbing the message.
-  std::vector<std::string> present_redact_fields;
-  if (redact_message_field_mask != nullptr) {
-    for (const std::string& path : redact_message_field_mask->paths()) {
-      absl::StatusOr<bool> is_present_status =
-          IsMessageFieldPathPresent(type, type_finder, path, *message);
-      if (!is_present_status.ok()) {
-        LOG(WARNING) << absl::Substitute(
-            "Failed to determine message field path '$0' for cloud audit "
-            "logging: $1",
-            path, is_present_status.status().ToString());
-        return false;
-      }
-      if (is_present_status.ValueOrDie()) {
-        present_redact_fields.push_back(path);
-      }
-    }
-  }
+// bool ScrubToStruct(
+//     const ProtoScrubber* scrubber, const google::protobuf::Type& type,
+//     const TypeHelper& type_helper,
+//     const std::function<const google::protobuf::Type*(const std::string&)>&
+//         type_finder,
+//     const google::protobuf::FieldMask* redact_message_field_mask,
+//     google::protobuf::field_extraction::MessageData* message,
+//     Struct* message_struct) {
+//   // Collect the present redact field paths before scrubbing the message.
+//   std::vector<std::string> present_redact_fields;
+//   if (redact_message_field_mask != nullptr) {
+//     for (const std::string& path : redact_message_field_mask->paths()) {
+//       absl::StatusOr<bool> is_present_status =
+//           IsMessageFieldPathPresent(type, type_finder, path, *message);
+//       if (!is_present_status.ok()) {
+//         LOG(WARNING) << "Failed to determine message field path " << path
+//                      << " for cloud audit "
+//                         "logging: "
+//                      << is_present_status.status().ToString();
+//         return false;
+//       }
+//       if (*is_present_status) {
+//         present_redact_fields.push_back(path);
+//       }
+//     }
+//   }
 
-  // Scrub the message.
-  if (!ScrubToStruct(scrubber, type, type_info, type_finder, message,
-                     message_struct)) {
-    return false;
-  }
+//   // Scrub the message.
+//   if (!ScrubToStruct(scrubber, type, type_helper, message, message_struct)) {
+//     return false;
+//   }
 
-  // Add empty Struct to the redact field paths (camel case).
-  for (const std::string& path : present_redact_fields) {
-    std::vector<std::string> path_pieces =
-        absl::StrSplit(proto2::util::converter::ToCamelCase(path), '.');
-    absl::Status status = RedactStructRecursively(
-        path_pieces.begin(), path_pieces.end(), message_struct);
-    if (!status.ok()) {
-      LOG(WARNING) << absl::Substitute(
-          "Failed to redact $0 message field for cloud audit logging: $1", path,
-          status.ToString());
-      return false;
-    }
-  }
+//   // Add empty Struct to the redact field paths (camel case).
+//   for (const std::string& path : present_redact_fields) {
+//     std::vector<std::string> path_pieces = absl::StrSplit(
+//         google::protobuf::util::converter::ToCamelCase(path), '.');
+//     absl::Status status = RedactStructRecursively(
+//         path_pieces.begin(), path_pieces.end(), message_struct);
+//     if (!status.ok()) {
+//       LOG(WARNING) << "Failed to redact " << path
+//                    << " message field for cloud audit logging: "
+//                    << status.ToString();
+//       return false;
+//     }
+//   }
 
-  return true;
-}
+//   return true;
+// }
 }  // namespace
 
+const google::protobuf::FieldMask& AuditProtoScrubber::FindWithDefault(
+    AuditDirective directive) {
+  static const google::protobuf::FieldMask default_field_mask;
+
+  auto it = directives_mapping_.find(directive);
+  if (it != directives_mapping_.end()) {
+    return it->second;
+  } else {
+    return default_field_mask;
+  }
+}
+
 AuditProtoScrubber::AuditProtoScrubber(
-    ScrubberContext scrubber_context, const TypeInfo* type_info,
-    const Type* message_type, const FieldPathToScrubType& field_policies)
+    ScrubberContext scrubber_context, const TypeHelper* type_helper,
+    const TypeInfo* type_info, const Type* message_type,
+    const FieldPathToScrubType& field_policies)
 // : type_info_(*service_type_info), message_type_(*message_type) {
 {
   type_info_ = type_info;
+  type_helper_ = type_helper;
   message_type_ = message_type;
   for (const auto& field_policy : field_policies) {
     for (const auto& directive : field_policy.second) {
@@ -152,7 +205,7 @@ AuditProtoScrubber::AuditProtoScrubber(
     const Type* result = nullptr;
     absl::StatusOr<const Type*> type = type_info_->ResolveTypeUrl(type_url);
     if (!type.ok()) {
-      VLOG(3) << "Failed to find Type for type url: " << type_url;
+      LOG(WARNING) << "Failed to find Type for type url: " << type_url;
     } else {
       result = *type;
     }
@@ -169,10 +222,9 @@ AuditProtoScrubber::AuditProtoScrubber(
   // AUDIT_REDACT. Fields that are AUDIT_REDACT will be redacted after
   // scrubbing.
   Protobuf::FieldMask audit_field_mask;
-  FieldMaskUtil::Union(
-      gtl::FindWithDefault(directives_mapping_, AuditDirective::AUDIT),
-      gtl::FindWithDefault(directives_mapping_, AuditDirective::AUDIT_REDACT),
-      &audit_field_mask);
+  FieldMaskUtil::Union(FindWithDefault(AuditDirective::AUDIT),
+                       FindWithDefault(AuditDirective::AUDIT_REDACT),
+                       &audit_field_mask);
 
   // Only create the scrubber if there are fields to retain.
   if (!audit_field_mask.paths().empty()) {
@@ -198,11 +250,12 @@ AuditProtoScrubber::AuditProtoScrubber(
   }
 }
 
-std::unique_ptr<AuditProtoScrubberInterface> AuditProtoScrubber::Create(
-    ScrubberContext scrubber_context, const TypeInfo* type_info,
-    const Type* message_type, const FieldPathToScrubType& field_policies) {
-  return absl::WrapUnique(new AuditProtoScrubber(scrubber_context, type_info,
-                                                 message_type, field_policies));
+std::unique_ptr<ProtoScrubberInterface> AuditProtoScrubber::Create(
+    ScrubberContext scrubber_context, const TypeHelper* type_helper,
+    const TypeInfo* type_info, const Type* message_type,
+    const FieldPathToScrubType& field_policies) {
+  return absl::WrapUnique(new AuditProtoScrubber(
+      scrubber_context, type_helper, type_info, message_type, field_policies));
 }
 
 AuditMetadata AuditProtoScrubber::ScrubMessage(
@@ -235,14 +288,13 @@ AuditMetadata AuditProtoScrubber::ScrubMessage(
   // property.
   if (scrubber_ == nullptr) {
     (*audit_metadata.scrubbed_message.mutable_fields())[kTypeProperty]
-        .set_string_value(
-            proto2::util::converter::GetFullTypeWithUrl(message_type_->name()));
+        .set_string_value(google::protobuf::util::converter::GetFullTypeWithUrl(
+            message_type_->name()));
     return audit_metadata;
   }
 
-  bool success =
-      ScrubToStruct(scrubber_.get(), *message_type_, *type_info_, type_finder_,
-                    &message_copy, &audit_metadata.scrubbed_message);
+  bool success = ScrubToStruct(scrubber_.get(), *message_type_, *type_helper_,
+                               &message_copy, &audit_metadata.scrubbed_message);
 
   if (!success) {
     LOG(ERROR) << "Failed to scrub message.";
@@ -250,14 +302,14 @@ AuditMetadata AuditProtoScrubber::ScrubMessage(
 
   // Handle redacted fields.
   auto redact_field_mask =
-      gtl::FindOrNull(directives_mapping_, AuditDirective::AUDIT_REDACT);
-  if (redact_field_mask != nullptr) {
+      directives_mapping_.find(AuditDirective::AUDIT_REDACT);
+  if (redact_field_mask != directives_mapping_.end()) {
     // Convert the paths to be redacted into camel case first, since the
     // resulting proto struct keys are in camel case.
     std::vector<std::string> redact_paths_camel_case;
-    for (const std::string& path : redact_field_mask->paths()) {
+    for (const std::string& path : redact_field_mask->second.paths()) {
       redact_paths_camel_case.push_back(
-          proto2::util::converter::ToCamelCase(path));
+          google::protobuf::util::converter::ToCamelCase(path));
     }
     RedactPaths(redact_paths_camel_case, &audit_metadata.scrubbed_message);
   }

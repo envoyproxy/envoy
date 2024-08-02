@@ -48,6 +48,7 @@ envoy_cc_library(
     hdrs = [
         "audit_proto_scrubber.h",
     ],
+    external_deps = ["grpc_transcoding"],
     deps = [
         ":logging_util",
         ":proto_scrubber_interface",
