@@ -171,11 +171,11 @@ public:
 
   const std::string& expectedSha256Digest() const { return expected_sha256_digest_; }
 
-  TestUtilOptions& setExpectedSha256Digests(const std::string& expected_sha256_digests) {
+  TestUtilOptions& setExpectedSha256Digests(std::vector<std::string>& expected_sha256_digests) {
     expected_sha256_digests_ = expected_sha256_digests;
     return *this;
   }
-  const std::string& expectedSha256Digests() const { return expected_sha256_digests_; }
+  const std::vector<std::string> expectedSha256Digests() const { return expected_sha256_digests_; }
 
   TestUtilOptions& setExpectedSha1Digest(const std::string& expected_sha1_digest) {
     expected_sha1_digest_ = expected_sha1_digest;
@@ -184,12 +184,12 @@ public:
 
   const std::string& expectedSha1Digest() const { return expected_sha1_digest_; }
 
-  TestUtilOptions& setExpectedSha1Digests(const std::string& expected_sha1_digests) {
+  TestUtilOptions& setExpectedSha1Digests(std::vector<std::string>& expected_sha1_digests) {
     expected_sha1_digests_ = expected_sha1_digests;
     return *this;
   }
 
-  const std::string& expectedSha1Digests() const { return expected_sha1_digests_; }
+  const std::vector<std::string> expectedSha1Digests() const { return expected_sha1_digests_; }
 
   TestUtilOptions& setExpectedLocalUri(const std::string& expected_local_uri) {
     expected_local_uri_ = {expected_local_uri};
@@ -205,12 +205,12 @@ public:
 
   const std::string& expectedSerialNumber() const { return expected_serial_number_; }
 
-  TestUtilOptions& setExpectedSerialNumbers(const std::string& expected_serial_numbers) {
+  TestUtilOptions& setExpectedSerialNumbers(std::vector<std::string>& expected_serial_numbers) {
     expected_serial_numbers_ = expected_serial_numbers;
     return *this;
   }
 
-  const std::string& expectedSerialNumbers() const { return expected_serial_numbers_; }
+  const std::vector<std::string> expectedSerialNumbers() const { return expected_serial_numbers_; }
 
   TestUtilOptions& setExpectedPeerIssuer(const std::string& expected_peer_issuer) {
     expected_peer_issuer_ = expected_peer_issuer;
@@ -333,12 +333,12 @@ private:
   NiceMock<Runtime::MockLoader> runtime_;
   Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
-  std::string expected_sha256_digests_;
+  std::vector<std::string> expected_sha256_digests_;
   std::string expected_sha1_digest_;
-  std::string expected_sha1_digests_;
+  std::vector<std::string> expected_sha1_digests_;
   std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
-  std::string expected_serial_numbers_;
+  std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
   std::string expected_peer_subject_;
   std::string expected_local_subject_;
@@ -1144,9 +1144,9 @@ TEST_P(SslSocketTest, GetCertDigests) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  auto sha256Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_256_HASHES, ',');
-  auto sha1Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_1_HASHES, ',');
-  auto serialNumbers = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_SERIALS, ',');
+  std::vector<std::string> sha256Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_256_HASHES, ',');
+  std::vector<std::string> sha1Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_1_HASHES, ',');
+  std::vector<std::string> serialNumbers = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_SERIALS, ',');
   testUtil(test_options.setExpectedSha256Digests(sha256Digests)
                .setExpectedSha1Digests(sha1Digests)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #
