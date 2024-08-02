@@ -1,3 +1,5 @@
+#include <openssl/x509.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -218,11 +220,11 @@ TEST(UtilityTest, TestMapX509Stack) {
       "Francisco,ST=California,C=US",
       "CN=Test Intermediate CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,"
       "ST=California,C=US"};
-  EXPECT_EQ(expected_subject, Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-              return Utility::getSubjectFromCertificate(cert);
-            }));
+  auto func = [](X509& cert) -> std::string { return Utility::getSubjectFromCertificate(cert); };
+  EXPECT_EQ(expected_subject, Utility::mapX509Stack(*cert_chain, func));
 
-  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "assert failure: field_extractor");
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*sk_X509_new_null(), func), "x509 stack is empty or NULL");
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "field_extractor is nullptr");
 }
 
 } // namespace
