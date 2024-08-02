@@ -4,6 +4,7 @@
 
 #ifdef __cplusplus
 #include <atomic>
+
 #define _Atomic(X) std::atomic<X>
 
 extern "C" {
