@@ -164,7 +164,7 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
 
   SubstitutionFormatUtils::parseSubcommand(format, ':', key, serialize_type, field_name);
   if (key.empty()) {
-    throwEnvoyExceptionOrPanic("Invalid filter state configuration, key cannot be empty.");
+    throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
   }
 
   if (serialize_type.empty()) {
@@ -172,12 +172,12 @@ FilterStateFormatter::create(const std::string& format, const absl::optional<siz
   }
   if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION &&
       serialize_type != FIELD_SERIALIZATION) {
-    throwEnvoyExceptionOrPanic("Invalid filter state serialize type, only "
-                               "support PLAIN/TYPED/FIELD.");
+    throw EnvoyException("Invalid filter state serialize type, only "
+                         "support PLAIN/TYPED/FIELD.");
   }
   if ((serialize_type == FIELD_SERIALIZATION) ^ !field_name.empty()) {
-    throwEnvoyExceptionOrPanic("Invalid filter state serialize type, FIELD "
-                               "should be used with the field name.");
+    throw EnvoyException("Invalid filter state serialize type, FIELD "
+                         "should be used with the field name.");
   }
 
   const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
@@ -423,8 +423,7 @@ CommonDurationFormatter::create(absl::string_view sub_command) {
   absl::InlinedVector<absl::string_view, 3> parsed_sub_commands = absl::StrSplit(sub_command, ':');
 
   if (parsed_sub_commands.size() < 2 || parsed_sub_commands.size() > 3) {
-    throwEnvoyExceptionOrPanic(
-        fmt::format("Invalid common duration configuration: {}.", sub_command));
+    throw EnvoyException(fmt::format("Invalid common duration configuration: {}.", sub_command));
   }
 
   absl::string_view start = parsed_sub_commands[0];
@@ -442,8 +441,7 @@ CommonDurationFormatter::create(absl::string_view sub_command) {
     } else if (precision_str == NanosecondsPrecision) {
       precision = DurationPrecision::Nanoseconds;
     } else {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Invalid common duration precision: {}.", precision_str));
+      throw EnvoyException(fmt::format("Invalid common duration precision: {}.", precision_str));
     }
   }
 
@@ -557,7 +555,7 @@ SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExt
   // Validate the input specifier here. The formatted string may be destined for a header, and
   // should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(format, getSystemTimeFormatNewlinePattern())) {
-    throwEnvoyExceptionOrPanic("Invalid header configuration. Format string contains newline.");
+    throw EnvoyException("Invalid header configuration. Format string contains newline.");
   }
 }
 
