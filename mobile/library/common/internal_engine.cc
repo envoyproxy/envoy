@@ -16,6 +16,7 @@ namespace {
 constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 // Google DNS address used for IPv6 probes.
 constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
+constexpr uint32_t IPV6_PROBE_PORT = 53;
 } // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
@@ -415,8 +416,9 @@ bool InternalEngine::hasIpV6Connectivity() {
   }
   Network::IoSocketHandleImpl socket_handle(socket_result.return_value_, /* socket_v6only= */ true,
                                             {domain});
-  Api::SysCallIntResult connect_result = socket_handle.connect(
-      std::make_shared<Network::Address::Ipv6Instance>(std::string(IPV6_PROBE_ADDRESS)));
+  Api::SysCallIntResult connect_result =
+      socket_handle.connect(std::make_shared<Network::Address::Ipv6Instance>(
+          std::string(IPV6_PROBE_ADDRESS), IPV6_PROBE_PORT));
   bool has_ipv6_connectivity = connect_result.return_value_ == 0;
   if (has_ipv6_connectivity) {
     ENVOY_LOG(trace, "Found IPv6 connectivity.");

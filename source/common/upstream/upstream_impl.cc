@@ -124,7 +124,7 @@ parseExtensionProtocolOptions(
   for (const auto& it : config.typed_extension_protocol_options()) {
     auto& name = it.first;
     auto object_or_error = createProtocolOptionsConfig(name, it.second, factory_context);
-    RETURN_IF_STATUS_NOT_OK(object_or_error);
+    RETURN_IF_NOT_OK_REF(object_or_error.status());
     if (object_or_error.value() != nullptr) {
       options[name] = std::move(object_or_error.value());
     }
@@ -235,7 +235,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
@@ -251,7 +251,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
       UpstreamLocalAddress extra_upstream_local_address;
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
 
       extra_upstream_local_address.socket_options_ =
@@ -275,7 +275,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
       UpstreamLocalAddress additional_upstream_local_address;
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -373,10 +373,10 @@ createUpstreamLocalAddressSelector(
                                                      envoy::config::core::v3::BindConfig{})),
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{})));
-  RETURN_IF_STATUS_NOT_OK(config_or_error);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
   auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       config_or_error.value(), cluster_name);
-  RETURN_IF_STATUS_NOT_OK(selector_or_error);
+  RETURN_IF_NOT_OK_REF(selector_or_error.status());
   return selector_or_error.value();
 }
 
@@ -981,7 +981,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
           config.has_http2_protocol_options(), validation_visitor);
-  RETURN_IF_STATUS_NOT_OK(options_or_error);
+  RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
 
