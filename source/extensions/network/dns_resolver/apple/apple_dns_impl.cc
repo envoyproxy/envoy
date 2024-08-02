@@ -221,9 +221,9 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
                                               pending_response_.v6_responses_.begin(),
                                               pending_response_.v6_responses_.end());
     } else {
-      pending_response_, all_responses_.insert(pending_response_.all_responses_.begin(),
-                                               pending_response_.v6_responses_.begin(),
-                                               pending_response_.v6_responses_.end());
+      pending_response_.all_responses_.insert(pending_response_.all_responses_.begin(),
+                                              pending_response_.v6_responses_.begin(),
+                                              pending_response_.v6_responses_.end());
     }
     return pending_response_.all_responses_;
   }
