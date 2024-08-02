@@ -68,10 +68,6 @@ public:
                       absl::string_view details) override {
     state().decoder_filter_chain_aborted_ = true;
     state().encoder_filter_chain_aborted_ = true;
-    state().remote_encode_complete_ = true;
-    state().encoder_end_stream_ = true;
-    state().local_complete_ = true;
-    state().should_stop_decoding_ = true;
     state().encoder_filter_chain_complete_ = true;
     state().observed_encode_end_stream_ = true;
     // TODO(alyssawilk) this should be done through the router to play well with hedging.

@@ -856,10 +856,8 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
                                   FilterIterationStartState filter_iteration_start_state) {
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
-  ENVOY_STREAM_LOG(trace,
-                   "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}, force_close: {}",
-                   *this, end_stream, filter_manager_callbacks_.isHalfCloseEnabled(),
-                   static_cast<bool>(state_.should_stop_decoding_));
+  ENVOY_STREAM_LOG(trace, "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}", *this,
+                   end_stream, filter_manager_callbacks_.isHalfCloseEnabled());
   if (filter == nullptr) {
     if (end_stream) {
       ASSERT(!state_.observed_encode_end_stream_);
@@ -921,8 +919,6 @@ void DownstreamFilterManager::sendLocalReply(
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   const bool is_grpc_request = state_.is_grpc_request_;
-  // Local reply stops decoding of downstream request.
-  stopDecoding();
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
@@ -1252,7 +1248,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     if (!(Http::CodeUtility::is2xx(response_status) || Http::CodeUtility::is1xx(response_status))) {
       // When the upstream half close is enabled the stream decoding is stopped on error responses
       // from the server.
-      stopDecoding();
+      // stopDecoding();
     }
   }
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
@@ -1474,15 +1470,9 @@ void FilterManager::checkAndCloseStreamIfFullyClosed() {
     return;
   }
 
-  if (state_.stream_closed_) {
-    return;
-  }
-
   // If upstream half close is enabled then close the stream either when force close
   // is set (i.e local reply) or when both server and client half closed.
-  if (state_.remote_encode_complete_ &&
-      (state_.remote_decode_complete_ || state_.should_stop_decoding_)) {
-    //state_.stream_closed_ = true;
+  if (state_.encoder_filter_chain_complete_ && state_.decoder_filter_chain_complete_) {
     ENVOY_STREAM_LOG(trace, "closing stream", *this);
     filter_manager_callbacks_.endStream();
   }

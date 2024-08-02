@@ -657,9 +657,10 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
-       << DUMP_MEMBER(state_.remote_decode_complete_) << DUMP_MEMBER(state_.remote_encode_complete_)
-       << DUMP_MEMBER(state_.encoder_end_stream_) << DUMP_MEMBER(state_.stream_closed_)
-       << DUMP_MEMBER(state_.should_stop_decoding_) << "\n";
+       << DUMP_MEMBER(state_.decoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.encoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.observed_decode_end_stream_)
+       << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -873,18 +874,20 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
-  void stopDecoding() { state_.should_stop_decoding_ = true; }
-
 protected:
   struct State {
     State()
-        : encoder_filter_chain_complete_(false), observed_decode_end_stream_(false),
-          observed_encode_end_stream_(false), has_1xx_headers_(false), created_filter_chain_(false),
-          is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false) {}
+        : decoder_filter_chain_complete_(false), encoder_filter_chain_complete_(false),
+          observed_decode_end_stream_(false), observed_encode_end_stream_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
+
+    // Set after decoder filter chain has completed iteration. Prevents further calls to decoder
+    // filters.
+    bool decoder_filter_chain_complete_ : 1;
 
     // Set after encoder filter chain has completed iteration. Prevents further calls to encoder
     // filters.
@@ -915,11 +918,6 @@ protected:
     bool decoder_filter_chain_aborted_ : 1;
     bool encoder_filter_chain_aborted_ : 1;
     bool saw_downstream_reset_ : 1;
-    bool stream_closed_ : 1; // Set when both remote_decode_complete_ and remote_encode_complete_ is
-                             // true observed for the first time and prevents ending the stream
-                             // multiple times. Only set when allow_upstream_half_close is enabled.
-    bool should_stop_decoding_ : 1; // Set to indicate that decoding on the stream should be stopped
-                                    // due to either local reply or error response from the server.
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
