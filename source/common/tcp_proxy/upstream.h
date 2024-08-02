@@ -59,6 +59,9 @@ private:
 class HttpUpstream;
 class CombinedUpstream;
 
+// This class is specific to TCP proxy connection pool and enables TCP proxying mode
+// for HTTP upstreams. This is currently only needed for HTTP/1 client codec that half closes
+// upstream network connection after encoding end_stream in TCP proxy (i.e. via CONNECT).
 class RouterUpstreamRequest : public Router::UpstreamRequest {
 public:
   using Router::UpstreamRequest::UpstreamRequest;

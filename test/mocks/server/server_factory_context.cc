@@ -11,6 +11,8 @@ MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl()), http_context_(store_.symbolTable()),
       grpc_context_(store_.symbolTable()), router_context_(store_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, httpServerPropertiesCacheManager())
+      .WillByDefault(ReturnRef(http_server_properties_cache_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));

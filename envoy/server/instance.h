@@ -13,6 +13,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
+#include "envoy/http/http_server_properties_cache.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
@@ -70,6 +71,11 @@ public:
    * @return const Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual const Upstream::ClusterManager& clusterManager() const PURE;
+
+  /**
+   * @return const Http::HttpServerPropertiesCacheManager& instance for use by the entire server.
+   */
+  virtual Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() PURE;
 
   /**
    * @return Ssl::ContextManager& singleton for use by the entire server.

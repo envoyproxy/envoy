@@ -158,7 +158,7 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsCon
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       auto extractor_or_error = TagExtractorImplBase::createTagExtractor(
           desc.name_, desc.regex_, desc.substr_, desc.negative_match_, desc.re_type_);
-      RETURN_IF_STATUS_NOT_OK(extractor_or_error);
+      RETURN_IF_NOT_OK_REF(extractor_or_error.status());
       addExtractor(std::move(extractor_or_error.value()));
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
