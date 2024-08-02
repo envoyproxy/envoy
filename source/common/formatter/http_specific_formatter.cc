@@ -194,8 +194,7 @@ GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view f
     return GrpcStatusFormatter::Number;
   }
 
-  throwEnvoyExceptionOrPanic(
-      "GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
+  throw EnvoyException("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
