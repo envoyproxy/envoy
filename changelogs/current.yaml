@@ -129,6 +129,6 @@ new_features:
 - area: dns
   change: |
     Prefer using IPv6 address when addresses from both families are available.
-    Can be reverted by setting ``envoy.reloadable_features.prefer_ipv4_dns_on_macos`` to false.
+    Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
 
 deprecated:
