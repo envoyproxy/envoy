@@ -1144,10 +1144,13 @@ TEST_P(SslSocketTest, GetCertDigests) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectedSha256Digests(TEST_NO_SAN_CERT_CHAIN_256_HASHES)
-               .setExpectedSha1Digests(TEST_NO_SAN_CERT_CHAIN_1_HASHES)
-               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
-               .setExpectedSerialNumbers(TEST_NO_SAN_CERT_CHAIN_SERIALS));
+  auto sha256Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_256_HASHES, ',');
+  auto sha1Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_1_HASHES, ',');
+  auto serialNumbers = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_SERIALS, ',');
+  testUtil(test_options.setExpectedSha256Digests(sha256Digests)
+               .setExpectedSha1Digests(sha1Digests)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #
+               .setExpectedSerialNumbers(serialNumbers));
 }
 
 TEST_P(SslSocketTest, GetCertDigestInvalidFiles) {

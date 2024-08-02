@@ -8,6 +8,7 @@
 #include "openssl/err.h"
 #include "openssl/safestack.h"
 #include "openssl/x509v3.h"
+#include "utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -80,7 +81,7 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   return cached_sha_256_peer_certificate_digest_;
 }
 
-const std::string& ConnectionInfoImplBase::sha256PeerCertificateChainDigests() const {
+absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChainDigests() const {
   if (!cached_sha_256_peer_certificate_digests_.empty()) {
     return cached_sha_256_peer_certificate_digests_;
   }
@@ -91,24 +92,14 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateChainDigests() c
     return cached_sha_256_peer_certificate_digests_;
   }
 
-  auto stack_len = sk_X509_num(cert_chain);
-  for (uint64_t i = 0; i < stack_len; i++) {
-    X509* cert = sk_X509_value(cert_chain, i);
-    if (!cert) {
-      cached_sha_256_peer_certificate_digests_ = cached_sha_256_peer_certificate_digests_ + ",";
-      continue;
-    }
-
-    std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-    unsigned int n;
-    X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
-    RELEASE_ASSERT(n == computed_hash.size(), "");
-    cached_sha_256_peer_certificate_digests_ =
-        absl::StrCat(cached_sha_256_peer_certificate_digests_, Hex::encode(computed_hash));
-    if (i < stack_len - 1) {
-      cached_sha_256_peer_certificate_digests_ = cached_sha_256_peer_certificate_digests_ + ",";
-    }
-  }
+  cached_sha_256_peer_certificate_digests_ =
+      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+        std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+        unsigned int n;
+        X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
+        RELEASE_ASSERT(n == computed_hash.size(), "");
+        return Hex::encode(computed_hash);
+      });
 
   return cached_sha_256_peer_certificate_digests_;
 }
@@ -131,7 +122,7 @@ const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
   return cached_sha_1_peer_certificate_digest_;
 }
 
-const std::string& ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
+absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
   if (!cached_sha_1_peer_certificate_digests_.empty()) {
     return cached_sha_1_peer_certificate_digests_;
   }
@@ -142,24 +133,14 @@ const std::string& ConnectionInfoImplBase::sha1PeerCertificateChainDigests() con
     return cached_sha_1_peer_certificate_digests_;
   }
 
-  auto stack_len = sk_X509_num(cert_chain);
-  for (uint64_t i = 0; i < stack_len; i++) {
-    X509* cert = sk_X509_value(cert_chain, i);
-    if (!cert) {
-      cached_sha_1_peer_certificate_digests_ = cached_sha_1_peer_certificate_digests_ + ",";
-      continue;
-    }
-
-    std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
-    unsigned int n;
-    X509_digest(cert, EVP_sha1(), computed_hash.data(), &n);
-    RELEASE_ASSERT(n == computed_hash.size(), "");
-    cached_sha_1_peer_certificate_digests_ =
-        absl::StrCat(cached_sha_1_peer_certificate_digests_, Hex::encode(computed_hash));
-    if (i < stack_len - 1) {
-      cached_sha_1_peer_certificate_digests_ = cached_sha_1_peer_certificate_digests_ + ",";
-    }
-  }
+  cached_sha_1_peer_certificate_digests_ =
+      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+        std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+        unsigned int n;
+        X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+        RELEASE_ASSERT(n == computed_hash.size(), "");
+        return Hex::encode(computed_hash);
+      });
 
   return cached_sha_1_peer_certificate_digests_;
 }
@@ -322,7 +303,7 @@ const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   return cached_serial_number_peer_certificate_;
 }
 
-const std::string& ConnectionInfoImplBase::serialNumbersPeerCertificates() const {
+absl::Span<const std::string> ConnectionInfoImplBase::serialNumbersPeerCertificates() const {
   if (!cached_serial_numbers_peer_certificates_.empty()) {
     return cached_serial_numbers_peer_certificates_;
   }
@@ -333,20 +314,10 @@ const std::string& ConnectionInfoImplBase::serialNumbersPeerCertificates() const
     return cached_serial_numbers_peer_certificates_;
   }
 
-  auto stack_len = sk_X509_num(cert_chain);
-  for (uint64_t i = 0; i < stack_len; i++) {
-    X509* cert = sk_X509_value(cert_chain, i);
-    if (!cert) {
-      cached_serial_numbers_peer_certificates_ = cached_serial_numbers_peer_certificates_ + ",";
-      continue;
-    }
-
-    cached_serial_numbers_peer_certificates_ = absl::StrCat(
-        cached_serial_numbers_peer_certificates_, Utility::getSerialNumberFromCertificate(*cert));
-    if (i < stack_len - 1) {
-      cached_serial_numbers_peer_certificates_ = cached_serial_numbers_peer_certificates_ + ",";
-    }
-  }
+  cached_serial_numbers_peer_certificates_ =
+      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+        return Utility::getSerialNumberFromCertificate(cert);
+      });
 
   return cached_serial_numbers_peer_certificates_;
 }

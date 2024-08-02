@@ -1,6 +1,7 @@
 #include "source/common/tls/utility.h"
 
 #include <cstdint>
+#include <vector>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
@@ -461,6 +462,23 @@ std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
       absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
                    X509_verify_cert_error_string(n));
   return error_details;
+}
+
+std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
+                                               std::function<std::string(X509&)> field_extractor) {
+  ASSERT(!sk_X509_num(&stack) || sk_X509_value(&stack, 0) != nullptr);
+  ASSERT(field_extractor);
+  std::vector<std::string> result;
+
+  for (uint64_t i = 0; i < sk_X509_num(&stack); i++) {
+    X509* cert = sk_X509_value(&stack, i);
+    if (!cert) {
+      result.push_back(""); // Add an empty string so it's clear something was omitted.
+    }
+    result.push_back(field_extractor(*cert));
+  }
+
+  return result;
 }
 
 } // namespace Tls

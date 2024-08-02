@@ -209,6 +209,22 @@ TEST(UtilityTest, TestGetX509ErrorInfo) {
             "verification error");
 }
 
+TEST(UtilityTest, TestMapX509Stack) {
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_chain.pem"));
+
+  std::vector<std::string> expected_subject{
+      "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San "
+      "Francisco,ST=California,C=US",
+      "CN=Test Intermediate CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,"
+      "ST=California,C=US"};
+  EXPECT_EQ(expected_subject, Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+              return Utility::getSubjectFromCertificate(cert);
+            }));
+
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "assert failure: field_extractor");
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets

@@ -1538,7 +1538,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.sha256PeerCertificateChainDigests();
+                    return absl::StrJoin(connection_info.sha256PeerCertificateChainDigests(), ",");
                   });
             }}},
           {"DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1",
@@ -1546,7 +1546,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.sha1PeerCertificateChainDigests();
+                    return absl::StrJoin(connection_info.sha1PeerCertificateChainDigests(), ",");
                   });
             }}},
           {"DOWNSTREAM_PEER_CHAIN_SERIALS",
@@ -1554,7 +1554,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](const std::string&, absl::optional<size_t>) {
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
-                    return connection_info.serialNumbersPeerCertificates();
+                    return absl::StrJoin(connection_info.serialNumbersPeerCertificates(), ",");
                   });
             }}},
           {"DOWNSTREAM_PEER_ISSUER",
