@@ -731,7 +731,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
       ENVOY_CONN_LOG(debug,
                      "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
                      read_callbacks_->connection());
-      connection_manager_.stats_.named_.downstream_cx_http1_soft_drain_.inc();
+      stats_.named_.downstream_cx_http1_soft_drain_.inc();
       soft_drain_http1_ = true;
     } else {
       startDrainSequence();
@@ -1800,6 +1800,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     // payload is no longer HTTP/1.1)
     if (!state_.is_tunneling_) {
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
+      if (connection_manager_.soft_drain_http1_) {
+        connection_manager_.drain_state_ = DrainState::Closing;
+      }
     }
   }
 

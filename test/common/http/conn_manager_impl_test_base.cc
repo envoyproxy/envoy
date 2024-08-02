@@ -187,13 +187,13 @@ HttpConnectionManagerImplMixin::requestHeaderCustomTag(const std::string& header
 }
 
 void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
-  use_srds_ = opts.use_srds;
-  http1_safe_max_connection_duration_ = opts.http1_safe_max_connection_duration;
-  if (opts.ssl) {
+  use_srds_ = opts.use_srds_;
+  http1_safe_max_connection_duration_ = opts.http1_safe_max_connection_duration_;
+  if (opts.ssl_) {
     ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
   }
 
-  server_name_ = opts.server_name;
+  server_name_ = opts.server_name_;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_)
@@ -217,7 +217,7 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
-  if (opts.tracing) {
+  if (opts.tracing_) {
     envoy::type::v3::FractionalPercent percent1;
     percent1.set_numerator(100);
     envoy::type::v3::FractionalPercent percent2;

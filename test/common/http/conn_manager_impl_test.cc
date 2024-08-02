@@ -24,9 +24,7 @@ namespace Envoy {
 namespace Http {
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -96,9 +94,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 // Similar to HeaderOnlyRequestAndResponse but uses newStreamHandle and has
 // lifetime checks.
 TEST_F(HttpConnectionManagerImplTest, HandleLifetime) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   Http::RequestDecoderHandlePtr decoder_handle;
 
   // Store the basic request encoder during filter chain setup.
@@ -175,9 +171,7 @@ TEST_F(HttpConnectionManagerImplTest, HandleLifetime) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseWithEarlyHeaderMutation) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   auto mock_early_header_mutation_1 = std::make_unique<NiceMock<Http::MockEarlyHeaderMutation>>();
   auto mock_early_header_mutation_2 = std::make_unique<NiceMock<Http::MockEarlyHeaderMutation>>();
@@ -268,9 +262,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseWithEarlyHeade
 
 TEST_F(HttpConnectionManagerImplTest, 1xxResponse) {
   proxy_100_continue_ = true;
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -328,9 +320,7 @@ TEST_F(HttpConnectionManagerImplTest, 1xxResponse) {
 
 TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFiltersProxyingDisabled) {
   proxy_100_continue_ = false;
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
@@ -357,9 +347,7 @@ TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFiltersProxyingDisab
 
 TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFilters) {
   proxy_100_continue_ = true;
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
@@ -385,9 +373,7 @@ TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFilters) {
 
 TEST_F(HttpConnectionManagerImplTest, PauseResume1xx) {
   proxy_100_continue_ = true;
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
@@ -421,9 +407,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume1xx) {
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
 TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithDecoderPause) {
   proxy_100_continue_ = true;
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -490,10 +474,7 @@ TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithDecoderPause) {
 
 // When create new stream, the stream info will be populated from the connection.
 TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
-  SetupOpts setup_opts;
-  setup_opts.ssl = true;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setSsl(true).setTracing(false));
 
   // Set up the codec.
   Buffer::OwnedImpl fake_input("input");
@@ -517,10 +498,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
 
 // By default, Envoy will set the server header to the server name, here "custom-value"
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
-  SetupOpts setup_opts;
-  setup_opts.server_name = "custom-value";
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setServerName("custom-value").setTracing(false));
   setUpEncoderAndDecoder(false, false);
 
   sendRequestHeadersAndData();
@@ -534,10 +512,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
 // When configured APPEND_IF_ABSENT if the server header is present it will be retained.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendPresent) {
   server_transformation_ = HttpConnectionManagerProto::APPEND_IF_ABSENT;
-  SetupOpts setup_opts;
-  setup_opts.server_name = "custom-value";
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setServerName("custom-value").setTracing(false));
   setUpEncoderAndDecoder(false, false);
 
   sendRequestHeadersAndData();
@@ -551,10 +526,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendPresent) {
 // When configured APPEND_IF_ABSENT if the server header is absent the server name will be set.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendAbsent) {
   server_transformation_ = HttpConnectionManagerProto::APPEND_IF_ABSENT;
-  SetupOpts setup_opts;
-  setup_opts.server_name = "custom-value";
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setServerName("custom-value").setTracing(false));
   setUpEncoderAndDecoder(false, false);
 
   sendRequestHeadersAndData();
@@ -568,10 +540,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendAbsent) {
 // When configured PASS_THROUGH, the server name will pass through.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughPresent) {
   server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
-  SetupOpts setup_opts;
-  setup_opts.server_name = "custom-value";
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setServerName("custom-value").setTracing(false));
   setUpEncoderAndDecoder(false, false);
 
   sendRequestHeadersAndData();
@@ -585,10 +554,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughPresent) {
 // When configured PASS_THROUGH, the server header will not be added if absent.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughAbsent) {
   server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
-  SetupOpts setup_opts;
-  setup_opts.server_name = "custom-value";
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setServerName("custom-value").setTracing(false));
   setUpEncoderAndDecoder(false, false);
 
   sendRequestHeadersAndData();
@@ -2664,9 +2630,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   request_headers_timeout_ = std::chrono::milliseconds(0);
   max_stream_duration_ = std::nullopt;
 
-  SetupOpts setup_opts;
-  setup_opts.server_name = "server-opts";
-  setup(setup_opts);
+  setup(SetupOpts().setServerName("server-opts"));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
@@ -2825,9 +2789,7 @@ TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTr
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
-  SetupOpts setup_opts;
-  setup_opts.ssl = true;
-  setup(setup_opts);
+  setup(SetupOpts().setSsl(true));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
@@ -4095,9 +4057,7 @@ TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
 
 // Make sure for upgrades, we do not append Connection: Close when draining.
 TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   // Store the basic request encoder during filter chain setup.
   auto* filter = new MockStreamFilter();
@@ -4162,9 +4122,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 
 // Make sure CONNECT requests hit the upgrade filter path.
 TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
       .WillRepeatedly(Return(true));
@@ -4188,9 +4146,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, ConnectWithEmptyPath) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _))
       .WillRepeatedly(Return(true));
@@ -4309,9 +4265,7 @@ TEST_F(HttpConnectionManagerImplTest,
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
-  SetupOpts setup_opts;
-  setup_opts.ssl = true;
-  setup(setup_opts);
+  setup(SetupOpts().setSsl(true));
 
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -4367,10 +4321,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 class ProxyStatusTest : public HttpConnectionManagerImplTest {
 public:
   void initialize() {
-    SetupOpts setup_opts;
-    setup_opts.server_name = servername_;
-    setup_opts.tracing = false;
-    setup(setup_opts);
+    setup(SetupOpts().setServerName(servername_).setTracing(false));
     setUpEncoderAndDecoder(/*request_with_data_and_trailers=*/false,
                            /*decode_headers_stop_all=*/false);
     sendRequestHeadersAndData();

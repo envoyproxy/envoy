@@ -120,9 +120,7 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
-  SetupOpts setup_opts;
-  setup_opts.server_name = "";
-  setup(setup_opts);
+  setup(SetupOpts().setServerName(""));
 
   // This is like ResponseBeforeRequestComplete, but it tests the case where we start the reply
   // before the request completes, but don't finish the reply until after the request completes.
@@ -524,12 +522,10 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionDurationSafeHttp1) {
   EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
-  max_connection_duration_ = (std::chrono::milliseconds(10));
+  max_connection_duration_ = std::chrono::milliseconds(10);
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
-  SetupOpts setup_opts;
-  setup_opts.http1_safe_max_connection_duration = true;
-  setup(setup_opts);
+  setup(SetupOpts().setHttp1SafeMaxConnectionDuration(true));
 
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -545,26 +541,30 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationSafeHttp1) {
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   startRequest(true, "hello");
 
-  // Invoking connection_duration_timer's callback SHOULD NOT create / start a drain timer.
-  EXPECT_LOG_CONTAINS(
-      "debug", "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
-      connection_duration_timer->invokeCallback());
+  {
+    EXPECT_CALL(*connection_duration_timer, disableTimer());
+    EXPECT_LOG_CONTAINS(
+        "debug", "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
+        connection_duration_timer->invokeCallback());
+  }
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
 
-  // Connection manager should add the Connection:close response header to all responses going over
-  // the connection.
+  // Connection manager now waits to send another response, adds the Connection:close header to it,
+  // then closes the connection.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) {
         // Check that the connection:close header is present.
         ASSERT_NE(headers.Connection(), nullptr);
         EXPECT_EQ(headers.getConnectionValue(), Headers::get().ConnectionValues.Close);
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
       }));
+  // Expect stream & connection to close after response is sent.
+  expectOnDestroy();
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
 TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
@@ -2749,9 +2749,7 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(true, true);
 
   // Kick off the incoming data.
@@ -2775,9 +2773,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathSecondFilter) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(true, false);
 
   // Verify headers go through both filters, and data and trailers go through the first filter only.
@@ -2802,9 +2798,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPath) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
@@ -2952,9 +2946,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
 
 // SRDS no scope found.
 TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
-  SetupOpts setup_opts;
-  setup_opts.use_srds = true;
-  setup(setup_opts);
+  setup(SetupOpts().setUseSrds(true));
   setupFilterChain(1, 0); // Recreate the chain for second stream.
 
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
@@ -2990,9 +2982,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
 
 // SRDS updating scopes affects routing.
 TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
-  SetupOpts setup_opts;
-  setup_opts.use_srds = true;
-  setup(setup_opts);
+  setup(SetupOpts().setUseSrds(true));
 
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
               computeScopeKey(_))
@@ -3047,9 +3037,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
 
 // SRDS Scope header update cause cross-scope reroute.
 TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
-  SetupOpts setup_opts;
-  setup_opts.use_srds = true;
-  setup(setup_opts);
+  setup(SetupOpts().setUseSrds(true));
 
   std::shared_ptr<Router::MockConfig> route_config1 =
       std::make_shared<NiceMock<Router::MockConfig>>();
@@ -3122,9 +3110,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
 
 // SRDS scoped RouteConfiguration found and route found.
 TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
-  SetupOpts setup_opts;
-  setup_opts.use_srds = true;
-  setup(setup_opts);
+  setup(SetupOpts().setUseSrds(true));
   setupFilterChain(1, 0);
 
   const std::string fake_cluster1_name = "fake_cluster1";
@@ -3170,9 +3156,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, NewConnection) {
-  SetupOpts setup_opts;
-  setup_opts.use_srds = true;
-  setup(setup_opts);
+  setup(SetupOpts().setUseSrds(true));
 
   filter_callbacks_.connection_.stream_info_.protocol_ = absl::nullopt;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
@@ -3190,9 +3174,7 @@ TEST_F(HttpConnectionManagerImplTest, NewConnection) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
 
   filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
   codec_->protocol_ = Http::Protocol::Http3;
@@ -3260,9 +3242,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
       "connection_provided_data", std::make_shared<SimpleType>(555),
       StreamInfo::FilterState::StateType::ReadOnly);
 
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   setupFilterChain(1, 0, /* num_requests = */ 3);
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -4246,10 +4226,7 @@ TEST_F(HttpConnectionManagerImplTest, StreamDeferralPreservesOrder) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, DownstreamTimingsRecordWhenRequestHeaderProcessingIsDone) {
-  SetupOpts setup_opts;
-  setup_opts.ssl = true;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setSsl(true).setTracing(false));
 
   // Set up the codec.
   Buffer::OwnedImpl fake_input("input");
@@ -4281,9 +4258,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamTimingsRecordWhenRequestHeaderPr
 }
 
 TEST_F(HttpConnectionManagerImplTest, PassMatchUpstreamSchemeHintToStreamInfo) {
-  SetupOpts setup_opts;
-  setup_opts.tracing = false;
-  setup(setup_opts);
+  setup(SetupOpts().setTracing(false));
   scheme_match_upstream_ = true;
 
   // Store the basic request encoder during filter chain setup.

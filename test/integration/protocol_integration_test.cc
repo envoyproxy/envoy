@@ -2858,6 +2858,69 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), Not(HasSubstr("DPE")));
 }
 
+// Test that with http1_safe_max_connection_duration set to true, drain_timeout is not used for
+// http1 connections after max_connection_duration is reached. Instead, envoy waits for the next
+// request, adds connection:close to the response headers, then closes the connection after the
+// stream ends.
+TEST_P(ProtocolIntegrationTest, Http1SafeConnDurationTimeout) {
+  config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_drain_timeout()->set_nanos(1'000'000 /*=1ms*/);
+        hcm.set_http1_safe_max_connection_duration(true);
+      });
+  initialize();
+
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+    test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+    EXPECT_EQ(test_server_->gauge("http.config_test.downstream_cx_http1_soft_drain")->value(), 0);
+    // The rest of the test is only for http1.
+    return;
+  }
+
+  // Wait until after the max connection duration
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  test_server_->waitForGaugeGe("http.config_test.downstream_cx_http1_soft_drain", 1);
+
+  // Envoy now waits for one more request/response over this connection before sending the
+  // connection:close header and closing the connection. No matter how long the request/response
+  // takes, envoy will not close the connection until it's able to send the connection:close header
+  // downstream in a response.
+  //
+  // Sleeping for longer than the drain phase duration just to show it is no longer relevant.
+  absl::SleepFor(absl::Seconds(1));
+
+  auto soft_drain_response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(soft_drain_response->waitForEndStream());
+  // Envoy will close the connection after the response has been sent.
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(soft_drain_response->complete());
+
+  // The client must have been notified that the connection will be closed.
+  EXPECT_EQ(soft_drain_response->headers().getConnectionValue(),
+            Http::Headers::get().ConnectionValues.Close);
+}
+
 // Test connection is closed after single request processed.
 TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));

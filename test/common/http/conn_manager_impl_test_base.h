@@ -30,11 +30,36 @@ namespace Envoy {
 namespace Http {
 
 struct SetupOpts {
-  bool ssl = false;
-  std::string server_name = "envoy-server-test";
-  bool tracing = true;
-  bool use_srds = false;
-  bool http1_safe_max_connection_duration = false;
+  SetupOpts& setSsl(bool ssl) {
+    ssl_ = ssl;
+    return *this;
+  }
+
+  SetupOpts& setServerName(absl::string_view server_name) {
+    server_name_ = server_name;
+    return *this;
+  }
+
+  SetupOpts& setTracing(bool tracing) {
+    tracing_ = tracing;
+    return *this;
+  }
+
+  SetupOpts& setUseSrds(bool use_srds) {
+    use_srds_ = use_srds;
+    return *this;
+  }
+
+  SetupOpts& setHttp1SafeMaxConnectionDuration(bool http1_safe_max_connection_duration) {
+    http1_safe_max_connection_duration_ = http1_safe_max_connection_duration;
+    return *this;
+  }
+
+  bool ssl_{false};
+  std::string server_name_{"envoy-server-test"};
+  bool tracing_{true};
+  bool use_srds_{false};
+  bool http1_safe_max_connection_duration_{false};
 };
 // Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
 // common/http as well as test/extensions/filters/http/ext_proc/, to reuse the many mocks/default
