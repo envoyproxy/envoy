@@ -45,6 +45,8 @@ ABSL_CONST_INIT const char* const kStructTypeUrl = "type.googleapis.com/google.p
 
 // class proto_processing_lib::proto_scrubber::ProtoScrubber;
 
+bool IsEmptyStruct(const ProtobufWkt::Struct& message_struct);
+
 bool IsLabelName(absl::string_view value);
 
 // Monitored resource label names are captured within curly brackets ("{", "}").
