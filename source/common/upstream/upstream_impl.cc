@@ -124,7 +124,7 @@ parseExtensionProtocolOptions(
   for (const auto& it : config.typed_extension_protocol_options()) {
     auto& name = it.first;
     auto object_or_error = createProtocolOptionsConfig(name, it.second, factory_context);
-    RETURN_IF_STATUS_NOT_OK(object_or_error);
+    RETURN_IF_NOT_OK_REF(object_or_error.status());
     if (object_or_error.value() != nullptr) {
       options[name] = std::move(object_or_error.value());
     }
@@ -235,7 +235,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
@@ -251,7 +251,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
       UpstreamLocalAddress extra_upstream_local_address;
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
 
       extra_upstream_local_address.socket_options_ =
@@ -275,7 +275,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
       UpstreamLocalAddress additional_upstream_local_address;
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -373,10 +373,10 @@ createUpstreamLocalAddressSelector(
                                                      envoy::config::core::v3::BindConfig{})),
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{})));
-  RETURN_IF_STATUS_NOT_OK(config_or_error);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
   auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       config_or_error.value(), cluster_name);
-  RETURN_IF_STATUS_NOT_OK(selector_or_error);
+  RETURN_IF_NOT_OK_REF(selector_or_error.status());
   return selector_or_error.value();
 }
 
@@ -550,7 +550,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = cluster.happyEyeballsConfig();
+        happy_eyeballs_config = *cluster.happyEyeballsConfig();
       } else {
         envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
         default_config.set_first_address_family_version(
@@ -981,7 +981,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
           config.has_http2_protocol_options(), validation_visitor);
-  RETURN_IF_STATUS_NOT_OK(options_or_error);
+  RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
 
@@ -1134,6 +1134,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
+      happy_eyeballs_config_(
+          config.upstream_connection_options().has_happy_eyeballs_config()
+              ? std::make_unique<
+                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
+                    config.upstream_connection_options().happy_eyeballs_config())
+              : nullptr),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1150,13 +1156,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
-                          config.track_cluster_stats().per_endpoint_stats()),
-      happy_eyeballs_config_(
-          config.upstream_connection_options().has_happy_eyeballs_config()
-              ? absl::make_optional<
-                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
-                    config.upstream_connection_options().happy_eyeballs_config())
-              : absl::nullopt) {
+                          config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(

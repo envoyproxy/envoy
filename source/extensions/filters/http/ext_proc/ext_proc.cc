@@ -309,6 +309,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   filter_callbacks_ = &callbacks;
+  watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
@@ -324,6 +325,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setEncoderFilterCallbacks(callbacks);
   encoding_state_.setEncoderFilterCallbacks(callbacks);
+  watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
 Filter::StreamOpenState Filter::openStream() {
@@ -345,7 +347,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(true);
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options, decoder_callbacks_);
+        client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -396,15 +398,18 @@ void Filter::onDestroy() {
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
 
-  if (stream_ != nullptr) {
-    stream_->notifyFilterDestroy();
-  }
-
   if (config_->observabilityMode()) {
     // In observability mode where the main stream processing and side stream processing are
     // asynchronous, it is possible that filter instance is destroyed before the side stream request
     // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
     // closure is deferred upon filter destruction with a timer.
+
+    // First, release the referenced filter resource.
+    if (stream_ != nullptr) {
+      stream_->notifyFilterDestroy();
+    }
+
+    // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
     // Perform immediate close on the stream otherwise.
@@ -1211,7 +1216,11 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
+
+    errorResponse.mutable_status()->set_code(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_timeout_error")
+            ? StatusCode::GatewayTimeout
+            : StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
@@ -1248,17 +1257,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      absl::Status mut_status;
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
-        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
-                                                         config().mutationChecker(),
-                                                         stats_.rejected_header_mutations_);
-      } else {
-        mut_status = MutationUtils::applyHeaderMutations(
-            response.headers(), headers, false, config().immediateMutationChecker().checker(),
-            stats_.rejected_header_mutations_);
-      }
+      const absl::Status mut_status = MutationUtils::applyHeaderMutations(
+          response.headers(), headers, false, config().mutationChecker(),
+          stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
