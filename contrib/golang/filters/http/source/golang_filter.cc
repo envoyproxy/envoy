@@ -172,8 +172,6 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
 
   auto decoding_s = dynamic_cast<processState*>(&decoding_state_);
   auto encoding_s = dynamic_cast<processState*>(&encoding_state_);
-  auto prev_decoding_filter_state = decoding_state_.filterState();
-  auto prev_encoding_filter_state = encoding_state_.filterState();
 
   // `log` may be called multiple times with different log type
   switch (log_context.accessLogType()) {
@@ -184,10 +182,6 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
     if (initRequest()) {
       request_headers_ = const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders());
     }
-
-    // This only run in the work thread, it's safe even without lock.
-    decoding_state_.setFilterState(FilterState::ProcessingLog);
-    encoding_state_.setFilterState(FilterState::ProcessingLog);
 
     if (request_headers_ != nullptr) {
       req_header_num = request_headers_->size();
@@ -216,12 +210,12 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
           const_cast<Http::ResponseTrailerMap*>(activation_response_trailers_);
     }
 
+    req_->is_golang_processing_log = 1;
     dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()), decoding_s,
                                          encoding_s, req_header_num, req_header_bytes,
                                          req_trailer_num, req_trailer_bytes, resp_header_num,
                                          resp_header_bytes, resp_trailer_num, resp_trailer_bytes);
-    decoding_state_.setFilterState(prev_decoding_filter_state);
-    encoding_state_.setFilterState(prev_encoding_filter_state);
+    req_->is_golang_processing_log = 0;
     break;
   default:
     // skip calling with unsupported log types

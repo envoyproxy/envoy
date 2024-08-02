@@ -60,8 +60,6 @@ enum class FilterState {
   WaitingTrailer,
   // Processing trailer in Go
   ProcessingTrailer,
-  // Processing log in Go
-  ProcessingLog,
   // All done
   Done,
 };
@@ -97,8 +95,7 @@ public:
   bool isProcessingInGo() {
     return filterState() == FilterState::ProcessingHeader ||
            filterState() == FilterState::ProcessingData ||
-           filterState() == FilterState::ProcessingTrailer ||
-           filterState() == FilterState::ProcessingLog;
+           filterState() == FilterState::ProcessingTrailer || req->is_golang_processing_log;
   }
   bool isProcessingHeader() { return filterState() == FilterState::ProcessingHeader; }
 
