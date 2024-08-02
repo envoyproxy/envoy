@@ -100,7 +100,6 @@ RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
-RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.

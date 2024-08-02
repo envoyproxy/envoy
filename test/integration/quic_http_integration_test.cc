@@ -2258,15 +2258,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   ASSERT_TRUE(response->complete());
 
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
-    test_server_->waitForCounterGe(
-        "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
-  } else {
-    EXPECT_EQ(
-        0u,
-        test_server_->counter("listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address")
-            ->value());
-  }
+  test_server_->waitForCounterGe(
+      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
 }
 
 TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFilter) {
