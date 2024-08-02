@@ -1,16 +1,10 @@
+#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
-
-#include "test/proto/logging.pb.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/logging.h"
-#include "test/test_common/status_utility.h"
-#include "test/test_common/utility.h"
 
 #include "absl/log/check.h"
 #include "absl/status/statusor.h"
@@ -26,6 +20,11 @@
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 #include "proto_processing_lib/proto_scrubber/utility.h"
 #include "src/google/protobuf/util/converter/type_info.h"
+#include "test/proto/logging.pb.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,6 +45,9 @@ using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::testing::ValuesIn;
+
+// The type property value that will be included into the converted Struct.
+constexpr char kTypeProperty[] = "@type";
 
 const char kTestRequest[] = R"pb(
   id: 123445
@@ -118,10 +120,11 @@ const char kTestResponse[] = R"pb(
 )pb";
 
 class AuditLoggingUtilTest : public ::testing::Test {
-protected:
+ protected:
   AuditLoggingUtilTest() = default;
   const Protobuf::Type* FindType(const std::string& type_url) {
-    absl::StatusOr<const Protobuf::Type*> result = type_helper_->ResolveTypeUrl(type_url);
+    absl::StatusOr<const Protobuf::Type*> result =
+        type_helper_->ResolveTypeUrl(type_url);
     if (!result.ok()) {
       return nullptr;
     }
@@ -131,24 +134,33 @@ protected:
   void SetUp() override {
     const std::string descriptor_path =
         TestEnvironment::runfilesPath("test/proto/logging.descriptor");
-    absl::StatusOr<std::unique_ptr<TypeHelper>> status = TypeHelper::Create(descriptor_path);
+    absl::StatusOr<std::unique_ptr<TypeHelper>> status =
+        TypeHelper::Create(descriptor_path);
     type_helper_ = std::move(status.value());
 
     type_finder_ = std::bind_front(&AuditLoggingUtilTest::FindType, this);
 
-    if (!Protobuf::TextFormat::ParseFromString(kTestRequest, &test_request_proto_)) {
+    if (!Protobuf::TextFormat::ParseFromString(kTestRequest,
+                                               &test_request_proto_)) {
       LOG(ERROR) << "Failed to parse textproto: " << kTestRequest;
     }
-    test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
-    request_type_ = type_finder_("type.googleapis.com/"
-                                 "logging.TestRequest");
+    test_request_raw_proto_ =
+        CordMessageData(test_request_proto_.SerializeAsCord());
+    request_type_ = type_finder_(
+        "type.googleapis.com/"
+        "logging.TestRequest");
 
-    if (!Protobuf::TextFormat::ParseFromString(kTestResponse, &test_response_proto_)) {
+    if (!Protobuf::TextFormat::ParseFromString(kTestResponse,
+                                               &test_response_proto_)) {
       LOG(ERROR) << "Failed to parse textproto: " << kTestResponse;
     }
-    test_response_raw_proto_ = CordMessageData(test_response_proto_.SerializeAsCord());
-    response_type_ = type_finder_("type.googleapis.com/"
-                                  "logging.TestResponse");
+    test_response_raw_proto_ =
+        CordMessageData(test_response_proto_.SerializeAsCord());
+    response_type_ = type_finder_(
+        "type.googleapis.com/"
+        "logging.TestResponse");
+
+    labels_.clear();
   }
 
   FieldMask* GetFieldMaskWith(const std::string& path) {
@@ -171,185 +183,295 @@ protected:
   const Type* response_type_;
 
   FieldMask field_mask_;
+
+  Envoy::Protobuf::Map<std::string, std::string> labels_;
 };
 
+TEST_F(AuditLoggingUtilTest, IsEmptyStruct_EmptyStruct) {
+  ProtobufWkt::Struct message_struct;
+  message_struct.mutable_fields()->insert(
+      {kTypeProperty, google::protobuf::Value()});
+  EXPECT_TRUE(IsEmptyStruct(message_struct));
+}
+
+TEST_F(AuditLoggingUtilTest, IsEmptyStruct_NonEmptyStruct) {
+  ProtobufWkt::Struct message_struct;
+  message_struct.mutable_fields()->insert(
+      {kTypeProperty, google::protobuf::Value()});
+  message_struct.mutable_fields()->insert(
+      {"another_field", google::protobuf::Value()});
+  EXPECT_FALSE(IsEmptyStruct(message_struct));
+}
+
+TEST_F(AuditLoggingUtilTest, IsLabelName_ValidLabel) {
+  EXPECT_TRUE(IsLabelName("{label}"));
+}
+
+TEST_F(AuditLoggingUtilTest, IsLabelName_EmptyString) {
+  EXPECT_FALSE(IsLabelName(""));
+}
+
+TEST_F(AuditLoggingUtilTest, GetLabelName_RemovesCurlyBraces) {
+  EXPECT_EQ(GetLabelName("{test}"), "test");
+}
+
+TEST_F(AuditLoggingUtilTest, GetLabelName_NoCurlyBraces) {
+  EXPECT_EQ(GetLabelName("test"), "test");
+}
+
+TEST_F(AuditLoggingUtilTest, GetLabelName_EmptyString) {
+  EXPECT_EQ(GetLabelName(""), "");
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_BasicExtraction) {
+  GetMonitoredResourceLabels(
+      "project/*/bucket/{bucket}/object/{object}",
+      "project/myproject/bucket/mybucket/object/myobject", &labels_);
+
+  EXPECT_EQ(labels_.size(), 2);
+  EXPECT_EQ(labels_["bucket"], "mybucket");
+  EXPECT_EQ(labels_["object"], "myobject");
+}
+
+TEST_F(AuditLoggingUtilTest,
+       GetMonitoredResourceLabels_MissingLabelsInResource) {
+  GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
+                             "project/myproject/bucket/mybucket", &labels_);
+
+  EXPECT_EQ(labels_.size(), 1);
+  EXPECT_EQ(labels_["bucket"], "mybucket");
+  EXPECT_EQ(labels_.find("object"), labels_.end());
+}
+
+TEST_F(AuditLoggingUtilTest,
+       GetMonitoredResourceLabels_ExtraSegmentsInResource) {
+  GetMonitoredResourceLabels(
+      "project/*/bucket/{bucket}/object/{object}",
+      "project/myproject/bucket/mybucket/object/myobject/extra", &labels_);
+
+  EXPECT_EQ(labels_.size(), 2);
+  EXPECT_EQ(labels_["bucket"], "mybucket");
+  EXPECT_EQ(labels_["object"], "myobject");
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_WithNoLabels) {
+  GetMonitoredResourceLabels(
+      "project/*/bucket/*/object/*",
+      "project/myproject/bucket/mybucket/object/myobject", &labels_);
+
+  EXPECT_EQ(labels_.size(), 0);
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_EmptyLabelExtractor) {
+  GetMonitoredResourceLabels(
+      "", "project/myproject/bucket/mybucket/object/myobject", &labels_);
+
+  EXPECT_EQ(labels_.size(), 0);
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively) {}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent) {}
+
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
-  EXPECT_EQ(3,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("bucket.objects"), test_request_raw_proto_));
+  EXPECT_EQ(3, ExtractRepeatedFieldSize(*request_type_, type_finder_,
+                                        GetFieldMaskWith("bucket.objects"),
+                                        test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_string) {
   EXPECT_EQ(1, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_strings"),
                                         test_request_raw_proto_));
-  EXPECT_EQ(2, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_strings"),
-                                        test_request_raw_proto_));
+  EXPECT_EQ(2, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_strings"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_message) {
-  EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_, GetFieldMaskWith("buckets"),
+  EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_,
+                                        GetFieldMaskWith("buckets"),
                                         test_response_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_map) {
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                        GetFieldMaskWith("sub_buckets"), test_response_raw_proto_));
+                                        GetFieldMaskWith("sub_buckets"),
+                                        test_response_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_enum) {
-  EXPECT_EQ(4,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_enum"), test_request_raw_proto_));
   EXPECT_EQ(4, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_enum"),
+                                        GetFieldMaskWith("repeated_enum"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(4, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_enum"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_double) {
-  EXPECT_EQ(1,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_double"), test_request_raw_proto_));
   EXPECT_EQ(1, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_double"),
+                                        GetFieldMaskWith("repeated_double"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(1, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_double"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_float) {
-  EXPECT_EQ(2,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_float"), test_request_raw_proto_));
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_float"),
+                                        GetFieldMaskWith("repeated_float"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(2, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_float"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_int64) {
-  EXPECT_EQ(3,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_int64"), test_request_raw_proto_));
   EXPECT_EQ(3, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_int64"),
+                                        GetFieldMaskWith("repeated_int64"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(3, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_int64"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_uint64) {
-  EXPECT_EQ(4,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_uint64"), test_request_raw_proto_));
   EXPECT_EQ(4, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_uint64"),
+                                        GetFieldMaskWith("repeated_uint64"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(4, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_uint64"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_int32) {
-  EXPECT_EQ(5,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_int32"), test_request_raw_proto_));
   EXPECT_EQ(5, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_int32"),
+                                        GetFieldMaskWith("repeated_int32"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(5, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_int32"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_fixed64) {
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_fixed64"),
                                         test_request_raw_proto_));
-  EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_fixed64"),
-                                        test_request_raw_proto_));
+  EXPECT_EQ(6, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_fixed64"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_fixed32) {
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_fixed32"),
                                         test_request_raw_proto_));
-  EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_fixed32"),
-                                        test_request_raw_proto_));
+  EXPECT_EQ(7, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_fixed32"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bool) {
-  EXPECT_EQ(5,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_bool"), test_request_raw_proto_));
-
   EXPECT_EQ(5, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_bool"),
+                                        GetFieldMaskWith("repeated_bool"),
                                         test_request_raw_proto_));
+
+  EXPECT_EQ(5, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_bool"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_uint32) {
-  EXPECT_EQ(8,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_uint32"), test_request_raw_proto_));
   EXPECT_EQ(8, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_uint32"),
+                                        GetFieldMaskWith("repeated_uint32"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(8, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_uint32"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sfixed64) {
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_sfixed64"),
                                         test_request_raw_proto_));
-  EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sfixed64"),
-                                        test_request_raw_proto_));
+  EXPECT_EQ(6, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_sfixed64"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sfixed32) {
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_sfixed32"),
                                         test_request_raw_proto_));
-  EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sfixed32"),
-                                        test_request_raw_proto_));
+  EXPECT_EQ(7, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_sfixed32"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sint32) {
-  EXPECT_EQ(5,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_sint32"), test_request_raw_proto_));
   EXPECT_EQ(5, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sint32"),
+                                        GetFieldMaskWith("repeated_sint32"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(5, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_sint32"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sint64) {
-  EXPECT_EQ(6,
-            ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_sint64"), test_request_raw_proto_));
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sint64"),
+                                        GetFieldMaskWith("repeated_sint64"),
                                         test_request_raw_proto_));
+  EXPECT_EQ(6, ExtractRepeatedFieldSize(
+                   *request_type_, type_finder_,
+                   GetFieldMaskWith("proto2_message.repeated_sint64"),
+                   test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_DefaultValue) {
   test_request_proto_.clear_repeated_strings();
-  test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
+  test_request_raw_proto_ =
+      CordMessageData(test_request_proto_.SerializeAsCord());
   EXPECT_EQ(0, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_strings"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_EmptyPath) {
-  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith(""),
-                                     test_request_raw_proto_),
-            0);
+  EXPECT_LT(
+      ExtractRepeatedFieldSize(*request_type_, type_finder_,
+                               GetFieldMaskWith(""), test_request_raw_proto_),
+      0);
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonRepeatedField) {
-  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith("bucket.ratio"),
+  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
+                                     GetFieldMaskWith("bucket.ratio"),
                                      test_request_raw_proto_),
             0);
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("bucket.unknown"), test_request_raw_proto_),
+                                     GetFieldMaskWith("bucket.unknown"),
+                                     test_request_raw_proto_),
             0);
-  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith("unknown"),
+  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
+                                     GetFieldMaskWith("unknown"),
                                      test_request_raw_proto_),
             0);
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
@@ -358,7 +480,8 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafPrimitiveTypeField) {
+TEST_F(AuditLoggingUtilTest,
+       ExtractRepeatedFieldSize_Error_NonLeafPrimitiveTypeField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("bucket.name.unknown"),
                                      test_request_raw_proto_),
@@ -372,300 +495,333 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafMapField) {
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafRepeatedField) {
+TEST_F(AuditLoggingUtilTest,
+       ExtractRepeatedFieldSize_Error_NonLeafRepeatedField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                     GetFieldMaskWith("buckets.name"), test_response_raw_proto_),
+                                     GetFieldMaskWith("buckets.name"),
+                                     test_response_raw_proto_),
             0);
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                     GetFieldMaskWith("buckets.objects"), test_response_raw_proto_),
+                                     GetFieldMaskWith("buckets.objects"),
+                                     test_response_raw_proto_),
             0);
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NullptrFieldMask) {
-  EXPECT_GT(
-      0, ExtractRepeatedFieldSize(*request_type_, type_finder_, nullptr, test_request_raw_proto_));
+  EXPECT_GT(0, ExtractRepeatedFieldSize(*request_type_, type_finder_, nullptr,
+                                        test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_EmptyFieldMask) {
   FieldMask field_mask;
-  EXPECT_GT(0, ExtractRepeatedFieldSize(*request_type_, type_finder_, &field_mask_,
-                                        test_request_raw_proto_));
+  EXPECT_GT(0, ExtractRepeatedFieldSize(*request_type_, type_finder_,
+                                        &field_mask_, test_request_raw_proto_));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK) {
-  EXPECT_THAT(
-      ExtractStringFieldValue(*request_type_, type_finder_, "bucket.name", test_request_raw_proto_),
-      IsOkAndHolds("test-bucket"));
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
+                                      "bucket.name", test_request_raw_proto_),
+              IsOkAndHolds("test-bucket"));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
   test_request_proto_.mutable_bucket()->clear_name();
-  test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
-  EXPECT_THAT(
-      ExtractStringFieldValue(*request_type_, type_finder_, "bucket.name", test_request_raw_proto_),
-      IsOkAndHolds(""));
+  test_request_raw_proto_ =
+      CordMessageData(test_request_proto_.SerializeAsCord());
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
+                                      "bucket.name", test_request_raw_proto_),
+              IsOkAndHolds(""));
 
   test_request_proto_.clear_bucket();
-  test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
-  EXPECT_THAT(
-      ExtractStringFieldValue(*request_type_, type_finder_, "bucket.name", test_request_raw_proto_),
-      IsOkAndHolds(""));
+  test_request_raw_proto_ =
+      CordMessageData(test_request_proto_.SerializeAsCord());
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
+                                      "bucket.name", test_request_raw_proto_),
+              IsOkAndHolds(""));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "", test_request_raw_proto_),
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "",
+                                      test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_UnknownField) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "bucket.unknown",
+  EXPECT_THAT(
+      ExtractStringFieldValue(*request_type_, type_finder_, "bucket.unknown",
+                              test_request_raw_proto_),
+      StatusIs(absl::StatusCode::kInvalidArgument));
+
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "unknown",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(
-      ExtractStringFieldValue(*request_type_, type_finder_, "unknown", test_request_raw_proto_),
+      ExtractStringFieldValue(*request_type_, type_finder_, "unknown1.unknown2",
+                              test_request_raw_proto_),
       StatusIs(absl::StatusCode::kInvalidArgument));
-
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "unknown1.unknown2",
-                                      test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
-                                      test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+TEST_F(AuditLoggingUtilTest,
+       ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
+  EXPECT_THAT(
+      ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
+                              test_request_raw_proto_),
+      StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_NonStringLeafNode) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "bucket.ratio",
-                                      test_request_raw_proto_),
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_,
+                                      "bucket.ratio", test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 
-  EXPECT_THAT(ExtractStringFieldValue(*response_type_, type_finder_, "sub_buckets",
-                                      test_response_raw_proto_),
+  EXPECT_THAT(ExtractStringFieldValue(*response_type_, type_finder_,
+                                      "sub_buckets", test_response_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
-  auto invalid_type_finder = [](absl::string_view /*type_url*/) { return nullptr; };
+  auto invalid_type_finder = [](absl::string_view /*type_url*/) {
+    return nullptr;
+  };
 
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, invalid_type_finder, "bucket.ratio",
-                                      test_request_raw_proto_),
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, invalid_type_finder,
+                                      "bucket.ratio", test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(StructUtilTest, RedactPaths_Basic) {
-  std::string proto_struct_string = "fields {"
-                                    "  key: \"nested\""
-                                    "  value {"
-                                    "    struct_value {"
-                                    "      fields {"
-                                    "        key: \"deeper_nest\""
-                                    "        value {"
-                                    "          struct_value: {"
-                                    "            fields {"
-                                    "              key: \"nice_field\""
-                                    "              value {"
-                                    "                string_value: \"nice value\""
-                                    "              }"
-                                    "            }"
-                                    "          }"
-                                    "        }"
-                                    "      }"
-                                    "    }"
-                                    "  }"
-                                    "}";
+  std::string proto_struct_string =
+      "fields {"
+      "  key: \"nested\""
+      "  value {"
+      "    struct_value {"
+      "      fields {"
+      "        key: \"deeper_nest\""
+      "        value {"
+      "          struct_value: {"
+      "            fields {"
+      "              key: \"nice_field\""
+      "              value {"
+      "                string_value: \"nice value\""
+      "              }"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct proto_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string,
+                                              &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"nested.deeper_nest"};
   RedactPaths(paths_to_redact, &proto_struct);
 
-  std::string expected_struct_string = "fields {"
-                                       "  key: \"nested\""
-                                       "  value {"
-                                       "    struct_value {"
-                                       "      fields {"
-                                       "        key: \"deeper_nest\""
-                                       "        value {"
-                                       "          struct_value: {}"
-                                       "        }"
-                                       "      }"
-                                       "    }"
-                                       "  }"
-                                       "}";
+  std::string expected_struct_string =
+      "fields {"
+      "  key: \"nested\""
+      "  value {"
+      "    struct_value {"
+      "      fields {"
+      "        key: \"deeper_nest\""
+      "        value {"
+      "          struct_value: {}"
+      "        }"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct expected_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
-  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string,
+                                              &expected_struct));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct,
+                                                         proto_struct));
 }
 
 TEST(StructUtilTest, RedactPaths_HandlesOneOfFields) {
-  std::string proto_struct_string = "fields {"
-                                    "  key: \"nested_value\""
-                                    "  value {"
-                                    "    struct_value {"
-                                    "      fields {"
-                                    "        key: \"uint32_field\""
-                                    "        value {"
-                                    "          number_value: 123"
-                                    "        }"
-                                    "      }"
-                                    "    }"
-                                    "  }"
-                                    "}";
+  std::string proto_struct_string =
+      "fields {"
+      "  key: \"nested_value\""
+      "  value {"
+      "    struct_value {"
+      "      fields {"
+      "        key: \"uint32_field\""
+      "        value {"
+      "          number_value: 123"
+      "        }"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct proto_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string,
+                                              &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"nested_value"};
   RedactPaths(paths_to_redact, &proto_struct);
 
-  std::string expected_struct_string = "fields {"
-                                       "  key: \"nested_value\""
-                                       "  value {"
-                                       "    struct_value {}"
-                                       "  }"
-                                       "}";
+  std::string expected_struct_string =
+      "fields {"
+      "  key: \"nested_value\""
+      "  value {"
+      "    struct_value {}"
+      "  }"
+      "}";
   Struct expected_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
-  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string,
+                                              &expected_struct));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct,
+                                                         proto_struct));
 }
 
 TEST(StructUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
-  std::string proto_struct_string = "fields {"
-                                    "  key: \"repeated_message_field\""
-                                    "  value {"
-                                    "    list_value {"
-                                    "      values {"
-                                    "        struct_value {"
-                                    "          fields {"
-                                    "            key: \"uint32_field\""
-                                    "            value {"
-                                    "              number_value: 123"
-                                    "            }"
-                                    "          }"
-                                    "        }"
-                                    "      }"
-                                    "      values {"
-                                    "        struct_value {"
-                                    "          fields {"
-                                    "            key: \"uint32_field\""
-                                    "            value {"
-                                    "              number_value: 456"
-                                    "            }"
-                                    "          }"
-                                    "        }"
-                                    "      }"
-                                    "    }"
-                                    "  }"
-                                    "}";
+  std::string proto_struct_string =
+      "fields {"
+      "  key: \"repeated_message_field\""
+      "  value {"
+      "    list_value {"
+      "      values {"
+      "        struct_value {"
+      "          fields {"
+      "            key: \"uint32_field\""
+      "            value {"
+      "              number_value: 123"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "      values {"
+      "        struct_value {"
+      "          fields {"
+      "            key: \"uint32_field\""
+      "            value {"
+      "              number_value: 456"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct proto_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string,
+                                              &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"repeated_message_field"};
   RedactPaths(paths_to_redact, &proto_struct);
 
-  std::string expected_struct_string = "fields {"
-                                       "  key: \"repeated_message_field\""
-                                       "  value {"
-                                       "    list_value {"
-                                       "      values {"
-                                       "        struct_value {}"
-                                       "      }"
-                                       "      values {"
-                                       "        struct_value {}"
-                                       "      }"
-                                       "    }"
-                                       "  }"
-                                       "}";
+  std::string expected_struct_string =
+      "fields {"
+      "  key: \"repeated_message_field\""
+      "  value {"
+      "    list_value {"
+      "      values {"
+      "        struct_value {}"
+      "      }"
+      "      values {"
+      "        struct_value {}"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct expected_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
-  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string,
+                                              &expected_struct));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct,
+                                                         proto_struct));
 }
 
 TEST(StructUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
-  std::string proto_struct_string = "fields {"
-                                    "  key: \"repeated_message_field\""
-                                    "  value {"
-                                    "    list_value {"
-                                    "      values {"
-                                    "        struct_value {"
-                                    "          fields {"
-                                    "            key: \"uint32_field\""
-                                    "            value {"
-                                    "              number_value: 123"
-                                    "            }"
-                                    "          }"
-                                    "          fields {"
-                                    "            key: \"deeper_nest\""
-                                    "            value {"
-                                    "              struct_value {"
-                                    "                fields {"
-                                    "                  key: \"nice_field\""
-                                    "                  value: {"
-                                    "                    string_value: \"nice value\""
-                                    "                  }"
-                                    "                }"
-                                    "              }"
-                                    "            }"
-                                    "          }"
-                                    "        }"
-                                    "      }"
-                                    "      values {"
-                                    "        struct_value {"
-                                    "          fields {"
-                                    "            key: \"uint32_field\""
-                                    "            value {"
-                                    "              number_value: 456"
-                                    "            }"
-                                    "          }"
-                                    "        }"
-                                    "      }"
-                                    "    }"
-                                    "  }"
-                                    "}";
+  std::string proto_struct_string =
+      "fields {"
+      "  key: \"repeated_message_field\""
+      "  value {"
+      "    list_value {"
+      "      values {"
+      "        struct_value {"
+      "          fields {"
+      "            key: \"uint32_field\""
+      "            value {"
+      "              number_value: 123"
+      "            }"
+      "          }"
+      "          fields {"
+      "            key: \"deeper_nest\""
+      "            value {"
+      "              struct_value {"
+      "                fields {"
+      "                  key: \"nice_field\""
+      "                  value: {"
+      "                    string_value: \"nice value\""
+      "                  }"
+      "                }"
+      "              }"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "      values {"
+      "        struct_value {"
+      "          fields {"
+      "            key: \"uint32_field\""
+      "            value {"
+      "              number_value: 456"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct proto_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string,
+                                              &proto_struct));
 
-  std::vector<std::string> paths_to_redact = {"repeated_message_field.deeper_nest"};
+  std::vector<std::string> paths_to_redact = {
+      "repeated_message_field.deeper_nest"};
   RedactPaths(paths_to_redact, &proto_struct);
 
-  std::string expected_struct_string = "fields {"
-                                       "  key: \"repeated_message_field\""
-                                       "  value {"
-                                       "    list_value {"
-                                       "      values {"
-                                       "        struct_value {"
-                                       "          fields {"
-                                       "            key: \"uint32_field\""
-                                       "            value {"
-                                       "              number_value: 123"
-                                       "            }"
-                                       "          }"
-                                       "          fields {"
-                                       "            key: \"deeper_nest\""
-                                       "            value {"
-                                       "              struct_value {}"
-                                       "            }"
-                                       "          }"
-                                       "        }"
-                                       "      }"
-                                       "      values {"
-                                       "        struct_value {"
-                                       "          fields {"
-                                       "            key: \"uint32_field\""
-                                       "            value {"
-                                       "              number_value: 456"
-                                       "            }"
-                                       "          }"
-                                       "        }"
-                                       "      }"
-                                       "    }"
-                                       "  }"
-                                       "}";
+  std::string expected_struct_string =
+      "fields {"
+      "  key: \"repeated_message_field\""
+      "  value {"
+      "    list_value {"
+      "      values {"
+      "        struct_value {"
+      "          fields {"
+      "            key: \"uint32_field\""
+      "            value {"
+      "              number_value: 123"
+      "            }"
+      "          }"
+      "          fields {"
+      "            key: \"deeper_nest\""
+      "            value {"
+      "              struct_value {}"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "      values {"
+      "        struct_value {"
+      "          fields {"
+      "            key: \"uint32_field\""
+      "            value {"
+      "              number_value: 456"
+      "            }"
+      "          }"
+      "        }"
+      "      }"
+      "    }"
+      "  }"
+      "}";
   Struct expected_struct;
-  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
-  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
+  CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string,
+                                              &expected_struct));
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct,
+                                                         proto_struct));
 }
 
 struct ResourceNameTestCase {
@@ -680,11 +836,13 @@ class ExtractLocationIdFromResourceNameTest
 TEST_P(ExtractLocationIdFromResourceNameTest, Test) {
   // Empty resource name - should return empty string.
   const ResourceNameTestCase& params = GetParam();
-  EXPECT_EQ(ExtractLocationIdFromResourceName(params.resource_name), params.expected_location);
+  EXPECT_EQ(ExtractLocationIdFromResourceName(params.resource_name),
+            params.expected_location);
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    ExtractLocationIdFromResourceNameTests, ExtractLocationIdFromResourceNameTest,
+    ExtractLocationIdFromResourceNameTests,
+    ExtractLocationIdFromResourceNameTest,
     ValuesIn<ResourceNameTestCase>({
         {"EmptyResource", "", ""},
         {"NoLocation", "projects/123/buckets/abc", ""},
@@ -705,12 +863,13 @@ INSTANTIATE_TEST_SUITE_P(
         {"RegionOnly", "regions/123", "123"},
         {"RegionAtStartWithMore", "regions/123/frwl/fw1", "123"},
     }),
-    [](const ::testing::TestParamInfo<ExtractLocationIdFromResourceNameTest::ParamType>& info) {
+    [](const ::testing::TestParamInfo<
+        ExtractLocationIdFromResourceNameTest::ParamType>& info) {
       return info.param.test_name;
     });
 
-} // namespace
-} // namespace ProtoMessageLogging
-} // namespace HttpFilters
-} // namespace Extensions
-} // namespace Envoy
+}  // namespace
+}  // namespace ProtoMessageLogging
+}  // namespace HttpFilters
+}  // namespace Extensions
+}  // namespace Envoy
