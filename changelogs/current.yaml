@@ -84,6 +84,9 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: quic
+  change: |
+    Removed ``envoy.reloadable_features.quic_fix_filter_manager_uaf`` runtime flag and legacy code paths.
 - area: udp
   change: |
     Removed ``envoy.restart_features.udp_read_normalize_addresses`` runtime flag and legacy code paths.
