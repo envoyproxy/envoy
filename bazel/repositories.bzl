@@ -302,7 +302,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
-    _com_github_rules_proto_grpc()
+    _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
@@ -1226,8 +1226,8 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _com_github_rules_proto_grpc():
-    external_http_archive("com_github_rules_proto_grpc")
+def _rules_proto_grpc():
+    external_http_archive("rules_proto_grpc")
 
 def _re2():
     external_http_archive("com_googlesource_code_re2")

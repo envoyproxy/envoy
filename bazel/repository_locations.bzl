@@ -398,7 +398,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
     ),
-    com_github_rules_proto_grpc = dict(
+    rules_proto_grpc = dict(
         project_name = "Protobuf and gRPC rules for Bazel",
         project_desc = "Bazel rules for building Protobuf and gRPC code and libraries from proto_library targets",
         project_url = "https://github.com/rules-proto-grpc/rules_proto_grpc",
