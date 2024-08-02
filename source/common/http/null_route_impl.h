@@ -103,6 +103,7 @@ struct RouteEntryImpl : public Router::RouteEntry {
 
   // Router::RouteEntry
   const std::string& clusterName() const override { return cluster_name_; }
+  const std::string getRequestHostValue(const Http::RequestHeaderMap&) const override { return ""; }
   const Router::RouteStatsContextOptRef routeStatsContext() const override {
     return Router::RouteStatsContextOptRef();
   }
