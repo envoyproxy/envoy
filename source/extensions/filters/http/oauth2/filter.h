@@ -141,6 +141,7 @@ public:
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
+  const std::string& cookieDomain() const { return cookie_domain_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
@@ -168,6 +169,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
+  const std::string cookie_domain_;
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;

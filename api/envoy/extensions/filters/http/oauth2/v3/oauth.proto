@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.oauth2]
 //
 
+// [#next-free-field: 6]
 message OAuth2Credentials {
   // [#next-free-field: 6]
   message CookieNames {
@@ -70,6 +71,10 @@ message OAuth2Credentials {
 
   // The cookie names used in OAuth filters flow.
   CookieNames cookie_names = 4;
+
+  // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
+  // This is useful when token cookies need to be shared across multiple subdomains.
+  string cookie_domain = 5;
 }
 
 // OAuth config
