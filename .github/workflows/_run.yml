@@ -26,6 +26,9 @@ on:
         default: false
       checkout-extra:
         type: string
+      concurrency-suffix:
+        type: string
+        default:
       container-command:
         type: string
         default: ./ci/run_envoy_docker.sh
@@ -141,7 +144,7 @@ concurrency:
     ${{ github.actor != 'trigger-release-envoy[bot]'
         && github.head_ref
         || github.run_id
-    }}-${{ github.workflow }}-${{ inputs.target }}
+    }}-${{ github.workflow }}-${{ inputs.target }}${{ inputs.concurrency-suffix }}
   cancel-in-progress: true
 
 env:
