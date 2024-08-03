@@ -133,5 +133,9 @@ new_features:
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: geoip
+  change: |
+    Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
+
 
 deprecated:
