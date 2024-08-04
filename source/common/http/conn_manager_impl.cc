@@ -1121,19 +1121,13 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
     failure_details = std::string(transformation_result.details());
   }
 
-  Code response_code = Code::BadRequest;
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
     grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
   }
 
-  // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
-  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-    sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
-  } else {
-    filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
-    resetStream();
-  }
+  sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, failure_details);
+
   if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
     connection_manager_.handleCodecError(failure_details);
   }
