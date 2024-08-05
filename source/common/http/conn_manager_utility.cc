@@ -76,6 +76,16 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
   }
 }
 
+void ConnectionManagerUtility::appendXff(RequestHeaderMap& request_headers,
+                                         Network::Connection& connection,
+                                         ConnectionManagerConfig& config) {
+  if (Network::Utility::isLoopbackAddress(*connection.connectionInfoProvider().remoteAddress())) {
+    Utility::appendXff(request_headers, config.localAddress());
+  } else {
+    Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
+  }
+}
+
 ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
@@ -134,12 +144,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
       final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
     if (!config.skipXffAppend()) {
-      if (Network::Utility::isLoopbackAddress(
-              *connection.connectionInfoProvider().remoteAddress())) {
-        Utility::appendXff(request_headers, config.localAddress());
-      } else {
-        Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
-      }
+      appendXff(request_headers, connection, config);
     }
     // If the prior hop is not a trusted proxy, overwrite any
     // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
@@ -172,12 +177,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
         return {nullptr, result.reject_options};
       }
       if (result.append_xff) {
-        if (Network::Utility::isLoopbackAddress(
-                *connection.connectionInfoProvider().remoteAddress())) {
-          Utility::appendXff(request_headers, config.localAddress());
-        } else {
-          Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
-        }
+        appendXff(request_headers, connection, config);
       }
 
       if (result.detected_remote_address) {
