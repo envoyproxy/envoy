@@ -24,7 +24,7 @@ public:
 
   /**
    * Get a function pointer from the dynamic module with a specific type.
-   * @tparam T the function pointer type to cast the symbol to.
+   * @param T the function pointer type to cast the symbol to.
    * @param symbol_ref the symbol to look up.
    * @return the symbol if found, otherwise nullptr.
    */
@@ -44,7 +44,7 @@ private:
   void* getSymbol(const absl::string_view symbol_ref) const;
 
   // The raw dlopen handle that can be used to look up symbols.
-  void* handle_ = nullptr;
+  void* handle_;
 };
 
 using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;

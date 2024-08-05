@@ -30,10 +30,7 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
   return std::make_shared<DynamicModule>(handle);
 }
 
-DynamicModule::~DynamicModule() {
-  ASSERT(handle_ != nullptr, "dlopen handle must be alive until the DynamicModule is destroyed.");
-  dlclose(handle_);
-}
+DynamicModule::~DynamicModule() { dlclose(handle_); }
 
 void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   // TODO(mathetake): maybe we should accept null-terminated const char* instead of string_view to
