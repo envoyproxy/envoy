@@ -125,6 +125,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: matching
+  change: |
+    Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
+    and :ref:`Dynamic metadata input matcher <extension_envoy.matching.matchers.metadata_matcher>`.
 - area: ratelimit
   change: |
     Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
