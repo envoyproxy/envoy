@@ -422,6 +422,10 @@ public:
     return callbacks_->upstreamOverrideHost();
   }
 
+  void setOrcaLoadReportCb(OrcaLoadReportCb callback) override {
+    orca_load_report_cb_ = std::move(callback);
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -604,6 +608,7 @@ private:
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
+  OrcaLoadReportCb orca_load_report_cb_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;

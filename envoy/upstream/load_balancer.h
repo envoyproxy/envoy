@@ -10,6 +10,8 @@
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
+#include "xds/data/orca/v3/orca_load_report.pb.h"
+
 namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
@@ -103,6 +105,16 @@ public:
    * and return the corresponding host directly.
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
+
+  // Invoked when a new orca report is received for this LB context.
+  using OrcaLoadReportCb =
+      std::function<absl::Status(const xds::data::orca::v3::OrcaLoadReport& orca_load_report)>;
+
+  /**
+   * Install a callback to be invoked when ORCA Load report is received for this
+   * LB context.
+   */
+  virtual void setOrcaLoadReportCb(OrcaLoadReportCb callback) PURE;
 };
 
 /**
