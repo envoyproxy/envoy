@@ -53,7 +53,8 @@ public:
                        Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
       : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
         factory_context_(factory_context), quota_buckets_(quota_buckets), client_(client),
-        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
+        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()),
+        random_(factory_context.serverFactoryContext().api().randomGenerator()) {
     createMatcher();
   }
 
@@ -113,6 +114,7 @@ private:
   BucketsCache& quota_buckets_;
   ThreadLocalClient& client_;
   TimeSource& time_source_;
+  Random::RandomGenerator& random_;
 };
 
 } // namespace RateLimitQuota

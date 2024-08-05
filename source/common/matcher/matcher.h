@@ -86,8 +86,9 @@ public:
 template <class DataType> class MatchInputFactory {
 public:
   MatchInputFactory(ProtobufMessage::ValidationVisitor& validator,
-                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : validator_(validator), validation_visitor_(validation_visitor) {}
+                    MatchTreeValidationVisitor<DataType>& validation_visitor,
+                    Random::RandomGenerator& random)
+      : validator_(validator), validation_visitor_(validation_visitor), random_(random) {}
 
   DataInputFactoryCb<DataType> createDataInput(const xds::core::v3::TypedExtensionConfig& config) {
     return createDataInputBase(config);
@@ -122,7 +123,7 @@ private:
 
       ProtobufTypes::MessagePtr message =
           Config::Utility::translateAnyToFactoryConfig(config.typed_config(), validator_, *factory);
-      auto data_input = factory->createDataInputFactoryCb(*message, validator_);
+      auto data_input = factory->createDataInputFactoryCb(*message, validator_, random_);
       return data_input;
     }
 
@@ -140,6 +141,7 @@ private:
 
   ProtobufMessage::ValidationVisitor& validator_;
   MatchTreeValidationVisitor<DataType>& validation_visitor_;
+  Random::RandomGenerator& random_;
 };
 
 /**
@@ -154,7 +156,8 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
-        match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
+        match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor,
+                             factory_context.api().randomGenerator()) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
   template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {

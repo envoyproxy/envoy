@@ -324,8 +324,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
         // dual registered as an extension descriptor and an HTTP matcher input
         // function, the descriptor extension takes priority.
         RateLimitDescriptorValidationVisitor validation_visitor;
-        Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(validator,
-                                                                         validation_visitor);
+        Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(
+            validator, validation_visitor, context.api().randomGenerator());
         Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
             input_factory.createDataInput(action.extension());
         actions_.emplace_back(std::make_unique<MatchInputRateLimitDescriptor>(

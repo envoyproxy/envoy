@@ -19,8 +19,9 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   ServiceMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input =
-      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+  auto input = factory.createDataInputFactoryCb(
+      *proto_config, factory_context.messageValidationVisitor(),
+      factory_context.serverFactoryContext().api().randomGenerator())();
 
   FakeStreamCodecFactory::FakeRequest request;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -37,8 +38,9 @@ TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   HostMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input =
-      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+  auto input = factory.createDataInputFactoryCb(
+      *proto_config, factory_context.messageValidationVisitor(),
+      factory_context.serverFactoryContext().api().randomGenerator())();
 
   FakeStreamCodecFactory::FakeRequest request;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -55,8 +57,9 @@ TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   PathMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input =
-      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+  auto input = factory.createDataInputFactoryCb(
+      *proto_config, factory_context.messageValidationVisitor(),
+      factory_context.serverFactoryContext().api().randomGenerator())();
 
   FakeStreamCodecFactory::FakeRequest request;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -73,8 +76,9 @@ TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   MethodMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input =
-      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+  auto input = factory.createDataInputFactoryCb(
+      *proto_config, factory_context.messageValidationVisitor(),
+      factory_context.serverFactoryContext().api().randomGenerator())();
 
   FakeStreamCodecFactory::FakeRequest request;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -96,8 +100,9 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
 
   typed_proto_config.set_property_name("key_0");
 
-  auto input =
-      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+  auto input = factory.createDataInputFactoryCb(
+      *proto_config, factory_context.messageValidationVisitor(),
+      factory_context.serverFactoryContext().api().randomGenerator())();
 
   FakeStreamCodecFactory::FakeRequest request;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -114,8 +119,9 @@ TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   RequestMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input =
-      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
+  auto input = factory.createDataInputFactoryCb(
+      *proto_config, factory_context.messageValidationVisitor(),
+      factory_context.serverFactoryContext().api().randomGenerator())();
 
   EXPECT_EQ(input->dataInputType(),
             "Envoy::Extensions::NetworkFilters::GenericProxy::RequestMatchData");
