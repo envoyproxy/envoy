@@ -7,7 +7,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
 #include "xds/data/orca/v3/orca_load_report.pb.h"
 
 namespace Envoy {

@@ -6,10 +6,7 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/common/fmt.h"
-#include "source/common/http/header_utility.h"
-#include "source/common/protobuf/utility.h"
 
-#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 using ::Envoy::Http::HeaderMap;

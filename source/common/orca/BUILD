@@ -13,7 +13,6 @@ envoy_cc_library(
     srcs = ["orca_parser.cc"],
     hdrs = ["orca_parser.h"],
     external_deps = [
-        "abseil_status",
         "abseil_strings",
         "abseil_statusor",
         "fmtlib",
@@ -21,8 +20,6 @@ envoy_cc_library(
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/common:base64_lib",
-        "//source/common/http:header_utility_lib",
-        "//source/common/protobuf:utility_lib_header",
         "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
