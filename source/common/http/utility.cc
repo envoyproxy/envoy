@@ -785,7 +785,7 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
   for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
     auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(*it));
     if (addr == nullptr) {
-      continue;
+      return {nullptr, false};
     }
     last_valid_addr = addr;
 

@@ -271,11 +271,9 @@ additional addresses from XFF:
  :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` original IP
  detection option instead.
 
- * If the remote address is contained by an entry in ``xff_trusted_cidrs`` and ``recurse`` is
-   ``false`` (the default), the trusted client address is the *last* (rightmost) IP address in XFF.
- * If the remote address is contained by an entry in ``xff_trusted_cidrs``, ``recurse`` is enabled,
-   and the *last* (rightmost) entry is also contained by an entry in ``xff_trusted_cidrs``, the
-   trusted client address is *second-last* IP address in XFF.
+ * If the remote address is contained by an entry in ``xff_trusted_cidrs``, and the *last*
+   (rightmost) entry is also contained by an entry in ``xff_trusted_cidrs``, the trusted client
+   address is *second-last* IP address in XFF.
  * If all entries in XFF are contained by an entry in ``xff_trusted_cidrs``, the trusted client
    address is the *first* (leftmost) IP address in XFF.
 
@@ -372,8 +370,7 @@ Example 6: The internal Envoy from Example 5, receiving a request proxied by ano
 Example 7: Envoy as edge proxy, with one trusted CIDR
     Settings:
       | use_remote_address = false
-      | xff_trusted_cidrs.cidrs = 192.0.2.0/24
-      | xff_trusted_cidrs.recurse = false
+      | xff_trusted_cidrs = 192.0.2.0/24
 
     Request details:
       | Downstream IP address = 192.0.2.5
@@ -382,13 +379,13 @@ Example 7: Envoy as edge proxy, with one trusted CIDR
     Result:
       | Trusted client address = 192.0.2.1
       | X-Envoy-External-Address is set to 192.0.2.1
+      | XFF is changed to "203.0.113.128, 203.0.113.10, 192.0.2.1, 192.0.2.5"
       | X-Envoy-Internal is removed (if it was present in the incoming request)
 
-Example 8: Envoy as edge proxy, with two trusted CIDRs and recurse enabled
+Example 8: Envoy as edge proxy, with two trusted CIDRs
     Settings:
       | use_remote_address = false
-      | xff_trusted_cidrs.cidrs = 192.0.2.0/24, 198.51.100.0/24
-      | xff_trusted_cidrs.recurse = true
+      | xff_trusted_cidrs = 192.0.2.0/24, 198.51.100.0/24
       | append_xff = true
 
     Request details:

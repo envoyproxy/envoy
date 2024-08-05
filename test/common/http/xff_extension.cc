@@ -10,9 +10,9 @@ Http::OriginalIPDetectionSharedPtr getXFFExtension(uint32_t hops, bool append_xf
 }
 
 Http::OriginalIPDetectionSharedPtr getXFFExtension(std::vector<Network::Address::CidrRange> cidrs,
-                                                   bool append_xff, bool recurse) {
-  return std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(
-      cidrs, append_xff, recurse);
+                                                   bool append_xff) {
+  return std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(cidrs,
+                                                                                      append_xff);
 }
 
 } // namespace Envoy

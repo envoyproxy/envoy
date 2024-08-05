@@ -11,8 +11,7 @@ namespace Xff {
 
 XffIPDetection::XffIPDetection(
     const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig& config)
-    : xff_num_trusted_hops_(!config.has_xff_trusted_cidrs() ? config.xff_num_trusted_hops() : 0),
-      append_xff_(config.append_xff()), recurse_(config.xff_trusted_cidrs().recurse()) {
+    : xff_num_trusted_hops_(config.xff_num_trusted_hops()), append_xff_(config.append_xff()) {
   if (config.has_xff_trusted_cidrs() && config.xff_num_trusted_hops() > 0) {
     ENVOY_LOG(warn, "Both xff_num_trusted_hops and xff_trusted_cidrs are configured; only "
                     "xff_trusted_cidrs will be used");
@@ -30,12 +29,11 @@ XffIPDetection::XffIPDetection(
 }
 
 XffIPDetection::XffIPDetection(uint32_t xff_num_trusted_hops, bool append_xff)
-    : xff_num_trusted_hops_(xff_num_trusted_hops), append_xff_(append_xff), recurse_(false) {}
+    : xff_num_trusted_hops_(xff_num_trusted_hops), append_xff_(append_xff) {}
 
 XffIPDetection::XffIPDetection(const std::vector<Network::Address::CidrRange> trusted_cidrs,
-                               bool append_xff, bool recurse)
-    : xff_num_trusted_hops_(0), xff_trusted_cidrs_(trusted_cidrs), append_xff_(append_xff),
-      recurse_(recurse) {}
+                               bool append_xff)
+    : xff_num_trusted_hops_(0), xff_trusted_cidrs_(trusted_cidrs), append_xff_(append_xff) {}
 
 Envoy::Http::OriginalIPDetectionResult
 XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
@@ -44,12 +42,10 @@ XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
                                                            xff_trusted_cidrs_)) {
       return {nullptr, false, absl::nullopt, false};
     }
-    if (recurse_) {
-      // Check XFF for last IP that isn't in `xff_trusted_cidrs`
-      auto ret = Envoy::Http::Utility::getLastNonTrustedAddressFromXFF(params.request_headers,
-                                                                       xff_trusted_cidrs_);
-      return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, append_xff_};
-    }
+    // Check XFF for last IP that isn't in `xff_trusted_cidrs`
+    auto ret = Envoy::Http::Utility::getLastNonTrustedAddressFromXFF(params.request_headers,
+                                                                     xff_trusted_cidrs_);
+    return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, append_xff_};
   }
 
   auto ret =

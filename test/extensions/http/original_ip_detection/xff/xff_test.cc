@@ -97,27 +97,7 @@ TEST_F(XffTrustedCidrsTest, RemoteIPv6IsTrusted) {
   EXPECT_EQ("2.2.2.2", result.detected_remote_address->ip()->addressAsString());
 }
 
-class XffTrustedCidrsRecurseTest : public testing::Test {
-protected:
-  XffTrustedCidrsRecurseTest() {
-    envoy::extensions::http::original_ip_detection::xff::v3::XffConfig config;
-    auto cidr1 = config.mutable_xff_trusted_cidrs()->add_cidrs();
-    cidr1->set_address_prefix("192.0.2.0");
-    cidr1->mutable_prefix_len()->set_value(24);
-    auto cidr2 = config.mutable_xff_trusted_cidrs()->add_cidrs();
-    cidr2->set_address_prefix("198.51.100.0");
-    cidr2->mutable_prefix_len()->set_value(24);
-    auto cidr3 = config.mutable_xff_trusted_cidrs()->add_cidrs();
-    cidr3->set_address_prefix("2001:db8:7e57:1::");
-    cidr3->mutable_prefix_len()->set_value(64);
-    config.mutable_xff_trusted_cidrs()->set_recurse(true);
-    xff_extension_ = std::make_shared<XffIPDetection>(config);
-  }
-
-  std::shared_ptr<XffIPDetection> xff_extension_;
-};
-
-TEST_F(XffTrustedCidrsRecurseTest, Recurse) {
+TEST_F(XffTrustedCidrsTest, Recurse) {
   Envoy::Http::TestRequestHeaderMapImpl headers{
       {"x-forwarded-for", "1.2.3.4,2.2.2.2,192.0.2.5, 198.51.100.1"}};
 
@@ -128,7 +108,7 @@ TEST_F(XffTrustedCidrsRecurseTest, Recurse) {
   EXPECT_EQ("2.2.2.2", result.detected_remote_address->ip()->addressAsString());
 }
 
-TEST_F(XffTrustedCidrsRecurseTest, RecurseAllAddressesTrusted) {
+TEST_F(XffTrustedCidrsTest, RecurseAllAddressesTrusted) {
   Envoy::Http::TestRequestHeaderMapImpl headers{
       {"x-forwarded-for", "192.0.2.4,192.0.2.5, 198.51.100.1"}};
 
