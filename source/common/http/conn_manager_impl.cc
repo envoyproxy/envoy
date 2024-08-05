@@ -417,6 +417,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     stats_.named_.downstream_cx_max_requests_reached_.inc();
   }
 
+  if (soft_drain_http1_) {
+    new_stream->filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+    // Prevent erroneous debug log of closing due to incoming connection close header.
+    drain_state_ = DrainState::Closing;
+  }
+
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
@@ -1793,17 +1799,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // point, the cached route should never be updated or refreshed.
   blockRouteCache();
 
-  if ((connection_manager_.drain_state_ != DrainState::NotDraining ||
-       connection_manager_.soft_drain_http1_) &&
+  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
     // payload is no longer HTTP/1.1)
     if (!state_.is_tunneling_) {
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
-      if (connection_manager_.soft_drain_http1_) {
-        connection_manager_.drain_state_ = DrainState::Closing;
-      }
     }
   }
 
