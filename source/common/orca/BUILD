@@ -23,3 +23,26 @@ envoy_cc_library(
         "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "orca_load_metrics_lib",
+    srcs = ["orca_load_metrics.cc"],
+    hdrs = ["orca_load_metrics.h"],
+    external_deps = [
+        "abseil_flat_hash_set",
+        "abseil_status",
+        "abseil_strings",
+        "abseil_statusor",
+        "fmtlib",
+    ],
+    deps = [
+        ":orca_parser",
+        "//envoy/common:exception_lib",
+        "//envoy/http:header_map_interface",
+        "//source/common/common:base64_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/protobuf:utility_lib_header",
+        # "//source/common/upstream:upstream_lib",
+        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
+    ],
+)

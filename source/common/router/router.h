@@ -559,6 +559,8 @@ private:
   Http::Context& httpContext() { return config_->http_context_; }
   bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                          std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
+  void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
+                                  UpstreamRequest& upstream_request);
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
@@ -611,6 +613,7 @@ private:
   bool request_buffer_overflowed_ : 1;
   const bool streaming_shadows_ : 1;
   bool upstream_request_started_ : 1;
+  bool orca_load_report_received_ : 1;
 };
 
 class ProdFilter : public Filter {
