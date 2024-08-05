@@ -15,6 +15,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setCurves(server_curves_)
                                   .setCiphers(server_ciphers_)
                                   .setExpectClientEcdsaCert(client_ecdsa_cert_)
+                                  .setTlsCertSelector(tls_cert_selector_yaml_)
                                   .setTlsKeyLogFilter(keylog_local_, keylog_remote_,
                                                       keylog_local_negative_,
                                                       keylog_remote_negative_, keylog_path_,

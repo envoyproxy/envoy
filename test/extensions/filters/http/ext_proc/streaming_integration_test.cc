@@ -399,6 +399,55 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyAndClose) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyObservabilityMode) {
+  const uint32_t num_chunks = 152;
+  const uint32_t chunk_size = 1000;
+  uint32_t total_size = num_chunks * chunk_size;
+
+  test_processor_.start(
+      ipVersion(),
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        // Expect a request_headers message as the first message on the stream,
+        // and send back an empty response.
+        ProcessingRequest header_req;
+        ASSERT_TRUE(stream->Read(&header_req));
+        ASSERT_TRUE(header_req.has_request_headers());
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        // Now, expect a bunch of request_body messages and respond to each.
+        // Count up the number of bytes we receive and make sure that we get
+        // them all.
+        uint32_t received_size = 0;
+        ProcessingRequest body_req;
+        do {
+          ASSERT_TRUE(stream->Read(&body_req));
+          ASSERT_TRUE(body_req.has_request_body());
+          received_size += body_req.request_body().body().size();
+          ProcessingResponse body_resp;
+          body_resp.mutable_request_body();
+          stream->Write(body_resp);
+        } while (!body_req.request_body().end_of_stream());
+
+        EXPECT_EQ(received_size, total_size);
+      });
+
+  // Enable observability mode.
+  proto_config_.set_observability_mode(true);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
+    // This header tells the "autonomous upstream" that will respond to our
+    // request to throw an error if it doesn't get the right number of bytes.
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
+  });
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+}
 // Do an HTTP GET that will return a body smaller than the buffer limit, which we process
 // in the processor.
 TEST_P(StreamingIntegrationTest, DISABLED_GetAndProcessBufferedResponseBody) {

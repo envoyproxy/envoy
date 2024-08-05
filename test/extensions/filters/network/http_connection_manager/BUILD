@@ -25,6 +25,7 @@ envoy_extension_cc_test_library(
     deps = [
         ":config_cc_proto",
         "//source/common/filter:config_discovery_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -74,6 +75,7 @@ envoy_extension_cc_test(
     deps = [
         ":config_cc_proto",
         ":config_test_base",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
     ],
 )
@@ -85,6 +87,7 @@ envoy_extension_cc_test(
     deps = [
         ":config_cc_proto",
         ":config_test_base",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
     ],

@@ -73,14 +73,17 @@ public class JniLibrary {
    * Send headers over an open HTTP stream. This method can be invoked once and
    * needs to be called before send_data.
    *
-   * @param engine    the stream's associated engine.
-   * @param stream    the stream to send headers over.
-   * @param headers   the headers to send.
-   * @param endStream supplies whether this is headers only.
+   * @param engine     the stream's associated engine.
+   * @param stream     the stream to send headers over.
+   * @param headers    the headers to send.
+   * @param endStream  supplies whether this is headers only.
+   * @param idempotent indicates that the request is idempotent. When idempotent is set to true
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
    * @return the resulting status of the operation.
    */
   protected static native int sendHeaders(long engine, long stream,
-                                          Map<String, List<String>> headers, boolean endStream);
+                                          Map<String, List<String>> headers, boolean endStream,
+                                          boolean idempotent);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple
