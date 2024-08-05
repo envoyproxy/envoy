@@ -531,16 +531,16 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnBodyAbortsAction) {
         std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
     cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt});
   });
+  LookupBodyCallback body_callback;
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
-      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
-        cb(std::make_unique<Buffer::OwnedImpl>("abcde"));
-      });
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) { body_callback = cb; });
   auto filter = makeFilter(mock_http_cache, false);
   EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   filter->onDestroy();
   // onBody should do nothing because the filter was destroyed.
+  body_callback(std::make_unique<Buffer::OwnedImpl>("abcde"));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
@@ -562,16 +562,17 @@ TEST_F(CacheFilterTest, OnDestroyBeforeOnTrailersAbortsAction) {
       .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
         cb(std::make_unique<Buffer::OwnedImpl>("abcde"));
       });
+  LookupTrailersCallback trailers_callback;
   EXPECT_CALL(*mock_lookup_context, getTrailers(_)).WillOnce([&](LookupTrailersCallback&& cb) {
-    cb(std::make_unique<Http::TestResponseTrailerMapImpl>());
+    trailers_callback = cb;
   });
   auto filter = makeFilter(mock_http_cache, false);
   EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   filter->onDestroy();
   // onTrailers should do nothing because the filter was destroyed.
+  trailers_callback(std::make_unique<Http::TestResponseTrailerMapImpl>());
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
