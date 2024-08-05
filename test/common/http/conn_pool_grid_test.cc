@@ -4,6 +4,7 @@
 
 #include "source/common/http/conn_pool_grid.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/upstream/transport_socket_match_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -240,6 +241,24 @@ public:
   std::unique_ptr<ConnectivityGridForTest> grid_;
   std::string host_impl_hostname_ = "hostname";
 };
+
+TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
+  Network::MockTransportSocketFactory factory;
+  Upstream::MockTransportSocketMatcher* transport_socket_matcher =
+      dynamic_cast<Upstream::MockTransportSocketMatcher*>(
+          cluster_->transport_socket_matcher_.get());
+  EXPECT_CALL(*transport_socket_matcher, resolve(_, _))
+      .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
+          factory, transport_socket_matcher->stats_, "test")));
+  EXPECT_CALL(factory, defaultServerNameIndication)
+      .WillRepeatedly(Return("transport_socket_hostname"));
+  host_impl_hostname_ = "custom_hostname";
+  transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>();
+  initialize();
+  // Without "hostname" in the TransportSocketOptionsImpl, this fails over to
+  // the host name in HostNameImpl
+  EXPECT_EQ("transport_socket_hostname", grid_->getOriginHostname());
+}
 
 TEST_F(ConnectivityGridTest, NoServerNameOverride) {
   host_impl_hostname_ = "custom_hostname";
