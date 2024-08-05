@@ -6,6 +6,10 @@ behavior_changes:
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
     <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
+- area: stats scoped_rds
+  change: |
+    Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
+    <envoy_v3_api_msg_config/route/v3/scoped_route>' and stat prefix extracted.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -80,6 +84,9 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: udp
+  change: |
+    Removed ``envoy.restart_features.udp_read_normalize_addresses`` runtime flag and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` and legacy code paths.
@@ -130,5 +137,9 @@ new_features:
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: dns
+  change: |
+    Prefer using IPv6 address when addresses from both families are available.
+    Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
 
 deprecated:

@@ -5,6 +5,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -294,6 +295,15 @@ envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
       } else {
         connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
       }
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
+      Http::HttpServerPropertiesCacheManager& cache_manager =
+          server_->httpServerPropertiesCacheManager();
+
+      Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+          [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+      cache_manager.forEachThreadLocalCache(clear_brokenness);
     }
     connectivity_manager_->refreshDns(configuration_key, true);
   });
