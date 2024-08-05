@@ -147,12 +147,9 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               // read event to trigger the current filter callback to process the data.
               listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
             }
-            // Waiting for more data.
-            return;
-          } else {
-            // Waiting for asynchronous callback.
-            return;
           }
+
+          return;
         }
       }
     }
