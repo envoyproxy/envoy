@@ -23,7 +23,7 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  uint32_t weight = 1, const std::string& zone = "") {
   envoy::config::core::v3::Locality locality;
   locality.set_zone(zone);
-  return HostSharedPtr{new HostImpl(
+  return HostSharedPtr{*HostImpl::create(
       cluster, "", *Network::Utility::resolveUrl(url), nullptr, nullptr, weight, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
       envoy::config::core::v3::UNKNOWN, time_source)};

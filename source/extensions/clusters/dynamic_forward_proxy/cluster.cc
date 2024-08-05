@@ -283,10 +283,12 @@ void Cluster::addOrUpdateHost(
 
     emplaced_host = host_map_
                         .try_emplace(host, host_info,
-                                     std::make_shared<Upstream::LogicalHost>(
-                                         info(), std::string{host}, host_info->address(),
-                                         host_info->addressList(), dummy_locality_lb_endpoint_,
-                                         dummy_lb_endpoint_, nullptr, time_source_))
+                                     std::shared_ptr<Upstream::LogicalHost>(THROW_OR_RETURN_VALUE(
+                                         Upstream::LogicalHost::create(
+                                             info(), std::string{host}, host_info->address(),
+                                             host_info->addressList(), dummy_locality_lb_endpoint_,
+                                             dummy_lb_endpoint_, nullptr, time_source_),
+                                         std::unique_ptr<Upstream::LogicalHost>)))
                         .first->second.logical_host_;
   }
 
