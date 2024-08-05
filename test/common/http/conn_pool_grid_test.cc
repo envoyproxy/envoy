@@ -51,6 +51,8 @@ public:
     return grid.getOrCreateHttp2Pool();
   }
 
+  std::string getOriginHostname() { return origin_.hostname_; }
+
   ConnectionPool::InstancePtr createHttp3Pool(bool alternate) override {
     if (!alternate) {
       return createMockPool("http3");
@@ -177,8 +179,8 @@ public:
         std::make_unique<PersistentQuicInfo>();
 #endif
     host_ = std::make_shared<Upstream::HostImpl>(
-        cluster_, "hostname", *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), nullptr,
-        nullptr, 1, envoy::config::core::v3::Locality(),
+        cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
+        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
         envoy::config::core::v3::UNKNOWN, simTime(), address_list_);
 
@@ -213,7 +215,7 @@ public:
 
   HttpServerPropertiesCacheImpl::Origin origin_{"https", "hostname", 9000};
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   ConnectivityGrid::ConnectivityOptions options_;
   Upstream::ClusterConnectivityState state_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
@@ -236,11 +238,22 @@ public:
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
+  std::string host_impl_hostname_ = "hostname";
 };
+
+TEST_F(ConnectivityGridTest, NoServerNameOverride) {
+  host_impl_hostname_ = "custom_hostname";
+  transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>();
+  initialize();
+  // Without "hostname" in the TransportSocketOptionsImpl, this fails over to
+  // the host name in HostNameImpl
+  EXPECT_EQ(host_impl_hostname_, grid_->getOriginHostname());
+}
 
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
   initialize();
+  EXPECT_EQ("hostname", grid_->getOriginHostname());
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_->http3Pool(), nullptr);
   EXPECT_NE(grid_->newStream(decoder_, callbacks_,
