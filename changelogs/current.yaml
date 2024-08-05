@@ -20,7 +20,7 @@ minor_behavior_changes:
 - area: http3
   change: |
     HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
-    guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ip``.
+    guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips``.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
