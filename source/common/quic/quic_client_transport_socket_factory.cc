@@ -77,9 +77,10 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
 
   if (tls_config.client_context_ != context) {
     bool accept_untrusted =
+        clientContextConfig() && clientContextConfig()->certificateValidationContext() &&
         clientContextConfig()->certificateValidationContext()->trustChainVerification() ==
-        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
-            ACCEPT_UNTRUSTED;
+            envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                ACCEPT_UNTRUSTED;
     // If the context has been updated, update the crypto config.
     tls_config.client_context_ = context;
     tls_config.crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
