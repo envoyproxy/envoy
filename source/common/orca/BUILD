@@ -13,14 +13,12 @@ envoy_cc_library(
     srcs = ["orca_parser.cc"],
     hdrs = ["orca_parser.h"],
     external_deps = [
-        "abseil_flat_hash_set",
         "abseil_status",
         "abseil_strings",
         "abseil_statusor",
         "fmtlib",
     ],
     deps = [
-        "//envoy/common:exception_lib",
         "//envoy/http:header_map_interface",
         "//source/common/common:base64_lib",
         "//source/common/http:header_utility_lib",
