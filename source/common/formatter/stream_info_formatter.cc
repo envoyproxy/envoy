@@ -1534,7 +1534,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
           {"DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256",
            {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
+            [](const absl::string_view, absl::optional<size_t>) {
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
                     return absl::StrJoin(connection_info.sha256PeerCertificateChainDigests(), ",");
@@ -1542,7 +1542,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
           {"DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1",
            {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
+            [](const absl::string_view, absl::optional<size_t>) {
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
                     return absl::StrJoin(connection_info.sha1PeerCertificateChainDigests(), ",");
@@ -1550,7 +1550,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
           {"DOWNSTREAM_PEER_CHAIN_SERIALS",
            {CommandSyntaxChecker::COMMAND_ONLY,
-            [](const std::string&, absl::optional<size_t>) {
+            [](const absl::string_view, absl::optional<size_t>) {
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
                     return absl::StrJoin(connection_info.serialNumbersPeerCertificates(), ",");
