@@ -13,6 +13,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: command line options
+  change: |
+    :option:`--enable-fine-grain-logging` and :option:`--component-log-level` were incompatible in that one
+    would make the other ineffective. Setting both options at once is now an error, to reduce potential confusion.
 - area: tcp
   change: |
     Added support for :ref:`connection_pool_per_downstream_connection
