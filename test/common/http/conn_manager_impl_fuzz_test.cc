@@ -94,11 +94,12 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
-        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainManager& manager) -> bool {
-          return filter_factory_.createFilterChain(manager);
-        }));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
+        .WillRepeatedly(
+            Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                       FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
+              return filter_factory_.createFilterChain(manager);
+            }));
   }
 
   Http::ForwardClientCertType

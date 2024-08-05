@@ -13,7 +13,7 @@ def print_profile(f):
     prev_cmd = None
     prev_timestamp = None
     for line in f:
-        sr = re.match('\++ (\d+\.\d+) (.*)', line)
+        sr = re.match(r'\++ (\d+\.\d+) (.*)', line)
         if sr:
             timestamp, cmd = sr.groups()
             if prev_cmd:

@@ -113,9 +113,10 @@ public:
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
   using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
-                                        const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainManager& manager) const PURE;
+  virtual bool createUpgradeFilterChain(
+      absl::string_view upgrade, const UpgradeMap* per_route_upgrade_map,
+      FilterChainManager& manager,
+      const Http::FilterChainOptions& option = EmptyFilterChainOptions{}) const PURE;
 };
 
 } // namespace Http

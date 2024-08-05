@@ -36,7 +36,7 @@ WatcherImpl::~WatcherImpl() {
 absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events,
                                    Watcher::OnChangedCb cb) {
   absl::StatusOr<FileWatchPtr> watch_or_error = addWatch(path, events, cb, false);
-  RETURN_IF_STATUS_NOT_OK(watch_or_error);
+  RETURN_IF_NOT_OK_REF(watch_or_error.status());
   if (watch_or_error.value() == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("invalid watch path ", path));
   }
@@ -56,7 +56,7 @@ absl::StatusOr<WatcherImpl::FileWatchPtr> WatcherImpl::addWatch(absl::string_vie
     }
 
     const auto result_or_error = file_system_.splitPathFromFilename(path);
-    RETURN_IF_STATUS_NOT_OK(result_or_error);
+    RETURN_IF_NOT_OK_REF(result_or_error.status());
     watch_fd = open(std::string(result_or_error.value().directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
@@ -116,7 +116,7 @@ absl::Status WatcherImpl::onKqueueEvent() {
 
     absl::StatusOr<PathSplitResult> pathname_or_error =
         file_system_.splitPathFromFilename(file->file_);
-    RETURN_IF_STATUS_NOT_OK(pathname_or_error);
+    RETURN_IF_NOT_OK_REF(pathname_or_error.status());
     PathSplitResult& pathname = pathname_or_error.value();
 
     if (file->watching_dir_) {
@@ -129,7 +129,7 @@ absl::Status WatcherImpl::onKqueueEvent() {
       if (event.fflags & NOTE_WRITE) {
         // directory was written -- check if the file we're actually watching appeared
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
-        RETURN_IF_STATUS_NOT_OK(file_or_error);
+        RETURN_IF_NOT_OK_REF(file_or_error.status());
         FileWatchPtr new_file = file_or_error.value();
         if (new_file != nullptr) {
           removeWatch(file);
@@ -150,7 +150,7 @@ absl::Status WatcherImpl::onKqueueEvent() {
         removeWatch(file);
 
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
-        RETURN_IF_STATUS_NOT_OK(file_or_error);
+        RETURN_IF_NOT_OK_REF(file_or_error.status());
         FileWatchPtr new_file = file_or_error.value();
         if (new_file == nullptr) {
           return absl::OkStatus();

@@ -209,7 +209,7 @@ public:
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager),
+               FilterChainManager& manager, const Http::FilterChainOptions&),
               (const));
 };
 
@@ -231,6 +231,14 @@ public:
   MOCK_METHOD(void, clearRouteCache, ());
 
   std::shared_ptr<Router::MockRoute> route_;
+};
+
+class MockSidestreamWatermarkCallbacks : public SidestreamWatermarkCallbacks {
+public:
+  ~MockSidestreamWatermarkCallbacks() override = default;
+
+  MOCK_METHOD(void, onSidestreamAboveHighWatermark, ());
+  MOCK_METHOD(void, onSidestreamBelowLowWatermark, ());
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
@@ -565,7 +573,7 @@ public:
     destructor_callback_ = callback;
   }
   void removeDestructorCallback() override { destructor_callback_.reset(); }
-  MOCK_METHOD(void, setWatermarkCallbacks, (DecoderFilterWatermarkCallbacks & callback),
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks & callback),
               (override));
   MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));

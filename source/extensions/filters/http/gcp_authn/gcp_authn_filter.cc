@@ -74,8 +74,12 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
     // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
     // with real audience string from the config.
-    std::string final_url =
-        absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str_}});
+
+    std::string final_url = absl::StrReplaceAll(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.gcp_authn_use_fixed_url")
+            ? UrlString
+            : filter_config_->http_uri().uri(),
+        {{"[AUDIENCE]", audience_str_}});
     client_->fetchToken(*this, buildRequest(final_url));
     initiating_call_ = false;
   } else {
