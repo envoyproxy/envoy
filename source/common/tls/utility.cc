@@ -466,15 +466,15 @@ std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
 
 std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
                                                std::function<std::string(X509&)> field_extractor) {
-
+  std::vector<std::string> result;
   if (sk_X509_num(&stack) <= 0) {
     IS_ENVOY_BUG("x509 stack is empty or NULL");
+    return result;
   }
   if (field_extractor == nullptr) {
     IS_ENVOY_BUG("field_extractor is nullptr");
+    return result;
   }
-  ASSERT(field_extractor);
-  std::vector<std::string> result;
 
   for (uint64_t i = 0; i < sk_X509_num(&stack); i++) {
     X509* cert = sk_X509_value(&stack, i);
