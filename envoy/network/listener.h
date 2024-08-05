@@ -358,6 +358,7 @@ struct UdpRecvData {
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
   uint8_t tos_ = 0;
+  Buffer::RawSlice saved_cmsg_;
 };
 
 /**
@@ -446,6 +447,11 @@ public:
    * An estimated number of UDP packets this callback expects to process in current read event.
    */
   virtual size_t numPacketsExpectedPerEventLoop() const PURE;
+
+  /**
+   * Information about which cmsg to save to QuicReceivedPacket, if any.
+   */
+  virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
 using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;

@@ -15,9 +15,11 @@ namespace Network {
 
 Api::IoCallUint64Result TestIoSocketHandle::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
+                                                    const UdpSaveCmsgConfig& save_cmsg_config,
                                                     RecvMsgOutput& output) {
 
-  auto result = Test::IoSocketHandlePlatformImpl::recvmsg(slices, num_slice, self_port, output);
+  auto result = Test::IoSocketHandlePlatformImpl::recvmsg(slices, num_slice, self_port,
+                                                          save_cmsg_config, output);
   if (read_override_) {
     read_override_(output);
   }

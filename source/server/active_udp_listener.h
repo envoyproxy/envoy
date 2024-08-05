@@ -87,6 +87,10 @@ public:
     // TODO(mattklein123) change this to a reasonable number if needed.
     return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
   }
+  const Network::IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const override {
+    static const Network::IoHandle::UdpSaveCmsgConfig empty_config{};
+    return empty_config;
+  }
 
   // Network::UdpWorker
   void onDataWorker(Network::UdpRecvData&& data) override;

@@ -647,8 +647,8 @@ private:
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                        Network::Address::InstanceConstSharedPtr peer_address,
-                       Buffer::InstancePtr buffer, MonotonicTime receive_time,
-                       uint8_t tos) override;
+                       Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                       Buffer::RawSlice* saved_csmg) override;
 
     uint64_t maxDatagramSize() const override {
       return cluster_.filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
