@@ -411,7 +411,7 @@ public:
     // Avoid host-specific domain search behavior when testing to improve
     // determinism.
     options.ndomains = 0;
-    options.timeout = 0;
+    options.timeout = zero_timeout ? 1 : 0;
     resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
                                                (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
   }
@@ -1937,13 +1937,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplZeroTimeoutTest,
 // Validate that timeouts result in an empty callback.
 TEST_P(DnsImplZeroTimeoutTest, Timeout) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
-
+  listener_.reset(); // reset connection to cause timeout
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 1 /*timeouts*/);
+             0 /*get_addr_failure*/, 3 /*timeouts*/);
 }
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
