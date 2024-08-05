@@ -13,6 +13,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: command line options
+  change: |
+    :option:`--enable-fine-grain-logging` and :option:`--component-log-level` were incompatible in that one
+    would make the other ineffective. Setting both options at once is now an error, to reduce potential confusion.
 - area: tcp
   change: |
     Added support for :ref:`connection_pool_per_downstream_connection
@@ -129,6 +133,10 @@ new_features:
   change: |
     Added support for :ref:`%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1% <config_access_log_format_response_flags>`,
     ``%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256``, and ``%DOWNSTREAM_PEER_CHAIN_SERIALS%``, as access log formatters.
+- area: matching
+  change: |
+    Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
+    and :ref:`Dynamic metadata input matcher <extension_envoy.matching.matchers.metadata_matcher>`.
 - area: ratelimit
   change: |
     Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
