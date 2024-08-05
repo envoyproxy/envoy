@@ -4,6 +4,8 @@ package envoy.extensions.http.original_ip_detection.xff.v3;
 
 import "envoy/config/core/v3/address.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.original_ip_detection.xff.v3";
@@ -51,14 +53,22 @@ message XffConfig {
   // If set, takes precedence over ``xff_num_trusted_hops``.
   XffTrustedCidrs xff_trusted_cidrs = 2;
 
-  // Whether to append the detected trusted client IP address to ``x-forwarded-for``.
+  // If set, Envoy will not append the remote address to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header.
+  //
+  // .. attention::
+  //
+  //   For proper proxy behaviour it is not recommended to set this option.
+  //   For backwards compatibility, if this option is unset and
+  //   ``xff_num_trusted_hops`` is set, it defaults to true. When
+  //   ``xff_trusted_cidrs`` is set, it defaults to false.
   //
   // This only applies when :ref:`use_remote_address
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
   // is false, otherwise :ref:`skip_xff_append
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
   // applies.
-  bool append_xff = 3;
+  google.protobuf.BoolValue skip_xff_append = 3;
 }
 
 message XffTrustedCidrs {

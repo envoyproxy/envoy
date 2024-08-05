@@ -176,7 +176,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
       if (result.reject_options.has_value()) {
         return {nullptr, result.reject_options};
       }
-      if (result.append_xff) {
+      if (!result.skip_xff_append) {
         appendXff(request_headers, connection, config);
       }
 

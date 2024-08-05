@@ -386,7 +386,6 @@ Example 8: Envoy as edge proxy, with two trusted CIDRs
     Settings:
       | use_remote_address = false
       | xff_trusted_cidrs = 192.0.2.0/24, 198.51.100.0/24
-      | append_xff = true
 
     Request details:
       | Downstream IP address = 192.0.2.5

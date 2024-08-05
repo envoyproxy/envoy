@@ -118,7 +118,7 @@ public:
         .WillByDefault(Return(envoy::extensions::filters::network::http_connection_manager::v3::
                                   HttpConnectionManager::KEEP_UNCHANGED));
 
-    detection_extensions_.push_back(getXFFExtension(0, false));
+    detection_extensions_.push_back(getXFFExtension(0, true));
     ON_CALL(config_, originalIpDetectionExtensions())
         .WillByDefault(ReturnRef(detection_extensions_));
   }
@@ -509,7 +509,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   // Reconfigure XFF detection.
   detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(1, false));
+  detection_extensions_.push_back(getXFFExtension(1, true));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -525,7 +525,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
 // Verify that xff_num_trusted_hops appends XFF with the remote address.
 TEST_F(ConnectionManagerUtilityTest, XFFTrustedHopsAppendsXFF) {
   detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(1, true));
+  detection_extensions_.push_back(getXFFExtension(1, false));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -547,7 +547,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRs) {
       Network::Address::CidrRange::create("198.51.100.0", 24).value(),
   };
   detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(cidrs, true));
+  detection_extensions_.push_back(getXFFExtension(cidrs, false));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -568,7 +568,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsSkipAppendXFF) {
       Network::Address::CidrRange::create("198.51.100.0", 24).value(),
   };
   detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(cidrs, false));
+  detection_extensions_.push_back(getXFFExtension(cidrs, true));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -588,7 +588,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsFailsOnBadIP) {
       Network::Address::CidrRange::create("198.51.100.0", 24).value(),
   };
   detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(cidrs, true));
+  detection_extensions_.push_back(getXFFExtension(cidrs, false));
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
