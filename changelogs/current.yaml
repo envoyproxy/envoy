@@ -15,10 +15,12 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
 - area: http3
   change: |
-    The ACCEPT_UNTRUSTED option now works more consistently for HTTP/3 requests. This change is guarded by ``envoy.reloadable_features.extend_h3_accept_untrusted``.
+    The ACCEPT_UNTRUSTED option now works more consistently for HTTP/3 requests. This change is
+    guarded by ``envoy.reloadable_features.extend_h3_accept_untrusted``.
 - area: http3
   change: |
-    HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ip``.
+    HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
+    guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ip``.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
