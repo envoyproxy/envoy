@@ -47,7 +47,11 @@ public:
     uri.set_uri("auth.com/oauth/token");
     uri.mutable_timeout()->set_seconds(1);
     cm_.initializeThreadLocalClusters({"auth"});
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, 0s);
+    retry_policy_.set_retry_on("5xx");
+    retry_policy_.mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
+    retry_policy_.mutable_retry_back_off()->mutable_max_interval()->set_seconds(10);
+    retry_policy_.mutable_num_retries()->set_value(5);
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, retry_policy_, 0s);
   }
 
   ABSL_MUST_USE_RESULT
@@ -65,6 +69,7 @@ public:
   std::shared_ptr<MockCallbacks> mock_callbacks_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
+  RouteRetryPolicy retry_policy_;
   std::shared_ptr<OAuth2Client> client_;
 };
 
@@ -166,7 +171,12 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenDefaultExpiresIn) {
   uri.set_cluster("auth");
   uri.set_uri("auth.com/oauth/token");
   uri.mutable_timeout()->set_seconds(1);
-  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, 2000s);
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  retry_policy.set_retry_on("5xx");
+  retry_policy.mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
+  retry_policy.mutable_retry_back_off()->mutable_max_interval()->set_seconds(10);
+  retry_policy.mutable_num_retries()->set_value(5);
+  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, retry_policy, 2000s);
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());

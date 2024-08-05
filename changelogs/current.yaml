@@ -125,6 +125,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: oauth
+  change: |
+    Added :ref:`retry_policy <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.retry_policy>` to reconnect to
+    the auth server when a connection fails to be established.
 - area: ratelimit
   change: |
     Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
