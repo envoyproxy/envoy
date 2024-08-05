@@ -580,10 +580,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       (upstream_http_protocol_options.value().auto_sni() ||
        upstream_http_protocol_options.value().auto_san_validation())) {
     // Default the header to Host/Authority header.
-    auto header_value = headers.getHostValue();
-    if (Runtime::runtimeFeatureEnabled(
+    std::string header_value = route_entry_->getRequestHostValue(headers);
+    if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.use_route_host_mutation_for_auto_sni")) {
-      header_value = route_entry_->getRequestHostValue(headers);
+      header_value = std::string(headers.getHostValue());
     }
 
     // Check whether `override_auto_sni_header` is specified.
