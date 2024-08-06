@@ -12,7 +12,7 @@ parameters:
   type: object
   default:
   - env
-  - linux_x64
+  - prechecks
 - name: concurrencyChecks
   displayName: "Check concurrency"
   type: number
@@ -59,40 +59,6 @@ stages:
       bucketGCP: $(GcsArtifactBucket)
       runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
 
-- stage: linux_x64
-  displayName: Linux x64
-  dependsOn: ${{ parameters.buildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
-  jobs:
-  - template: stage/linux.yml
-    parameters:
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      bazelConfigRBE: --config=remote-ci --config=rbe-google --jobs=200
-      pool: envoy-x64-large
-      # these are parsed differently and _must_ be expressed in this way
-      runBuild: variables['RUN_BUILD']
-      runTests: $(RUN_TESTS)
-
-- stage: linux_arm64
-  displayName: Linux arm64
-  dependsOn: ${{ parameters.buildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
-  jobs:
-  - template: stage/linux.yml
-    parameters:
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      rbe: false
-      artifactSuffix: .arm64
-      timeoutBuild: 180
-      pool: envoy-arm-large
-      runBuild: variables['RUN_BUILD']
-      runTests: $(RUN_TESTS)
-      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
-
 - stage: check
   displayName: Checks (Linux x64)
   dependsOn: ${{ parameters.checkStageDeps }}
@@ -110,8 +76,9 @@ stages:
 
 - stage: publish
   displayName: Publish
-  dependsOn: ["env", "linux_x64", "linux_arm64"]
+  dependsOn: ["env", "prechecks"]
   variables:
+    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
     RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
     RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
     PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
@@ -131,6 +98,7 @@ stages:
       bucketGCP: $(GcsArtifactBucket)
       timeoutDockerBuild: ${{ parameters.timeoutDockerBuild }}
       timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
+      runBuild: variables['RUN_BUILD']
       runDocker: variables['RUN_DOCKER']
       runPackaging: variables['RUN_PACKAGING']
       publishDockerhub: variables['PUBLISH_DOCKERHUB']
