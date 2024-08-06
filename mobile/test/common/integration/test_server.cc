@@ -203,8 +203,14 @@ void TestServer::start(TestServerType type, int port) {
   }
   }
 
-  upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
-                                                   upstream_config_, true);
+  if (version_ == Network::Address::IpVersion::v4) {
+    auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.3", port_);
+    upstream_ =
+        std::make_unique<AutonomousUpstream>(std::move(factory), address, upstream_config_, true);
+  } else {
+    upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
+                                                     upstream_config_, true);
+  }
 
   // Legacy behavior for cronet tests.
   if (type == TestServerType::HTTP3) {
