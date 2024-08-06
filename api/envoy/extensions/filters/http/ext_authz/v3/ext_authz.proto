@@ -296,7 +296,15 @@ message ExtAuthz {
   // Additional metadata to be added to the filter state for logging purposes. The metadata will be
   // added to StreamInfo's filter state under the namespace corresponding to the ext_authz filter
   // name.
+  //
+  // If this is unset and ``emit_filter_state_stats`` is false, the filter will not emit any filter
+  // state.
   google.protobuf.Struct filter_metadata = 28;
+
+  // When set to true, the filter will emit per-stream stats for accessing logging.
+  //
+  // If this is false and ``filter_metadata`` is unset, the filter will not emit any filter state.
+  bool emit_filter_state_stats = 29;
 }
 
 // Configuration for buffering the request data.
