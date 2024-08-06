@@ -47,6 +47,13 @@ public:
    * watermarks have gone below.
    */
   virtual void onSidestreamBelowLowWatermark() PURE;
+
+  /**
+    Sidestream subscribes to downstream watermark events.
+  */
+  virtual void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+  virtual void
+  removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
 /**

@@ -33,6 +33,20 @@ public:
     }
   }
 
+  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
+    if (decode_callback_ != nullptr) {
+      // Sidestream subscribes to downstream watermark events.
+      decoder_callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+    }
+  }
+
+  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
+    if (decode_callback_ != nullptr) {
+      // Sidestream stop subscribing to downstream watermark events.
+      decoder_callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
+    }
+  }
+
   /**
    * The set function needs to be called by stream decoder filter before side stream connection is
    * established, to apply the backpressure to downstream when it is above watermark,
