@@ -100,6 +100,12 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.options_.udp_max_queries = udp_max_queries_;
   }
 
+  // This block reinstates cares defaults before https://github.com/c-ares/c-ares/pull/542
+  options.optmask_ |= ARES_OPT_TIMEOUT;
+  options.options_.timeout = 5;
+  options.optmask_ |= ARES_OPT_TRIES;
+  options.options_.tries = 4;
+
   return options;
 }
 
@@ -577,7 +583,7 @@ public:
       resolvers.reserve(resolver_addrs.size());
       for (const auto& resolver_addr : resolver_addrs) {
         auto address_or_error = Network::Address::resolveProtoAddress(resolver_addr);
-        RETURN_IF_STATUS_NOT_OK(address_or_error);
+        RETURN_IF_NOT_OK_REF(address_or_error.status());
         resolvers.push_back(std::move(address_or_error.value()));
       }
     }

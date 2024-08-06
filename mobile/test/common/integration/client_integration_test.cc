@@ -1015,7 +1015,7 @@ TEST_P(ClientIntegrationTest, CancelDuringResponse) {
     ASSERT_TRUE(
         waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR", 1));
     ASSERT_TRUE(waitForCounterGe(
-        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED", 1));
+        "http3.upstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED", 1));
   }
 }
 
@@ -1304,33 +1304,6 @@ TEST_P(ClientIntegrationTest, Proxying) {
   terminal_callback_.waitReady();
   ASSERT_EQ(cc_.status_, "200");
   ASSERT_EQ(cc_.on_complete_calls_, 2);
-}
-
-TEST_P(ClientIntegrationTest, DirectResponse) {
-  initialize();
-
-  // Override to not validate stream intel.
-  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    cc_.on_complete_received_byte_count_ = final_intel.received_byte_count;
-    cc_.on_complete_calls_++;
-    cc_.terminal_callback_->setReady();
-  };
-
-  default_request_headers_.setHost("127.0.0.1");
-  default_request_headers_.setPath("/");
-
-  stream_ = createNewStream(std::move(stream_callbacks));
-  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
-                       true);
-  terminal_callback_.waitReady();
-  ASSERT_EQ(cc_.status_, "404");
-  ASSERT_EQ(cc_.on_headers_calls_, 1);
-  stream_.reset();
-
-  // Verify the default runtime values.
-  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
-  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 TEST_P(ClientIntegrationTest, TestRuntimeSet) {

@@ -347,6 +347,7 @@ envoy_cc_test_binary(
         "abseil_symbolize",
     ],
     deps = [
+        ":common_extensions_lib",
         "//source/common/http:rds_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -369,6 +370,7 @@ envoy_cc_test_binary(
     ],
     linkstatic = envoy_select_linkstatic(),
     deps = [
+        ":common_extensions_lib",
         "//source/exe:main_common_lib",
         "//source/exe:platform_impl_lib",
         "//source/exe:process_wide_lib",
@@ -569,6 +571,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
@@ -1116,6 +1119,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "common_extensions_lib",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/extensions/clusters/eds:eds_lib",
@@ -1368,6 +1372,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/http/match_delegate:config",
+        "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1900,6 +1905,8 @@ envoy_cc_test(
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//source/extensions/upstreams/http/udp:config",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",

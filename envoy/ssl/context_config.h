@@ -200,6 +200,16 @@ public:
    */
   virtual bool fullScanCertsOnSNIMismatch() const PURE;
 
+  /**
+   * @return true if the client cipher preference is enabled, false otherwise.
+   */
+  virtual bool preferClientCiphers() const PURE;
+
+  /**
+   * @return a factory which can be used to create TLS context provider instances.
+   */
+  virtual TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
+
   virtual bool enableTlsSessionCache() const PURE;
 
   virtual const envoy::config::core::v3::GrpcService& tlsSessionCacheGrpcService() const PURE;

@@ -1,1 +1,1 @@
-FROM openpolicyagent/opa:0.65.0-istio@sha256:eba0c7092641cc57692876809923d1801f1a6de87c83b643506f19dd87af6aca
+FROM openpolicyagent/opa:0.67.0-istio@sha256:41512cb576ba71c2a7267a64958f9f866d549fd681792eac1679cccd3f8b0276

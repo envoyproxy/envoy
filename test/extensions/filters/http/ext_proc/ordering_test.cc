@@ -84,10 +84,10 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                             const Grpc::GrpcServiceConfigWithHashKey&,
-                                             const Envoy::Http::AsyncClient::StreamOptions&,
-                                             Envoy::Http::DecoderFilterWatermarkCallbacks*) {
+  virtual ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const Envoy::Http::AsyncClient::StreamOptions&,
+          Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -223,10 +223,10 @@ protected:
 // A base class for tests that will check that gRPC streams fail while being created
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const Grpc::GrpcServiceConfigWithHashKey&,
-                                     const Envoy::Http::AsyncClient::StreamOptions&,
-                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) override {
+  ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const Envoy::Http::AsyncClient::StreamOptions&,
+          Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) override {
     callbacks.onGrpcError(Grpc::Status::Internal);
     // Returns nullptr on start stream failure.
     return nullptr;

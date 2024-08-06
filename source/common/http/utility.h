@@ -519,7 +519,8 @@ void transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers, absl::string
  * order is:
  * - the routeEntry() (for config that's applied on weighted clusters)
  * - the route
- * - and finally from the virtual host object (routeEntry()->virtualhost()).
+ * - the virtual host object
+ * - the route configuration
  *
  * To use, simply:
  *

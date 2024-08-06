@@ -21,8 +21,8 @@ void truncate(std::string& str, absl::optional<size_t> max_length) {
 
 } // namespace
 
-ReqWithoutQuery::ReqWithoutQuery(const std::string& main_header,
-                                 const std::string& alternative_header,
+ReqWithoutQuery::ReqWithoutQuery(absl::string_view main_header,
+                                 absl::string_view alternative_header,
                                  absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
@@ -66,16 +66,14 @@ const Http::HeaderEntry* ReqWithoutQuery::findHeader(const Http::HeaderMap& head
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
-ReqWithoutQueryCommandParser::parse(const std::string& command, const std::string& subcommand,
-                                    absl::optional<size_t>& max_length) const {
+ReqWithoutQueryCommandParser::parse(absl::string_view command, absl::string_view subcommand,
+                                    absl::optional<size_t> max_length) const {
   if (command == "REQ_WITHOUT_QUERY") {
-    std::string main_header, alternative_header;
-
-    THROW_IF_NOT_OK(Envoy::Formatter::SubstitutionFormatUtils::parseSubcommandHeaders(
-        subcommand, main_header, alternative_header));
-    return std::make_unique<ReqWithoutQuery>(main_header, alternative_header, max_length);
+    auto status_or = Envoy::Formatter::SubstitutionFormatUtils::parseSubcommandHeaders(subcommand);
+    THROW_IF_NOT_OK_REF(status_or.status());
+    return std::make_unique<ReqWithoutQuery>(status_or.value().first, status_or.value().second,
+                                             max_length);
   }
-
   return nullptr;
 }
 

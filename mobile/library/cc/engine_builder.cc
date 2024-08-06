@@ -240,8 +240,13 @@ EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setSocketReceiveBufferSize(int32_t size) {
-  socket_receive_buffer_size_ = size;
+EngineBuilder& EngineBuilder::setUdpSocketReceiveBufferSize(int32_t size) {
+  udp_socket_receive_buffer_size_ = size;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setUdpSocketSendBufferSize(int32_t size) {
+  udp_socket_send_buffer_size_ = size;
   return *this;
 }
 
@@ -318,6 +323,11 @@ EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
   respect_system_proxy_settings_ = value;
   return *this;
 }
+
+EngineBuilder& EngineBuilder::setIosNetworkServiceType(int ios_network_service_type) {
+  ios_network_service_type_ = ios_network_service_type;
+  return *this;
+}
 #endif
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
@@ -335,25 +345,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
   auto* route_config = hcm->mutable_route_config();
   route_config->set_name("api_router");
-  auto* remote_service = route_config->add_virtual_hosts();
-  remote_service->set_name("remote_service");
-  remote_service->add_domains("127.0.0.1");
 
-  auto* route = remote_service->add_routes();
-  route->mutable_match()->set_prefix("/");
-  route->mutable_direct_response()->set_status(404);
-  route->mutable_direct_response()->mutable_body()->set_inline_string("not found");
-  route->add_request_headers_to_remove("x-forwarded-proto");
-  route->add_request_headers_to_remove("x-envoy-mobile-cluster");
   auto* api_service = route_config->add_virtual_hosts();
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
 
-  route = api_service->add_routes();
+  auto* route = api_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->add_request_headers_to_remove("x-forwarded-proto");
   route->add_request_headers_to_remove("x-envoy-mobile-cluster");
+  route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
   auto* route_to = route->mutable_route();
   route_to->set_cluster_header("x-envoy-mobile-cluster");
   route_to->mutable_timeout()->set_seconds(0);
@@ -716,18 +718,39 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
             .PackFrom(alpn_options);
 
-    // Set the upstream connections socket receive buffer size. The operating system defaults are
-    // usually too small for QUIC.
-    // NOTE: An H3 cluster can also establish H2 connections (for example, if the H3 connection is
-    // marked as broken in the ConnectivityGrid). This option would apply to all connections in the
-    // cluster, meaning H2 TCP connections buffer size would also be set to 1MB. On the platforms
-    // we've tested, IPPROTO_UDP cannot be used as a level for the SO_RCVBUF option.
-    envoy::config::core::v3::SocketOption* sock_opt =
+    // Set the upstream connections UDP socket receive buffer size. The operating system defaults
+    // are usually too small for QUIC.
+    envoy::config::core::v3::SocketOption* udp_rcv_buf_sock_opt =
         base_cluster->mutable_upstream_bind_config()->add_socket_options();
-    sock_opt->set_name(SO_RCVBUF);
-    sock_opt->set_level(SOL_SOCKET);
-    sock_opt->set_int_value(socket_receive_buffer_size_);
-    sock_opt->set_description(absl::StrCat("SO_RCVBUF = ", socket_receive_buffer_size_, " bytes"));
+    udp_rcv_buf_sock_opt->set_name(SO_RCVBUF);
+    udp_rcv_buf_sock_opt->set_level(SOL_SOCKET);
+    udp_rcv_buf_sock_opt->set_int_value(udp_socket_receive_buffer_size_);
+    // Only apply the socket option to the datagram socket.
+    udp_rcv_buf_sock_opt->mutable_type()->mutable_datagram();
+    udp_rcv_buf_sock_opt->set_description(
+        absl::StrCat("UDP SO_RCVBUF = ", udp_socket_receive_buffer_size_, " bytes"));
+
+    envoy::config::core::v3::SocketOption* udp_snd_buf_sock_opt =
+        base_cluster->mutable_upstream_bind_config()->add_socket_options();
+    udp_snd_buf_sock_opt->set_name(SO_SNDBUF);
+    udp_snd_buf_sock_opt->set_level(SOL_SOCKET);
+    udp_snd_buf_sock_opt->set_int_value(udp_socket_send_buffer_size_);
+    // Only apply the socket option to the datagram socket.
+    udp_snd_buf_sock_opt->mutable_type()->mutable_datagram();
+    udp_snd_buf_sock_opt->set_description(
+        absl::StrCat("UDP SO_SNDBUF = ", udp_socket_send_buffer_size_, " bytes"));
+    // Set the network service type on iOS, if supplied.
+#if defined(__APPLE__)
+    if (ios_network_service_type_ > 0) {
+      envoy::config::core::v3::SocketOption* net_svc_sock_opt =
+          base_cluster->mutable_upstream_bind_config()->add_socket_options();
+      net_svc_sock_opt->set_name(SO_NET_SERVICE_TYPE);
+      net_svc_sock_opt->set_level(SOL_SOCKET);
+      net_svc_sock_opt->set_int_value(ios_network_service_type_);
+      net_svc_sock_opt->set_description(
+          absl::StrCat("SO_NET_SERVICE_TYPE = ", ios_network_service_type_));
+    }
+#endif
   }
 
   // Set up stats.
