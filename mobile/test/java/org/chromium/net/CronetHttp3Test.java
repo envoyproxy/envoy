@@ -53,8 +53,6 @@ public class CronetHttp3Test {
   private CronvoyLogger logger;
   // The engine for this test.
   private CronvoyUrlRequestContext cronvoyEngine;
-  // The engine builder for this test.
-  private NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder;
   // A URL which will point to the IP and port of the test servers.
   private String testServerUrl;
 
@@ -114,7 +112,7 @@ public class CronetHttp3Test {
     }
   }
 
-  TestUrlRequestCallback doBasicGetRequest() {
+  private TestUrlRequestCallback doBasicGetRequest() {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     UrlRequest.Builder urlRequestBuilder =
         cronvoyEngine.newUrlRequestBuilder(testServerUrl, callback, callback.getExecutor());
@@ -124,7 +122,7 @@ public class CronetHttp3Test {
   }
 
   // Sets up a basic POST request with 4 byte body, set idempotent.
-  TestUrlRequestCallback doBasicPostRequest() {
+  private TestUrlRequestCallback doBasicPostRequest() {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     ExperimentalUrlRequest.Builder urlRequestBuilder =
         cronvoyEngine.newUrlRequestBuilder(testServerUrl, callback, callback.getExecutor());
@@ -181,26 +179,26 @@ public class CronetHttp3Test {
 
     // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
     // advertisement.
-    TestUrlRequestCallback get_callback = doBasicGetRequest();
+    TestUrlRequestCallback getCallback = doBasicGetRequest();
 
     // Verify the second request used HTTP/3
-    assertEquals(200, get_callback.mResponseInfo.getHttpStatusCode());
-    assertEquals("h3", get_callback.mResponseInfo.getNegotiatedProtocol());
+    assertEquals(200, getCallback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", getCallback.mResponseInfo.getNegotiatedProtocol());
 
     // Now stop the HTTP/3 server.
     http3TestServer.shutdown();
     http3TestServer = null;
 
     // The next request will fail on HTTP2 but should succeed on HTTP/2 despite having a body.
-    TestUrlRequestCallback post_callback = doBasicPostRequest();
-    assertEquals(200, post_callback.mResponseInfo.getHttpStatusCode());
-    assertEquals("h2", post_callback.mResponseInfo.getNegotiatedProtocol());
+    TestUrlRequestCallback postCallback = doBasicPostRequest();
+    assertEquals(200, postCallback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h2", postCallback.mResponseInfo.getNegotiatedProtocol());
   }
 
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  public void testNoRetryPostPostHandshake() throws Exception {
+  public void testNoRetryPostAfterHandshake() throws Exception {
     setUp(printEnvoyLogs);
 
     // Do the initial HTTP/2 request to get the alt-svc response.
@@ -286,8 +284,8 @@ public class CronetHttp3Test {
     retryPostHandshake();
 
     // From prior calls, there was one HTTP/3 connection established.
-    String pre_stats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(pre_stats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    String preStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(preStats.contains("cluster.base.upstream_cx_http3_total: 1"));
 
     // This should change QUIC brokenness to "failed recently".
     cronvoyEngine.getEnvoyEngine().setPreferredNetwork(EnvoyNetworkType.WLAN);
@@ -295,7 +293,7 @@ public class CronetHttp3Test {
     // The next request may go out over HTTP/2 or HTTP/3 (depends on who wins the race)
     // but HTTP/3 will be tried.
     doBasicGetRequest();
-    String post_stats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(post_stats.contains("cluster.base.upstream_cx_http3_total: 2"));
+    String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
   }
 }
