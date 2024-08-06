@@ -447,10 +447,13 @@ message HttpConnectionManager {
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
-  // If set to true, :ref:`common_http_protocol_options.max_connection_duration
-  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` will not
-  // trigger Envoy to close HTTP1 connections. Instead, Envoy will only add the Connection:close
-  // response header to all responses until the client chooses to close the connection.
+  // If set to true, Envoy will not start a drain timer for downstream HTTP1 connections after
+  // :ref:`common_http_protocol_options.max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` passes.
+  // Instead, Envoy will wait for the next downstream request, add connection:close to the response
+  // headers, then close the connection after the stream ends.
+  //
+  // This behavior is compliant with `RFC 9112 section 9.6 <https://www.rfc-editor.org/rfc/rfc9112#name-tear-down>`_
   //
   // If set to false, ``max_connection_duration`` will cause Envoy to enter the normal drain
   // sequence for HTTP1 with Envoy eventually closing the connection (once there are no active
