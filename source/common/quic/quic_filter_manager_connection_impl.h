@@ -173,8 +173,6 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
-  bool fixQuicLifetimeIssues() const { return fix_quic_lifetime_issues_; }
-
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
 
@@ -233,7 +231,6 @@ private:
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
   absl::optional<Network::ConnectionCloseType> close_type_during_initialize_;
-  bool fix_quic_lifetime_issues_{false};
 };
 
 } // namespace Quic

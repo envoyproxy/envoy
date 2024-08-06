@@ -549,9 +549,9 @@ fasteners==0.19 \
     # via
     #   google-apitools
     #   gsutil
-flake8==7.1.0 \
-    --hash=sha256:2e416edcc62471a64cea09353f4e7bdba32aeb079b6e360554c659a122b1bc6a \
-    --hash=sha256:48a07b626b55236e0fb4784ee69a465fbf59d79eec1f5b4785c3d3bc57d17aa5
+flake8==7.1.1 \
+    --hash=sha256:049d058491e228e03e67b390f311bbf88fce2dbaa8fa673e7aea87b7198b8d38 \
+    --hash=sha256:597477df7860daa5aa0fdd84bf5208a043ab96b8e96ab708770ae0364dd03213
     # via
     #   -r requirements.in
     #   envoy-code-check
