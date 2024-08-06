@@ -960,7 +960,7 @@ case $CI_TARGET in
         ;;
 
     verify_examples)
-        run_ci_verify "*" "win32-front-proxy|shared"
+        run_ci_verify "*" "win32-front-proxy|shared|dlb"
         ;;
 
     verify.trigger)
