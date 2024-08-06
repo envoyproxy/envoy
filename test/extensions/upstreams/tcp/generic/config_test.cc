@@ -31,7 +31,7 @@ public:
     EXPECT_CALL(lb_context_, downstreamConnection()).WillRepeatedly(Return(&connection_));
   }
 
-  void setup() {
+  void SetUp() override {
     scoped_runtime_.mergeValues({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
                                   GetParam() ? "true" : "false"}});
   }
@@ -54,7 +54,6 @@ INSTANTIATE_TEST_SUITE_P(UpstreamHttpFiltersWithTunneling, TcpConnPoolTest,
                          ::testing::Values(true, false));
 
 TEST_P(TcpConnPoolTest, TestNoTunnelingConfig) {
-  setup();
   EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(),
@@ -62,7 +61,6 @@ TEST_P(TcpConnPoolTest, TestNoTunnelingConfig) {
 }
 
 TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
-  setup();
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
@@ -79,7 +77,6 @@ TEST_P(TcpConnPoolTest, TestTunnelingDisabledByFilterState) {
 }
 
 TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
-  setup();
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
@@ -99,7 +96,6 @@ TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
 }
 
 TEST_P(TcpConnPoolTest, TestNoConnPool) {
-  setup();
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
@@ -112,7 +108,6 @@ TEST_P(TcpConnPoolTest, TestNoConnPool) {
 }
 
 TEST_P(TcpConnPoolTest, Http2Config) {
-  setup();
   auto info = std::make_shared<Upstream::MockClusterInfo>();
   const std::string fake_cluster_name = "fake_cluster";
 
@@ -128,7 +123,6 @@ TEST_P(TcpConnPoolTest, Http2Config) {
 }
 
 TEST_P(TcpConnPoolTest, Http3Config) {
-  setup();
   auto info = std::make_shared<Upstream::MockClusterInfo>();
   const std::string fake_cluster_name = "fake_cluster";
   EXPECT_CALL(*info, features())
