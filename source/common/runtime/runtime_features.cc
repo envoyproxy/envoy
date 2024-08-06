@@ -73,7 +73,6 @@ RUNTIME_GUARD(envoy_reloadable_features_prefer_ipv6_dns_on_macos);
 RUNTIME_GUARD(envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
-RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
 RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
