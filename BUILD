@@ -69,13 +69,6 @@ package_group(
 )
 
 package_group(
-    name = "examples_library",
-    packages = [
-        "//examples/...",
-    ],
-)
-
-package_group(
     name = "mobile_library",
     packages = [
         "//mobile/...",
