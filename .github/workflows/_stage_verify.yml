@@ -49,24 +49,6 @@ jobs:
             export NO_BUILD_SETUP=1
           rbe: false
           steps-pre: |
-            - run: |
-                # TODO(phlax): Remove this once resolved properly
-                # Downgrade Docker to workaround https://github.com/containers/skopeo/issues/2365
-                sudo install -m 0755 -d /etc/apt/keyrings
-                sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-                sudo chmod a+r /etc/apt/keyrings/docker.asc
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-                  https://download.docker.com/linux/ubuntu \
-                  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-                  | sudo  tee /etc/apt/sources.list.d/docker.list \
-                  > /dev/null
-                sudo apt-get update
-                sudo apt-get install -y -qq --allow-downgrades \
-                  docker-ce=5:24.0.9-1~ubuntu.24.04~noble \
-                  docker-ce-cli=5:24.0.9-1~ubuntu.24.04~noble
-                sudo systemctl restart docker
-                sudo docker --version
-              shell: bash
             - id: url
               uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.30
               with:
