@@ -57,7 +57,7 @@ envoy_cmake(
     postfix_script = """
         mkdir -p $INSTALLDIR/lib/external $INSTALLDIR/include/external \
         && find . -name "*.a" | xargs -I{} cp -a {} $INSTALLDIR/lib/ \
-        && find . -name "*.h" | xargs -I{} cp -a {} $INSTALLDIR/include
+        && find . -name "*.h" ! -name config.h | xargs -I{} cp -a {} $INSTALLDIR/include
     """,
     tags = [
         "cpu:16",
