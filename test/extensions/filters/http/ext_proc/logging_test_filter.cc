@@ -34,7 +34,7 @@ public:
         filter_state->getDataReadOnly<ExtProcLoggingInfo>(logging_id_);
     if (ext_proc_logging_info != nullptr) {
       EXPECT_NE(ext_proc_logging_info->bytesSent(), 0);
-      if (!check_received_bytes_) {
+      if (check_received_bytes_) {
         EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
       }
       ASSERT_TRUE(ext_proc_logging_info->upstreamHost() != nullptr);
