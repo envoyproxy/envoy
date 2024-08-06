@@ -79,7 +79,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<                   \
         RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);                               \
     std::string prefix = PREFIX;                                                                   \
-    if (route_local) {                                                                             \
+    if (route_local && !route_local->ROUTE_LOCAL_PREFIX_OVERRIDE().empty()) {                      \
       prefix = route_local->ROUTE_LOCAL_PREFIX_OVERRIDE();                                         \
     }                                                                                              \
     return prefix +                                                                                \
