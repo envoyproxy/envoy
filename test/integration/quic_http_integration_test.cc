@@ -2133,6 +2133,10 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }
+
+  // Close connections before `SocketInterfaceSwap` goes out of scope to ensure packets aren't
+  // processed while it is being swapped back.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
@@ -2254,15 +2258,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   ASSERT_TRUE(response->complete());
 
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
-    test_server_->waitForCounterGe(
-        "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
-  } else {
-    EXPECT_EQ(
-        0u,
-        test_server_->counter("listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address")
-            ->value());
-  }
+  test_server_->waitForCounterGe(
+      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
 }
 
 TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFilter) {
@@ -2417,12 +2414,10 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  // TODO(https://github.com/envoyproxy/envoy/issues/34492) fix
-  return;
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   std::string listener = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
-  EXPECT_LOG_CONTAINS(
+  WAIT_FOR_LOG_CONTAINS(
       "info",
       fmt::format("Quic connection from {} with id {} closed {} with details:",
                   quic_connection_->self_address().ToString(),

@@ -10,8 +10,8 @@ namespace Platform {
 
 Stream::Stream(InternalEngine* engine, envoy_stream_t handle) : engine_(engine), handle_(handle) {}
 
-Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream) {
-  engine_->sendHeaders(handle_, std::move(headers), end_stream);
+Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream, bool idempotent) {
+  engine_->sendHeaders(handle_, std::move(headers), end_stream, idempotent);
   return *this;
 }
 

@@ -12,7 +12,7 @@ void start_server(Envoy::TestServerType test_server_type) {
   weak_test_server_ = strong_test_server_;
 
   if (auto server = test_server()) {
-    server->start(test_server_type);
+    server->start(test_server_type, 0);
   }
 }
 

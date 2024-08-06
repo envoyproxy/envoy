@@ -465,10 +465,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setDetails(std::string(details));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.dns_cache_set_first_resolve_complete")) {
-      primary_host_info->host_info_->setFirstResolveComplete();
-    }
+    primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
   } else if (current_address == nullptr) {

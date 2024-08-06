@@ -1544,15 +1544,13 @@ public:
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
 
   // TODO(vikaschoudhary16): Remove this api.
-  // This api is only used to enable half-close semantics on the upstream connection.
-  // This ideally should be done via calling connection.enableHalfClose() but since TcpProxy
-  // does not have access to the upstream connection, it is done via this api for now.
+  // This api is only used to enable TCP tunneling semantics in the upstream codec.
+  // TCP proxy extension uses this API when proxyingn TCP tunnel via HTTP CONNECT or POST.
   /**
-   * Enable half-close semantics on the upstream connection. Reading a remote half-close
+   * Enable TCP tunneling semantics on the upstream codec. Reading a remote half-close
    * will not fully close the connection. This is off by default.
-   * @param enabled Whether to set half-close semantics as enabled or disabled.
    */
-  virtual void enableHalfClose() PURE;
+  virtual void enableTcpTunneling() PURE;
   /**
    * Enable/disable further data from this stream.
    */

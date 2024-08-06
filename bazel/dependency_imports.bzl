@@ -18,7 +18,7 @@ load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
 # go version for rules_go
-GO_VERSION = "1.20"
+GO_VERSION = "1.22.5"
 
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"

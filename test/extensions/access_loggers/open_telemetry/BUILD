@@ -37,6 +37,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//envoy/common:time_interface",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
@@ -59,6 +60,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//source/extensions/access_loggers/open_telemetry:config",
         "//test/mocks/server:factory_context_mocks",
@@ -74,6 +76,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/extensions/access_loggers/open_telemetry:config",
@@ -100,6 +103,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.open_telemetry"],
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
@@ -130,6 +134,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
         "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",

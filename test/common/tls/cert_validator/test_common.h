@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
@@ -34,9 +35,23 @@ public:
   Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
   uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
+  Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override {
+    return nullptr;
+  }
+  void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool,
+                                       bool) override {
+    cert_selection_result_ = selected_ctx.has_value() ? Ssl::CertificateSelectionStatus::Successful
+                                                      : Ssl::CertificateSelectionStatus::Failed;
+  }
+  Ssl::CertificateSelectionStatus certificateSelectionResult() const override {
+    return cert_selection_result_;
+  }
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
   Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};
+  Ssl::CertificateSelectionStatus cert_selection_result_{
+      Ssl::CertificateSelectionStatus::NotStarted};
 };
 
 class TestCertificateValidationContextConfig

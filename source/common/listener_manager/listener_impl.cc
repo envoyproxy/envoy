@@ -148,8 +148,10 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
   // Socket might be nullptr when doing server validation.
   // TODO(mattklein123): See the comment in the validation code. Make that code not return nullptr
   // so this code can be simpler.
-  Network::SocketSharedPtr socket = factory.createListenSocket(
-      local_address_, socket_type, options_, bind_type_, socket_creation_options_, worker_index);
+  Network::SocketSharedPtr socket = THROW_OR_RETURN_VALUE(
+      factory.createListenSocket(local_address_, socket_type, options_, bind_type_,
+                                 socket_creation_options_, worker_index),
+      Network::SocketSharedPtr);
 
   // Binding is done by now.
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
@@ -683,18 +685,24 @@ void ListenerImpl::createListenerFilterFactories(
     switch (socket_type_) {
     case Network::Socket::Type::Datagram: {
       if (udp_listener_config_->listener_factory_->isTransportConnectionless()) {
-        udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
-            config.listener_filters(), *listener_factory_context_);
+        udp_listener_filter_factories_ =
+            THROW_OR_RETURN_VALUE(parent_.factory_->createUdpListenerFilterFactoryList(
+                                      config.listener_filters(), *listener_factory_context_),
+                                  std::vector<Network::UdpListenerFilterFactoryCb>);
       } else {
         // This is a QUIC listener.
-        quic_listener_filter_factories_ = parent_.factory_->createQuicListenerFilterFactoryList(
-            config.listener_filters(), *listener_factory_context_);
+        quic_listener_filter_factories_ =
+            THROW_OR_RETURN_VALUE(parent_.factory_->createQuicListenerFilterFactoryList(
+                                      config.listener_filters(), *listener_factory_context_),
+                                  Filter::QuicListenerFilterFactoriesList);
       }
       break;
     }
     case Network::Socket::Type::Stream:
-      listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
-          config.listener_filters(), *listener_factory_context_);
+      listener_filter_factories_ =
+          THROW_OR_RETURN_VALUE(parent_.factory_->createListenerFilterFactoryList(
+                                    config.listener_filters(), *listener_factory_context_),
+                                Filter::ListenerFilterFactoriesList);
       break;
     }
   }

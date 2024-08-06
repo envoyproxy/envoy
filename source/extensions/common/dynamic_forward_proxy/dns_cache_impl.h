@@ -140,10 +140,6 @@ private:
     void setAddresses(Network::Address::InstanceConstSharedPtr address,
                       std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
       absl::WriterMutexLock lock{&resolve_lock_};
-      if (!(Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.dns_cache_set_first_resolve_complete"))) {
-        first_resolve_complete_ = true;
-      }
       address_ = address;
       address_list_ = std::move(list);
     }

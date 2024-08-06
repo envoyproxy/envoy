@@ -9,6 +9,8 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/http/sidestream_watermark.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -44,7 +46,7 @@ public:
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
-        Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) PURE;
+        Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

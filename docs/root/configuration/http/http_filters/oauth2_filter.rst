@@ -41,7 +41,7 @@ with the same value.
 The OAuth filter encodes URLs in query parameters using the
 `URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
 
-When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.
+When receiving request redirected from the authorization service the Oauth filter decodes URLs from query parameters.
 However the encoded character sequences that represent ASCII control characters or extended ASCII codepoints are not
 decoded. The characters without defined meaning in URL according to `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_
 are also left undecoded. Specifically the following characters are left in the encoded form:
@@ -252,8 +252,8 @@ during those requests by enabling the :ref:`use_refresh_token <envoy_v3_api_fiel
 This behavior can be useful for AJAX requests which cannot handle redirects correctly.
 
 :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` provides
-possibility to update access token by using a refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
-By enabling this flag a new access token is obtained using by a refresh token without redirecting the user to log in again. This requires the refresh token to be provided by authorization_endpoint when the user logs in.
+the possibility to update access token by using a refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
+By enabling this flag a new access token is obtained using the refresh token without redirecting the user to log in again. This requires the refresh token to be provided by the authorization_endpoint when the user logs in.
 If the attempt to get an access token by using a refresh token fails then the user is redirected to the authorization endpoint as usual.
 
 Generally, allowlisting is inadvisable from a security standpoint.

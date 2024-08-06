@@ -68,7 +68,8 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
   EngineBuilder& setUseGroIfAvailable(bool use_gro_if_available);
-  EngineBuilder& setSocketReceiveBufferSize(int32_t size);
+  EngineBuilder& setUdpSocketReceiveBufferSize(int32_t size);
+  EngineBuilder& setUdpSocketSendBufferSize(int32_t size);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& setUpstreamTlsSni(std::string sni);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
@@ -182,7 +183,11 @@ private:
 
   // This is the same value Cronet uses for QUIC:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
-  int32_t socket_receive_buffer_size_ = 1024 * 1024; // 1MB
+  int32_t udp_socket_receive_buffer_size_ = 1024 * 1024; // 1MB
+  // This is the same value Cronet uses for QUIC:
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_session_pool.cc;l=790-793;drc=7f04a8e033c23dede6beae129cd212e6d4473d72
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/third_party/quiche/src/quiche/quic/core/quic_constants.h;l=43-47;drc=34ad7f3844f882baf3d31a6bc6e300acaa0e3fc8
+  int32_t udp_socket_send_buffer_size_ = 1452 * 20;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

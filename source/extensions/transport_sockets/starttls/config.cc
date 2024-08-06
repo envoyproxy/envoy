@@ -20,11 +20,11 @@ DownstreamStartTlsSocketFactory::createTransportSocketFactory(
 
   auto raw_or_error = raw_socket_config_factory.createTransportSocketFactory(
       outer_config.cleartext_socket_config(), context, server_names);
-  RETURN_IF_STATUS_NOT_OK(raw_or_error);
+  RETURN_IF_NOT_OK_REF(raw_or_error.status());
 
   auto factory_or_error = tls_socket_config_factory.createTransportSocketFactory(
       outer_config.tls_socket_config(), context, server_names);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
 
   return std::make_unique<StartTlsDownstreamSocketFactory>(std::move(raw_or_error.value()),
                                                            std::move(factory_or_error.value()));
@@ -43,11 +43,11 @@ UpstreamStartTlsSocketFactory::createTransportSocketFactory(
 
   auto raw_or_error = raw_socket_config_factory.createTransportSocketFactory(
       outer_config.cleartext_socket_config(), context);
-  RETURN_IF_STATUS_NOT_OK(raw_or_error);
+  RETURN_IF_NOT_OK_REF(raw_or_error.status());
 
   auto factory_or_error = tls_socket_config_factory.createTransportSocketFactory(
       outer_config.tls_socket_config(), context);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
 
   return std::make_unique<StartTlsSocketFactory>(std::move(raw_or_error.value()),
                                                  std::move(factory_or_error.value()));

@@ -126,6 +126,7 @@ public:
   MOCK_METHOD(const std::string&, cipherSuites, (), (const));
   MOCK_METHOD(const std::string&, ecdhCurves, (), (const));
   MOCK_METHOD(const std::string&, signatureAlgorithms, (), (const));
+  MOCK_METHOD(bool, preferClientCiphers, (), (const));
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
@@ -136,6 +137,8 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
+  MOCK_METHOD(Ssl::TlsCertificateSelectorFactory, tlsCertificateSelectorFactory, (),
+              (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 

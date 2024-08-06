@@ -3102,6 +3102,7 @@ envoy_quic_cc_library(
         ":quic_core_http_spdy_utils_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
+        "@com_google_absl//absl/base:nullability",
     ],
 )
 

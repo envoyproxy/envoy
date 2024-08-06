@@ -132,7 +132,7 @@ public class Http2TestServerTest {
         })
         .setOnCancel((ignored) -> { throw new AssertionError("Unexpected OnCancel called."); })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestScenario.getHeaders(), false);
+        .sendHeaders(requestScenario.getHeaders(), /* endStream= */ false, /* idempotent= */ false);
 
     latch.await();
     assertNotNull(response.get().getEnvoyError());
@@ -169,7 +169,7 @@ public class Http2TestServerTest {
         })
         .setOnCancel((ignored) -> { throw new AssertionError("Unexpected OnCancel called."); })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestScenario.getHeaders(), false);
+        .sendHeaders(requestScenario.getHeaders(), /* endStream= */ false, /* idempotent= */ false);
 
     latch.await();
     assertNotNull(response.get().getEnvoyError());
@@ -220,7 +220,8 @@ public class Http2TestServerTest {
           return null;
         })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestScenario.getHeaders(), /* hasRequestBody= */ false);
+        .sendHeaders(requestScenario.getHeaders(), /* hasRequestBody= */ false,
+                     /* idempotent= */ false);
 
     latch.await();
     response.get().throwAssertionErrorIfAny();

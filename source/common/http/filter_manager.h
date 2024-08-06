@@ -91,7 +91,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  virtual bool complete() PURE;
+  virtual bool observedEndStream() PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -212,7 +212,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool complete() override;
+  bool observedEndStream() override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -304,7 +304,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool complete() override;
+  bool observedEndStream() override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -745,7 +745,7 @@ public:
    * @param end_stream whether the request is header only.
    */
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
-    state_.remote_decode_complete_ = end_stream;
+    state_.observed_decode_end_stream_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
   }
 
@@ -755,7 +755,7 @@ public:
    * @param end_stream whether this data is the end of the request.
    */
   void decodeData(Buffer::Instance& data, bool end_stream) {
-    state_.remote_decode_complete_ = end_stream;
+    state_.observed_decode_end_stream_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
   }
 
@@ -764,7 +764,7 @@ public:
    * @param trailers the trailers to decode.
    */
   void decodeTrailers(RequestTrailerMap& trailers) {
-    state_.remote_decode_complete_ = true;
+    state_.observed_decode_end_stream_ = true;
     decodeTrailers(nullptr, trailers);
   }
 
@@ -819,8 +819,12 @@ public:
 
   /**
    * Marks local processing as complete.
+   * TODO(yanvlasov): deprecate and decommission this function.
    */
-  void setLocalComplete() { state_.local_complete_ = true; }
+  void setLocalComplete() {
+    state_.observed_encode_end_stream_ = true;
+    state_.decoder_filter_chain_aborted_ = true;
+  }
 
   /**
    * Whether the filters have been destroyed.
@@ -830,7 +834,7 @@ public:
   /**
    * Whether remote processing has been marked as complete.
    */
-  virtual bool remoteDecodeComplete() const { return state_.remote_decode_complete_; }
+  virtual bool decoderObservedEndStream() const { return state_.observed_decode_end_stream_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
@@ -864,18 +868,27 @@ public:
 protected:
   struct State {
     State()
-        : remote_decode_complete_(false), remote_encode_complete_(false), local_complete_(false),
-          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
-          is_grpc_request_(false), non_100_response_headers_encoded_(false),
-          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
-          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
+        : encoder_filter_chain_complete_(false), observed_decode_end_stream_(false),
+          observed_encode_end_stream_(false), has_1xx_headers_(false), created_filter_chain_(false),
+          is_head_request_(false), is_grpc_request_(false),
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
+          saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
 
-    bool remote_decode_complete_ : 1;
-    bool remote_encode_complete_ : 1;
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
+    // Set after encoder filter chain has completed iteration. Prevents further calls to encoder
+    // filters.
+    bool encoder_filter_chain_complete_ : 1;
+
+    // Set `true` when the filter manager observes end stream on the decoder path (from downstream
+    // client) before iteration of the decoder filter chain begins. This flag is used for setting
+    // end_stream value when resuming decoder filter chain iteration.
+    bool observed_decode_end_stream_ : 1;
+    // Set `true` when the filter manager observes end stream on the encoder path (from upstream
+    // server or Envoy's local reply) before iteration of the encoder filter chain begins. This flag
+    // is used for setting end_stream value when resuming encoder filter chain iteration.
+    bool observed_encode_end_stream_ : 1;
+
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
     bool has_1xx_headers_ : 1;
@@ -1018,6 +1031,8 @@ private:
     return request_metadata_map_vector_.get();
   }
 
+  bool stopDecoderFilterChain() { return state_.decoder_filter_chain_aborted_; }
+
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
   // This is unset if there is no downstream connection, e.g. for health check or
@@ -1142,7 +1157,7 @@ public:
    * For the DownstreamFilterManager rely on external state, to handle the case
    * of internal redirects.
    */
-  bool remoteDecodeComplete() const override {
+  bool decoderObservedEndStream() const override {
     return streamInfo().downstreamTiming() &&
            streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
   }

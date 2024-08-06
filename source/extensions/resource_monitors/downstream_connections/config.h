@@ -17,7 +17,7 @@ class ActiveDownstreamConnectionsMonitorFactory
               DownstreamConnectionsConfig> {
 public:
   ActiveDownstreamConnectionsMonitorFactory()
-      : ProactiveFactoryBase("envoy.resource_monitors.downstream_connections") {}
+      : ProactiveFactoryBase("envoy.resource_monitors.global_downstream_max_connections") {}
 
 private:
   Server::ProactiveResourceMonitorPtr createProactiveResourceMonitorFromProtoTyped(

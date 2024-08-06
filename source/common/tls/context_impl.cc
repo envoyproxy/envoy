@@ -308,11 +308,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  // use the server's cipher list preferences
-  for (auto& ctx : tls_contexts_) {
-    SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
-  }
-
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
 
@@ -697,7 +692,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
 
 namespace Ssl {
 
-bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
+bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) const {
   const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
   if (c == nullptr) {
     return false;

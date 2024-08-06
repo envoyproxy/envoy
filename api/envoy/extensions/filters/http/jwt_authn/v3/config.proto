@@ -355,11 +355,12 @@ message JwtProvider {
   // Specify the claim name you want to copy in which HTTP header. For examples, following config:
   // The claim must be of type; string, int, double, bool. Array type claims are not supported
   //
-  // .. code-block:: yaml
-  //
-  //   claim_to_headers:
-  //     - name: x-jwt-claim-nested-claim
-  //       claim: claim.nested.key
+  // .. literalinclude:: /_configs/repo/jwt_authn.yaml
+  //    :language: yaml
+  //    :lines: 44-48
+  //    :linenos:
+  //    :lineno-start: 44
+  //    :caption: :download:`jwt_authn.yaml </_configs/repo/jwt_authn.yaml>`
   //
   // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;

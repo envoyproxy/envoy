@@ -38,6 +38,9 @@ protected:
 
     client_ =
         std::make_unique<ExternalProcessorClientImpl>(client_manager_, *stats_store_.rootScope());
+
+    watermark_callbacks_.setDecoderFilterCallbacks(&decoder_callbacks_);
+    watermark_callbacks_.setEncoderFilterCallbacks(&encoder_callbacks_);
   }
 
   Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused) {
@@ -76,6 +79,8 @@ protected:
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 
   testing::NiceMock<Stats::MockStore> stats_store_;
 };
@@ -84,7 +89,7 @@ TEST_F(ExtProcStreamTest, OpenCloseStream) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, &decoder_callbacks_);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   stream->close();
@@ -94,7 +99,7 @@ TEST_F(ExtProcStreamTest, SendToStream) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, &decoder_callbacks_);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
@@ -108,7 +113,7 @@ TEST_F(ExtProcStreamTest, SendAndClose) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, &decoder_callbacks_);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
@@ -118,7 +123,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, &decoder_callbacks_);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
   ProcessingResponse resp;
@@ -151,7 +156,7 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, &decoder_callbacks_);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -167,7 +172,7 @@ TEST_F(ExtProcStreamTest, StreamError) {
   Http::AsyncClient::ParentContext parent_context;
   parent_context.stream_info = &stream_info_;
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
-  auto stream = client_->start(*this, config_with_hash_key_, options, &decoder_callbacks_);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);

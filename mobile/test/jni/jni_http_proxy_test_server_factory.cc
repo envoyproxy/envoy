@@ -22,7 +22,7 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpProxyTestServerFactory_start(J
 
   Envoy::ExtensionRegistry::registerFactories();
   Envoy::TestServer* test_server = new Envoy::TestServer();
-  test_server->start(static_cast<Envoy::TestServerType>(type));
+  test_server->start(static_cast<Envoy::TestServerType>(type), 0);
 
   jclass java_http_proxy_server_factory_class = jni_helper.findClass(
       "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer");

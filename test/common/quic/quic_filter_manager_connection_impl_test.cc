@@ -129,5 +129,11 @@ TEST_F(QuicFilterManagerConnectionImplTest, IsHalfCloseEnabled) {
   EXPECT_FALSE(impl_.isHalfCloseEnabled());
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
+  const absl::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
+  EXPECT_TRUE(id.has_value());
+  EXPECT_NE(id.value_or(0), 0);
+}
+
 } // namespace Quic
 } // namespace Envoy

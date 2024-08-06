@@ -1315,6 +1315,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
     tls_context.set_ocsp_staple_policy(
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
   }
+  tls_context.set_prefer_client_ciphers(options.prefer_client_ciphers_);
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
@@ -1506,6 +1507,9 @@ void ConfigHelper::initializeTls(
   for (const auto& curve : options.curves_) {
     common_tls_context.mutable_tls_params()->add_ecdh_curves(curve);
   }
+  for (const auto& cipher : options.ciphers_) {
+    common_tls_context.mutable_tls_params()->add_cipher_suites(cipher);
+  }
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
@@ -1528,9 +1532,20 @@ void ConfigHelper::initializeTls(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
   }
+
   if (!options.san_matchers_.empty()) {
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
+  }
+  if (!options.tls_cert_selector_yaml_.empty()) {
+    auto* cert_selector = common_tls_context.mutable_custom_tls_certificate_selector();
+#ifdef ENVOY_ENABLE_YAML
+    TestUtility::loadFromYaml(TestEnvironment::substitute(options.tls_cert_selector_yaml_),
+                              *cert_selector);
+#else
+    UNREFERENCED_PARAMETER(cert_selector);
+    PANIC("YAML support compiled out");
+#endif
   }
   initializeTlsKeyLog(common_tls_context, options);
 }

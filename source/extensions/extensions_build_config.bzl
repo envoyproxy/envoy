@@ -81,6 +81,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
     "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
+    "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
 
     #
     # Network Matchers
@@ -108,6 +109,11 @@ EXTENSIONS = {
     # CEL Matching Input
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
+
+    #
+    # Dynamic Metadata Matching Input
+    #
+    "envoy.matching.inputs.dynamic_metadata":           "//source/extensions/matching/http/metadata_input:metadata_input_lib",
 
     #
     # Matching actions
@@ -240,7 +246,7 @@ EXTENSIONS = {
 
     "envoy.resource_monitors.fixed_heap":               "//source/extensions/resource_monitors/fixed_heap:config",
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
-    "envoy.resource_monitors.downstream_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
+    "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
 
     #
     # Stat sinks
@@ -267,7 +273,6 @@ EXTENSIONS = {
     # Tracers
     #
 
-    "envoy.tracers.dynamic_ot":                         "//source/extensions/tracers/dynamic_ot:config",
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",

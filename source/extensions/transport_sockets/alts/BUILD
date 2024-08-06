@@ -1,4 +1,4 @@
-load("@com_github_rules_proto_grpc//cpp:defs.bzl", "cpp_grpc_library")
+load("@rules_proto_grpc//cpp:defs.bzl", "cpp_grpc_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",

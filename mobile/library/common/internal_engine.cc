@@ -5,6 +5,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -16,6 +17,7 @@ namespace {
 constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 // Google DNS address used for IPv6 probes.
 constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
+constexpr uint32_t IPV6_PROBE_PORT = 53;
 } // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
@@ -58,10 +60,11 @@ envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
 }
 
 envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
-                                           bool end_stream) {
-  return dispatcher_->post([this, stream, headers = std::move(headers), end_stream]() mutable {
-    http_client_->sendHeaders(stream, std::move(headers), end_stream);
-  });
+                                           bool end_stream, bool idempotent) {
+  return dispatcher_->post(
+      [this, stream, headers = std::move(headers), end_stream, idempotent]() mutable {
+        http_client_->sendHeaders(stream, std::move(headers), end_stream, idempotent);
+      });
   return ENVOY_SUCCESS;
 }
 
@@ -293,6 +296,15 @@ envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
         connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
       }
     }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
+      Http::HttpServerPropertiesCacheManager& cache_manager =
+          server_->httpServerPropertiesCacheManager();
+
+      Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+          [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+      cache_manager.forEachThreadLocalCache(clear_brokenness);
+    }
     connectivity_manager_->refreshDns(configuration_key, true);
   });
 }
@@ -414,8 +426,9 @@ bool InternalEngine::hasIpV6Connectivity() {
   }
   Network::IoSocketHandleImpl socket_handle(socket_result.return_value_, /* socket_v6only= */ true,
                                             {domain});
-  Api::SysCallIntResult connect_result = socket_handle.connect(
-      std::make_shared<Network::Address::Ipv6Instance>(std::string(IPV6_PROBE_ADDRESS)));
+  Api::SysCallIntResult connect_result =
+      socket_handle.connect(std::make_shared<Network::Address::Ipv6Instance>(
+          std::string(IPV6_PROBE_ADDRESS), IPV6_PROBE_PORT));
   bool has_ipv6_connectivity = connect_result.return_value_ == 0;
   if (has_ipv6_connectivity) {
     ENVOY_LOG(trace, "Found IPv6 connectivity.");

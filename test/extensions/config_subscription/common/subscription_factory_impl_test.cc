@@ -323,7 +323,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
   primary_clusters.insert("static_cluster_baz");
 
   {
-    EXPECT_CALL(cm_, primaryClusters()).Times(2).WillRepeatedly(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
     EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
 
     EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,

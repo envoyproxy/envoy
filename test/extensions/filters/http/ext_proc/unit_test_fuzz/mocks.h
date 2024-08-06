@@ -33,7 +33,7 @@ public:
               (ExternalProcessing::ExternalProcessorCallbacks & callbacks,
                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                const Envoy::Http::AsyncClient::StreamOptions&,
-               Envoy::Http::DecoderFilterWatermarkCallbacks*));
+               Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&));
 };
 
 } // namespace UnitTestFuzz

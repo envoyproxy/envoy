@@ -31,12 +31,15 @@ public:
 protected:
   bool server_tlsv1_3_{false};
   std::vector<std::string> server_curves_;
+  std::vector<std::string> server_ciphers_;
   bool server_rsa_cert_{true};
   bool server_rsa_cert_ocsp_staple_{false};
   bool server_ecdsa_cert_{false};
   bool server_ecdsa_cert_ocsp_staple_{false};
   bool ocsp_staple_required_{false};
+  bool prefer_client_ciphers_{false};
   bool client_ecdsa_cert_{false};
+  std::string tls_cert_selector_yaml_{""};
   // Set this true to debug SSL handshake issues with openssl s_client. The
   // verbose trace will be in the logs, openssl must be installed separately.
   bool debug_with_s_client_{false};

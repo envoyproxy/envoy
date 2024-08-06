@@ -440,7 +440,7 @@ absl::Status HdsCluster::updateHealthchecks(
       // If it does not, create a new one.
       auto checker_or_error =
           Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
-      RETURN_IF_STATUS_NOT_OK(checker_or_error);
+      RETURN_IF_NOT_OK_REF(checker_or_error.status());
       auto new_health_checker = checker_or_error.value();
       health_checkers_map.insert({health_check, new_health_checker});
       health_checkers.push_back(new_health_checker);

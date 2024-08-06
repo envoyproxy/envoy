@@ -805,7 +805,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           shadow_streams_.insert(shadow_stream);
           shadow_stream->setDestructorCallback(
               [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
-          shadow_stream->setWatermarkCallbacks(*callbacks_);
+          shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
         }
       }
     }
@@ -993,6 +993,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   if (callbacks_->decoderBufferLimit() != 0) {
     retry_shadow_buffer_limit_ = callbacks_->decoderBufferLimit();
   }
+
+  watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
 
 void Filter::cleanup() {
