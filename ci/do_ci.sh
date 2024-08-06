@@ -238,7 +238,7 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  if [[ "${CI_TARGET}" == "release" ]]; then
+  if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
   elif [[ "${CI_TARGET}" == "msan" ]]; then
@@ -700,10 +700,14 @@ case $CI_TARGET in
             fetch-gcc)
                 targets=("${FETCH_GCC_TARGETS[@]}")
                 ;;
-            fetch-release)
+            fetch-release|fetch-release.test_only)
                 targets=(
                     "${FETCH_BUILD_TARGETS[@]}"
                     "${FETCH_ALL_TEST_TARGETS[@]}")
+                ;;
+            fetch-release.server_only)
+                targets=(
+                    "${FETCH_BUILD_TARGETS[@]}")
                 ;;
             fetch-*coverage)
                 targets=("${FETCH_TEST_TARGETS[@]}")
@@ -807,8 +811,8 @@ case $CI_TARGET in
                  "${PUBLISH_ARGS[@]}"
         ;;
 
-    release|release.server_only)
-        if [[ "$CI_TARGET" == "release" ]]; then
+    release|release.server_only|release.test_only)
+        if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
             # define the 'release' builds as canonical and test them only in CI, so the
@@ -820,19 +824,13 @@ case $CI_TARGET in
             fi
         fi
         setup_clang_toolchain
-        ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
-        if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
-            echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
-            rm -rf "${ENVOY_BINARY_DIR}"
-        fi
-        mkdir -p "$ENVOY_BINARY_DIR"
         # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
         # reuse settings and any already compiled artefacts, the bundle itself will always be compiled
         # `--stripopt=--strip-all -c opt`
         BAZEL_RELEASE_OPTIONS=(
             --stripopt=--strip-all
             -c opt)
-        if [[ "$CI_TARGET" == "release" ]]; then
+        if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # Run release tests
             echo "Testing with:"
             echo "  targets: ${TEST_TARGETS[*]}"
@@ -844,6 +842,22 @@ case $CI_TARGET in
                 "${BAZEL_RELEASE_OPTIONS[@]}" \
                 "${TEST_TARGETS[@]}"
         fi
+
+        if [[ "$CI_TARGET" == "release.test_only" ]]; then
+            exit 0
+        fi
+
+        ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
+        if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
+            echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
+            rm -rf "${ENVOY_BINARY_DIR}"
+        fi
+        mkdir -p "$ENVOY_BINARY_DIR"
+
+        # Build
+        echo "Building with:"
+        echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_RELEASE_OPTIONS[@]}" \
