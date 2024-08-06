@@ -3063,6 +3063,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxConnectio
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             0);
+  EXPECT_EQ(nullptr, response->headers().Connection());
 
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
@@ -3072,7 +3073,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxConnectio
     return;
   }
 
-  // Sending second request and waiting to complete the response.
+  // Sending second request.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_2.first;
   auto response_2 = std::move(encoder_decoder_2.second);
@@ -3093,7 +3094,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxConnectio
             1);
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    EXPECT_EQ(nullptr, response->headers().Connection());
+    ASSERT_NE(nullptr, response_2->headers().Connection());
     EXPECT_EQ("close", response_2->headers().getConnectionValue());
   } else {
     EXPECT_TRUE(codec_client_->sawGoAway());
@@ -3145,7 +3146,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxStreamDur
     // stream ends. We should notify the client.
     EXPECT_EQ("close", response_2->headers().getConnectionValue());
   } else {
-    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response_2->waitForEndStream());
     codec_client_->close();
   }
 }
