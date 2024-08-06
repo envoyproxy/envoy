@@ -72,7 +72,7 @@ void CorsFilter::initializeCorsPolicies() {
   if (policies_.empty()) {
     policies_ = {
         decoder_callbacks_->route()->routeEntry()->corsPolicy(),
-        decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
+        decoder_callbacks_->route()->virtualHost().corsPolicy(),
     };
   }
 }

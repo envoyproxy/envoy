@@ -11,8 +11,8 @@ void InstanceImpl::maybeCreateHeapShrinker() {
       std::make_unique<Memory::HeapShrinker>(dispatcher(), overloadManager(), *stats().rootScope());
 }
 
-std::unique_ptr<OverloadManager> InstanceImpl::createOverloadManager() {
-  return std::make_unique<OverloadManagerImpl>(
+absl::StatusOr<std::unique_ptr<OverloadManager>> InstanceImpl::createOverloadManager() {
+  return OverloadManagerImpl::create(
       dispatcher(), *stats().rootScope(), threadLocal(), bootstrap().overload_manager(),
       messageValidationContext().staticValidationVisitor(), api(), options());
 }

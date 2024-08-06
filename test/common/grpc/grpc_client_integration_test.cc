@@ -27,13 +27,13 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
   initialize();
   auto stream = createStream(empty_metadata_);
 
-  testing::StrictMock<Http::MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
 
   // Registering the new watermark callback.
   stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
   // Expect that flow control kicks in and watermark calls are triggered.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
 
   // Create send request with large request string.
   helloworld::HelloRequest request_msg;

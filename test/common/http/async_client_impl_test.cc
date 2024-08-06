@@ -470,26 +470,27 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   auto* request =
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
-  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   // Registering a new watermark callback should note that the high watermark has already been hit.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
 
   // Upstream gets unblocked.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runLowWatermarkCallbacks();
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);
   // Blocked again.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
   // Clear the callback, which calls the low watermark function.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   request->removeWatermarkCallbacks();
   // Add the callback back.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
@@ -498,7 +499,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   // On request end, we expect to run the low watermark callbacks.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
@@ -528,17 +529,18 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);
   // Upstream is blocked.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
   // Reset the stream, which will call the low watermark callbacks.
-  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
   expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -2171,7 +2173,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   auto& path_match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ("", path_match_criterion.matcher());
   EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
-  const auto& route_config = route_entry->virtualHost().routeConfig();
+  const auto& route_config = route->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
   auto cluster_info = filter_callbacks->clusterInfo();
@@ -2209,9 +2211,9 @@ public:
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
-    route_impl_.reset(new NullRouteImpl(
+    route_impl_ = std::make_unique<NullRouteImpl>(
         client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
-        Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>()));
+        Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }
 
   std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
@@ -2279,11 +2281,11 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_entry.shadowPolicies().empty());
-  EXPECT_TRUE(route_entry.virtualHost().rateLimitPolicy().empty());
-  EXPECT_EQ(nullptr, route_entry.virtualHost().corsPolicy());
-  EXPECT_FALSE(route_entry.virtualHost().includeAttemptCountInRequest());
-  EXPECT_FALSE(route_entry.virtualHost().includeAttemptCountInResponse());
-  EXPECT_FALSE(route_entry.virtualHost().routeConfig().usesVhds());
+  EXPECT_TRUE(route_impl_->virtualHost().rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_impl_->virtualHost().corsPolicy());
+  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInRequest());
+  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInResponse());
+  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 

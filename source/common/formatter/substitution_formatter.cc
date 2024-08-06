@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Formatter {
 
-const std::regex& SubstitutionFormatParser::commandWithArgsRegex() {
+const re2::RE2& SubstitutionFormatParser::commandWithArgsRegex() {
   // The following regex is used to check validity of the formatter command and to
   // extract groups.
   // The formatter command has the following format:
@@ -26,29 +26,29 @@ const std::regex& SubstitutionFormatParser::commandWithArgsRegex() {
   // formatter command string.
   //
   // clang-format off
-  // Non-capturing group specifying optional :LENGTH -------------------------------
-  //                                                                                |
-  // Non-capturing group specifying optional (SUBCOMMAND)---                        |
-  //                                                              |                 |
-  // Non-capturing group specifying mandatory COMMAND             |                 |
-  //  which uses only A-Z, 0-9 and _ characters                   |                 |
-  //  Group is used only to specify allowed characters.           |                 |
-  //                                      |                       |                 |
-  //                                      |                       |                 |
-  //                              ____________________  _____________________ _____________
-  //                              |                  |  |                   | |           |
-  CONSTRUCT_ON_FIRST_USE(std::regex,
-                         R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\(([^\)]*|[^\}]*)\))?(?::([0-9]+))?%)EOF");
-  //                             |__________________|     |______________|        |______|
-  //                                      |                      |                   |
-  // Capturing group specifying COMMAND --                       |                   |
-  // The index of this group is 1.                               |                   |
-  //                                                             |                   |
-  // Capturing group for SUBCOMMAND. If present, it will --------                    |
-  // contain SUBCOMMAND without ")%". The index                                      |
-  // of SUBCOMMAND group is 2.                                                       |
-  //                                                                                 |
-  // Capturing group for LENGTH. If present, it will --------------------------------
+  // Non-capturing group specifying optional :LENGTH ----------------------
+  //                                                                       |
+  // Non-capturing group specifying optional (SUBCOMMAND)---               |
+  //                                                        |              |
+  // Non-capturing group specifying mandatory COMMAND       |              |
+  //  which uses only A-Z, 0-9 and _ characters             |              |
+  //  Group is used only to specify allowed characters.     |              |
+  //                                      |                 |              |
+  //                                      |                 |              |
+  //                              _________________  _____________ _____________
+  //                              |               |  |           | |           |
+  CONSTRUCT_ON_FIRST_USE(re2::RE2,
+                         R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\((.*?)\))?(?::([0-9]+))?%)EOF");
+  //                             |__________________|     |___|        |______|
+  //                                       |                |              |
+  // Capturing group specifying COMMAND ---                 |              |
+  // The index of this group is 1.                          |              |
+  //                                                        |              |
+  // Capturing group for SUBCOMMAND. If present, it will ---               |
+  // contain SUBCOMMAND without "(" and ")". The index                     |
+  // of SUBCOMMAND group is 2.                                             |
+  //                                                                       |
+  // Capturing group for LENGTH. If present, it will ----------------------
   // contain just number without ":". The index of
   // LENGTH group is 3.
   // clang-format on
