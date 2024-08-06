@@ -1,1 +1,0 @@
-FROM mysql:9.0.1@sha256:d8df069848906979fd7511db00dc22efeb0a33a990d87c3c6d3fcdafd6fc6123
