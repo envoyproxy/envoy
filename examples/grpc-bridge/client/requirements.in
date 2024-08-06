@@ -1,5 +1,0 @@
-grpcio
-grpcio-tools
-idna>=3.7
-protobuf>=3.18.0
-requests>=2.32.0

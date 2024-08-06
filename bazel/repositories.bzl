@@ -355,6 +355,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    external_http_archive(name = "envoy_examples")
+
     _com_github_maxmind_libmaxminddb()
 
     # TODO(keith): Remove patch when we update rules_pkg

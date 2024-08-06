@@ -213,16 +213,6 @@ function bazel_contrib_binary_build() {
   bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
 }
 
-function run_ci_verify () {
-    export DOCKER_NO_PULL=1
-    export DOCKER_RMI_CLEANUP=1
-    # This is set to simulate an environment where users have shared home drives protected
-    # by a strong umask (ie only group readable by default).
-    umask 027
-    chmod -R o-rwx examples/
-    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}"
-}
-
 CI_TARGET=$1
 shift
 
@@ -949,7 +939,13 @@ case $CI_TARGET in
         ;;
 
     verify_examples)
-        run_ci_verify "*" "win32-front-proxy|shared"
+        DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
+        bazel run --config=ci \
+                  --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --sandbox_writable_path="${HOME}/.docker/" \
+                  --sandbox_writable_path="$HOME" \
+                  @envoy_examples//:verify_examples
         ;;
 
     verify.trigger)
