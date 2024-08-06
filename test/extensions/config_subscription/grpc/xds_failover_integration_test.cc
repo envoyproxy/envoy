@@ -873,7 +873,6 @@ TEST_P(XdsFailoverAdsIntegrationTest,
   // next loop there are going to be 2 failures (one for primary and another for
   // failover).
   for (int i = 1; i < 3; ++i) {
-    printAllCounters();
     // Wait longer due to the fixed 5 seconds failover .
     waitForPrimaryXdsRetryTimer(2 * i + 1, 5);
 
