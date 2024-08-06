@@ -267,12 +267,12 @@ func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64
 
 //export envoyGoFilterOnHttpLog
 func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
-	decodingS *C.processState, encodingS *C.processState,
+	decodingStateWrapper *C.processState, encodingStateWrapper *C.processState,
 	reqHeaderNum, reqHeaderBytes, reqTrailerNum, reqTrailerBytes,
 	respHeaderNum, respHeaderBytes, respTrailerNum, respTrailerBytes uint64) {
 
-	decodingState := getOrCreateState(decodingS)
-	encodingState := getOrCreateState(encodingS)
+	decodingState := getOrCreateState(decodingStateWrapper)
+	encodingState := getOrCreateState(encodingStateWrapper)
 	req := getRequest(r)
 	if req == nil {
 		req = createRequest(r)

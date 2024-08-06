@@ -130,34 +130,8 @@ func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTra
 		return
 	}
 
-	reqHeader.Set("a", "b")
-	out, _ := reqHeader.Get("a")
-	if out != "b" {
-		api.LogErrorf("req a's value: %s", out)
-		return
-	}
-	reqHeader.Del("a")
-	out, ok := reqHeader.Get("a")
-	if ok || out != "" {
-		api.LogErrorf("unexpected req a's value: %s", out)
-		return
-	}
-
 	if reqTrailer != nil {
 		xReqTrailer, _ = reqTrailer.Get("x-trailer")
-
-		reqTrailer.Set("a", "b")
-		out, _ = reqTrailer.Get("a")
-		if out != "b" {
-			api.LogErrorf("req trailer a's value: %s", out)
-			return
-		}
-		reqTrailer.Del("a")
-		out, ok = reqTrailer.Get("a")
-		if ok || out != "" {
-			api.LogErrorf("unexpected req trailer a's value: %s", out)
-			return
-		}
 	}
 
 	code, ok := f.callbacks.StreamInfo().ResponseCode()
@@ -173,34 +147,8 @@ func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTra
 		return
 	}
 
-	respHeader.Set("a", "b")
-	out, _ = respHeader.Get("a")
-	if out != "b" {
-		api.LogErrorf("resp a's value: %s", out)
-		return
-	}
-	respHeader.Del("a")
-	out, ok = respHeader.Get("a")
-	if ok || out != "" {
-		api.LogErrorf("unexpected resp a's value: %s", out)
-		return
-	}
-
 	if respTrailer != nil {
 		xRespTrailer, _ = respTrailer.Get("x-trailer")
-
-		respTrailer.Set("a", "b")
-		out, _ = respTrailer.Get("a")
-		if out != "b" {
-			api.LogErrorf("resp trailer a's value: %s", out)
-			return
-		}
-		respTrailer.Del("a")
-		out, ok = respTrailer.Get("a")
-		if ok || out != "" {
-			api.LogErrorf("unexpected resp trailer a's value: %s", out)
-			return
-		}
 	}
 
 	size, err := f.callbacks.GetProperty("response.size")

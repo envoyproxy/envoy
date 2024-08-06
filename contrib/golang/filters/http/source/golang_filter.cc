@@ -170,8 +170,8 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   uint64_t resp_trailer_num = 0;
   uint64_t resp_trailer_bytes = 0;
 
-  auto decoding_s = dynamic_cast<processState*>(&decoding_state_);
-  auto encoding_s = dynamic_cast<processState*>(&encoding_state_);
+  auto decoding_state = dynamic_cast<processState*>(&decoding_state_);
+  auto encoding_state = dynamic_cast<processState*>(&encoding_state_);
 
   // `log` may be called multiple times with different log type
   switch (log_context.accessLogType()) {
@@ -211,8 +211,8 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
     }
 
     req_->is_golang_processing_log = 1;
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()), decoding_s,
-                                         encoding_s, req_header_num, req_header_bytes,
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()), decoding_state,
+                                         encoding_state, req_header_num, req_header_bytes,
                                          req_trailer_num, req_trailer_bytes, resp_header_num,
                                          resp_header_bytes, resp_trailer_num, resp_trailer_bytes);
     req_->is_golang_processing_log = 0;
