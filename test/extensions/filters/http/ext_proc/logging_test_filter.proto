@@ -5,5 +5,5 @@ package test.integration.filters;
 message LoggingTestFilterConfig {
   string logging_id = 1;
   string upstream_cluster_name = 2;
-  bool check_request_path_only = 3;
+  bool check_received_bytes = 3;
 }

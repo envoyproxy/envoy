@@ -23,9 +23,9 @@ namespace ExternalProcessing {
 class LoggingTestFilter : public Http::PassThroughFilter {
 public:
   LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name,
-                    bool check_request_path_only)
+                    bool check_received_bytes)
       : logging_id_(logging_id), expected_cluster_name_(cluster_name),
-        check_request_path_only_(check_request_path_only) {}
+        check_received_bytes_(check_received_bytes) {}
   void encodeComplete() override {
     ASSERT(decoder_callbacks_ != nullptr);
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
@@ -34,7 +34,7 @@ public:
         filter_state->getDataReadOnly<ExtProcLoggingInfo>(logging_id_);
     if (ext_proc_logging_info != nullptr) {
       EXPECT_NE(ext_proc_logging_info->bytesSent(), 0);
-      if (!check_request_path_only_) {
+      if (!check_received_bytes_) {
         EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
       }
       ASSERT_TRUE(ext_proc_logging_info->upstreamHost() != nullptr);
@@ -45,7 +45,7 @@ public:
 private:
   std::string logging_id_;
   std::string expected_cluster_name_;
-  const bool check_request_path_only_;
+  const bool check_received_bytes_;
 };
 
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
@@ -59,7 +59,7 @@ public:
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(
           proto_config.logging_id(), proto_config.upstream_cluster_name(),
-          proto_config.check_request_path_only()));
+          proto_config.check_received_bytes()));
     };
   }
 };
