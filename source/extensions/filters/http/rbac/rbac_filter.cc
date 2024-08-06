@@ -1,3 +1,4 @@
+#include "rbac_filter.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "envoy/stats/scope.h"
@@ -71,54 +72,28 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
           proto_config, context, validation_visitor, action_validation_visitor_)) {}
 
-std::string RoleBasedAccessControlFilterConfig::shadowEffectivePolicyIdField(
-    const Http::StreamFilterCallbacks* callbacks) const {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
-  std::string shadow_rules_stat_prefix = shadow_rules_stat_prefix_;
-  if (route_local) {
-    shadow_rules_stat_prefix = route_local->shadowRulesStatPrefix();
+#define DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(GETTER_NAME, PREFIX, ROUTE_LOCAL_PREFIX_OVERRIDE,  \
+                                                DYNAMIC_METADATA_KEY)                              \
+  std::string RoleBasedAccessControlFilterConfig::GETTER_NAME(                                     \
+      const Http::StreamFilterCallbacks* callbacks) const {                                        \
+    const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<                   \
+        RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);                               \
+    std::string prefix = PREFIX;                                                                   \
+    if (route_local) {                                                                             \
+      prefix = route_local->ROUTE_LOCAL_PREFIX_OVERRIDE();                                         \
+    }                                                                                              \
+    return prefix +                                                                                \
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().DYNAMIC_METADATA_KEY;        \
   }
-  return shadow_rules_stat_prefix +
-         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField;
-}
-std::string RoleBasedAccessControlFilterConfig::shadowEngineResultField(
-    const Http::StreamFilterCallbacks* callbacks) const {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
 
-  std::string shadow_rules_stat_prefix = shadow_rules_stat_prefix_;
-  if (route_local) {
-    shadow_rules_stat_prefix = route_local->shadowRulesStatPrefix();
-  }
-  return shadow_rules_stat_prefix +
-         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
-}
-
-std::string RoleBasedAccessControlFilterConfig::enforcedEffectivePolicyIdField(
-    const Http::StreamFilterCallbacks* callbacks) const {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
-
-  std::string rules_stat_prefix = rules_stat_prefix_;
-  if (route_local) {
-    rules_stat_prefix = route_local->rulesStatPrefix();
-  }
-  return rules_stat_prefix +
-         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EnforcedEffectivePolicyIdField;
-}
-std::string RoleBasedAccessControlFilterConfig::enforcedEngineResultField(
-    const Http::StreamFilterCallbacks* callbacks) const {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
-
-  std::string rules_stat_prefix = rules_stat_prefix_;
-  if (route_local) {
-    rules_stat_prefix = route_local->rulesStatPrefix();
-  }
-  return rules_stat_prefix +
-         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EnforcedEngineResultField;
-}
+DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(shadowEffectivePolicyIdField, shadow_rules_stat_prefix_,
+                                        shadowRulesStatPrefix, ShadowEffectivePolicyIdField)
+DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(shadowEngineResultField, shadow_rules_stat_prefix_,
+                                        shadowRulesStatPrefix, ShadowEngineResultField)
+DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(enforcedEffectivePolicyIdField, rules_stat_prefix_,
+                                        rulesStatPrefix, EnforcedEffectivePolicyIdField)
+DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(enforcedEngineResultField, rules_stat_prefix_,
+                                        rulesStatPrefix, EnforcedEngineResultField)
 
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
 RoleBasedAccessControlFilterConfig::engine(const Http::StreamFilterCallbacks* callbacks,
