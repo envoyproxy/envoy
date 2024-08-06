@@ -13,6 +13,10 @@ minor_behavior_changes:
   change: |
     Added support for :ref:`connection_pool_per_downstream_connection
     <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
+- area: golang
+  change: |
+    Now the ``OnLog`` callback in Golang filter is run before the request is logged in access loggers. Therefore, we
+    can produce the dynamic metadata used in the access log.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted

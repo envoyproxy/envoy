@@ -182,6 +182,7 @@ public:
   MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
   MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
+  MOCK_METHOD(void, prependAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
 
