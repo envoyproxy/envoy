@@ -216,6 +216,29 @@ TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_BasicExtraction) {
   EXPECT_EQ(labels_["object"], "myobject");
 }
 
+TEST_F(AuditLoggingUtilTest, StringToDirectiveMap_CorrectMapping) {
+  const auto& map = StringToDirectiveMap();
+
+  EXPECT_EQ(map.size(), 2);
+  EXPECT_EQ(map.at(kAuditRedact), AuditDirective::AUDIT_REDACT);
+  EXPECT_EQ(map.at(kAudit), AuditDirective::AUDIT);
+}
+
+TEST_F(AuditLoggingUtilTest, AuditDirectiveFromString_ValidDirective) {
+  auto directive = AuditDirectiveFromString(kAuditRedact);
+  ASSERT_TRUE(directive.has_value());
+  EXPECT_EQ(directive.value(), AuditDirective::AUDIT_REDACT);
+
+  directive = AuditDirectiveFromString(kAudit);
+  ASSERT_TRUE(directive.has_value());
+  EXPECT_EQ(directive.value(), AuditDirective::AUDIT);
+}
+
+TEST_F(AuditLoggingUtilTest, AuditDirectiveFromString_InvalidDirective) {
+  auto directive = AuditDirectiveFromString("invalid_directive");
+  EXPECT_FALSE(directive.has_value());
+}
+
 TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_MissingLabelsInResource) {
   GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
                              "project/myproject/bucket/mybucket", &labels_);
