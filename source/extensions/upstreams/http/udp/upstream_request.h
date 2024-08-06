@@ -77,7 +77,7 @@ public:
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override {}
   void readDisable(bool) override {}
   void resetStream() override;
-  void enableHalfClose() override {}
+  void enableTcpTunneling() override {}
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 

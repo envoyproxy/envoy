@@ -30,7 +30,8 @@ public:
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
-  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message&,
+  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
+                                             const Protobuf::Message&,
                                              ProtobufMessage::ValidationVisitor&) override {
     return std::make_unique<ClusterProvidedLbConfig>();
   }

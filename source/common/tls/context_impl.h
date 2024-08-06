@@ -57,7 +57,7 @@ struct TlsContext {
 #endif
 
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
-  bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
+  bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version) const;
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
@@ -175,7 +175,7 @@ using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 class ServerContextFactory : public Envoy::Config::UntypedFactory {
 public:
   std::string category() const override { return "envoy.ssl.server_context_factory"; }
-  virtual Ssl::ServerContextSharedPtr
+  virtual absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                       const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,

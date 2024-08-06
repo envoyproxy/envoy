@@ -72,6 +72,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "sidestream_watermark_lib",
+    hdrs = ["sidestream_watermark.h"],
+    deps = [
+        "//envoy/http:async_client_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "character_set_validation_lib",
     hdrs = ["character_set_validation.h"],
 )

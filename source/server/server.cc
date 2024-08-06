@@ -503,7 +503,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // stats.
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  RETURN_IF_NOT_OK_REF(producer_or_error.status());
   stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
@@ -619,7 +619,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = createOverloadManager();
+  auto overload_manager_or_error = createOverloadManager();
+  RETURN_IF_NOT_OK(overload_manager_or_error.status());
+  overload_manager_ = std::move(*overload_manager_or_error);
   null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
@@ -738,6 +740,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
 
+  http_server_properties_cache_manager_ =
+      std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+          serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
+          thread_local_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
@@ -838,7 +845,7 @@ void InstanceBase::onRuntimeReady() {
   if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.downstream_connections` instead."
+              "`envoy.resource_monitors.global_downstream_max_connections` instead."
               "This runtime key will be removed in future.",
               Runtime::Keys::GlobalMaxCxRuntimeKey);
   }
@@ -931,9 +938,11 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
-    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
-                    "connections. Configure a "
-                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+    ENVOY_LOG(
+        warn,
+        "There is no configured limit to the number of allowed active downstream "
+        "connections. Configure a "
+        "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.");
   }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
