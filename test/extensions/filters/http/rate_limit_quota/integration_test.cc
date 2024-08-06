@@ -927,6 +927,78 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
   }
 }
 
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithAbandonAction) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
+  custom_headers_cpy.insert({"name", "prod"});
+  for (int i = 0; i < 3; ++i) {
+    // Send downstream client request to upstream.
+    sendClientRequest(&custom_headers);
+
+    // 3rd downstream  request will not trigger the reports to RLQS server since it is
+    // same as 2nd request, which will find the entry in the cache.
+    if (i != 2) {
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+
+      // 1st request will start the gRPC stream.
+      if (i == 0) {
+        // Start the gRPC stream to RLQS server on the first request.
+        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+        ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+        rlqs_stream_->startGrpcStream();
+
+        // Build the response.
+        auto* bucket_action = rlqs_response.add_bucket_action();
+
+        for (const auto& [key, value] : custom_headers_cpy) {
+          (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        }
+
+        // Set up the abandon action.
+        bucket_action->mutable_abandon_action();
+      } else {
+        // 2nd request will still send report to RLQS server as the previous abandon
+        // action has removed the cache entry. but it won't start gRPC stream
+        // again since it is kept open.
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+        // Build the rlqs server response.
+        auto* bucket_action = rlqs_response.add_bucket_action();
+
+        for (const auto& [key, value] : custom_headers_cpy) {
+          (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        }
+      }
+
+      // Send the response from RLQS server.
+      rlqs_stream_->sendGrpcMessage(rlqs_response);
+    }
+
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+
+    // Verify the response to downstream.
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
+    // open.
+    cleanupUpstreamAndDownstream();
+  }
+}
+
 } // namespace
 } // namespace RateLimitQuota
 } // namespace HttpFilters

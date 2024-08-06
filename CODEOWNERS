@@ -62,7 +62,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @suniltheta @mattklein123
+/*/extensions/tracers/xray @suniltheta @mattklein123 @nbaws
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
@@ -177,12 +177,16 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @sergkir85
 # CEL input matcher
 /*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
+# dynamic metadata input matcher
+/*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input
 /*/extensions/matching/http/cel_input @tyxia @yanavlasov
+# dynamic metadata input
+/*/extensions/matching/http/metadata_input @vikaschoudhary16 @kyessenov
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @lambdai @soulxu
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -343,6 +347,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 # Match delegate extension
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
+# Generic proxy and related extensions
+/*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
 
 /*/extensions/health_checkers/common @zuercher @botengyao
 

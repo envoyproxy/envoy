@@ -38,7 +38,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
   router_->onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 // Validate that we don't set x-envoy-overloaded when Envoy header suppression
@@ -73,7 +73,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -141,7 +141,7 @@ public:
     router_->decodeHeaders(headers_, header_only_request);
     if (pool_ready) {
       EXPECT_EQ(
-          1U, callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+          1U, callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
     }
   }
   void sendResponse() {
@@ -385,7 +385,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   // This will result in retry_state_ being deleted.
   router_->decodeData(data, false);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // This should not trigger a retry as the retry state has been deleted.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -435,7 +435,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -486,7 +486,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // Upstream responds back to envoy.
   Http::ResponseHeaderMapPtr response_headers(
@@ -540,7 +540,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
   EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // Destroy the router, causing the upstream request to be cancelled.
   // Response code on span is 0 because the upstream never sent a response.
@@ -591,7 +591,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // The span should be annotated with the reset-related fields.
   EXPECT_CALL(*child_span_1,
@@ -635,7 +635,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
 
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // Upstream responds back with a normal response. Span should be annotated as usual.
   Http::ResponseHeaderMapPtr response_headers(
@@ -684,7 +684,7 @@ TEST_F(RouterTestNoChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.active_span_, injectContext(_, _));
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -891,7 +891,7 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
   Buffer::OwnedImpl data;
   router_->decodeData(data, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
@@ -909,10 +909,10 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
                 .value());
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_completed")
                 .value());
@@ -944,7 +944,7 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
   Buffer::OwnedImpl data;
   router_->decodeData(data, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
@@ -962,10 +962,10 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
                 .value());
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_timeout_.value());
 
   EXPECT_EQ(
       1U,

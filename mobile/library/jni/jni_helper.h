@@ -10,16 +10,14 @@ namespace JNI {
 /** A custom deleter to delete JNI global ref. */
 class GlobalRefDeleter {
 public:
-  explicit GlobalRefDeleter(JNIEnv* env) : env_(env) {}
+  explicit GlobalRefDeleter() = default;
 
-  void operator()(jobject object) const {
-    if (object != nullptr) {
-      env_->DeleteGlobalRef(object);
-    }
-  }
+  GlobalRefDeleter(const GlobalRefDeleter&) = default;
 
-private:
-  JNIEnv* const env_;
+  // This is to allow move semantics in `GlobalRefUniquePtr`.
+  GlobalRefDeleter& operator=(const GlobalRefDeleter&) = default;
+
+  void operator()(jobject object) const;
 };
 
 /** A unique pointer for JNI global ref. */
@@ -29,21 +27,14 @@ using GlobalRefUniquePtr = std::unique_ptr<typename std::remove_pointer<T>::type
 /** A custom deleter to delete JNI local ref. */
 class LocalRefDeleter {
 public:
-  explicit LocalRefDeleter(JNIEnv* env) : env_(env) {}
+  explicit LocalRefDeleter() = default;
 
   LocalRefDeleter(const LocalRefDeleter&) = default;
 
   // This is to allow move semantics in `LocalRefUniquePtr`.
-  LocalRefDeleter& operator=(const LocalRefDeleter&) { return *this; }
+  LocalRefDeleter& operator=(const LocalRefDeleter&) = default;
 
-  void operator()(jobject object) const {
-    if (object != nullptr) {
-      env_->DeleteLocalRef(object);
-    }
-  }
-
-private:
-  JNIEnv* const env_;
+  void operator()(jobject object) const;
 };
 
 /** A unique pointer for JNI local ref. */
@@ -53,16 +44,11 @@ using LocalRefUniquePtr = std::unique_ptr<typename std::remove_pointer<T>::type,
 /** A custom deleter for UTF strings. */
 class StringUtfDeleter {
 public:
-  StringUtfDeleter(JNIEnv* env, jstring j_str) : env_(env), j_str_(j_str) {}
+  explicit StringUtfDeleter(jstring j_str) : j_str_(j_str) {}
 
-  void operator()(const char* c_str) const {
-    if (c_str != nullptr) {
-      env_->ReleaseStringUTFChars(j_str_, c_str);
-    }
-  }
+  void operator()(const char* c_str) const;
 
 private:
-  JNIEnv* const env_;
   jstring j_str_;
 };
 
@@ -111,16 +97,11 @@ using ArrayElementsUniquePtr = std::unique_ptr<
 /** A custom deleter for JNI primitive array critical. */
 class PrimitiveArrayCriticalDeleter {
 public:
-  PrimitiveArrayCriticalDeleter(JNIEnv* env, jarray array) : env_(env), array_(array) {}
+  explicit PrimitiveArrayCriticalDeleter(jarray array) : array_(array) {}
 
-  void operator()(void* c_array) const {
-    if (c_array != nullptr) {
-      env_->ReleasePrimitiveArrayCritical(array_, c_array, 0);
-    }
-  }
+  void operator()(void* c_array) const;
 
 private:
-  JNIEnv* const env_;
   jarray array_;
 };
 
@@ -221,7 +202,7 @@ public:
   template <typename T = jobject>
   [[nodiscard]] LocalRefUniquePtr<T> getObjectField(jobject object, jfieldID field_id) {
     LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectField(object, field_id)),
-                                LocalRefDeleter(env_));
+                                LocalRefDeleter());
     return result;
   }
 
@@ -360,7 +341,7 @@ public:
   template <typename T = jobject>
   [[nodiscard]] LocalRefUniquePtr<T> getObjectArrayElement(jobjectArray array, jsize index) {
     LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectArrayElement(array, index)),
-                                LocalRefDeleter(env_));
+                                LocalRefDeleter());
     rethrowException();
     return result;
   }
@@ -382,7 +363,7 @@ public:
                                                                              jboolean* is_copy) {
     PrimitiveArrayCriticalUniquePtr<T> result(
         static_cast<T>(env_->GetPrimitiveArrayCritical(array, is_copy)),
-        PrimitiveArrayCriticalDeleter(env_, array));
+        PrimitiveArrayCriticalDeleter(array));
     return result;
   }
 
@@ -429,7 +410,7 @@ public:
     va_list args;
     va_start(args, method_id);
     LocalRefUniquePtr<T> result(static_cast<T>(env_->CallObjectMethodV(object, method_id, args)),
-                                LocalRefDeleter(env_));
+                                LocalRefDeleter());
     va_end(args);
     rethrowException();
     return result;
@@ -461,8 +442,7 @@ public:
     va_list args;
     va_start(args, method_id);
     LocalRefUniquePtr<T> result(
-        static_cast<T>(env_->CallStaticObjectMethodV(clazz, method_id, args)),
-        LocalRefDeleter(env_));
+        static_cast<T>(env_->CallStaticObjectMethodV(clazz, method_id, args)), LocalRefDeleter());
     va_end(args);
     rethrowException();
     return result;
