@@ -175,17 +175,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["api"],
         release_date = "2024-03-27",
     ),
-    rules_proto_grpc = dict(
-        project_name = "rules_proto_grpc",
-        project_desc = "Bazel rules for building Protobuf and gRPC code and libraries from proto_library targets ",
-        project_url = "https://github.com/rules-proto-grpc/rules_proto_grpc",
-        version = "4.6.0",
-        sha256 = "2a0860a336ae836b54671cbbe0710eec17c64ef70c4c5a88ccfd47ea6e3739bd",
-        strip_prefix = "rules_proto_grpc-{version}",
-        urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/releases/download/{version}/rules_proto_grpc-{version}.tar.gz"],
-        use_category = ["build"],
-        release_date = "2023-12-14",
-    ),
     envoy_toolshed = dict(
         project_name = "envoy_toolshed",
         project_desc = "Tooling, libraries, runners and checkers for Envoy proxy's CI",

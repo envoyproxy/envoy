@@ -68,11 +68,11 @@ RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_timer_based_rate_limit_token_bucket);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_host_for_preresolve_dfp_dns);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
+RUNTIME_GUARD(envoy_reloadable_features_prefer_ipv6_dns_on_macos);
 // Fixes fail-open behaviour of failure_mode_allow for external authz grpc servers.
 RUNTIME_GUARD(envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
-RUNTIME_GUARD(envoy_reloadable_features_quic_fix_filter_manager_uaf);
 RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
@@ -90,7 +90,6 @@ RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_ups
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
-RUNTIME_GUARD(envoy_reloadable_features_upstream_allow_connect_with_2xx);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_remote_address_use_connection);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
@@ -101,7 +100,6 @@ RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
-RUNTIME_GUARD(envoy_restart_features_udp_read_normalize_addresses);
 RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -151,6 +149,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_if_no_connections);
 FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
+// TODO(alyssawilk): evaluate and make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

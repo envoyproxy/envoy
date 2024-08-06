@@ -6,9 +6,17 @@ behavior_changes:
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
     <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
+- area: stats scoped_rds
+  change: |
+    Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
+    <envoy_v3_api_msg_config/route/v3/scoped_route>' and stat prefix extracted.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: command line options
+  change: |
+    :option:`--enable-fine-grain-logging` and :option:`--component-log-level` were incompatible in that one
+    would make the other ineffective. Setting both options at once is now an error, to reduce potential confusion.
 - area: tcp
   change: |
     Added support for :ref:`connection_pool_per_downstream_connection
@@ -84,6 +92,15 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: quic
+  change: |
+    Removed ``envoy.reloadable_features.quic_fix_filter_manager_uaf`` runtime flag and legacy code paths.
+- area: udp
+  change: |
+    Removed ``envoy.restart_features.udp_read_normalize_addresses`` runtime flag and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.upstream_allow_connect_with_2xx`` and legacy code paths.
 - area: upstream flow control
   change: |
     Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
@@ -104,6 +121,10 @@ new_features:
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regardless of whether
     ``alt_stat_name`` is set.
+- area: formatter
+  change: |
+    Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
+    ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
@@ -115,9 +136,21 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: matching
+  change: |
+    Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
+    and :ref:`Dynamic metadata input matcher <extension_envoy.matching.matchers.metadata_matcher>`.
+- area: ratelimit
+  change: |
+    Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
+    by setting by setting filter state value ``envoy.ratelimit.hits_addend`` to the desired value.
 - area: access_log
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: dns
+  change: |
+    Prefer using IPv6 address when addresses from both families are available.
+    Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
 
 deprecated:
