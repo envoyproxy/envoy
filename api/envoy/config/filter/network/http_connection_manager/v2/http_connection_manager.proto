@@ -108,6 +108,7 @@ message HttpConnectionManager {
     // specified on the parent listener, then it is used instead of this field.
     //
     // .. attention::
+    //
     //  This field has been deprecated in favor of `traffic_direction`.
     OperationName operation_name = 1 [
       deprecated = true,
