@@ -7,6 +7,9 @@
 #include <utility>
 #include <vector>
 
+#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
+#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
+
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
@@ -16,7 +19,6 @@
 #include "absl/types/span.h"
 #include "google/protobuf/util/converter/json_objectwriter.h"
 #include "google/protobuf/util/converter/protostream_objectsource.h"
-#include "google/protobuf/util/converter/type_info.h"
 #include "google/protobuf/util/converter/utility.h"
 #include "google/protobuf/util/type_resolver.h"
 #include "grpc_transcoding/type_helper.h"
@@ -27,8 +29,6 @@
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 #include "proto_processing_lib/proto_scrubber/unknown_field_checker.h"
-#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
-#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,11 +40,10 @@ using ::Envoy::Protobuf::FieldMask;
 using ::Envoy::Protobuf::io::CodedOutputStream;
 using ::Envoy::Protobuf::io::CordOutputStream;
 using ::Envoy::Protobuf::util::JsonParseOptions;
-using ::Envoy::Protobuf::util::JsonStringToMessage;
 using ::Envoy::ProtobufUtil::FieldMaskUtil;
 using ::Envoy::ProtobufWkt::Struct;
+using ::Envoy::ProtobufWkt::Type;
 using ::google::grpc::transcoding::TypeHelper;
-using ::google::protobuf::Type;
 using ::google::protobuf::util::converter::JsonObjectWriter;
 using ::google::protobuf::util::converter::ProtoStreamObjectSource;
 using ::google::protobuf::util::converter::TypeInfo;
@@ -54,10 +53,9 @@ using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::proto_processing_lib::proto_scrubber::UnknownFieldChecker;
 
-absl::Status ConvertToStruct(
-    const google::protobuf::field_extraction::MessageData& message,
-    const google::protobuf::Type& type, const TypeHelper& type_helper,
-    Struct* message_struct) {
+absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
+                             const Envoy::ProtobufWkt::Type& type, const TypeHelper& type_helper,
+                             Struct* message_struct) {
   // Convert from message data to JSON using absl::Cord.
   auto in_stream = message.CreateCodedInputStreamWrapper();
   ProtoStreamObjectSource os(&in_stream->Get(), type_helper.Resolver(), type);
@@ -74,12 +72,11 @@ absl::Status ConvertToStruct(
 
   // Convert from JSON (in absl::Cord) to Struct.
   JsonParseOptions options;
-  auto status = JsonStringToMessage(cord_out_stream.Consume().Flatten(),
-                                    message_struct, options);
+  auto status =
+      TestUtility::loadFromJson(cord_out_stream.Consume().Flatten(), message_struct, options);
   if (!status.ok()) {
     return absl::InternalError(
-        absl::StrCat("Failed to parse Struct from formatted JSON of '",
-                     type.name(), "' message."));
+        absl::StrCat("Failed to parse Struct from formatted JSON of '", type.name(), "' message."));
   }
 
   (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
@@ -87,13 +84,9 @@ absl::Status ConvertToStruct(
   return absl::OkStatus();
 }
 
-bool ScrubToStruct(
-    const ProtoScrubber* scrubber, const google::protobuf::Type& type,
-    const TypeHelper& type_helper,
-    // const std::function<const google::protobuf::Type*(const std::string&)>&
-    //     type_finder,
-    google::protobuf::field_extraction::MessageData* message,
-    google::protobuf::Struct* message_struct) {
+bool ScrubToStruct(const ProtoScrubber* scrubber, const Envoy::ProtobufWkt::Type& type,
+                   const TypeHelper& type_helper, Protobuf::field_extraction::MessageData* message,
+                   Envoy::ProtobufWkt::Struct* message_struct) {
   message_struct->Clear();
 
   // When scrubber or message is nullptr, it indicates that there's nothing to
@@ -129,7 +122,7 @@ bool ScrubToStruct(
 //     const std::function<const google::protobuf::Type*(const std::string&)>&
 //         type_finder,
 //     const google::protobuf::FieldMask* redact_message_field_mask,
-//     google::protobuf::field_extraction::MessageData* message,
+//     Protobuf::field_extraction::MessageData* message,
 //     Struct* message_struct) {
 //   // Collect the present redact field paths before scrubbing the message.
 //   std::vector<std::string> present_redact_fields;
@@ -171,10 +164,9 @@ bool ScrubToStruct(
 
 //   return true;
 // }
-}  // namespace
+} // namespace
 
-const google::protobuf::FieldMask& AuditProtoScrubber::FindWithDefault(
-    AuditDirective directive) {
+const google::protobuf::FieldMask& AuditProtoScrubber::FindWithDefault(AuditDirective directive) {
   static const google::protobuf::FieldMask default_field_mask;
 
   auto it = directives_mapping_.find(directive);
@@ -185,13 +177,9 @@ const google::protobuf::FieldMask& AuditProtoScrubber::FindWithDefault(
   }
 }
 
-AuditProtoScrubber::AuditProtoScrubber(
-    ScrubberContext scrubber_context, const TypeHelper* type_helper,
-    const TypeInfo* type_info, const Type* message_type,
-    const FieldPathToScrubType& field_policies)
-// : type_info_(*service_type_info), message_type_(*message_type) {
-{
-  type_info_ = type_info;
+AuditProtoScrubber::AuditProtoScrubber(ScrubberContext scrubber_context,
+                                       const TypeHelper* type_helper, const Type* message_type,
+                                       const FieldPathToScrubType& field_policies) {
   type_helper_ = type_helper;
   message_type_ = message_type;
   for (const auto& field_policy : field_policies) {
@@ -203,7 +191,7 @@ AuditProtoScrubber::AuditProtoScrubber(
   // Initialize type finder.
   type_finder_ = [&](const std::string& type_url) {
     const Type* result = nullptr;
-    absl::StatusOr<const Type*> type = type_info_->ResolveTypeUrl(type_url);
+    absl::StatusOr<const Type*> type = type_helper_->ResolveTypeUrl(type_url);
     if (!type.ok()) {
       LOG(WARNING) << "Failed to find Type for type url: " << type_url;
     } else {
@@ -213,8 +201,7 @@ AuditProtoScrubber::AuditProtoScrubber(
   };
 
   for (const auto& directive : directives_mapping_) {
-    LOG(INFO) << "Audit Directive: "
-              << std::to_string(static_cast<int>(directive.first)) << ": "
+    LOG(INFO) << "Audit Directive: " << std::to_string(static_cast<int>(directive.first)) << ": "
               << directive.second.DebugString();
   }
 
@@ -223,45 +210,38 @@ AuditProtoScrubber::AuditProtoScrubber(
   // scrubbing.
   Protobuf::FieldMask audit_field_mask;
   FieldMaskUtil::Union(FindWithDefault(AuditDirective::AUDIT),
-                       FindWithDefault(AuditDirective::AUDIT_REDACT),
-                       &audit_field_mask);
+                       FindWithDefault(AuditDirective::AUDIT_REDACT), &audit_field_mask);
 
   // Only create the scrubber if there are fields to retain.
   if (!audit_field_mask.paths().empty()) {
-    field_checker_ = std::make_unique<CloudAuditLogFieldChecker>(message_type_,
-                                                                 type_finder_);
+    field_checker_ = std::make_unique<CloudAuditLogFieldChecker>(message_type_, type_finder_);
 
     if (!audit_field_mask.paths().empty()) {
-      absl::Status status = field_checker_->AddOrIntersectFieldPaths(
-          std::vector<std::string>(audit_field_mask.paths().begin(),
-                                   audit_field_mask.paths().end()));
+      absl::Status status = field_checker_->AddOrIntersectFieldPaths(std::vector<std::string>(
+          audit_field_mask.paths().begin(), audit_field_mask.paths().end()));
       if (!status.ok()) {
-        LOG(WARNING) << "Failed to create proto scrubber for message '"
-                     << message_type_->name()
+        LOG(WARNING) << "Failed to create proto scrubber for message '" << message_type_->name()
                      << "' for audit logging: " << status;
       }
     }
-    scrubber_ =
-        std::make_unique<proto_processing_lib::proto_scrubber::ProtoScrubber>(
-            message_type_, type_finder_,
-            std::vector<const FieldCheckerInterface*>{
-                field_checker_.get(), UnknownFieldChecker::GetDefault()},
-            scrubber_context);
+    scrubber_ = std::make_unique<proto_processing_lib::proto_scrubber::ProtoScrubber>(
+        message_type_, type_finder_,
+        std::vector<const FieldCheckerInterface*>{field_checker_.get(),
+                                                  UnknownFieldChecker::GetDefault()},
+        scrubber_context);
   }
 }
 
-std::unique_ptr<ProtoScrubberInterface> AuditProtoScrubber::Create(
-    ScrubberContext scrubber_context, const TypeHelper* type_helper,
-    const TypeInfo* type_info, const Type* message_type,
-    const FieldPathToScrubType& field_policies) {
-  return absl::WrapUnique(new AuditProtoScrubber(
-      scrubber_context, type_helper, type_info, message_type, field_policies));
+std::unique_ptr<ProtoScrubberInterface>
+AuditProtoScrubber::Create(ScrubberContext scrubber_context, const TypeHelper* type_helper,
+                           const Type* message_type, const FieldPathToScrubType& field_policies) {
+  return absl::WrapUnique(
+      new AuditProtoScrubber(scrubber_context, type_helper, message_type, field_policies));
 }
 
-AuditMetadata AuditProtoScrubber::ScrubMessage(
-    const google::protobuf::field_extraction::MessageData& raw_message) const {
-  google::protobuf::field_extraction::CordMessageData message_copy(
-      raw_message.ToCord());
+AuditMetadata
+AuditProtoScrubber::ScrubMessage(const Protobuf::field_extraction::MessageData& raw_message) const {
+  Protobuf::field_extraction::CordMessageData message_copy(raw_message.ToCord());
 
   AuditMetadata audit_metadata;
 
@@ -269,47 +249,44 @@ AuditMetadata AuditProtoScrubber::ScrubMessage(
   for (const auto& directive : directives_mapping_) {
     const Protobuf::FieldMask& field_mask = directive.second;
     switch (directive.first) {
-      case AuditDirective::AUDIT:
-        // audit_metadata.num_response_items.emplace(ExtractRepeatedFieldSize(
-        //     message_type_, type_finder_, &field_mask, message_copy));
+    case AuditDirective::AUDIT:
+      // audit_metadata.num_response_items.emplace(ExtractRepeatedFieldSize(
+      //     message_type_, type_finder_, &field_mask, message_copy));
 
-        GetTargetResourceOrTargetResourceCallback(
-            field_mask, message_copy, /*callback=*/false, &audit_metadata);
+      GetTargetResourceOrTargetResourceCallback(field_mask, message_copy, /*callback=*/false,
+                                                &audit_metadata);
 
-        GetTargetResourceOrTargetResourceCallback(
-            field_mask, message_copy, /*callback=*/true, &audit_metadata);
-        break;
-      default:
-        // No need to handle AUDIT_REDACT, and method level directives.
-        break;
+      GetTargetResourceOrTargetResourceCallback(field_mask, message_copy, /*callback=*/true,
+                                                &audit_metadata);
+      break;
+    default:
+      // No need to handle AUDIT_REDACT, and method level directives.
+      break;
     }
   }
   // If there are no fields to retain, no need to scrub and only populate @type
   // property.
   if (scrubber_ == nullptr) {
-    (*audit_metadata.scrubbed_message.mutable_fields())[kTypeProperty]
-        .set_string_value(google::protobuf::util::converter::GetFullTypeWithUrl(
-            message_type_->name()));
+    (*audit_metadata.scrubbed_message.mutable_fields())[kTypeProperty].set_string_value(
+        google::protobuf::util::converter::GetFullTypeWithUrl(message_type_->name()));
     return audit_metadata;
   }
 
-  bool success = ScrubToStruct(scrubber_.get(), *message_type_, *type_helper_,
-                               &message_copy, &audit_metadata.scrubbed_message);
+  bool success = ScrubToStruct(scrubber_.get(), *message_type_, *type_helper_, &message_copy,
+                               &audit_metadata.scrubbed_message);
 
   if (!success) {
     LOG(ERROR) << "Failed to scrub message.";
   }
 
   // Handle redacted fields.
-  auto redact_field_mask =
-      directives_mapping_.find(AuditDirective::AUDIT_REDACT);
+  auto redact_field_mask = directives_mapping_.find(AuditDirective::AUDIT_REDACT);
   if (redact_field_mask != directives_mapping_.end()) {
     // Convert the paths to be redacted into camel case first, since the
     // resulting proto struct keys are in camel case.
     std::vector<std::string> redact_paths_camel_case;
     for (const std::string& path : redact_field_mask->second.paths()) {
-      redact_paths_camel_case.push_back(
-          google::protobuf::util::converter::ToCamelCase(path));
+      redact_paths_camel_case.push_back(google::protobuf::util::converter::ToCamelCase(path));
     }
     RedactPaths(redact_paths_camel_case, &audit_metadata.scrubbed_message);
   }
@@ -317,8 +294,7 @@ AuditMetadata AuditProtoScrubber::ScrubMessage(
 }
 
 void AuditProtoScrubber::GetTargetResourceOrTargetResourceCallback(
-    const Protobuf::FieldMask& field_mask,
-    const google::protobuf::field_extraction::MessageData& message,
+    const Protobuf::FieldMask& field_mask, const Protobuf::field_extraction::MessageData& message,
     bool callback, AuditMetadata* audit_metadata) const {
   // There should be only one target resource; this is checked at config
   // compile time.
@@ -328,19 +304,16 @@ void AuditProtoScrubber::GetTargetResourceOrTargetResourceCallback(
 
   // The extraction can success but the string can be empty.
   absl::StatusOr<std::string> status_or_target_resource =
-      ExtractStringFieldValue(*message_type_, type_finder_, field_mask.paths(0),
-                              message);
+      ExtractStringFieldValue(*message_type_, type_finder_, field_mask.paths(0), message);
   if (!status_or_target_resource.ok()) {
-    LOG(ERROR) << "Unable to extract target resource: "
-               << status_or_target_resource.status();
+    LOG(ERROR) << "Unable to extract target resource: " << status_or_target_resource.status();
     return;
   }
 
   // Only set up the target resource callback if there is a non empty extracted
   // value.
   if (callback && !status_or_target_resource.value().empty()) {
-    audit_metadata->target_resource_callback.emplace(
-        *status_or_target_resource);
+    audit_metadata->target_resource_callback.emplace(*status_or_target_resource);
   } else {
     audit_metadata->target_resource.emplace(*status_or_target_resource);
   }
@@ -349,25 +322,21 @@ void AuditProtoScrubber::GetTargetResourceOrTargetResourceCallback(
 }
 
 void AuditProtoScrubber::MaybePopulateResourceLocation(
-    absl::string_view resource_selector,
-    const google::protobuf::field_extraction::MessageData& raw_message,
+    absl::string_view resource_selector, const Protobuf::field_extraction::MessageData& raw_message,
     AuditMetadata* result) const {
   if (target_resource_location_selector_.empty()) {
     return;
   }
 
-  absl::StatusOr<std::string> extracted_resource_location =
-      ExtractStringFieldValue(*message_type_, type_finder_,
-                              target_resource_location_selector_, raw_message);
+  absl::StatusOr<std::string> extracted_resource_location = ExtractStringFieldValue(
+      *message_type_, type_finder_, target_resource_location_selector_, raw_message);
 
   if (!extracted_resource_location.ok()) {
-    LOG(ERROR) << "Unable to extract resource location: "
-               << extracted_resource_location.status();
+    LOG(ERROR) << "Unable to extract resource location: " << extracted_resource_location.status();
   } else if (target_resource_location_selector_ == resource_selector) {
     // Resource location is in the same field as the resource name - need to
     // extract it.
-    absl::string_view location_id =
-        ExtractLocationIdFromResourceName(*extracted_resource_location);
+    absl::string_view location_id = ExtractLocationIdFromResourceName(*extracted_resource_location);
     if (!location_id.empty()) {
       result->resource_location = location_id;
     }
@@ -376,7 +345,7 @@ void AuditProtoScrubber::MaybePopulateResourceLocation(
   }
 }
 
-}  // namespace ProtoMessageLogging
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace ProtoMessageLogging
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

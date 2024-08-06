@@ -63,7 +63,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library( 
+envoy_cc_library(
     name = "filter",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
