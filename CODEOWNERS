@@ -338,6 +338,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao
 /*/extensions/health_checkers/tcp @zuercher @botengyao
+/*/extensions/health_checkers/common @zuercher @botengyao
 # Health check event sinks
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
 # IP Geolocation
@@ -349,8 +350,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
-
-/*/extensions/health_checkers/common @zuercher @botengyao
+# Dynamic Modules
+/*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
