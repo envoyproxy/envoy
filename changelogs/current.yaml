@@ -148,5 +148,8 @@ new_features:
   change: |
     Prefer using IPv6 address when addresses from both families are available.
     Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
+- area: grpc_field_extraction
+  change: |
+    Added ``map<string, string>`` support: Target fields of type ``map<string, string>`` can be extracted and added to dynamic metadata.
 
 deprecated:
