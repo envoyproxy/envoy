@@ -34,7 +34,7 @@ jobs:
       container-command:
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
-      runs-on: envoy-x64-small
+      runs-on: ubuntu-24.04
       steps-pre: ${{ matrix.steps-pre }}
       source: ${{ matrix.source }}
       target: ${{ matrix.target }}
@@ -62,8 +62,8 @@ jobs:
                   > /dev/null
                 sudo apt-get update
                 sudo apt-get install -y -qq --allow-downgrades \
-                  docker-ce=5:24.0.9-1~ubuntu.22.04~jammy \
-                  docker-ce-cli=5:24.0.9-1~ubuntu.22.04~jammy
+                  docker-ce=5:24.0.9-1~ubuntu.24.04~noble \
+                  docker-ce-cli=5:24.0.9-1~ubuntu.24.04~noble
                 sudo systemctl restart docker
                 sudo docker --version
               shell: bash
@@ -102,6 +102,5 @@ jobs:
                 # Install expected host packages
                 export DEBIAN_FRONTEND=noninteractive
                 sudo apt-get -qq update -y
-                sudo apt-get -qq install -y --no-install-recommends expect gettext whois
-                pip install -r ./.github/workflows/verify-requirements.txt
+                sudo apt-get -qq install -y --no-install-recommends expect gettext yq whois
               shell: bash
