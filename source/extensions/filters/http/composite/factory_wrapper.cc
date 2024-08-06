@@ -42,6 +42,9 @@ void FactoryCallbacksWrapper::addStreamFilter(Http::StreamFilterSharedPtr filter
 void FactoryCallbacksWrapper::addAccessLogHandler(AccessLog::InstanceSharedPtr access_log) {
   access_loggers_.push_back(std::move(access_log));
 }
+void FactoryCallbacksWrapper::prependAccessLogHandler(AccessLog::InstanceSharedPtr access_log) {
+  access_loggers_.push_front(std::move(access_log));
+}
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions

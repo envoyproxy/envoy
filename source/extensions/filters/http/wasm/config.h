@@ -60,7 +60,7 @@ private:
         return;
       }
       callbacks.addStreamFilter(filter);
-      callbacks.addAccessLogHandler(filter);
+      callbacks.prependAccessLogHandler(filter);
     };
   }
 };
