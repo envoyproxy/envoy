@@ -18,12 +18,13 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_HttpTestServerFactory_start(
-    JNIEnv* env, jclass, jint type, jobject headers, jstring body, jobject trailers) {
+    JNIEnv* env, jclass, jint type, jint requested_port, jobject headers, jstring body,
+    jobject trailers) {
   Envoy::JNI::JniHelper jni_helper(env);
 
   Envoy::ExtensionRegistry::registerFactories();
   Envoy::TestServer* test_server = new Envoy::TestServer();
-  test_server->start(static_cast<Envoy::TestServerType>(type));
+  test_server->start(static_cast<Envoy::TestServerType>(type), requested_port);
 
   auto cpp_headers = Envoy::JNI::javaMapToCppMap(jni_helper, headers);
   auto cpp_body = Envoy::JNI::javaStringToCppString(jni_helper, body);

@@ -139,6 +139,11 @@ void ValidationInstance::initialize(const Options& options,
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
 
+  http_server_properties_cache_manager_ =
+      std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+          serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
+          thread_local_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },

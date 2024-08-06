@@ -344,7 +344,7 @@ Filter::StreamOpenState Filter::openStream() {
     auto options = Http::AsyncClient::StreamOptions()
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
-                       .setBufferBodyForRetry(true);
+                       .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
     ExternalProcessorStreamPtr stream_object =
         client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
@@ -1216,7 +1216,11 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
+
+    errorResponse.mutable_status()->set_code(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_timeout_error")
+            ? StatusCode::GatewayTimeout
+            : StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }

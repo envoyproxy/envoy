@@ -12,7 +12,7 @@
 #include "source/common/common/logger.h"
 
 #include "quiche/http2/adapter/data_source.h"
-#include "quiche/spdy/core/hpack/hpack_encoder.h"
+#include "quiche/http2/hpack/hpack_encoder.h"
 
 namespace Envoy {
 namespace Http {
