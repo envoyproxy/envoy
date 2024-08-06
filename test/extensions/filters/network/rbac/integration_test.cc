@@ -135,7 +135,7 @@ typed_config:
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
 }
 
-TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDeniedSimulatedTimer) {
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDenied) {
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
@@ -149,37 +149,16 @@ typed_config:
         principals:
           - not_id:
               any: true
-  delay_deny: 1s
+  delay_deny: 5s
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello", false, false));
-  timeSystem().advanceTimeWait(std::chrono::seconds(2));
-  tcp_client->waitForDisconnect();
+  ASSERT_TRUE(tcp_client->connected());
 
-  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
-  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
-}
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  ASSERT_TRUE(tcp_client->connected());
 
-TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDeniedPartialWrite) {
-  initializeFilter(R"EOF(
-name: rbac
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
-  stat_prefix: tcp.
-  rules:
-    policies:
-      "deny_all":
-        permissions:
-          - any: true
-        principals:
-          - not_id:
-              any: true
-  delay_deny: 1s
-)EOF");
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  std::string buff(16 * 1024 * 1024, 'a');
-  // Write 16MB of data in 500ms. This should complete if the RBAC filter does not pause the read.
-  ASSERT_TRUE(tcp_client->partialWrite(buff, false, std::chrono::milliseconds(500)));
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
