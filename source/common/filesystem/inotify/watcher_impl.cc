@@ -54,7 +54,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
 
 absl::Status WatcherImpl::onInotifyEvent() {
   while (true) {
-    uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
+    alignas(inotify_event) uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
     ssize_t rc = read(inotify_fd_, &buffer, sizeof(buffer));
     if (rc == -1 && errno == EAGAIN) {
       return absl::OkStatus();
