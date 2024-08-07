@@ -5,8 +5,8 @@
 // This is a pure single C header file that defines the ABI of the dynamic module
 // used by Envoy.
 //
-// This must not contain any dependencies besides stdlib since it is not only used by Envoy
-// itself but also by dynamic module SDKs written in non-C++ languages.
+// This must not contain any dependencies besides standard library since it is not only used by
+// Envoy itself but also by dynamic module SDKs written in non-C++ languages.
 //
 // Currently, compatibility is only guaranteed by an exact version match between the Envoy
 // codebase and the dynamic module SDKs. In the future, after the ABI is stabilized, we will revisit
