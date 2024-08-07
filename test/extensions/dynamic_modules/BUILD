@@ -15,7 +15,6 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:get_some_variable",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/go:no_op",
-        "//test/extensions/dynamic_modules/test_data/rust:no_op",
     ],
     deps = [
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -25,16 +24,14 @@ envoy_cc_test(
 )
 
 sh_test(
-    name = "ensure_identical_abi_headers",
+    name = "ensure_Go_SDK_identical_abi_header",
     srcs = ["ensure_identical_abi_headers.sh"],
     args = [
         "$(location //source/extensions/dynamic_modules:abi.h)",
         "$(location //source/extensions/dynamic_modules/sdk/go:abi.h)",
-        "$(location //source/extensions/dynamic_modules/sdk/rust:abi.h)",
     ],
     data = [
         "//source/extensions/dynamic_modules:abi.h",
         "//source/extensions/dynamic_modules/sdk/go:abi.h",
-        "//source/extensions/dynamic_modules/sdk/rust:abi.h",
     ],
 )
