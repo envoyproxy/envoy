@@ -14,22 +14,24 @@ namespace Extensions {
 namespace DynamicModules {
 
 // This loads a shared object file from the test_data directory.
-std::string testSharedObjectPath(std::string name) {
+std::string testSharedObjectPath(std::string name, std::string language) {
   return TestEnvironment::substitute(
              "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/") +
-         "lib" + name + ".so";
+         language + "/lib" + name + ".so";
 }
 
-TEST(DynamicModuleTest, InvalidPath) {
+TEST(DynamicModuleTestGeneral, InvalidPath) {
   absl::StatusOr<DynamicModuleSharedPtr> result = newDynamicModule("invalid_name", false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
-TEST(DynamicModuleTest, LoadNoOp) {
+// This tests the behavior around do_not_close flag. Only implemented for C as Go cannot be
+// reloaded.
+TEST(DynamicModuleTestGeneral, DoNotClose) {
   using GetSomeVariableFuncType = int (*)();
   absl::StatusOr<DynamicModuleSharedPtr> module =
-      newDynamicModule(testSharedObjectPath("no_op"), false);
+      newDynamicModule(testSharedObjectPath("get_some_variable", "c"), false);
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
@@ -39,8 +41,8 @@ TEST(DynamicModuleTest, LoadNoOp) {
 
   // Release the module, and reload it.
   module->reset();
-  module =
-      newDynamicModule(testSharedObjectPath("no_op"), true); // This time, do not close the module.
+  module = newDynamicModule(testSharedObjectPath("get_some_variable", "c"),
+                            true); // This time, do not close the module.
   EXPECT_TRUE(module.ok());
 
   // This module must be reloaded and the variable must be reset.
@@ -53,7 +55,7 @@ TEST(DynamicModuleTest, LoadNoOp) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("no_op"), false);
+  module = newDynamicModule(testSharedObjectPath("get_some_variable", "c"), false);
   EXPECT_TRUE(module.ok());
 
   // This module must be the already loaded one, and the variable must be kept.
@@ -61,6 +63,27 @@ TEST(DynamicModuleTest, LoadNoOp) {
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
   EXPECT_NE(getSomeVariable3, nullptr);
   EXPECT_EQ(getSomeVariable3(), 4); // Start from 4.
+}
+
+/**
+ * Class to test the identical behavior of the dynamic module in different languages.
+ */
+class DynamicModuleTestLanguages : public ::testing::TestWithParam<std::string> {
+public:
+  static std::string languageParamToTestName(const ::testing::TestParamInfo<std::string>& info) {
+    return info.param;
+  };
+};
+
+INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages,
+                         testing::Values("c", "go", "rust"),
+                         DynamicModuleTestLanguages::languageParamToTestName);
+
+TEST_P(DynamicModuleTestLanguages, LoadNoOp) {
+  std::string language = GetParam();
+  absl::StatusOr<DynamicModuleSharedPtr> module =
+      newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_TRUE(module.ok());
 }
 
 } // namespace DynamicModules

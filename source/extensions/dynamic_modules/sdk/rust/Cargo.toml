@@ -1,0 +1,15 @@
+[package]
+name = "envoy-proxy-dynamic-modules-rust-sdk"
+version = "0.1.0"
+edition = "2021"
+authors = ["Takeshi Yoneda <t.y.mathetake@gmail.com>"]
+description = "Envoy Proxy Dynamic Modules Rust SDK"
+license = "Apache-2.0"
+repository = "https://github.com/envoyproxy/envoy"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.65.1"
+
+[lib]

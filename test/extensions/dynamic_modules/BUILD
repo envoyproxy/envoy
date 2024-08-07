@@ -12,11 +12,29 @@ envoy_cc_test(
     name = "dynamic_modules_test",
     srcs = ["dynamic_modules_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data:no_op",
+        "//test/extensions/dynamic_modules/test_data/c:get_some_variable",
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/go:no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:no_op",
     ],
     deps = [
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+sh_test(
+    name = "ensure_identical_abi_headers",
+    srcs = ["ensure_identical_abi_headers.sh"],
+    args = [
+        "$(location //source/extensions/dynamic_modules:abi.h)",
+        "$(location //source/extensions/dynamic_modules/sdk/go:abi.h)",
+        "$(location //source/extensions/dynamic_modules/sdk/rust:abi.h)",
+    ],
+    data = [
+        "//source/extensions/dynamic_modules:abi.h",
+        "//source/extensions/dynamic_modules/sdk/go:abi.h",
+        "//source/extensions/dynamic_modules/sdk/rust:abi.h",
     ],
 )

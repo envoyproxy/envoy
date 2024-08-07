@@ -10,6 +10,18 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
+// Helpers to get a function pointer type from a function declaration in the ABI.
+
+template <typename T> struct FunctionTraits;
+template <typename Ret, typename... Args> struct FunctionTraits<Ret (*)(Args...)> {
+  using Type = Ret(Args...);
+};
+/**
+ * Get a function pointer type from a function declaration.
+ * @param T the function declaration.
+ */
+template <typename T> using FunctionPointerTypeFromDeclaration = typename FunctionTraits<T>::Type*;
+
 /**
  * A class for loading and managing dynamic modules. This corresponds to a single dlopen handle.
  * When the DynamicModule object is destroyed, the dlopen handle is closed.

@@ -7,6 +7,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/extensions/dynamic_modules/abi.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -27,7 +29,25 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to load dynamic module: ", object_file_path, " : ", dlerror()));
   }
-  return std::make_shared<DynamicModule>(handle);
+
+  DynamicModuleSharedPtr dynamic_module = std::make_shared<DynamicModule>(handle);
+
+  const auto init_function = dynamic_module->getFunctionPointer<
+      FunctionPointerTypeFromDeclaration<decltype(&envoy_dynamic_module_on_program_init)>>(
+      "envoy_dynamic_module_on_program_init");
+
+  if (init_function == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to resolve envoy_dynamic_module_on_program_init: ", dlerror()));
+  }
+
+  const size_t result = (*init_function)();
+  if (result != 0) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("envoy_dynamic_module_on_program_init failed: ", object_file_path,
+                     " : returned non-zero status: ", result));
+  }
+  return dynamic_module;
 }
 
 DynamicModule::~DynamicModule() { dlclose(handle_); }
