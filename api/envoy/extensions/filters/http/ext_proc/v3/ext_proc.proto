@@ -277,19 +277,28 @@ message ExternalProcessor {
   google.protobuf.Duration deferred_close_timeout = 19;
 
   // [#not-implemented-hide:]
-  // If the body processing mode is STREAMED, this configuration enables sending body to the side stream server
-  // when the header external processing is still ongoing.
-  // When the filter has this enabled and body processing mode is STREAMED,
-  // the side stream server must wait for at least the first chunk of body arrives,
-  // process both the request headers and body, then encode the response headers in the
+  // Enables sending body to the side stream server when the header external processing is still ongoing.
+  // It only works for STREAMED body processing mode. For any other body processing modes, it is ignored.
+  //
+  // In the use cases if the side stream server must wait for at least one chunk of body before sending back
+  // the response for the headers, this filter configuration has to be enabled to support this.
+  //
+  // The side stream server must not send a separate header response in this case. Instead, it encodes the
+  // response headers in the first body response and sends back to Envoy.
+
+  // It works this way:
+  // 1. After receiving both headers and certain amount chunks of body, the side stream server processes them,
+  // then encode the response headers in the
   // :ref:`header_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.header_mutation>`
   // and encode the first chunk of the response body in the
   // :ref:`body_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.body_mutation>`.
-  // Depending on the direction of the mainstream traffic, they must be encoded either in the
+  //
+  // 2. Depending on the direction of the mainstream traffic, they must be encoded either in the
   // :ref:`request_body <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_body>`, or the
   // :ref:`response_body <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_body>`
-  // and send it back to Envoy. The rest of the body requests and responses are forwarded as usual.
-  // The side stream server must not send a separate header response in this case.
+  //
+  // 3. The side stream server then sends this response back to Envoy.
+  // 4. The rest of the body requests and responses are forwarded as usual.
   bool send_body_before_recv_header_resp = 21;
 }
 
