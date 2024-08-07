@@ -29,7 +29,7 @@
 namespace Envoy {
 namespace {
 
-std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool http) {
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool http, int port) {
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
@@ -40,7 +40,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool ht
   auto* base_address = listener->mutable_address();
   base_address->mutable_socket_address()->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
   base_address->mutable_socket_address()->set_address("127.0.0.1");
-  base_address->mutable_socket_address()->set_port_value(0);
+  base_address->mutable_socket_address()->set_port_value(port);
 
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
   hcm.set_stat_prefix("remote hcm");
@@ -137,7 +137,8 @@ TestServer::TestServer()
   Envoy::ExtensionRegistry::registerFactories();
 }
 
-void TestServer::start(TestServerType type) {
+void TestServer::start(TestServerType type, int port) {
+  port_ = port;
   ASSERT(!upstream_);
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
@@ -180,7 +181,7 @@ void TestServer::start(TestServerType type) {
     test_server_ = IntegrationTestServer::create(
         "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
         absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
-        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(true));
+        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(true, port_));
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Http proxy is now running");
     return;
@@ -195,15 +196,29 @@ void TestServer::start(TestServerType type) {
     test_server_ = IntegrationTestServer::create(
         "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
         absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
-        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(false));
+        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(false, port_));
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Https proxy is now running");
     return;
   }
   }
 
-  upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
-                                                   upstream_config_, true);
+// We have series of Cronvoy tests which don't bind to port 0, and often hit
+// port conflicts with other processes using 127.0.0.1. Default non-apple
+// builds to 127.0.0.1 (this fails on iOS and probably OSX with Can't assign
+// requested address)
+#if !defined(__APPLE__)
+  if (version_ == Network::Address::IpVersion::v4) {
+#else
+  if (false) {
+#endif
+    auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.3", port_);
+    upstream_ =
+        std::make_unique<AutonomousUpstream>(std::move(factory), address, upstream_config_, true);
+  } else {
+    upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
+                                                     upstream_config_, true);
+  }
 
   // Legacy behavior for cronet tests.
   if (type == TestServerType::HTTP3) {

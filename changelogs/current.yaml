@@ -21,6 +21,14 @@ minor_behavior_changes:
   change: |
     Added support for :ref:`connection_pool_per_downstream_connection
     <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
+- area: http3
+  change: |
+    The ACCEPT_UNTRUSTED option now works more consistently for HTTP/3 requests. This change is
+    guarded by ``envoy.reloadable_features.extend_h3_accept_untrusted``.
+- area: http3
+  change: |
+    HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
+    guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips``.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
@@ -88,6 +96,9 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: quic
+  change: |
+    Removed ``envoy.reloadable_features.quic_fix_filter_manager_uaf`` runtime flag and legacy code paths.
 - area: udp
   change: |
     Removed ``envoy.restart_features.udp_read_normalize_addresses`` runtime flag and legacy code paths.
