@@ -358,7 +358,8 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
-    stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(), config_->deferredCloseTimeout());
+    stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
+                                                        config_->deferredCloseTimeout());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -376,8 +377,6 @@ void Filter::closeStream() {
     }
     config_->threadLocalStreamManager().erase(stream_);
     stream_ = nullptr;
-    // config_->threadLocalStreamManager().erase(decoder_callbacks_->streamId());
-
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
@@ -1360,28 +1359,22 @@ void Filter::mergePerRouteConfig() {
 
 void DeferredDeletableStream::closeStreamOnTimer() {
   // Close the stream.
-  // ExternalProcessorStream* raw_stream = nullptr;
   if (stream_) {
     ENVOY_LOG(debug, "Closing the stream");
     if (stream_->close()) {
       stats.streams_closed_.inc();
     }
+    // Erase this entry from the map; this will also reset the stream_ pointer.
     parent.erase(stream_.get());
-    // stream_.reset();
-
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
-
-  // Erase this entry from the map.
-  // parent.erase(raw_stream);
 }
 
 // In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
 // to prevent unbounded resource usage growth.
 void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher) {
-  derferred_close_timer =
-      dispatcher.createTimer([this] { closeStreamOnTimer(); });
+  derferred_close_timer = dispatcher.createTimer([this] { closeStreamOnTimer(); });
   derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 

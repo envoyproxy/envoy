@@ -174,15 +174,16 @@ class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
-  ExternalProcessorStream* store(ExternalProcessorStreamPtr stream,
-                                 const ExtProcFilterStats& stat, const std::chrono::milliseconds& timeout) {
-    stream_manager_[stream_id] =
-        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat);
-    return stream_manager_[stream_id]->stream_.get();
+  ExternalProcessorStream* store(ExternalProcessorStreamPtr stream, const ExtProcFilterStats& stat,
+                                 const std::chrono::milliseconds& timeout) {
+    auto deferred_stream =
+        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat, timeout);
+    ExternalProcessorStream* raw_stream = deferred_stream->stream_.get();
+    stream_manager_[raw_stream] = std::move(deferred_stream);
+    return stream_manager_[raw_stream]->stream_.get();
   }
 
   void erase(ExternalProcessorStream* stream) { stream_manager_.erase(stream); }
-
   void deferredErase(ExternalProcessorStream* stream, Envoy::Event::Dispatcher& dispatcher) {
     auto it = stream_manager_.find(stream);
     if (it == stream_manager_.end()) {
