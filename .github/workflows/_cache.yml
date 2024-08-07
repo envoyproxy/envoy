@@ -29,7 +29,7 @@ on:
 # For a job that does, you can restore with something like:
 #
 #    steps:
-#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.30
+#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.34
 #      with:
 #        key: "${{ needs.env.outputs.build-image }}"
 #
