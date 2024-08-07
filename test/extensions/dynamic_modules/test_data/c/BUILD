@@ -5,5 +5,3 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = ["//test/extensions/dynamic_modules:__pkg__"])
 
 test_program(name = "no_op")
-
-test_program(name = "get_some_variable")

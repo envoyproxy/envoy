@@ -31,7 +31,7 @@ TEST(DynamicModuleTestGeneral, InvalidPath) {
 TEST(DynamicModuleTestGeneral, DoNotClose) {
   using GetSomeVariableFuncType = int (*)();
   absl::StatusOr<DynamicModuleSharedPtr> module =
-      newDynamicModule(testSharedObjectPath("get_some_variable", "c"), false);
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
@@ -41,7 +41,7 @@ TEST(DynamicModuleTestGeneral, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("get_some_variable", "c"),
+  module = newDynamicModule(testSharedObjectPath("no_op", "c"),
                             true); // This time, do not close the module.
   EXPECT_TRUE(module.ok());
 
@@ -55,7 +55,7 @@ TEST(DynamicModuleTestGeneral, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("get_some_variable", "c"), false);
+  module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(module.ok());
 
   // This module must be the already loaded one, and the variable must be kept.

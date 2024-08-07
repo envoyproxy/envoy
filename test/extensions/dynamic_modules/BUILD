@@ -12,7 +12,6 @@ envoy_cc_test(
     name = "dynamic_modules_test",
     srcs = ["dynamic_modules_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data/c:get_some_variable",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/go:no_op",
     ],
