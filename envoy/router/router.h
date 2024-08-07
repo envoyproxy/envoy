@@ -903,8 +903,7 @@ public:
   /**
    * Returns the final host value for the request, taking into account route-level mutations.
    *
-   * This function determines the appropriate host value by considering various route configuration
-   * options that can modify the original host. It applies the following logic in order:
+   * The value returned is computed with the following logic in order:
    *
    * 1. If a host rewrite is configured for the route, it returns that value.
    * 2. If an auto host rewrite header is specified, it attempts to use the value from that header.
