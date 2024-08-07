@@ -158,7 +158,7 @@ jobs:
     name: ${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.33
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.34
       id: started
       name: Create timestamp
       with:
@@ -166,7 +166,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.33
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.34
       name: Context
       id: context
       with:
@@ -187,11 +187,11 @@ jobs:
           | . * {$config, $check}
     - if: ${{ inputs.cache-build-image }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.33
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.34
       with:
         image_tag: ${{ inputs.cache-build-image }}
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.33
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.34
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -202,7 +202,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.33
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.34
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -219,7 +219,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.33
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.34
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -227,7 +227,7 @@ jobs:
         config: ${{ inputs.checkout-extra }}
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.33
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.34
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
