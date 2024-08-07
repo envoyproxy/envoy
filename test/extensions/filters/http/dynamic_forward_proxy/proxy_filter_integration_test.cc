@@ -291,12 +291,14 @@ typed_config:
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_),
+                HasSubstr("dns_resolution_failure{cares_norecords:Domain_name_not_found}"));
 
     response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+                HasSubstr("dns_resolution_failure{cares_norecords:Domain_name_not_found}"));
   }
 
   void multipleRequestsMaybeReresolve(bool reresolve) {

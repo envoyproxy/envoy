@@ -214,11 +214,9 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     }
   }
 
-  status = ARES_EBADNAME;
   if (status == ARES_SUCCESS) {
     pending_response_.status_ = ResolutionStatus::Success;
     pending_response_.details_ = absl::StrCat("cares_success:", ares_strerror(status));
-    std::cerr << "RESPONSE DETAILS: " << pending_response_.details_ << "\n";
 
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       bool can_process_v4 =
