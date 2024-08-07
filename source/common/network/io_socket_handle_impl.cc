@@ -231,16 +231,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 Address::InstanceConstSharedPtr
 IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss, socklen_t ss_len) {
   if (recent_received_addresses_ == nullptr) {
-    return Address::addressFromSockAddrOrDie(ss, ss_len, fd_,
-                                             socket_v6only_ || !udp_read_normalize_addresses_);
+    return Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
   }
   quic::QuicSocketAddress quic_address(ss);
   auto it = recent_received_addresses_->Lookup(quic_address);
   if (it != recent_received_addresses_->end()) {
     return *it->second;
   }
-  Address::InstanceConstSharedPtr new_address = Address::addressFromSockAddrOrDie(
-      ss, ss_len, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
+  Address::InstanceConstSharedPtr new_address =
+      Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
   recent_received_addresses_->Insert(
       quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
   return new_address;

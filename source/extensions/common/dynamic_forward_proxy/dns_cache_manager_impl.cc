@@ -27,7 +27,7 @@ absl::StatusOr<DnsCacheSharedPtr> DnsCacheManagerImpl::getCache(
   }
 
   auto cache_or_status = DnsCacheImpl::createDnsCacheImpl(context_, config);
-  RETURN_IF_STATUS_NOT_OK(cache_or_status);
+  RETURN_IF_NOT_OK_REF(cache_or_status.status());
   DnsCacheSharedPtr new_cache = std::move(cache_or_status.value());
   caches_.emplace(config.name(), ActiveCache{config, new_cache});
   return new_cache;

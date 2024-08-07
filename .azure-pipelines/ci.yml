@@ -328,6 +328,9 @@ steps:
     else
         sudo chown -R azure-pipelines:azure-pipelines ${{ parameters.pathCacheTemp }}/all
     fi
+    sudo systemctl stop docker docker.socket
+    sudo umount /var/lib/docker
+    sudo rm -rf /mnt/docker
 
   displayName: "Cache/save (${{ parameters.cacheName}})"
   condition: and(succeeded(), ne('${{ parameters.cacheName }}', ''), ne(variables.CACHE_RESTORED, 'true'))

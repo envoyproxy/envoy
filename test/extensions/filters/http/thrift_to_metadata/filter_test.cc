@@ -485,6 +485,39 @@ TEST_P(FilterTest, IncompleteRequestWithTrailer) {
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 
+  filter_->decodeComplete();
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 1);
+}
+
+TEST_P(FilterTest, IncompleteRequestWithEarlyComplete) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Call;
+
+  initializeFilter(config_yaml_);
+  const std::map<std::string, std::string>& expected_metadata = {
+      {"protocol", "unknown"},
+      {"transport", "unknown"},
+      {"request_message_type", "unknown"},
+      {"method_name", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl whole_message;
+  writeMessage(whole_message, transport_type, protocol_type, message_type);
+  Buffer::OwnedImpl buffer;
+  // incomplete message
+  buffer.move(whole_message, whole_message.length() / 2);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+
+  filter_->decodeComplete();
+
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 0);
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
@@ -518,6 +551,40 @@ TEST_P(FilterTest, IncompleteResponseWithTrailer) {
 
   Http::TestResponseTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+  filter_->encodeComplete();
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 1);
+}
+
+TEST_P(FilterTest, IncompleteResponseEarlyComplete) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Reply;
+
+  initializeFilter(config_yaml_);
+  const std::map<std::string, std::string>& expected_metadata = {
+      {"protocol", "unknown"},
+      {"transport", "unknown"},
+      {"response_message_type", "unknown"},
+      {"method_name", "unknown"},
+      {"response_reply_type", "unknown"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().ThriftToMetadata,
+                                               MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl whole_message;
+  writeMessage(whole_message, transport_type, protocol_type, message_type, ReplyType::Success);
+  Buffer::OwnedImpl buffer;
+  // incomplete message
+  buffer.move(whole_message, whole_message.length() / 2);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
+
+  filter_->encodeComplete();
 
   EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 0);
   EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);

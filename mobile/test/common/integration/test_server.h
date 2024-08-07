@@ -31,7 +31,7 @@ public:
   /**
    * Starts the test server. This function blocks until the test server is ready to accept requests.
    */
-  void start(TestServerType type);
+  void start(TestServerType type, int port = 0);
 
   /**
    * Shutdowns the server server. This function blocks until all the resources have been freed.

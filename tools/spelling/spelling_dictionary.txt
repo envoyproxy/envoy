@@ -93,6 +93,7 @@ OWS
 Preconnecting
 RCVBUF
 RTCP
+RTLD
 RTP
 SOH
 SPC
@@ -306,6 +307,7 @@ NOAUTH
 NOCHECKRESP
 NODATA
 NODELAY
+NODELETE
 NOLINT
 NOLINTNEXTLINE
 NONAME
@@ -721,6 +723,9 @@ dgst
 dir
 dirname
 djb
+dlclose
+dlopen
+dlsym
 downcalls
 downcasted
 downcased

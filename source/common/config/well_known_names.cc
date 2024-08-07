@@ -26,6 +26,8 @@ std::string expandRegex(const std::string& regex) {
               // Route names may contain dots and slashes in addition to
               // alphanumerics, underscores, and dashes.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
+              // Scoped Route names are named similarly to route config names.
+              {"<SCOPED_ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
               // Match a prefix that is either a listener plus name or cluster plus name
               {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"},
               {"<PROXY_PROTOCOL_VERSION>", R"(\d)"}});
@@ -182,6 +184,11 @@ TagNameValues::TagNameValues() {
   // Note: <route_config_name> can contain dots thus we have to maintain full
   // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
+
+  // http.[<stat_prefix>.]scoped_rds.(<scoped_route_config_name>.)<base_stat>
+  addRe2(SCOPED_RDS_CONFIG,
+         R"(^http\.<TAG_VALUE>\.scoped_rds\.((<SCOPED_ROUTE_CONFIG_NAME>)\.)\w+?$)",
+         ".scoped_rds.");
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");

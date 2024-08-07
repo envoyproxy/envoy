@@ -41,7 +41,7 @@ public class QuicTestServerTest {
     Map<String, String> headers = new HashMap<>();
     headers.put("Cache-Control", "max-age=0");
     headers.put("Content-Type", "text/plain");
-    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, headers,
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP3, 0, headers,
                                                  "This is a simple text file served by QUIC.\n",
                                                  Collections.emptyMap());
 

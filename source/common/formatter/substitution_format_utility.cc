@@ -14,10 +14,10 @@ namespace Formatter {
 
 static const std::string DefaultUnspecifiedValueString = "-";
 
-absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxFlags flags,
-                                                const std::string& command,
-                                                const std::string& subcommand,
-                                                const absl::optional<size_t>& length) {
+absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
+                                                absl::string_view command,
+                                                absl::string_view subcommand,
+                                                absl::optional<size_t> length) {
   if ((flags == COMMAND_ONLY) && ((subcommand.length() != 0) || length.has_value())) {
     return absl::InvalidArgumentError(
         fmt::format("{} does not take any parameters or length", command));
@@ -92,12 +92,11 @@ absl::string_view SubstitutionFormatUtils::truncateStringView(absl::string_view 
   return str.substr(0, max_length.value());
 }
 
-absl::Status SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& subcommand,
-                                                             std::string& main_header,
-                                                             std::string& alternative_header) {
+absl::StatusOr<SubstitutionFormatUtils::HeaderPair>
+SubstitutionFormatUtils::parseSubcommandHeaders(absl::string_view subcommand) {
+  absl::string_view main_header, alternative_header;
   // subs is used only to check if there are more than 2 headers separated by '?'.
-  std::vector<std::string> subs;
-  alternative_header = "";
+  std::vector<absl::string_view> subs;
   parseSubcommand(subcommand, '?', main_header, alternative_header, subs);
   if (!subs.empty()) {
     return absl::InvalidArgumentError(
@@ -120,7 +119,7 @@ absl::Status SubstitutionFormatUtils::parseSubcommandHeaders(const std::string& 
           "Invalid header configuration. Format string contains null or newline.");
     }
   }
-  return absl::OkStatus();
+  return {std::make_pair(main_header, alternative_header)};
 }
 
 } // namespace Formatter

@@ -302,7 +302,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
-    _com_github_rules_proto_grpc()
+    _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
@@ -361,6 +361,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    external_http_archive(name = "envoy_examples")
+
     _com_github_maxmind_libmaxminddb()
 
     external_http_archive("rules_pkg")
@@ -443,11 +445,6 @@ def _com_github_c_ares_c_ares():
     external_http_archive(
         name = "com_github_c_ares_c_ares",
         build_file_content = BUILD_ALL_CONTENT,
-        # Patch c-ares library aith commit
-        # https://github.com/c-ares/c-ares/commit/a070d7835d667b2fae5266fe1b790677dae47d25
-        # This commit fixes an issue when the gRPC library attempts to resolve a domain name.
-        patches = ["@envoy//bazel/foreign_cc:cares.patch"],
-        patch_args = ["-p1"],
     )
     native.bind(
         name = "ares",
@@ -1226,8 +1223,8 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _com_github_rules_proto_grpc():
-    external_http_archive("com_github_rules_proto_grpc")
+def _rules_proto_grpc():
+    external_http_archive("rules_proto_grpc")
 
 def _re2():
     external_http_archive("com_googlesource_code_re2")

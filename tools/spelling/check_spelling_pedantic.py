@@ -106,6 +106,9 @@ RST_LITERAL = re.compile(r'``.*``')
 # RST code block marker.
 RST_CODE_BLOCK = '.. code-block::'
 
+# RST literal include.
+RST_LITERAL_INCLUDE = '.. literalinclude::'
+
 # Path names.
 ABSPATH = re.compile(r'(?:\s|^)((/[A-Za-z0-9_.*-]+)+)(?:\s|$)')
 FILEREF = re.compile(r'(?:\s|^)([A-Za-z0-9_./-]+\.(cc|js|h|py|sh))(?:\s|$)')
@@ -649,7 +652,7 @@ def extract_comments(lines):
             comments.append(Comment(line=line_idx, col=col, text=text, last_on_line=last_on_line))
 
     # Handle control statements and filter out comments that are part of
-    # RST code block directives.
+    # RST code block and literal include directives.
     result = []
     n = 0
     nc = len(comments)
@@ -687,7 +690,8 @@ def extract_comments(lines):
                     break
 
                 n += 1
-        elif text.strip().startswith(RST_CODE_BLOCK):
+        elif text.strip().startswith(RST_CODE_BLOCK) or text.strip().startswith(
+                RST_LITERAL_INCLUDE):
             # Start of a code block.
             indent = len(INDENT.search(text).group(1))
             last_line = comments[n].line

@@ -344,7 +344,7 @@ Filter::StreamOpenState Filter::openStream() {
     auto options = Http::AsyncClient::StreamOptions()
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
-                       .setBufferBodyForRetry(true);
+                       .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
     ExternalProcessorStreamPtr stream_object =
         client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);

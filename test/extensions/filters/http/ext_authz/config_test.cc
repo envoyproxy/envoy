@@ -163,6 +163,60 @@ TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
   testFilterFactory(ext_authz_config_yaml);
 }
 
+TEST_F(ExtAuthzFilterHttpTest, FilterWithServerContext) {
+  const std::string ext_authz_config_yaml = R"EOF(
+  stat_prefix: "wall"
+  allowed_headers:
+      patterns:
+      - exact: baz
+      - prefix: x-
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    authorization_request:
+      headers_to_add:
+      - key: foo
+        value: bar
+      - key: bar
+        value: foo
+
+    authorization_response:
+      allowed_upstream_headers:
+        patterns:
+        - exact: baz
+        - prefix: x-success
+      allowed_client_headers:
+        patterns:
+        - exact: baz
+        - prefix: x-fail
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: baz-append
+        - prefix: x-append
+
+    path_prefix: /extauth
+
+  failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 100
+    pack_as_bytes: true
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
 public:
   void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {

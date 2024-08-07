@@ -53,7 +53,7 @@ public:
 
 class HeaderFormatter {
 public:
-  HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
+  HeaderFormatter(absl::string_view main_header, absl::string_view alternative_header,
                   absl::optional<size_t> max_length);
 
 protected:
@@ -97,7 +97,7 @@ private:
  */
 class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
-  RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
+  RequestHeaderFormatter(absl::string_view main_header, absl::string_view alternative_header,
                          absl::optional<size_t> max_length);
 
   // FormatterProvider
@@ -114,7 +114,7 @@ public:
  */
 class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
-  ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
+  ResponseHeaderFormatter(absl::string_view main_header, absl::string_view alternative_header,
                           absl::optional<size_t> max_length);
 
   // FormatterProvider
@@ -131,7 +131,7 @@ public:
  */
 class ResponseTrailerFormatter : public FormatterProvider, HeaderFormatter {
 public:
-  ResponseTrailerFormatter(const std::string& main_header, const std::string& alternative_header,
+  ResponseTrailerFormatter(absl::string_view main_header, absl::string_view alternative_header,
                            absl::optional<size_t> max_length);
 
   // FormatterProvider
@@ -205,12 +205,12 @@ public:
   BuiltInHttpCommandParser() = default;
 
   // CommandParser
-  FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
-                             absl::optional<size_t>& max_length) const override;
+  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
+                             absl::optional<size_t> max_length) const override;
 
 private:
   using FormatterProviderCreateFunc =
-      std::function<FormatterProviderPtr(const std::string&, absl::optional<size_t>&)>;
+      std::function<FormatterProviderPtr(absl::string_view, absl::optional<size_t>)>;
 
   using FormatterProviderLookupTbl =
       absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,

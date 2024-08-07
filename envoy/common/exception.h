@@ -57,15 +57,14 @@ public:
 // the macros above.
 #define THROW_IF_STATUS_NOT_OK(variable, throw_action) THROW_IF_NOT_OK_REF(variable.status());
 
-// TODO(alyssawilk) remove in favor of RETURN_IF_NOT_OK
-#define RETURN_IF_STATUS_NOT_OK(variable)                                                          \
-  if (!variable.status().ok()) {                                                                   \
-    return variable.status();                                                                      \
+#define RETURN_IF_NOT_OK_REF(variable)                                                             \
+  if (const absl::Status& temp_status = variable; !temp_status.ok()) {                             \
+    return temp_status;                                                                            \
   }
 
 // Make sure this works for functions without calling the functoin twice as well.
-#define RETURN_IF_NOT_OK(variable)                                                                 \
-  if (absl::Status temp_status = variable; !temp_status.ok()) {                                    \
+#define RETURN_IF_NOT_OK(status_fn)                                                                \
+  if (absl::Status temp_status = (status_fn); !temp_status.ok()) {                                 \
     return temp_status;                                                                            \
   }
 

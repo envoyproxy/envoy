@@ -68,8 +68,8 @@ public:
                       absl::string_view details) override {
     state().decoder_filter_chain_aborted_ = true;
     state().encoder_filter_chain_aborted_ = true;
-    state().remote_encode_complete_ = true;
-    state().local_complete_ = true;
+    state().encoder_filter_chain_complete_ = true;
+    state().observed_encode_end_stream_ = true;
     // TODO(alyssawilk) this should be done through the router to play well with hedging.
     upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
                                                           details);
@@ -596,9 +596,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
-  if (enable_half_close_) {
-    upstream_->enableHalfClose();
-  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 

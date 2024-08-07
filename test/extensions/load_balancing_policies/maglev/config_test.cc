@@ -20,6 +20,7 @@ TEST(MaglevConfigTest, Validate) {
   NiceMock<Upstream::MockClusterInfo> cluster_info;
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
+  NiceMock<Upstream::MockLoadBalancerFactoryContext> lb_factory_context;
 
   {
     envoy::config::core::v3::TypedExtensionConfig config;
@@ -30,8 +31,8 @@ TEST(MaglevConfigTest, Validate) {
     auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
     EXPECT_EQ("envoy.load_balancing_policies.maglev", factory.name());
 
-    auto lb_config =
-        factory.loadConfig(*factory.createEmptyConfigProto(), context.messageValidationVisitor());
+    auto lb_config = factory.loadConfig(lb_factory_context, *factory.createEmptyConfigProto(),
+                                        context.messageValidationVisitor());
     auto thread_aware_lb =
         factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
                        context.api_.random_, context.time_system_);
@@ -59,7 +60,8 @@ TEST(MaglevConfigTest, Validate) {
 
     auto message_ptr = factory.createEmptyConfigProto();
     message_ptr->MergeFrom(config_msg);
-    auto lb_config = factory.loadConfig(*message_ptr, context.messageValidationVisitor());
+    auto lb_config =
+        factory.loadConfig(lb_factory_context, *message_ptr, context.messageValidationVisitor());
 
     EXPECT_THROW_WITH_MESSAGE(factory.create(*lb_config, cluster_info, main_thread_priority_set,
                                              context.runtime_loader_, context.api_.random_,

@@ -177,12 +177,16 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @sergkir85
 # CEL input matcher
 /*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
+# dynamic metadata input matcher
+/*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input
 /*/extensions/matching/http/cel_input @tyxia @yanavlasov
+# dynamic metadata input
+/*/extensions/matching/http/metadata_input @vikaschoudhary16 @kyessenov
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @lambdai @soulxu
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -334,6 +338,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao
 /*/extensions/health_checkers/tcp @zuercher @botengyao
+/*/extensions/health_checkers/common @zuercher @botengyao
 # Health check event sinks
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
 # IP Geolocation
@@ -345,8 +350,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
-
-/*/extensions/health_checkers/common @zuercher @botengyao
+# Dynamic Modules
+/*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

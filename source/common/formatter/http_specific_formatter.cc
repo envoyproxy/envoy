@@ -42,8 +42,8 @@ AccessLogTypeFormatter::formatValueWithContext(const HttpFormatterContext& conte
   return ValueUtil::stringValue(AccessLogType_Name(context.accessLogType()));
 }
 
-HeaderFormatter::HeaderFormatter(const std::string& main_header,
-                                 const std::string& alternative_header,
+HeaderFormatter::HeaderFormatter(absl::string_view main_header,
+                                 absl::string_view alternative_header,
                                  absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
@@ -81,8 +81,8 @@ ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) 
   return ValueUtil::stringValue(std::string(val));
 }
 
-ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
-                                                 const std::string& alternative_header,
+ResponseHeaderFormatter::ResponseHeaderFormatter(absl::string_view main_header,
+                                                 absl::string_view alternative_header,
                                                  absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
@@ -98,8 +98,8 @@ ResponseHeaderFormatter::formatValueWithContext(const HttpFormatterContext& cont
   return HeaderFormatter::formatValue(context.responseHeaders());
 }
 
-RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
-                                               const std::string& alternative_header,
+RequestHeaderFormatter::RequestHeaderFormatter(absl::string_view main_header,
+                                               absl::string_view alternative_header,
                                                absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
@@ -115,8 +115,8 @@ RequestHeaderFormatter::formatValueWithContext(const HttpFormatterContext& conte
   return HeaderFormatter::formatValue(context.requestHeaders());
 }
 
-ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_header,
-                                                   const std::string& alternative_header,
+ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header,
+                                                   absl::string_view alternative_header,
                                                    absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
@@ -194,8 +194,7 @@ GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view f
     return GrpcStatusFormatter::Number;
   }
 
-  throwEnvoyExceptionOrPanic(
-      "GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
+  throw EnvoyException("GrpcStatusFormatter only supports CAMEL_STRING, SNAKE_STRING or NUMBER.");
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
@@ -299,96 +298,85 @@ BuiltInHttpCommandParser::getKnownFormatters() {
       FormatterProviderLookupTbl,
       {{"REQ",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](const std::string& format, absl::optional<size_t>& max_length) {
-           std::string main_header, alternative_header;
-
-           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
-                                                                           alternative_header));
-
-           return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
-                                                           max_length);
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_STATUS_NOT_OK(result, throw);
+           return std::make_unique<RequestHeaderFormatter>(result.value().first,
+                                                           result.value().second, max_length);
          }}},
        {"RESP",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](const std::string& format, absl::optional<size_t>& max_length) {
-           std::string main_header, alternative_header;
-
-           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
-                                                                           alternative_header));
-
-           return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header,
-                                                            max_length);
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_STATUS_NOT_OK(result, throw);
+           return std::make_unique<ResponseHeaderFormatter>(result.value().first,
+                                                            result.value().second, max_length);
          }}},
        {"TRAILER",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](const std::string& format, absl::optional<size_t>& max_length) {
-           std::string main_header, alternative_header;
-
-           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
-                                                                           alternative_header));
-
-           return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header,
-                                                             max_length);
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_STATUS_NOT_OK(result, throw);
+           return std::make_unique<ResponseTrailerFormatter>(result.value().first,
+                                                             result.value().second, max_length);
          }}},
        {"LOCAL_REPLY_BODY",
         {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, absl::optional<size_t>&) {
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<LocalReplyBodyFormatter>();
          }}},
        {"ACCESS_LOG_TYPE",
         {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, absl::optional<size_t>&) {
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<AccessLogTypeFormatter>();
          }}},
        {"GRPC_STATUS",
         {CommandSyntaxChecker::PARAMS_OPTIONAL,
-         [](const std::string& format, const absl::optional<size_t>&) {
+         [](absl::string_view format, absl::optional<size_t>) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
                                                         GrpcStatusFormatter::parseFormat(format));
          }}},
        {"GRPC_STATUS_NUMBER",
         {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, const absl::optional<size_t>&) {
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>(),
                                                         GrpcStatusFormatter::Number);
          }}},
        {"REQUEST_HEADERS_BYTES",
         {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, absl::optional<size_t>&) {
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<HeadersByteSizeFormatter>(
                HeadersByteSizeFormatter::HeaderType::RequestHeaders);
          }}},
        {"RESPONSE_HEADERS_BYTES",
         {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, absl::optional<size_t>&) {
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<HeadersByteSizeFormatter>(
                HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
          }}},
        {"RESPONSE_TRAILERS_BYTES",
         {CommandSyntaxChecker::COMMAND_ONLY,
-         [](const std::string&, absl::optional<size_t>&) {
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<HeadersByteSizeFormatter>(
                HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
          }}},
        {"STREAM_INFO_REQ",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](const std::string& format, absl::optional<size_t>& max_length) {
-           std::string main_header, alternative_header;
-           THROW_IF_NOT_OK(SubstitutionFormatUtils::parseSubcommandHeaders(format, main_header,
-                                                                           alternative_header));
-
-           return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
-                                                           max_length);
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_STATUS_NOT_OK(result, throw);
+           return std::make_unique<RequestHeaderFormatter>(result.value().first,
+                                                           result.value().second, max_length);
          }}},
        {"TRACE_ID",
-        {CommandSyntaxChecker::COMMAND_ONLY, [](const std::string&, absl::optional<size_t>&) {
+        {CommandSyntaxChecker::COMMAND_ONLY, [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<TraceIDFormatter>();
          }}}});
 }
 
-FormatterProviderPtr BuiltInHttpCommandParser::parse(const std::string& command,
-                                                     const std::string& subcommand,
-                                                     absl::optional<size_t>& max_length) const {
+FormatterProviderPtr BuiltInHttpCommandParser::parse(absl::string_view command,
+                                                     absl::string_view subcommand,
+                                                     absl::optional<size_t> max_length) const {
   const FormatterProviderLookupTbl& providers = getKnownFormatters();
 
   auto it = providers.find(command);

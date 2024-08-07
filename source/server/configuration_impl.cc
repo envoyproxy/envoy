@@ -140,7 +140,7 @@ absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap&
     ENVOY_LOG(debug, "listener #{}:", i);
     absl::StatusOr<bool> update_or_error =
         server.listenerManager().addOrUpdateListener(listeners[i], "", false);
-    RETURN_IF_STATUS_NOT_OK(update_or_error);
+    RETURN_IF_NOT_OK_REF(update_or_error.status());
   }
   RETURN_IF_NOT_OK(initializeWatchdogs(bootstrap, server));
   // This has to happen after ClusterManager initialization, as it depends on config from

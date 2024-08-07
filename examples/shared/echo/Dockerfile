@@ -1,1 +1,0 @@
-FROM jmalloc/echo-server@sha256:86f2c45aa7e7ebe1be30b21f8cfff25a7ed6e3b059751822d4b35bf244a688d5

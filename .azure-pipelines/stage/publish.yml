@@ -45,6 +45,14 @@ parameters:
   type: string
   default: ""
 
+- name: bazelConfigRBE
+  type: string
+  default: --config=remote-ci --config=rbe-google --jobs=$(RbeJobs)
+
+- name: runBuild
+  displayName: "Run Build"
+  type: string
+  default: true
 - name: runDocker
   displayName: "Run Docker"
   type: string
@@ -64,8 +72,58 @@ parameters:
   default: false
 
 jobs:
+
+- job: release_x64
+  displayName: Binary release
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runBuild }}, 'true'))
+  timeoutInMinutes: 120
+  pool:
+    vmImage: $(agentUbuntu)
+  steps:
+  - template: ../ci.yml
+    parameters:
+      artifactName: release
+      ciTarget: release.server_only
+      cacheName: release-server-only
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
+      cacheVersion: $(cacheKeyBazel)
+      cacheTestResults: false
+      publishTestResults: false
+      rbe: true
+
+- job: release_arm64
+  displayName: Binary release (arm64)
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runBuild }}, 'true'))
+  timeoutInMinutes: 180
+  pool: envoy-arm-large
+  steps:
+  - bash: |
+      CI_TARGET="release.server_only"
+      echo "${CI_TARGET}"
+      echo "##vso[task.setvariable variable=value;isoutput=true]${CI_TARGET}"
+    name: target
+  - template: ../ci.yml
+    parameters:
+      artifactName: release
+      ciTarget: release.server_only
+      cacheName: release-server-only
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
+      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      cacheVersion: $(cacheKeyBazel)
+      cacheTestResults: false
+      artifactSuffix: .arm64
+      publishTestResults: false
+      rbe: false
+
 - job: docker
   displayName: "Docker (Linux multi arch)"
+  dependsOn:
+  - release_x64
+  - release_arm64
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runDocker }}, 'true'))
@@ -128,7 +186,7 @@ jobs:
 
 - job: package_x64
   displayName: Linux debs (x64)
-  dependsOn: []
+  dependsOn: ["release_x64"]
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runPackaging }}, 'true'))
@@ -162,7 +220,7 @@ jobs:
 
 - job: package_arm64
   displayName: Linux debs (arm64)
-  dependsOn: []
+  dependsOn: ["release_arm64"]
   condition: |
     and(not(canceled()),
         eq(${{ parameters.runPackaging }}, 'true'))

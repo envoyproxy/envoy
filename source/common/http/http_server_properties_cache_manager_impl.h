@@ -36,6 +36,8 @@ public:
   getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
            Event::Dispatcher& dispatcher) override;
 
+  void forEachThreadLocalCache(CacheFn cache_fn) override;
+
 private:
   // Contains a cache and the options associated with it.
   struct CacheWithOptions {

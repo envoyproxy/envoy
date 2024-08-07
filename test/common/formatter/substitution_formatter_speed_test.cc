@@ -75,7 +75,8 @@ BENCHMARK(BM_AccessLogFormatterSetup);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   static const char* LogFormat =
       "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
@@ -96,7 +97,8 @@ BENCHMARK(BM_AccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StructAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> struct_formatter = makeStructFormatter(false);
 
@@ -110,7 +112,8 @@ BENCHMARK(BM_StructAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> typed_struct_formatter =
       makeStructFormatter(true);
@@ -125,7 +128,8 @@ BENCHMARK(BM_TypedStructAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
@@ -139,7 +143,8 @@ BENCHMARK(BM_JsonAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> typed_json_formatter =
       makeJsonFormatter(true);
@@ -155,7 +160,7 @@ BENCHMARK(BM_TypedJsonAccessLogFormatter);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FormatterCommandParsing(benchmark::State& state) {
   const std::string token = "Listener:namespace:key";
-  std::string listener, names, key;
+  absl::string_view listener, names, key;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     Formatter::SubstitutionFormatUtils::parseSubcommand(token, ':', listener, names, key);
   }

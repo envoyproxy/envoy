@@ -78,7 +78,7 @@ public:
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
-  void enableHalfClose() override {}
+  void enableTcpTunneling() override {}
   void readDisable(bool disable) override;
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}

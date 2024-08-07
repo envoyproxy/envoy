@@ -73,7 +73,8 @@ public:
     return std::make_unique<ThreadAwareLbImpl>();
   }
 
-  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message&,
+  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
+                                             const Protobuf::Message&,
                                              ProtobufMessage::ValidationVisitor&) override {
     return std::make_unique<EmptyLoadBalancerConfig>();
   }

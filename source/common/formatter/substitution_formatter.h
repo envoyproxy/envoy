@@ -17,6 +17,7 @@
 #include "source/common/json/json_loader.h"
 
 #include "absl/types/optional.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -28,7 +29,7 @@ namespace Formatter {
 template <class FormatterContext>
 class PlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
 public:
-  PlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
+  PlainStringFormatterBase(absl::string_view str) { str_.set_string_value(str); }
 
   // FormatterProviderBase
   absl::optional<std::string> formatWithContext(const FormatterContext&,
@@ -102,19 +103,21 @@ public:
   parse(absl::string_view format,
         const std::vector<CommandParserBasePtr<FormatterContext>>& command_parsers = {}) {
     std::string current_token;
+    current_token.reserve(32);
     std::vector<FormatterProviderBasePtr<FormatterContext>> formatters;
 
-    for (size_t pos = 0; pos < format.size(); ++pos) {
+    for (size_t pos = 0; pos < format.size();) {
       if (format[pos] != '%') {
-        current_token += format[pos];
+        current_token.push_back(format[pos]);
+        pos++;
         continue;
       }
 
       // escape '%%'
       if (format.size() > pos + 1) {
         if (format[pos + 1] == '%') {
-          current_token += '%';
-          pos++;
+          current_token.push_back('%');
+          pos += 2;
           continue;
         }
       }
@@ -122,34 +125,21 @@ public:
       if (!current_token.empty()) {
         formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{
             new PlainStringFormatterBase<FormatterContext>(current_token)});
-        current_token = "";
+        current_token.clear();
       }
 
-      std::smatch m;
-      const std::string search_space = std::string(format.substr(pos));
-      if (!std::regex_search(search_space, m, commandWithArgsRegex())) {
+      absl::string_view sub_format = format.substr(pos);
+      const size_t sub_format_size = sub_format.size();
+
+      absl::string_view command, command_arg;
+      absl::optional<size_t> max_len;
+
+      if (!re2::RE2::Consume(&sub_format, commandWithArgsRegex(), &command, &command_arg,
+                             &max_len)) {
         throwEnvoyExceptionOrPanic(
             fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
                         format, pos));
       }
-
-      const std::string match = m.str(0);
-      // command is at at index 1.
-      const std::string command = m.str(1);
-      // subcommand is at index 2.
-      const std::string subcommand = m.str(2);
-      // optional length is at index 3. If present, validate that it is valid integer.
-      absl::optional<size_t> max_length;
-      if (m.str(3).length() != 0) {
-        size_t length_value;
-        if (!absl::SimpleAtoi(m.str(3), &length_value)) {
-          throwEnvoyExceptionOrPanic(absl::StrCat("Length must be an integer, given: ", m.str(3)));
-        }
-        max_length = length_value;
-      }
-      std::vector<std::string> path;
-
-      const size_t command_end_position = pos + m.str(0).length() - 1;
 
       bool added = false;
 
@@ -159,7 +149,7 @@ public:
       // First, try the built-in command parsers.
       for (const auto& cmd :
            BuiltInCommandParserFactoryHelper<FormatterContext>::commandParsers()) {
-        auto formatter = cmd->parse(command, subcommand, max_length);
+        auto formatter = cmd->parse(command, command_arg, max_len);
         if (formatter) {
           formatters.push_back(std::move(formatter));
           added = true;
@@ -170,7 +160,7 @@ public:
       // Next, try the command parsers provided by the user.
       if (!added) {
         for (const auto& cmd : command_parsers) {
-          auto formatter = cmd->parse(command, subcommand, max_length);
+          auto formatter = cmd->parse(command, command_arg, max_len);
           if (formatter) {
             formatters.push_back(std::move(formatter));
             added = true;
@@ -182,7 +172,7 @@ public:
       // Finally, try the command parsers that are built-in and context-independent.
       if (!added) {
         for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
-          auto formatter = cmd->parse(command, subcommand, max_length);
+          auto formatter = cmd->parse(command, command_arg, max_len);
           if (formatter) {
             formatters.push_back(std::make_unique<StreamInfoFormatterWrapper<FormatterContext>>(
                 std::move(formatter)));
@@ -196,7 +186,7 @@ public:
         throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
       }
 
-      pos = command_end_position;
+      pos += (sub_format_size - sub_format.size());
     }
 
     if (!current_token.empty() || format.empty()) {
@@ -210,7 +200,7 @@ public:
   }
 
 private:
-  static const std::regex& commandWithArgsRegex();
+  static const re2::RE2& commandWithArgsRegex();
 };
 
 inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";

@@ -347,7 +347,7 @@ envoy_cc_test_binary(
         "abseil_symbolize",
     ],
     deps = [
-        "//source/common/formatter:formatter_extension_lib",
+        ":common_extensions_lib",
         "//source/common/http:rds_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -370,7 +370,7 @@ envoy_cc_test_binary(
     ],
     linkstatic = envoy_select_linkstatic(),
     deps = [
-        "//source/common/formatter:formatter_extension_lib",
+        ":common_extensions_lib",
         "//source/exe:main_common_lib",
         "//source/exe:platform_impl_lib",
         "//source/exe:process_wide_lib",
@@ -1119,6 +1119,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "common_extensions_lib",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/extensions/clusters/eds:eds_lib",
@@ -1149,7 +1150,6 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/formatter:formatter_extension_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_socket_lib",

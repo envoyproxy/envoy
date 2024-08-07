@@ -36,7 +36,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
   auto result_or_error = file_system_.splitPathFromFilename(path);
-  RETURN_IF_STATUS_NOT_OK(result_or_error);
+  RETURN_IF_NOT_OK_REF(result_or_error.status());
   const PathSplitResult result = result_or_error.value();
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
