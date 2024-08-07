@@ -85,6 +85,8 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     const std::string tags_join = absl::StrJoin(tags, ",");
     headers.appendEnvoyIpTags(tags_join, ",");
     if (!config_->customHeader().empty()) {
+      // remove the header if it already exists and then set it with the tags.
+      headers.remove(Http::LowerCaseString(config_->customHeader()));
       headers.addReferenceKey(Http::LowerCaseString(config_->customHeader()), tags_join);
     }
 
