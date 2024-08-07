@@ -36,9 +36,7 @@ public:
   const std::string& MessageType() const override { return message_type_->name(); }
 
 private:
-  // Initializes an instance of ProtoScrubber using FieldPolicies. All other
-  // relevant info can be obtained from
-  // ::google::protobuf::util::converter::TypeInfo.
+  // Initializes an instance of ProtoScrubber using FieldPolicies.
   AuditProtoScrubber(proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
                      const google::grpc::transcoding::TypeHelper* type_helper,
                      const ::Envoy::ProtobufWkt::Type* message_type,

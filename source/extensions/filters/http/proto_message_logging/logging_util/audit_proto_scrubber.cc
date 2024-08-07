@@ -20,7 +20,6 @@
 #include "google/protobuf/util/converter/json_objectwriter.h"
 #include "google/protobuf/util/converter/protostream_objectsource.h"
 #include "google/protobuf/util/converter/utility.h"
-#include "google/protobuf/util/type_resolver.h"
 #include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/message_data/message_data.h"
@@ -72,8 +71,8 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
 
   // Convert from JSON (in absl::Cord) to Struct.
   JsonParseOptions options;
-  auto status =
-      TestUtility::loadFromJson(cord_out_stream.Consume().Flatten(), message_struct, options);
+  auto status = Protobuf::util::JsonStringToMessage(cord_out_stream.Consume().Flatten(),
+                                                    message_struct, options);
   if (!status.ok()) {
     return absl::InternalError(
         absl::StrCat("Failed to parse Struct from formatted JSON of '", type.name(), "' message."));
@@ -191,7 +190,7 @@ AuditProtoScrubber::AuditProtoScrubber(ScrubberContext scrubber_context,
   // Initialize type finder.
   type_finder_ = [&](const std::string& type_url) {
     const Type* result = nullptr;
-    absl::StatusOr<const Type*> type = type_helper_->ResolveTypeUrl(type_url);
+    absl::StatusOr<const Type*> type = type_helper_->Info()->GetTypeByTypeUrl(type_url);
     if (!type.ok()) {
       LOG(WARNING) << "Failed to find Type for type url: " << type_url;
     } else {
