@@ -485,8 +485,16 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   }
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
+    // Filter can potentially be destroyed during encodeTrailers.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
   } else {
     Http::ResponseTrailerMap& response_trailers = encoder_callbacks_->addEncodedTrailers();
+    // Filter can potentially be destroyed during addEncodedTrailers.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
     response_trailers = std::move(*trailers);
   }
   finalizeEncodingCachedResponse();
@@ -677,6 +685,10 @@ void CacheFilter::encodeCachedResponse() {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
                                       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
+    // Filter can potentially be destroyed during encodeHeaders.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
   }
   if (filter_state_ == FilterState::EncodeServingFromCache && is_head_request_) {
     filter_state_ = FilterState::ResponseServedFromCache;
@@ -698,6 +710,10 @@ void CacheFilter::finalizeEncodingCachedResponse() {
     // encodeHeaders returned StopIteration waiting for finishing encoding the cached response --
     // continue encoding.
     encoder_callbacks_->continueEncoding();
+    // Filter can potentially be destroyed during continueEncoding.
+    if (filter_state_ == FilterState::Destroyed) {
+      return;
+    }
   }
   filter_state_ = FilterState::ResponseServedFromCache;
 }
