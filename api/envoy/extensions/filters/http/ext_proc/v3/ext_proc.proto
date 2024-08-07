@@ -99,7 +99,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -275,6 +275,22 @@ message ExternalProcessor {
   // backend stream lifetime. In this case, Envoy will eventually timeout the external processor stream according to this time limit.
   // The default value is 5000 milliseconds (5 seconds) if not specified.
   google.protobuf.Duration deferred_close_timeout = 19;
+
+  // [#not-implemented-hide:]
+  // If the body processing mode is STREAMED, this configuration enables sending body to the side stream server
+  // when the header external processing is still ongoing.
+  // When the filter has this enabled and body processing mode is STREAMED,
+  // the side stream server must wait for at least the first chunk of body arrives,
+  // process both the request headers and body, then encode the response headers in the
+  // :ref:`header_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.header_mutation>`
+  // and encode the first chunk of the response body in the
+  // :ref:`body_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.body_mutation>`.
+  // Depending on the direction of the mainstream traffic, they must be encoded either in the
+  // :ref:`request_body <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_body>`, or the
+  // :ref:`response_body <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_body>`
+  // and send it back to Envoy. The rest of the body requests and responses are forwarded as usual.
+  // The side stream server must not send a separate header response in this case.
+  bool send_body_before_recv_header_resp = 21;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
