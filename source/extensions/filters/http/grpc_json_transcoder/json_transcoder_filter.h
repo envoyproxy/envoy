@@ -78,11 +78,14 @@ public:
    *         is not found, status with Code::NOT_FOUND is returned. If the method is found, but
    * fields cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
    */
-  absl::Status createTranscoder(const Http::RequestHeaderMap& headers,
-                                Protobuf::io::ZeroCopyInputStream& request_input,
-                                google::grpc::transcoding::TranscoderInputStream& response_input,
-                                std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                                MethodInfoSharedPtr& method_info) const;
+  absl::Status
+  createTranscoder(const Http::RequestHeaderMap& headers,
+                   Protobuf::io::ZeroCopyInputStream& request_input,
+                   google::grpc::transcoding::TranscoderInputStream& response_input,
+                   std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
+                   MethodInfoSharedPtr& method_info,
+                   envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams&
+                       unknown_params) const;
 
   /**
    * Converts an arbitrary protobuf message to JSON.
@@ -135,6 +138,7 @@ private:
 
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
+  bool capture_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
   bool case_insensitive_enum_parsing_{false};
 
@@ -217,6 +221,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   MethodInfoSharedPtr method_;
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams unknown_params_;
   Http::ResponseHeaderMap* response_headers_{};
   Grpc::Decoder decoder_;
 

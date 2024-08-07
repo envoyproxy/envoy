@@ -145,6 +145,7 @@ envoy_cc_library(
     deps = [
         ":macros",
         ":safe_memcpy_lib",
+        "//envoy/common:base_includes",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
     ],
@@ -458,6 +459,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "trie_lookup_table_lib",
+    hdrs = ["trie_lookup_table.h"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -470,6 +476,7 @@ envoy_cc_library(
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
+        "@com_googlesource_code_re2//:re2",
     ],
 )
 

@@ -4,6 +4,8 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
+#include "quiche/quic/core/quic_packets.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -49,6 +51,19 @@ void EnvoyQuicServerConnection::OnCanWrite() {
   quic::QuicConnection::OnCanWrite();
   onWriteEventDone();
 }
+
+void EnvoyQuicServerConnection::ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                                                 const quic::QuicSocketAddress& peer_address,
+                                                 const quic::QuicReceivedPacket& packet) {
+  if (!first_packet_received_) {
+    if (listener_filter_manager_ != nullptr) {
+      listener_filter_manager_->onFirstPacketReceived(packet);
+    }
+    first_packet_received_ = true;
+  }
+
+  quic::QuicConnection::ProcessUdpPacket(self_address, peer_address, packet);
+};
 
 void EnvoyQuicServerConnection::OnEffectivePeerMigrationValidated(bool is_migration_linkable) {
   quic::QuicConnection::OnEffectivePeerMigrationValidated(is_migration_linkable);

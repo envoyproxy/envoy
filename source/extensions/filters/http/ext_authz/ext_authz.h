@@ -41,13 +41,25 @@ namespace ExtAuthz {
   COUNTER(error)                                                                                   \
   COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)                                                                    \
-  COUNTER(invalid)
+  COUNTER(invalid)                                                                                 \
+  COUNTER(ignored_dynamic_metadata)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
  */
 struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  explicit ExtAuthzLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+      : filter_metadata_(filter_metadata) {}
+
+  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+
+private:
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
 };
 
 /**
@@ -90,6 +102,8 @@ public:
   bool hasDecoderHeaderMutationRules() const {
     return decoder_header_mutation_checker_.has_value();
   }
+
+  bool enableDynamicMetadataIngestion() const { return enable_dynamic_metadata_ingestion_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -135,6 +149,8 @@ public:
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
+
+  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
@@ -182,9 +198,11 @@ private:
   const bool validate_mutations_;
   Stats::Scope& scope_;
   const absl::optional<Filters::Common::MutationRules::Checker> decoder_header_mutation_checker_;
+  const bool enable_dynamic_metadata_ingestion_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
+  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;

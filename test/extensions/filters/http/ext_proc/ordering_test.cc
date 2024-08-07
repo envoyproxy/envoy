@@ -60,7 +60,7 @@ protected:
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -84,9 +84,10 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                             const Grpc::GrpcServiceConfigWithHashKey&,
-                                             const Envoy::Http::AsyncClient::StreamOptions&) {
+  virtual ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const Envoy::Http::AsyncClient::StreamOptions&,
+          Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -222,9 +223,10 @@ protected:
 // A base class for tests that will check that gRPC streams fail while being created
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const Grpc::GrpcServiceConfigWithHashKey&,
-                                     const Envoy::Http::AsyncClient::StreamOptions&) override {
+  ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const Envoy::Http::AsyncClient::StreamOptions&,
+          Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) override {
     callbacks.onGrpcError(Grpc::Status::Internal);
     // Returns nullptr on start stream failure.
     return nullptr;
@@ -781,7 +783,7 @@ TEST_F(OrderingTest, GrpcErrorAfterTimeout) {
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   request_timer->invokeCallback();
   // Nothing should happen now despite the gRPC error
@@ -834,7 +836,7 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_body, true));
 
   // Now, fire the timeout, which will end everything
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   response_timer->invokeCallback();
 }
 
@@ -867,8 +869,8 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 
-  // Now fire the timeout and expect a 500 error
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  // Now fire the timeout and expect a 504 error
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::GatewayTimeout, _, _, _, _));
   request_timer->invokeCallback();
 }
 

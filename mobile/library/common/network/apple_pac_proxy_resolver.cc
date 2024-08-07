@@ -54,7 +54,11 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
           static_cast<CFStringRef>(CFDictionaryGetValue(cf_dictionary, kCFProxyHostNameKey));
       CFNumberRef cf_port =
           static_cast<CFNumberRef>(CFDictionaryGetValue(cf_dictionary, kCFProxyPortNumberKey));
-      proxies.emplace_back(ProxySettings(Apple::toString(cf_host), Apple::toInt(cf_port)));
+      std::string host = Apple::toString(cf_host);
+      int port = Apple::toInt(cf_port);
+      if (!host.empty() && port > 0) {
+        proxies.emplace_back(ProxySettings(std::move(host), port));
+      }
     } else if (is_direct_proxy) {
       proxies.push_back(ProxySettings::direct());
     }
@@ -98,7 +102,7 @@ void ApplePacProxyResolver::resolveProxies(
   CFRunLoopSourceRef run_loop_source = createPacUrlResolverSource(
       cf_proxy_autoconfiguration_file_url, cf_target_url, context.release());
 
-  CFRunLoopAddSource(CFRunLoopGetMain(), run_loop_source, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, kCFRunLoopDefaultMode);
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);

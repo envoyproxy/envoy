@@ -299,9 +299,9 @@ public:
    * @param typed_config for the extension config.
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string& typed_struct_type =
+    static const std::string typed_struct_type =
         xds::type::v3::TypedStruct::default_instance().GetTypeName();
-    static const std::string& legacy_typed_struct_type =
+    static const std::string legacy_typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetTypeName();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
@@ -391,12 +391,15 @@ public:
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
-   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
+   * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
+   *                         in the given index, a nullptr factory will be returned.
+   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
+   * grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope, bool skip_cluster_check);
+                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx);
 
   /**
    * Translate opaque config from google.protobuf.Any to defined proto message.
@@ -415,21 +418,24 @@ public:
    * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
-   * @throws EnvoyException if there is a mismatch between design and configuration.
+   * @return a status indicating if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
-                                      const std::string& filter_chain_type, bool is_terminal_filter,
-                                      bool last_filter_in_current_config) {
+  static absl::Status validateTerminalFilters(const std::string& name,
+                                              const std::string& filter_type,
+                                              const std::string& filter_chain_type,
+                                              bool is_terminal_filter,
+                                              bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      ExceptionUtil::throwEnvoyException(
+      return absl::InvalidArgumentError(
           fmt::format("Error: terminal filter named {} of type {} must be the "
                       "last filter in a {} filter chain.",
                       name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      ExceptionUtil::throwEnvoyException(fmt::format(
+      return absl::InvalidArgumentError(fmt::format(
           "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
           name, filter_type, filter_chain_type));
     }
+    return absl::OkStatus();
   }
 
   /**

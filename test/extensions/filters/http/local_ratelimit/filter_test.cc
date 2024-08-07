@@ -6,6 +6,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
@@ -304,6 +305,31 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
   EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_2_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(FilterTest, RequestRateLimitedXRateLimitHeadersWithTimerBasedTokenBucket) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"}});
+
+  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
+
+  auto request_headers = Http::TestRequestHeaderMapImpl();
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
   EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_2_->decodeHeaders(request_headers, false));
@@ -315,6 +341,20 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(FilterTest, RequestRateLimitedXRateLimitHeadersWithoutRunningDecodeHeaders) {
+  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
+
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("", response_headers.get_("x-ratelimit-remaining"));
 }
 
 static constexpr absl::string_view descriptor_config_yaml = R"(
@@ -456,10 +496,9 @@ public:
     decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_
         .emplace_back(route_rate_limit_);
-    decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_
-        .rate_limit_policy_entry_.clear();
-    decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_
-        .rate_limit_policy_entry_.emplace_back(vh_rate_limit_);
+    decoder_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_.clear();
+    decoder_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
+        .emplace_back(vh_rate_limit_);
   }
 
   std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}}};
@@ -674,6 +713,55 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedXRateLimitHeaders)
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ("0", response_headers.get_("x-ratelimit-limit"));
   EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedWithoutXRateLimitHeaders) {
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "\"OFF\"", "0", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+
+  auto request_headers = Http::TestRequestHeaderMapImpl();
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-ratelimit-limit")).empty());
+  EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-ratelimit-remaining")).empty());
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
+TEST_F(DescriptorFilterTest,
+       RouteDescriptorRequestRatelimitedXRateLimitHeadersWithTimerTokenBucket) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"}});
+
+  setUpTest(fmt::format(descriptor_config_yaml, "0", "DRAFT_VERSION_03", "0", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+
+  auto request_headers = Http::TestRequestHeaderMapImpl();
+  auto response_headers = Http::TestResponseHeaderMapImpl();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
   EXPECT_EQ("60", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
@@ -694,7 +782,7 @@ TEST_F(DescriptorFilterTest, NoVHRateLimitOption) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
   auto headers = Http::TestRequestHeaderMapImpl();
@@ -717,7 +805,7 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
   auto headers = Http::TestRequestHeaderMapImpl();
@@ -738,7 +826,7 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))
@@ -758,7 +846,7 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))
@@ -781,7 +869,7 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet)
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))
@@ -804,7 +892,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
 
@@ -823,7 +911,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
 
@@ -841,7 +929,7 @@ TEST_F(DescriptorFilterTest, IncludeVirtualHostRateLimitsSetTrue) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateLocalDescriptors(_, _, _, _))

@@ -93,6 +93,7 @@ OWS
 Preconnecting
 RCVBUF
 RTCP
+RTLD
 RTP
 SOH
 SPC
@@ -306,6 +307,7 @@ NOAUTH
 NOCHECKRESP
 NODATA
 NODELAY
+NODELETE
 NOLINT
 NOLINTNEXTLINE
 NONAME
@@ -464,6 +466,7 @@ UDP
 UDS
 UHV
 UNC
+UPN
 URI
 URL
 USEVC
@@ -720,6 +723,9 @@ dgst
 dir
 dirname
 djb
+dlclose
+dlopen
+dlsym
 downcalls
 downcasted
 downcased
@@ -875,6 +881,7 @@ inotify
 inserter
 instantiation
 instantiations
+interop
 interpretable
 intra
 ints
@@ -1177,6 +1184,7 @@ refcount
 referencee
 referer
 refetch
+reframed
 refvec
 regex
 regexes
@@ -1207,6 +1215,7 @@ resolv
 resolvers
 responder
 restarter
+resumable
 resync
 ret
 retransmissions
@@ -1256,6 +1265,7 @@ servercert
 setenv
 setsockopt
 sfixed
+sidestream
 sig
 sigaction
 sigactions
@@ -1517,3 +1527,4 @@ CNAME
 NAT
 NXDOMAIN
 DNAT
+RSP

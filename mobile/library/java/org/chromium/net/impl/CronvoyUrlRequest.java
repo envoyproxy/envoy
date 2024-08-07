@@ -180,6 +180,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
   private String mCurrentUrl;
   private volatile CronvoyUrlResponseInfoImpl mUrlResponseInfo;
   private String mPendingRedirectUrl;
+  private boolean mIdempotent;
 
   /**
    * @param executor The executor for orchestrating tasks between envoy-mobile callbacks
@@ -188,7 +189,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
                     Executor executor, String userAgent, boolean allowDirectExecutor,
                     Collection<Object> connectionAnnotations, boolean trafficStatsTagSet,
                     int trafficStatsTag, boolean trafficStatsUidSet, int trafficStatsUid,
-                    RequestFinishedInfo.Listener requestFinishedListener) {
+                    RequestFinishedInfo.Listener requestFinishedListener, boolean idempotent) {
     if (url == null) {
       throw new NullPointerException("URL is required");
     }
@@ -210,6 +211,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     mCurrentUrl = url;
     mUserAgent = userAgent;
     mRequestAnnotations = connectionAnnotations;
+    mIdempotent = idempotent;
   }
 
   @Override
@@ -538,7 +540,7 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
                                                              /* explicitFlowControl= */ true));
-    mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null);
+    mStream.get().sendHeaders(envoyRequestHeaders, mUploadDataStream == null, mIdempotent);
     if (mUploadDataStream != null && mUrlChain.size() == 1) {
       mUploadDataStream.initializeWithRequest();
     }
@@ -782,7 +784,12 @@ public final class CronvoyUrlRequest extends CronvoyUrlRequestBase {
       if (responseCode >= 300 && responseCode < 400) {
         setUrlResponseInfo(headers, responseCode);
         List<String> locationFields = mUrlResponseInfo.getAllHeaders().get("location");
-        locationField = locationFields == null ? null : locationFields.get(0);
+        if (locationFields != null && !locationFields.isEmpty() &&
+            !locationFields.get(0).isEmpty()) {
+          locationField = locationFields.get(0);
+        } else {
+          locationField = null;
+        }
       } else {
         locationField = null;
       }

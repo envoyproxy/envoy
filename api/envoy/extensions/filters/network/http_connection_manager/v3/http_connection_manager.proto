@@ -547,9 +547,10 @@ message HttpConnectionManager {
   // race with the final GOAWAY frame. During this grace period, Envoy will
   // continue to accept new streams. After the grace period, a final GOAWAY
   // frame is sent and Envoy will start refusing new streams. Draining occurs
-  // both when a connection hits the idle timeout or during general server
-  // draining. The default grace period is 5000 milliseconds (5 seconds) if this
-  // option is not specified.
+  // either when a connection hits the idle timeout, when :ref:`max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
+  // is reached, or during general server draining. The default grace period is
+  // 5000 milliseconds (5 seconds) if this option is not specified.
   google.protobuf.Duration drain_timeout = 12;
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
@@ -588,26 +589,33 @@ message HttpConnectionManager {
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
 
+  // The interval to flush the above access logs.
+  //
   // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`access_log_flush_interval
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
-  // Note that if both this field and :ref:`access_log_flush_interval
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
-  // are specified, the former (deprecated field) is ignored.
+  //
+  //   This field is deprecated in favor of
+  //   :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
+  //   Note that if both this field and :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
+  //   are specified, the former (deprecated field) is ignored.
   google.protobuf.Duration access_log_flush_interval = 54 [
     deprecated = true,
     (validate.rules).duration = {gte {nanos: 1000000}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
+  // If set to true, HCM will flush an access log once when a new HTTP request is received, after the request
+  // headers have been evaluated, and before iterating through the HTTP filter chain.
+  //
   // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`flush_access_log_on_new_request
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
-  // Note that if both this field and :ref:`flush_access_log_on_new_request
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
-  // are specified, the former (deprecated field) is ignored.
+  //
+  //   This field is deprecated in favor of
+  //   :ref:`flush_access_log_on_new_request
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
+  //   Note that if both this field and :ref:`flush_access_log_on_new_request
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
+  //   are specified, the former (deprecated field) is ignored.
   bool flush_access_log_on_new_request = 55
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

@@ -170,6 +170,11 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+.. _config_access_log_format_start_time_local:
+
+%START_TIME_LOCAL%
+  Same as :ref:`START_TIME <config_access_log_format_start_time>`, but use local time zone.
+
 .. _config_access_log_format_emit_time:
 
 %EMIT_TIME%
@@ -177,6 +182,11 @@ The following command operators are supported:
 
   EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_emit_time_local:
+
+%EMIT_TIME_LOCAL%
+  Same as :ref:`EMIT_TIME <config_access_log_format_emit_time>`, but use local time zone.
 
 %REQUEST_HEADERS_BYTES%
   HTTP
@@ -542,6 +552,7 @@ HTTP only
   **OverloadManagerTerminated**, **OM**, Overload Manager terminated the request.
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
+  **DownstreamRemoteReset**, **DR**, The response details are ``http2.remote_reset`` or ``http2.remote_refuse``.
 
 UDP
   Not implemented ("-").
@@ -574,6 +585,10 @@ UDP
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
+
+%UPSTREAM_CLUSTER_RAW%
+  Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
+  <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` does NOT modify this value.
 
 %UPSTREAM_LOCAL_ADDRESS%
   Local address of the upstream connection. If the address is an IP address it includes both
@@ -1248,6 +1263,9 @@ UDP
                                  Note: It is only relevant for UDP tunneling over HTTP.
   * UdpPeriodic - On any UDP Proxy filter periodic log record.
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
+
+%UNIQUE_ID%
+   A unique identifier (UUID) that is generated dynamically.
 
 %ENVIRONMENT(X):Z%
   Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.

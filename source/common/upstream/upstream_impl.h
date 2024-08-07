@@ -89,11 +89,13 @@ public:
   };
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
+  getTypedLbConfigFromLegacyProtoWithoutSubset(LoadBalancerFactoryContext& lb_factory_context,
+                                               const ClusterProto& cluster,
                                                ProtobufMessage::ValidationVisitor& visitor);
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
+  getTypedLbConfigFromLegacyProto(LoadBalancerFactoryContext& lb_factory_context,
+                                  const ClusterProto& cluster,
                                   ProtobufMessage::ValidationVisitor& visitor);
 };
 
@@ -414,6 +416,11 @@ public:
     return std::make_unique<HostHandleImpl>(shared_from_this());
   }
 
+  void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
+    lb_policy_data_ = std::move(lb_policy_data);
+  }
+  const HostLbPolicyDataPtr& lbPolicyData() const override { return lb_policy_data_; }
+
 protected:
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
@@ -437,6 +444,7 @@ private:
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
   std::atomic<Host::HealthStatus> eds_health_status_{};
+  HostLbPolicyDataPtr lb_policy_data_;
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {
@@ -993,8 +1001,8 @@ public:
         manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
   }
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
-                                Http::FilterChainManager&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
@@ -1004,9 +1012,12 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
-  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
-    return happy_eyeballs_config_;
+    if (happy_eyeballs_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *happy_eyeballs_config_;
   }
 
 protected:
@@ -1095,6 +1106,8 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamFactoryContextImpl upstream_context_;
+  std::unique_ptr<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
@@ -1109,8 +1122,6 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
-  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
-      happy_eyeballs_config_;
 };
 
 /**
@@ -1180,7 +1191,7 @@ public:
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context);
+                  ClusterFactoryContext& cluster_context, absl::Status& creation_status);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed.

@@ -15,7 +15,7 @@ namespace Http {
 namespace {
 
 static const absl::optional<std::chrono::seconds> kNoTtl = absl::nullopt;
-class HttpServerPropertiesCacheImplTest : public testing::Test {
+class HttpServerPropertiesCacheImplTest : public testing::TestWithParam<Envoy::MockKeyValueStore*> {
 public:
   HttpServerPropertiesCacheImplTest()
       : dispatcher_([]() {
@@ -24,8 +24,7 @@ public:
               []() { return std::make_unique<Event::SimulatedTimeSystemHelper>(); });
           return NiceMock<Event::MockDispatcher>();
         }()),
-        store_(new NiceMock<MockKeyValueStore>()),
-        expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
+        store_(GetParam()), expiration1_(dispatcher_.timeSource().monotonicTime() + Seconds(5)),
         expiration2_(dispatcher_.timeSource().monotonicTime() + Seconds(10)),
         protocol1_(alpn1_, hostname1_, port1_, expiration1_),
         protocol2_(alpn2_, hostname2_, port2_, expiration2_), protocols1_({protocol1_}),
@@ -49,6 +48,7 @@ public:
 
   const std::string hostname1_ = "hostname1";
   const std::string hostname2_ = "hostname2";
+  const std::string hostname3_ = "hostname3";
   const uint32_t port1_ = 1;
   const uint32_t port2_ = 2;
   const std::string https_ = "https";
@@ -62,6 +62,7 @@ public:
 
   const HttpServerPropertiesCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const HttpServerPropertiesCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
+  const HttpServerPropertiesCacheImpl::Origin origin3_ = {https_, hostname3_, port2_};
 
   HttpServerPropertiesCacheImpl::AlternateProtocol protocol1_;
   HttpServerPropertiesCacheImpl::AlternateProtocol protocol2_;
@@ -70,50 +71,55 @@ public:
   std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> protocols2_;
 };
 
-TEST_F(HttpServerPropertiesCacheImplTest, Init) {
+#define EXPECT_CALL_WHEN_STORE_VALID(method)                                                       \
+  if (store_) {                                                                                    \
+    EXPECT_CALL(*store_, method);                                                                  \
+  }
+
+TEST_P(HttpServerPropertiesCacheImplTest, Init) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
+TEST_P(HttpServerPropertiesCacheImplTest, SetAlternativesThenSrtt) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(0), protocols_->getSrtt(origin1_));
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
+TEST_P(HttpServerPropertiesCacheImplTest, SetSrttThenAlternatives) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "clear|5|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|5|0", kNoTtl));
   protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
   EXPECT_EQ(1, protocols_->size());
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|5|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, SetConcurrency) {
+TEST_P(HttpServerPropertiesCacheImplTest, SetConcurrency) {
   initialize();
   EXPECT_EQ(0, protocols_->size());
-  EXPECT_CALL(*store_, addOrUpdate("https://hostname1:1", "clear|0|5", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|0|5", kNoTtl));
   protocols_->setConcurrentStreams(origin1_, 5);
   EXPECT_EQ(5, protocols_->getConcurrentStreams(origin1_));
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, FindAlternatives) {
+TEST_P(HttpServerPropertiesCacheImplTest, FindAlternatives) {
   initialize();
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -121,13 +127,13 @@ TEST_F(HttpServerPropertiesCacheImplTest, FindAlternatives) {
   EXPECT_EQ(protocols1_, protocols.ref());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
+TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
   initialize();
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols2_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -136,13 +142,13 @@ TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterReplacement) {
   EXPECT_NE(protocols1_, protocols.ref());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
+TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
   initialize();
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname2:2", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname2:2", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
   protocols_->setAlternatives(origin2_, protocols2_);
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
@@ -153,29 +159,29 @@ TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesForMultipleOrigins) {
   EXPECT_EQ(protocols2_, protocols.ref());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterExpiration) {
+TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterExpiration) {
   initialize();
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0", kNoTtl));
   protocols_->setAlternatives(origin1_, protocols1_);
   dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
-  EXPECT_CALL(*store_, remove("https://hostname1:1"));
+  EXPECT_CALL_WHEN_STORE_VALID(remove("https://hostname1:1"));
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_FALSE(protocols.has_value());
   EXPECT_EQ(1u, protocols_->size());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterPartialExpiration) {
+TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterPartialExpiration) {
   initialize();
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1",
-                          "alpn1=\"hostname1:1\"; ma=5,alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1",
+                  "alpn1=\"hostname1:1\"; ma=5,alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
   std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> both = {protocol1_, protocol2_};
   protocols_->setAlternatives(origin1_, both);
   dispatcher_.globalTimeSystem().advanceTimeWait(Seconds(6));
-  EXPECT_CALL(*store_,
-              addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
+  EXPECT_CALL_WHEN_STORE_VALID(
+      addOrUpdate("https://hostname1:1", "alpn2=\"hostname2:2\"; ma=10|0|0", kNoTtl));
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin1_);
   ASSERT_TRUE(protocols.has_value());
@@ -183,7 +189,7 @@ TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterPartialExpiration
   EXPECT_EQ(protocols2_, protocols.ref());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterTruncation) {
+TEST_P(HttpServerPropertiesCacheImplTest, FindAlternativesAfterTruncation) {
   initialize();
   std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol> expected_protocols;
   for (size_t i = 0; i < 10; ++i) {
@@ -203,7 +209,7 @@ TEST_F(HttpServerPropertiesCacheImplTest, FindAlternativesAfterTruncation) {
   EXPECT_EQ(expected_protocols, protocols.ref());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
+TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
   initialize();
   std::string origin_str = "https://hostname1:1";
   absl::optional<HttpServerPropertiesCache::Origin> origin =
@@ -233,8 +239,10 @@ TEST_F(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
   // Negative port.
   EXPECT_TRUE(!HttpServerPropertiesCacheImpl::stringToOrigin("https://:-1").has_value());
 }
-
-TEST_F(HttpServerPropertiesCacheImplTest, MaxEntries) {
+TEST_P(HttpServerPropertiesCacheImplTest, MaxEntries) {
+  // This test requires store. Do not execute it when store is not present.
+  if (store_ == nullptr)
+    return;
   initialize();
   EXPECT_EQ(0, protocols_->size());
   const std::string hostname = "hostname";
@@ -251,7 +259,7 @@ TEST_F(HttpServerPropertiesCacheImplTest, MaxEntries) {
   }
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, ToAndFromString) {
+TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromString) {
   initialize();
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
@@ -295,7 +303,7 @@ TEST_F(HttpServerPropertiesCacheImplTest, ToAndFromString) {
   testAltSvc("h3-29=\":443\"; ma=86460|2000|0", "h3-29=\":443\"; ma=86460|2000|0");
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, InvalidString) {
+TEST_P(HttpServerPropertiesCacheImplTest, InvalidString) {
   initialize();
   // Too many numbers
   EXPECT_FALSE(
@@ -319,7 +327,10 @@ TEST_F(HttpServerPropertiesCacheImplTest, InvalidString) {
                   .has_value());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, CacheLoad) {
+TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
+  // This test requires store. Do not execute it when store is not present.
+  if (store_ == nullptr)
+    return;
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
     fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|2|3");
@@ -339,7 +350,10 @@ TEST_F(HttpServerPropertiesCacheImplTest, CacheLoad) {
   EXPECT_EQ(3, protocols_->getConcurrentStreams(origin1_));
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
+TEST_P(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
+  // This test requires store. Do not execute it when store is not present.
+  if (store_ == nullptr)
+    return;
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("https://hostname1:1", "clear|5|0");
   }));
@@ -350,15 +364,17 @@ TEST_F(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
   EXPECT_EQ(std::chrono::microseconds(5), protocols_->getSrtt(origin1_));
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
-  EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
-  EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
-    fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0");
-  }));
+TEST_P(HttpServerPropertiesCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
+  if (store_ != nullptr) {
+    EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
+    EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+      fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0");
+    }));
+  }
   initialize();
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
+TEST_P(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
   max_entries_ = 1u;
   initialize();
   EXPECT_EQ(0u, protocols_->size());
@@ -366,14 +382,36 @@ TEST_F(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
   protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
   EXPECT_EQ(1u, protocols_->size());
   EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
 
-  // Fetch HTTP/3 status for another origin should overwrite the cache.
+  // Fetch HTTP/3 status for another origin should overwrite the cache because
+  // it's limited to one entry.
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Broken());
   EXPECT_EQ(1u, protocols_->size());
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
+TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
+  initialize();
+  EXPECT_EQ(0u, protocols_->size());
+
+  protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
+  protocols_->getOrCreateHttp3StatusTracker(origin2_).markHttp3Confirmed();
+  protocols_->getOrCreateHttp3StatusTracker(origin3_).markHttp3Broken();
+
+  EXPECT_EQ(3u, protocols_->size());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin3_).isHttp3Broken());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Confirmed());
+
+  protocols_->resetBrokenness();
+
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).hasHttp3FailedRecently());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin3_).hasHttp3FailedRecently());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Confirmed());
+}
+
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
@@ -390,7 +428,7 @@ TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
   EXPECT_EQ(protocols1_, protocols.ref());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
   std::string suffix = ".example.com";
   std::string host1 = "www.example.com";
   std::string host2 = "www.other.com";
@@ -406,7 +444,7 @@ TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
   ASSERT_FALSE(protocols.has_value());
 }
 
-TEST_F(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
+TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "second.example.com";
@@ -424,6 +462,9 @@ TEST_F(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCa
   EXPECT_EQ(protocols2_, protocols.ref());
 }
 
+// Execute all tests when key value store is nullptr and when it is valid.
+INSTANTIATE_TEST_SUITE_P(HttpServerPropertiesCacheImplTestSuite, HttpServerPropertiesCacheImplTest,
+                         testing::Values(nullptr, new NiceMock<MockKeyValueStore>()));
 } // namespace
 } // namespace Http
 } // namespace Envoy

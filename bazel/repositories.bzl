@@ -244,12 +244,7 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
-        external_http_archive(
-            name = "io_bazel_rules_go",
-            # TODO(wrowe, sunjayBhatia): remove when Windows RBE supports batch file invocation
-            patch_args = ["-p1"],
-            patches = ["@envoy//bazel:rules_go.patch"],
-        )
+        external_http_archive(name = "io_bazel_rules_go")
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
@@ -307,7 +302,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
-    _com_github_rules_proto_grpc()
+    _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
@@ -338,7 +333,6 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_googleurl()
     _io_hyperscan()
     _io_vectorscan()
-    _io_opentracing_cpp()
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
@@ -363,9 +357,12 @@ def envoy_dependencies(skip_targets = []):
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:flatbuffers.patch"],
     )
+    external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    external_http_archive(name = "envoy_examples")
+
     _com_github_maxmind_libmaxminddb()
 
     external_http_archive("rules_pkg")
@@ -761,24 +758,8 @@ def _io_vectorscan():
         patches = ["@envoy//bazel/foreign_cc:vectorscan.patch"],
     )
 
-def _io_opentracing_cpp():
-    external_http_archive(
-        name = "io_opentracing_cpp",
-        patch_args = ["-p1"],
-        # Workaround for LSAN false positive in https://github.com/envoyproxy/envoy/issues/7647
-        patches = ["@envoy//bazel:io_opentracing_cpp.patch"],
-    )
-    native.bind(
-        name = "opentracing",
-        actual = "@io_opentracing_cpp//:opentracing",
-    )
-
 def _io_opentelemetry_api_cpp():
-    external_http_archive(
-        name = "io_opentelemetry_cpp",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
-    )
+    external_http_archive(name = "io_opentelemetry_cpp")
     native.bind(
         name = "opentelemetry_api",
         actual = "@io_opentelemetry_cpp//api:api",
@@ -992,7 +973,7 @@ def _com_google_protobuf():
         # instead.
         external_http_archive(
             "com_google_protobuf_protoc_%s" % platform,
-            build_file = "@rules_proto//proto/private:BUILD.protoc",
+            build_file = "@envoy//bazel/protoc:BUILD.protoc",
         )
 
     external_http_archive(
@@ -1141,11 +1122,6 @@ def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
-        patches = [
-            "@envoy//bazel/external:quiche_sequencer_fix.patch",
-            "@envoy//bazel/external:quiche_stream_fix.patch",
-        ],
-        patch_args = ["-p1"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
@@ -1173,8 +1149,8 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:quic_platform_base",
     )
     native.bind(
-        name = "quiche_spdy_hpack",
-        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
+        name = "quiche_http2_hpack",
+        actual = "@com_github_google_quiche//:http2_hpack_hpack_lib",
     )
     native.bind(
         name = "quiche_http2_hpack_decoder",
@@ -1247,8 +1223,8 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _com_github_rules_proto_grpc():
-    external_http_archive("com_github_rules_proto_grpc")
+def _rules_proto_grpc():
+    external_http_archive("rules_proto_grpc")
 
 def _re2():
     external_http_archive("com_googlesource_code_re2")
@@ -1439,13 +1415,6 @@ filegroup(
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-    # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during integration tests.
-    external_http_archive(
-        name = "kafka_python_client",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
 def _com_github_fdio_vpp_vcl():
     external_http_archive(
         name = "com_github_fdio_vpp_vcl",
@@ -1460,13 +1429,7 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive(
-        name = "rules_foreign_cc",
-        # This patch is needed to fix build on macos with xcode 15.3.
-        # remove this when https://github.com/bazelbuild/rules_foreign_cc/issues/1186 fixed.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
-    )
+    external_http_archive(name = "rules_foreign_cc")
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

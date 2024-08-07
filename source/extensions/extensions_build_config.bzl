@@ -81,6 +81,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
     "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
+    "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
 
     #
     # Network Matchers
@@ -108,6 +109,11 @@ EXTENSIONS = {
     # CEL Matching Input
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
+
+    #
+    # Dynamic Metadata Matching Input
+    #
+    "envoy.matching.inputs.dynamic_metadata":           "//source/extensions/matching/http/metadata_input:metadata_input_lib",
 
     #
     # Matching actions
@@ -218,6 +224,7 @@ EXTENSIONS = {
     "envoy.filters.network.sni_dynamic_forward_proxy":            "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
     "envoy.filters.network.wasm":                                 "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":                      "//source/extensions/filters/network/zookeeper_proxy:config",
+    "envoy.filters.network.generic_proxy":                        "//source/extensions/filters/network/generic_proxy:config",
 
     #
     # UDP filters
@@ -239,7 +246,7 @@ EXTENSIONS = {
 
     "envoy.resource_monitors.fixed_heap":               "//source/extensions/resource_monitors/fixed_heap:config",
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
-    "envoy.resource_monitors.downstream_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
+    "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
 
     #
     # Stat sinks
@@ -266,7 +273,6 @@ EXTENSIONS = {
     # Tracers
     #
 
-    "envoy.tracers.dynamic_ot":                         "//source/extensions/tracers/dynamic_ot:config",
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
@@ -280,6 +286,7 @@ EXTENSIONS = {
 
     "envoy.tracers.opentelemetry.resource_detectors.environment":         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:config",
     "envoy.tracers.opentelemetry.resource_detectors.dynatrace":           "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
+    "envoy.tracers.opentelemetry.resource_detectors.static_config":       "//source/extensions/tracers/opentelemetry/resource_detectors/static:config",
 
     #
     # OpenTelemetry tracer samplers
@@ -414,6 +421,7 @@ EXTENSIONS = {
     "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
     "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
     "envoy.quic.server_preferred_address.fixed":        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
+    "envoy.quic.server_preferred_address.datasource":   "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_factory_config",
     "envoy.quic.connection_debug_visitor.basic":        "//source/extensions/quic/connection_debug_visitor:envoy_quic_connection_debug_visitor_basic",
 
     #
@@ -517,12 +525,19 @@ EXTENSIONS = {
     #
 
     "envoy.router.cluster_specifier_plugin.lua": "//source/extensions/router/cluster_specifiers/lua:config",
+
+    #
+    # Extensions for generic proxy
+    #
+    "envoy.filters.generic.router":                             "//source/extensions/filters/network/generic_proxy/router:config",
+    "envoy.generic_proxy.codecs.dubbo":                         "//source/extensions/filters/network/generic_proxy/codecs/dubbo:config",
+    "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
-EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:examples_library", "//:mobile_library"]
-EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:examples_library", "//:mobile_library"]
+EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:mobile_library"]
+EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:mobile_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
 MOBILE_PACKAGE_VISIBILITY = ["//:mobile_library"]
 

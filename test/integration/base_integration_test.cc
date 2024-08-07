@@ -18,7 +18,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/server/proto_descriptors.h"
 
@@ -153,7 +153,7 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
@@ -581,7 +581,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
@@ -693,16 +693,18 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                                           std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    try {
+    TRY_NEEDS_AUDIT {
       Network::TcpListenSocket give_me_a_name(
           Network::Utility::getAddressWithPort(
               *Network::Test::getCanonicalLoopbackAddress(version_), port),
           nullptr, true);
       return AssertionSuccess();
-    } catch (const EnvoyException&) {
+    }
+    END_TRY
+    CATCH(const EnvoyException&, {
       // The nature of this function requires using a real sleep here.
       timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
-    }
+    });
   }
 
   return AssertionFailure() << "Timeout waiting for port availability";

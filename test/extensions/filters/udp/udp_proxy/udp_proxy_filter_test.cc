@@ -1737,8 +1737,8 @@ TEST_F(HttpUpstreamImplTest, OnResetStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
 
-  // If the creation callbacks are active will resetting the stream, it means that response
-  // headers were not received, so it's expected to be a failure.
+  // If the creation callbacks are active, it means that response headers were not received,
+  // so it's expected to call onStreamFailure.
   EXPECT_CALL(creation_callbacks_, onStreamFailure());
   upstream_->onResetStream(Http::StreamResetReason::ConnectionTimeout, "reason");
 }
@@ -1747,10 +1747,10 @@ TEST_F(HttpUpstreamImplTest, LocalCloseByDownstreamResetsStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
 
-  // If the creation callbacks are active will resetting the stream, it means that response
-  // headers were not received, so it's expected to be a failure.
-  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  // If the creation callbacks are active, it means that response headers were not received,
+  // so it's expected to reset the stream, but not to call onStreamFailure as it's Downstream event.
   EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -1758,10 +1758,10 @@ TEST_F(HttpUpstreamImplTest, RemoteCloseByDownstreamResetsStream) {
   setup();
   setAndExpectRequestEncoder(expectedHeaders());
 
-  // If the creation callbacks are active will resetting the stream, it means that response
-  // headers were not received, so it's expected to be a failure.
-  EXPECT_CALL(creation_callbacks_, onStreamFailure());
+  // If the creation callbacks are active, it means that response headers were not received,
+  // so it's expected to reset the stream, but not to call onStreamFailure as it's Downstream event.
   EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   upstream_->onDownstreamEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1949,9 +1949,8 @@ public:
     header_evaluator_ = Envoy::Router::HeaderParser::configure(headers_to_add).value();
     config_ = std::make_unique<NiceMock<MockUdpTunnelingConfig>>(*header_evaluator_);
     stream_info_.downstream_connection_info_provider_->setConnectionID(0);
-    session_access_logs_ = std::make_unique<std::vector<AccessLog::InstanceSharedPtr>>();
-    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(
-        cluster_, &context_, *config_, callbacks_, stream_info_, false, *session_access_logs_);
+    pool_ = std::make_unique<TunnelingConnectionPoolImpl>(cluster_, &context_, *config_, callbacks_,
+                                                          stream_info_);
   }
 
   void createNewStream() { pool_->newStream(stream_callbacks_); }
@@ -1962,7 +1961,6 @@ public:
   std::unique_ptr<NiceMock<MockUdpTunnelingConfig>> config_;
   NiceMock<MockUpstreamTunnelCallbacks> callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  std::unique_ptr<std::vector<AccessLog::InstanceSharedPtr>> session_access_logs_;
   NiceMock<MockHttpStreamCallbacks> stream_callbacks_;
   NiceMock<Http::MockRequestEncoder> request_encoder_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
@@ -2006,6 +2004,7 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
 
   std::string upstream_host_name = "upstream_host_test";
   EXPECT_CALL(*upstream_host_, hostname()).WillOnce(ReturnRef(upstream_host_name));
+  EXPECT_CALL(stream_callbacks_, resetIdleTimer());
   pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
   EXPECT_EQ(stream_info_.upstreamInfo()->upstreamHost()->hostname(), upstream_host_name);
 }
@@ -2025,17 +2024,28 @@ TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   pool_->onStreamSuccess(request_encoder_);
 }
 
+TEST_F(TunnelingConnectionPoolImplTest, OnDownstreamEvent) {
+  setup();
+  createNewStream();
+
+  EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+
+  EXPECT_CALL(request_encoder_.stream_, removeCallbacks(_));
+  EXPECT_CALL(request_encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  pool_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+}
+
 TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   setup();
 
   TunnelingConnectionPoolFactory factory;
-  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_,
-                                           false, *session_access_logs_);
+  auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
 
   EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
-  auto invalid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_,
-                                             stream_info_, false, *session_access_logs_);
+  auto invalid_pool =
+      factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
 }
 
