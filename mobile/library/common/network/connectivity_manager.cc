@@ -1,3 +1,4 @@
+#include "connectivity_manager.h"
 #include "library/common/network/connectivity_manager.h"
 
 #include <net/if.h>
@@ -100,6 +101,15 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network
   network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
 
   return network_state_.configuration_key_;
+}
+
+envoy_netconf_t ConnectivityManagerImpl::onNetworkMadeDefault(NetworkType network) {
+  envoy_netconf_t configuration_key = setPreferredNetwork(network);
+  for (std::reference_wrapper<Quic::EnvoyQuicNetworkObserverRegistryImpl> registry :
+       quic_observer_registry_factory_->getCreatedObserverRegistries()) {
+    registry.get().onNetworkMadeDefault();
+  }
+  return configuration_key;
 }
 
 void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {

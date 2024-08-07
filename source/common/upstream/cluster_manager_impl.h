@@ -42,6 +42,21 @@
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
+#else
+namespace Envoy {
+
+// A dumb definition if QUICHE is compiled out.
+namespace Quic {
+
+class EnvoyQuicNetworkObserverRegistryFactory {};
+
+} // namespace Quic
+
+} // namespace Envoy
+#endif
+
 namespace Envoy {
 namespace Upstream {
 
@@ -371,6 +386,9 @@ public:
 
   Config::EdsResourcesCacheOptRef edsResourcesCache() override;
 
+  void
+  createNetworkObserverRegistries(Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) override;
+
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
@@ -695,6 +713,18 @@ private:
      */
     ClusterEntry* initializeClusterInlineIfExists(absl::string_view cluster);
 
+#ifdef ENVOY_ENABLE_QUIC
+    Quic::EnvoyQuicNetworkObserverRegistry* getNetworkObserverRegistry() {
+      return network_observer_registry_.get();
+    }
+
+    void createThreadLocalNetworkObserverRegistry(
+        Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) {
+      network_observer_registry_ =
+          factory.createQuicNetworkObserverRegistry(thread_local_dispatcher_);
+    }
+#endif
+
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
     // Known clusters will exclusively exist in either `thread_local_clusters_`
@@ -720,6 +750,10 @@ private:
   private:
     static ThreadLocalClusterManagerStats generateStats(Stats::Scope& scope,
                                                         const std::string& thread_name);
+
+#ifdef ENVOY_ENABLE_QUIC
+    Quic::EnvoyQuicNetworkObserverRegistryPtr network_observer_registry_;
+#endif
   };
 
   struct ClusterData : public ClusterManagerCluster {

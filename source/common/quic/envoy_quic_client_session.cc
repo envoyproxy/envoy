@@ -1,3 +1,4 @@
+#include "envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 
 #include <openssl/ssl.h>
@@ -111,6 +112,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
   network_connection_ = nullptr;
+  if (registry_.has_value()) {
+    registry_->unregisterObserver(*network_connectivity_observer_);
+  }
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
@@ -157,6 +161,10 @@ void EnvoyQuicClientSession::OnCanWrite() {
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   ENVOY_CONN_LOG(debug, "HTTP/3 GOAWAY received", *this);
   quic::QuicSpdyClientSession::OnHttp3GoAway(stream_id);
+  notifyServerGoAway();
+}
+
+void EnvoyQuicClientSession::notifyServerGoAway() {
   if (http_connection_callbacks_ != nullptr) {
     // HTTP/3 GOAWAY doesn't have an error code field.
     http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
@@ -306,6 +314,14 @@ void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
 std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
   return configured_alpns_.empty() ? quic::QuicSpdyClientSession::GetAlpnsToOffer()
                                    : configured_alpns_;
+}
+
+void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
+  if (network_connectivity_observer_ == nullptr) {
+    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserver>(*this);
+  }
+  registry.registerObserver(*network_connectivity_observer_);
+  registry_ = makeOptRef(registry);
 }
 
 } // namespace Quic

@@ -14,7 +14,9 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
+
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
@@ -183,6 +185,7 @@ private:
   // address. This fails over to using the primary address if the second address
   // in the list isn't of a different address family.
   bool attempt_happy_eyeballs_;
+  Quic::EnvoyQuicNetworkObserverRegistryPtr network_observer_registry_;
 };
 
 std::unique_ptr<Http3ConnPoolImpl>

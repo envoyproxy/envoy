@@ -45,7 +45,8 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     quic::ConnectionIdGeneratorInterface& generator,
-    Network::UpstreamTransportSocketFactory& transport_socket_factory);
+    Network::UpstreamTransportSocketFactory& transport_socket_factory,
+    EnvoyQuicNetworkObserverRegistry* network_observer_registry = nullptr);
 
 } // namespace Quic
 } // namespace Envoy

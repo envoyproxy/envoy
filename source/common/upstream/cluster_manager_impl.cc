@@ -1710,6 +1710,19 @@ Config::EdsResourcesCacheOptRef ClusterManagerImpl::edsResourcesCache() {
   return {};
 }
 
+void ClusterManagerImpl::createNetworkObserverRegistries(
+    Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) {
+#ifdef ENVOY_ENABLE_QUIC
+  tls_.runOnAllThreads([&factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ENVOY_LOG(trace, "cm: create network observer registry in {}",
+              cluster_manager->thread_local_dispatcher_.name());
+    cluster_manager->createThreadLocalNetworkObserverRegistry(factory);
+  });
+#else
+  (void)factory;
+#endif
+}
+
 ClusterDiscoveryManager
 ClusterManagerImpl::createAndSwapClusterDiscoveryManager(std::string thread_name) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;

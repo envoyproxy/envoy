@@ -310,10 +310,13 @@ envoy_cc_library(
     srcs = [
         "envoy_quic_client_session.cc",
         "envoy_quic_client_stream.cc",
+        "quic_network_connectivity_observer.cc",
     ],
     hdrs = [
         "envoy_quic_client_session.h",
         "envoy_quic_client_stream.h",
+        "envoy_quic_network_observer_registry_factory.h",
+        "quic_network_connectivity_observer.h",
     ],
     tags = ["nofips"],
     deps = [

@@ -157,7 +157,8 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), address, source_address,
       quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
-      transportSocketOptions(), connection_id_generator_, host_->transportSocketFactory());
+      transportSocketOptions(), connection_id_generator_, host_->transportSocketFactory(),
+      network_observer_registry_.get());
 }
 
 std::unique_ptr<Http3ConnPoolImpl>

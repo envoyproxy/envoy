@@ -38,6 +38,13 @@
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
+
+namespace Quic {
+
+class EnvoyQuicNetworkObserverRegistryFactory;
+
+} // namespace Quic
+
 namespace Upstream {
 
 /**
@@ -467,6 +474,9 @@ public:
    * Returns an EdsResourcesCache that is unique for the cluster manager.
    */
   virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
+
+  virtual void createNetworkObserverRegistries(
+      Envoy::Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
