@@ -60,11 +60,11 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
-# Enable auto code formatting and linting during build for Rust source code.
-build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
-build --output_groups=+clippy_checks
-build --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
-build --output_groups=+rustfmt_checks
+# Enable auto rustfmt and clippy during build time of Rust source code.
+build:linux --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+build:linux --output_groups=+clippy_checks
+build:linux --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
+build:linux --output_groups=+rustfmt_checks
 
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
