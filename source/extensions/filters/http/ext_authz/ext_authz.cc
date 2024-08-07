@@ -89,6 +89,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
+      emit_filter_state_stats_(config.emit_filter_state_stats()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
