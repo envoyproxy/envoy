@@ -99,23 +99,14 @@ public:
                      "Already connected to an xDS server, skipping establishNewStream() call");
       return;
     }
-    // First check if Envoy ever connected to the primary/failover, and if so
-    // persist attempts to that source.
-    // Prior connection to failover is disregarded as Envoy will try
-    // reconnecting to the primary again.
-    if (ever_connected_to_primary_) {
-      ASSERT(connection_state_ == ConnectionState::None ||
-             connection_state_ == ConnectionState::ConnectingToPrimary);
-      ENVOY_LOG_MISC(trace, "Attempting to reconnect to the primary gRPC source, as a connection "
-                            "to it was previously established.");
-      connection_state_ = ConnectionState::ConnectingToPrimary;
-      primary_grpc_stream_->establishNewStream();
-      return;
-    }
     // connection_state_ is either None, ConnectingToPrimary or
     // ConnectingToFailover. In the first 2 cases try to connect to the primary
     // (preferring the primary in the case of None), and in the third case
     // try to connect to the failover.
+    // Note that if a connection to the primary source was ever successful, the
+    // failover manager will keep setting connection_state_ to either None or
+    // ConnectingToPrimary, which ensures that only the primary stream will be
+    // established.
     if (connection_state_ == ConnectionState::ConnectingToFailover) {
       connection_state_ = ConnectionState::ConnectingToFailover;
       failover_grpc_stream_->establishNewStream();
