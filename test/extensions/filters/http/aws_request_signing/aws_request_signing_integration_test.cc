@@ -446,6 +446,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   dnsSetup();
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
