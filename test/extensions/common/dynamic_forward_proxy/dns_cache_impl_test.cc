@@ -135,19 +135,7 @@ void verifyCaresDnsConfigAndUnpack(
   typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 }
 
-class DnsCacheImplPreresolveTest : public DnsCacheImplTest,
-                                   public testing::WithParamInterface<bool> {
-public:
-  bool normalizeDfpHost() { return GetParam(); }
-};
-
-INSTANTIATE_TEST_SUITE_P(DnsCachePreresolveNormalizedDfpHost, DnsCacheImplPreresolveTest,
-                         testing::Bool());
-
-TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns",
-                                absl::StrCat(normalizeDfpHost())}});
-
+TEST_F(DnsCacheImplTest, PreresolveSuccess) {
   Network::DnsResolver::ResolveCb resolve_cb;
   std::string host = "bar.baz.com";
   uint32_t port = 443;
@@ -162,7 +150,7 @@ TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
                                       DnsHostInfoEquals("10.0.0.1:443", "bar.baz.com", false),
                                       Network::DnsResolver::ResolutionStatus::Success));
 
-  initialize({{normalizeDfpHost() ? host : authority, port}} /* preresolve_hostnames */);
+  initialize({{host, port}} /* preresolve_hostnames */);
 
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({"10.0.0.1"}));
@@ -170,21 +158,19 @@ TEST_P(DnsCacheImplPreresolveTest, PreresolveSuccess) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   MockLoadDnsCacheEntryCallbacks callbacks;
-  if (normalizeDfpHost()) {
-    // Retrieve with the hostname and port in the "host".
-    auto result = dns_cache_->loadDnsCacheEntry(authority, port, false, callbacks);
-    EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
-    EXPECT_EQ(result.handle_, nullptr);
-    EXPECT_NE(absl::nullopt, result.host_info_);
-  }
+  // Retrieve with the hostname and port in the "host".
+  auto result = dns_cache_->loadDnsCacheEntry(authority, port, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
+  EXPECT_NE(absl::nullopt, result.host_info_);
   // Retrieve with the hostname only in the "host".
-  auto result = dns_cache_->loadDnsCacheEntry(host, port, false, callbacks);
+  result = dns_cache_->loadDnsCacheEntry(host, port, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_NE(absl::nullopt, result.host_info_);
 }
 
-TEST_P(DnsCacheImplPreresolveTest, PreresolveFailure) {
+TEST_F(DnsCacheImplTest, PreresolveFailure) {
   EXPECT_THROW_WITH_MESSAGE(
       initialize({{"bar.baz.com", 443}} /* preresolve_hostnames */, 0 /* max_hosts */),
       EnvoyException,
