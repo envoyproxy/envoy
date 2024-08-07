@@ -9,6 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+const char kBucketMetadataNamespace[] = "envoy.extensions.http_filters.rate_limit_quota.bucket";
+
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
@@ -46,8 +48,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   for (const auto& bucket : bucket_id_proto.bucket())
     (*bucket_log_fields)[bucket.first] = ValueUtil::stringValue(bucket.second);
 
-  callbacks_->streamInfo().setDynamicMetadata(
-      "envoy.extensions.http_filters.rate_limit_quota.bucket", bucket_log);
+  callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
 
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // For first matched request, create a new bucket in the cache and sent the report to RLQS
