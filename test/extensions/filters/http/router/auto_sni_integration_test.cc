@@ -178,7 +178,6 @@ virtual_hosts:
       cluster: cluster_0
       host_rewrite_path_regex:
         pattern:
-            google_re2: {}
             regex: ".*"
         substitution: "foo"
   )EOF";
