@@ -92,7 +92,8 @@ TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
       newDynamicModule(testSharedObjectPath("no_program_init", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("undefined symbol: envoy_dynamic_module_on_program_init"));
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("undefined symbol: envoy_dynamic_module_on_program_init"));
 }
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInitFail) {
