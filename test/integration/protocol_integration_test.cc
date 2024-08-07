@@ -3050,22 +3050,14 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxConnectio
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Sending first request and waiting to complete the response.
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(*request_encoder_, 1, true);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response->complete());
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             0);
-  EXPECT_EQ(nullptr, response->headers().Connection());
 
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  // http1 is not closed at this point because envoy needs to send a response with the
+  // connection:close response header to be able to safely close the connection. For other protocols
+  // it's safe for envoy to just close the connection, so they do so.
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
@@ -3074,14 +3066,11 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxConnectio
   }
 
   // Sending second request.
-  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder_2.first;
-  auto response_2 = std::move(encoder_decoder_2.second);
-  codec_client_->sendData(*request_encoder_, 1, true);
+  auto response_2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
   // Before sending the response, sleep past the drain timer. Nothing should happen.
-  absl::SleepFor(absl::Seconds(1));
+  timeSystem().advanceTimeWait(Seconds(1));
   EXPECT_FALSE(codec_client_->sawGoAway());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -3114,24 +3103,12 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionVsMaxStreamDur
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sending first request and waiting to complete the response.
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(*request_encoder_, 1, true);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response->complete());
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             0);
 
   // Sending second request and waiting to complete the response.
-  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder_2.first;
-  auto response_2 = std::move(encoder_decoder_2.second);
-  codec_client_->sendData(*request_encoder_, 1, true);
+  auto response_2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             1);
