@@ -216,7 +216,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
   if (status == ARES_SUCCESS) {
     pending_response_.status_ = ResolutionStatus::Success;
-    pending_response_.details_ = "cares_success";
+    pending_response_.details_ = absl::StrCat("cares_success:", ares_strerror(status));
 
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       bool can_process_v4 =
@@ -265,10 +265,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success to populate back the
     // "empty records" response.
     pending_response_.status_ = ResolutionStatus::Success;
-    pending_response_.details_ = "cares_norecords";
+    pending_response_.details_ = absl::StrCat("cares_norecords:", ares_strerror(status));
     ASSERT(addrinfo == nullptr);
   } else {
-    pending_response_.details_ = "cares_failure";
+    pending_response_.details_ = absl::StrCat("cares_failure:", ares_strerror(status));
   }
 
   if (timeouts > 0) {
