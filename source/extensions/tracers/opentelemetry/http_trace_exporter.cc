@@ -61,8 +61,11 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   }
   message->body().add(request_body);
 
-  const auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
-      DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())));
+  const auto options =
+      Http::AsyncClient::RequestOptions()
+          .setTimeout(std::chrono::milliseconds(
+              DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())))
+          .setDiscardResponseBody(true);
 
   Http::AsyncClient::Request* in_flight_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
