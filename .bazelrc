@@ -351,6 +351,12 @@ build:remote-clang-cl --config=remote-windows
 build:remote-clang-cl --config=clang-cl
 build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
+# Enable auto rustfmt and clippy during build time of Rust source code.
+build:rust-format --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+build:rust-format --output_groups=+clippy_checks
+build:rust-format --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
+build:rust-format --output_groups=+rustfmt_checks
+
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
 # changes, this build type may need to be broken up.
@@ -369,11 +375,7 @@ build:compile-time-options --config=libc++20
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
-# Enable auto rustfmt and clippy during build time of Rust source code.
-build:compile-time-options --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
-build:compile-time-options --output_groups=+clippy_checks
-build:compile-time-options --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
-build:compile-time-options --output_groups=+rustfmt_checks
+build:compile-time-options --config=rust-format
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
