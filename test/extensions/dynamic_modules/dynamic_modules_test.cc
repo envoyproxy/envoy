@@ -86,6 +86,24 @@ TEST_P(DynamicModuleTestLanguages, LoadNoOp) {
   EXPECT_TRUE(module.ok());
 }
 
+TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
+  std::string language = GetParam();
+  absl::StatusOr<DynamicModuleSharedPtr> result =
+      newDynamicModule(testSharedObjectPath("no_program_init", language), false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("undefined symbol: envoy_dynamic_module_on_program_init"));
+}
+
+TEST_P(DynamicModuleTestLanguages, NoProgramInitFail) {
+  std::string language = GetParam();
+  absl::StatusOr<DynamicModuleSharedPtr> result =
+      newDynamicModule(testSharedObjectPath("no_program_init_fail", language), false);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("returned non-zero status: 12345"));
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

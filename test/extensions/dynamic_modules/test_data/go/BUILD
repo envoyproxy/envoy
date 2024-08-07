@@ -1,17 +1,11 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary")
+load("//test/extensions/dynamic_modules/test_data/go:test_data.bzl", "test_program")
 
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//test/extensions/dynamic_modules:__pkg__"])
 
-go_binary(
-    name = "no_op",
-    srcs = ["no_op.go"],
-    out = "libno_op.so",
-    cgo = True,
-    importpath = "github.com/envoyproxy/envoy/test/extensions/dynmic_modules/sdk/go",
-    linkmode = "c-shared",
-    deps = [
-        "//source/extensions/dynamic_modules/sdk/go:sdk",
-    ],
-)
+test_program(name = "no_op")
+
+test_program(name = "no_program_init")
+
+test_program(name = "no_program_init_fail")
