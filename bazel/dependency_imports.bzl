@@ -205,7 +205,6 @@ def envoy_dynamic_modules_rust_sdk_dependencies():
     crates_repository(
         name = "dynamic_module_rust_sdk_crate_index",
         cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
-        # This is also required for the same reason as above.
         generator = "@cargo_bazel_bootstrap//:cargo-bazel",
         manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )

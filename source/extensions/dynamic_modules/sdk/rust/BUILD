@@ -10,8 +10,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-exports_files(["abi.h"])
-
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],

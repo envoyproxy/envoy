@@ -8,8 +8,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-exports_files(["abi.h"])
-
 envoy_cc_library(
     name = "dynamic_modules_lib",
     srcs = [
