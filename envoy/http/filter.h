@@ -1200,6 +1200,9 @@ public:
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
 
   const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
+  const envoy::config::core::v3::Metadata& metadata() const {
+    return streamInfo().dynamicMetadata();
+  }
 
   const Network::Address::Instance& localAddress() const {
     return *connectionInfoProvider().localAddress();

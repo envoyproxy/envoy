@@ -22,10 +22,22 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: command line options
+  change: |
+    :option:`--enable-fine-grain-logging` and :option:`--component-log-level` were incompatible in that one
+    would make the other ineffective. Setting both options at once is now an error, to reduce potential confusion.
 - area: tcp
   change: |
     Added support for :ref:`connection_pool_per_downstream_connection
     <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
+- area: http3
+  change: |
+    The ACCEPT_UNTRUSTED option now works more consistently for HTTP/3 requests. This change is
+    guarded by ``envoy.reloadable_features.extend_h3_accept_untrusted``.
+- area: http3
+  change: |
+    HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
+    guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips``.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
@@ -93,6 +105,9 @@ removed_config_or_runtime:
 - area: stateful_session
   change: |
     Removed ``envoy.reloadable_features.stateful_session_encode_ttl_in_cookie`` runtime flag and legacy code paths.
+- area: quic
+  change: |
+    Removed ``envoy.reloadable_features.quic_fix_filter_manager_uaf`` runtime flag and legacy code paths.
 - area: udp
   change: |
     Removed ``envoy.restart_features.udp_read_normalize_addresses`` runtime flag and legacy code paths.
@@ -103,6 +118,9 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read`` runtime flag
     and legacy code paths.
+- area: dynamic forward proxy
+  change: |
+    Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
 
 new_features:
 - area: tls
@@ -134,6 +152,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: matching
+  change: |
+    Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
+    and :ref:`Dynamic metadata input matcher <extension_envoy.matching.matchers.metadata_matcher>`.
 - area: ratelimit
   change: |
     Added the ability to modify :ref:`hits_addend <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`
@@ -142,5 +164,13 @@ new_features:
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: dns
+  change: |
+    Prefer using IPv6 address when addresses from both families are available.
+    Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
+- area: rbac
+  change: |
+    Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
+    the configured duration.
 
 deprecated:

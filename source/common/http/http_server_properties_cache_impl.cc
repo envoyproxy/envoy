@@ -296,6 +296,14 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   return *it->second.h3_status_tracker;
 }
 
+void HttpServerPropertiesCacheImpl::resetBrokenness() {
+  for (auto& protocol : protocols_) {
+    if (protocol.second.h3_status_tracker && protocol.second.h3_status_tracker->isHttp3Broken()) {
+      protocol.second.h3_status_tracker->markHttp3FailedRecently();
+    }
+  }
+}
+
 absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {
   for (const std::string& suffix : canonical_suffixes_) {
     if (absl::EndsWith(hostname, suffix)) {

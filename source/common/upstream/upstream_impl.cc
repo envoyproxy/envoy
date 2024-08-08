@@ -380,6 +380,20 @@ createUpstreamLocalAddressSelector(
   return selector_or_error.value();
 }
 
+class LoadBalancerFactoryContextImpl : public Upstream::LoadBalancerFactoryContext {
+public:
+  explicit LoadBalancerFactoryContextImpl(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : server_context_(server_context) {}
+
+  Event::Dispatcher& mainThreadDispatcher() override {
+    return server_context_.mainThreadDispatcher();
+  }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+};
+
 } // namespace
 
 // Allow disabling ALPN checks for transport sockets. See
@@ -987,7 +1001,8 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
@@ -1030,12 +1045,13 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+  return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
   // In this case the subset load balancer should not be used.
@@ -1043,12 +1059,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+      return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
     }
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(lb_factory_context, cluster, visitor);
 }
 
 using ProtocolOptionsHashMap =
@@ -1188,9 +1204,10 @@ ClusterInfoImpl::ClusterInfoImpl(
   } else {
     // If load_balancing_policy is not set, we will try to convert legacy lb_policy
     // to load_balancing_policy and use it.
+    LoadBalancerFactoryContextImpl lb_factory_context(server_context);
 
     auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-        config, server_context.messageValidationVisitor());
+        lb_factory_context, config, server_context.messageValidationVisitor());
 
     if (!lb_pair.ok()) {
       throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
@@ -1357,13 +1374,14 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
+      LoadBalancerFactoryContextImpl lb_factory_context(context);
       auto proto_message = factory->createEmptyConfigProto();
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              context.messageValidationVisitor(), *proto_message);
 
       load_balancer_factory_ = factory;
-      load_balancer_config_ =
-          factory->loadConfig(*proto_message, context.messageValidationVisitor());
+      load_balancer_config_ = factory->loadConfig(lb_factory_context, *proto_message,
+                                                  context.messageValidationVisitor());
 
       break;
     }
