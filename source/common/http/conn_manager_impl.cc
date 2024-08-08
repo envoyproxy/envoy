@@ -1152,17 +1152,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Both shouldDrainConnectionUponCompletion() and is_head_request_ affect local replies: set them
   // as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
-    if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
-      // Only mark the connection to be closed if the request indicates so. The connection might
-      // already be marked so before this step, in which case if shouldCloseConnection() returns
-      // false, the stream info value shouldn't be overridden.
-      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
-    }
-  } else {
-    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(
-        HeaderUtility::shouldCloseConnection(protocol, *request_headers_));
+  if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
+    // Only mark the connection to be closed if the request indicates so. The connection might
+    // already be marked so before this step, in which case if shouldCloseConnection() returns
+    // false, the stream info value shouldn't be overridden.
+    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
   }
 
   filter_manager_.streamInfo().protocol(protocol);
