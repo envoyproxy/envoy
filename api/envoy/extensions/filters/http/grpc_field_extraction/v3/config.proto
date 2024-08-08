@@ -52,7 +52,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Here are config requirements
 //
-// 1. the target field should be among the following primitive types: `string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
+// 1. the target field should be among the following primitive types: `string`,
+// `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`, `fixed32`,
+// `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`, `map<string, string>`.
 //
 // 2. the target field could be repeated.
 //
@@ -61,9 +63,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Output Format
 // -------------
 //
-// 1. the extracted field names/values will be wrapped in be ``field<StringValue>`` -> ``values<ListValue of StringValue>``, which will be added in the dynamic ``metadata<google.protobuf.Struct>``.
+// 1. the extracted field names/values will be wrapped in be ``field<StringValue
+// or MapValue>`` -> ``values<ListValue of StringValue or StructValue>``, which will be added in the dynamic ``metadata<google.protobuf.Struct>``.
 //
-// 2. if the field value is empty, a empty ``<ListValue>`` will be set.
+// 2. if the field value is empty, an empty ``<ListValue>`` will be set.
 //
 // Performance
 // -----------
