@@ -39,6 +39,14 @@ behavior_changes:
   change: |
     Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
     <envoy_v3_api_msg_config/route/v3/scoped_route>' and stat prefix extracted.
+- area: http
+  change: |
+    The default configuration of Envoy will continue to trust internal addresses while in the future it will not trust them by default.
+    If you have tooling such as probes on your private network which need to be treated as trusted (e.g. changing arbitrary ``x-envoy``
+    headers) please explictily include those addresses or CIDR ranges into :ref:`internal_address_config
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+    See the config examples from the above ``internal_address_config`` link. This default no trust internal address can be turned on by
+    setting runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` to ``true``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
