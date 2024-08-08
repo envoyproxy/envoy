@@ -541,13 +541,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationSafeHttp1) {
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   startRequest(true, "hello");
 
-  {
-    EXPECT_CALL(*connection_duration_timer, disableTimer());
-    EXPECT_LOG_CONTAINS(
-        "debug", "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
-        connection_duration_timer->invokeCallback());
-  }
-
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+  connection_duration_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http1_soft_drain_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
 
   // Connection manager now waits to send another response, adds the Connection:close header to it,
