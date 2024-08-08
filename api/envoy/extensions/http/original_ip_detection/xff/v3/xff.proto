@@ -42,10 +42,6 @@ message XffConfig {
   // addresses in ``x-forwarded-for`` are within the trusted list, the first (leftmost)
   // entry is used.
   //
-  // If the first ``x-forwarded-for`` entry evaluated after a trusted proxy IP is a
-  // private or loopback IP, or if no ``x-forwarded-for`` header was sent, the
-  // remote IP is considered the real IP.
-  //
   // This is typically used when requests are proxied by a
   // `CDN <https://en.wikipedia.org/wiki/Content_delivery_network>`_.
   //

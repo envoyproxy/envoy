@@ -797,13 +797,6 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     }
 
     // If we reach here we found a non-trusted address
-    if (Network::Utility::isInternalAddress(*addr.get()) ||
-        Network::Utility::isLoopbackAddress(*addr.get())) {
-      // If the next IP after skipping all trusted IPs is internal or loopback
-      // we cannot determine the true remote IP: Either a proxy didn't add its IP,
-      // or XFF is malformed.
-      return {nullptr, false};
-    }
     return {addr, xff_entries.size() == 1};
   }
   // If we reach this point all addresses in XFF were considered trusted, so return
