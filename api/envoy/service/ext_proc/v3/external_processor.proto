@@ -57,7 +57,7 @@ service ExternalProcessor {
 
 // This represents the different types of messages that Envoy can send
 // to an external processing server.
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message ProcessingRequest {
   reserved 1;
 
@@ -123,18 +123,6 @@ message ProcessingRequest {
   //   are needed.
   //
   bool observability_mode = 10;
-
-  // Specify whether the filter is sending the body before it receives the header response.
-  // This flag is encoded when Envoy sends header request to the server.
-  //
-  // * A value of ``true`` indicates that the server must not send a standalone header response.
-  //   It should wait for the body arrives, process them, then encode the first chunk body and
-  //   the header in one ProcessResponse
-  //   :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`
-  //   and sends it.  For details, please check:
-  //   // [#comment:TODO :ref:`send_body_before_recv_header_resp <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_before_recv_header_resp>]`
-  // * A value of ``false`` indicates no such restriction.
-  bool send_body_before_recv_header_resp = 11
 }
 
 // For every ProcessingRequest received by the server with the ``observability_mode`` field
@@ -232,6 +220,30 @@ message HttpHeaders {
   // If true, then there is no message body associated with this
   // request or response.
   bool end_of_stream = 3;
+
+  // [#not-implemented-hide:]
+  // Specify whether Envoy is sending the body before it receives the header response.
+  // Iff [#comment:TODO :ref:`send_body_before_recv_header_resp <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_before_recv_header_resp>`]
+  // is set to true, this flag is encoded as true.
+  //
+  // * A value of ``true`` indicates that the server must not send a standalone header response.
+  //   It has to wait for both headers and some body chunks arrives before sending the responses. The first response
+  //   has to be a body response, which contains both the header mutation and the first chunk of body mutation.
+  //   1. The header response is encoded in
+  //      :ref:`header_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.header_mutation>`
+  //
+  //   2. The first chunk of body response is encoded in
+  //      :ref:`body_mutation <envoy_v3_api_field_service.ext_proc.v3.CommonResponse.body_mutation>`.
+  //
+  //   3. Depending on the direction of the mainstream traffic, they must be encoded either in the
+  //      :ref:`request_body <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_body>`, or the
+  //      :ref:`response_body <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_body>`
+  //
+  //   4. The side stream server then sends this ``ProcessingResponse`` back to Envoy.
+  //   5. The rest of the body requests and responses are forwarded as usual.
+
+  // * A value of ``false`` indicates no such restriction.
+  bool send_body_before_recv_header_resp = 4;
 }
 
 // This message contains the message body that Envoy sends to the external server.
