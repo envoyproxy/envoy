@@ -134,7 +134,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_downgrade_to_canonical_name);
 // TODO(pksohn): enable after fixing https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
-
+// TODO(botengyao): this will be default true in the next release after this warning release.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
