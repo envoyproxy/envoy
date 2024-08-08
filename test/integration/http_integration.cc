@@ -340,6 +340,21 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* range = hcm.mutable_internal_address_config()->add_cidr_ranges();
+        // Set loopback to be trusted so tests can set x-envoy headers.
+        range->set_address_prefix("127.0.0.1");
+        range->mutable_prefix_len()->set_value(32);
+        // Legacy tests also set XFF: 10.0.0.1
+        range->set_address_prefix("10.0.0.0");
+        range->mutable_prefix_len()->set_value(8);
+        range = hcm.mutable_internal_address_config()->add_cidr_ranges();
+        range->set_address_prefix("::1");
+        range->mutable_prefix_len()->set_value(128);
+      });
 }
 
 void HttpIntegrationTest::useAccessLog(
