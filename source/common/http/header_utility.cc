@@ -236,12 +236,12 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 namespace {
-// This function is used to validate the authority.
-// Because it is used for both H/1 and H/2 validations, this function permits
-// the character "@" which is not permitted by oghttp2's implementation.
-// The H/1 spec allows "user-info@host:port" for the authority, and the H/2 spec doesn't.
-// Once UHV is used, this function should be removed, and the H/1 and H/2
-// authority validations should be different..
+// This function validates the authority header for both HTTP/1 and HTTP/2.
+// Note the HTTP/1 spec allows "user-info@host:port" for the authority, whereas
+// the HTTP/2 spec only allows "host:port". Thus, this function permits all the
+// HTTP/2 valid characters (similar to oghttp2's implementation) and the "@" character.
+// Once UHV is used, this function should be removed, and the HTTP/1 and HTTP/2
+// authority validations should be different.
 bool check_authority_h1_h2(const absl::string_view header_value) {
   static constexpr char ValidAuthorityChars[] = {
       0 /* NUL  */, 0 /* SOH  */, 0 /* STX  */, 0 /* ETX  */,

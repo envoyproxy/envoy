@@ -38,7 +38,7 @@ minor_behavior_changes:
     Modified the authority header value validator to allow the same characters as oghttp2
     plus the "@" character. This is compliant with nghttp2, and supports the HTTP/1 use-cases
     that allow user-info@ as part of the authority. This behavior can be reverted by setting
-    the runitme guard ``envoy.reloadable_features.internal_authority_header_validator`` to false.
+    the runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
