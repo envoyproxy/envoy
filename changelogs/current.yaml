@@ -4,8 +4,8 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: tracing
   change: |
-    Datadog: Disabled remote configuration by default.
-    To enable this feature, use the :ref:`remote_config <envoy_v3_api_field_config.trace.v3.DatadogConfig.remote_config>` field.
+    Removed support for (long deprecated) opentracing.  See `issue 27401
+    <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
 - area: http
   change: |
     Added HTTP1-safe option for :ref:`max_connection_duration
