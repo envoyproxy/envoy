@@ -21,6 +21,7 @@ public:
   MOCK_METHOD(size_t, size, (), (const));
   MOCK_METHOD(HttpServerPropertiesCache::Http3StatusTracker&, getOrCreateHttp3StatusTracker,
               (const Origin& origin));
+  MOCK_METHOD(void, resetBrokenness, ());
 };
 
 class MockHttpServerPropertiesCacheManager : public HttpServerPropertiesCacheManager {
@@ -30,6 +31,7 @@ public:
   MOCK_METHOD(HttpServerPropertiesCacheSharedPtr, getCache,
               (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
                Event::Dispatcher& dispatcher));
+  MOCK_METHOD(void, forEachThreadLocalCache, (HttpServerPropertiesCacheManager::CacheFn));
 };
 
 } // namespace Http

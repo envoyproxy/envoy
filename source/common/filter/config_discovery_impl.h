@@ -111,7 +111,7 @@ public:
   absl::Status onConfigUpdate(const Protobuf::Message& message, const std::string&,
                               Config::ConfigAppliedCb applied_on_all_threads) override {
     const absl::StatusOr<FactoryCb> config_or_error = instantiateFilterFactory(message);
-    RETURN_IF_STATUS_NOT_OK(config_or_error);
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
     update(config_or_error.value(), applied_on_all_threads);
     return absl::OkStatus();
   }
@@ -120,7 +120,7 @@ public:
     absl::optional<FactoryCb> cb;
     if (default_configuration_) {
       auto cb_or_error = instantiateFilterFactory(*default_configuration_);
-      RETURN_IF_STATUS_NOT_OK(cb_or_error);
+      RETURN_IF_NOT_OK_REF(cb_or_error.status());
       cb = cb_or_error.value();
     }
     update(cb, applied_on_all_threads);
@@ -225,7 +225,7 @@ private:
         message.GetTypeName());
     absl::StatusOr<Http::FilterFactoryCb> error_or_factory =
         factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
-    RETURN_IF_STATUS_NOT_OK(error_or_factory);
+    RETURN_IF_NOT_OK_REF(error_or_factory.status());
     return NamedHttpFilterFactoryCb{factory->name(), error_or_factory.value()};
   }
 
@@ -257,7 +257,7 @@ private:
         message.GetTypeName());
     absl::StatusOr<Network::FilterFactoryCb> cb_or_error =
         factory->createFilterFactoryFromProto(message, factory_context_);
-    RETURN_IF_STATUS_NOT_OK(cb_or_error);
+    RETURN_IF_NOT_OK_REF(cb_or_error.status());
     return cb_or_error.value();
   }
 

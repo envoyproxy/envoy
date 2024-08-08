@@ -174,6 +174,11 @@ public:
    */
   virtual HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) PURE;
+
+  /**
+   * Changes any origins with status "Broken" for HTTP/3 to "Failed Recently"
+   */
+  virtual void resetBrokenness() PURE;
 };
 
 using HttpServerPropertiesCacheSharedPtr = std::shared_ptr<HttpServerPropertiesCache>;
@@ -195,6 +200,14 @@ public:
   virtual HttpServerPropertiesCacheSharedPtr
   getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
            Event::Dispatcher& dispatcher) PURE;
+
+  using CacheFn = std::function<void(HttpServerPropertiesCache&)>;
+
+  /**
+   * Run the supplied function on each HttpServerPropertiesCache on this thread.
+   * @param cache_fn supplies the function to run.
+   */
+  virtual void forEachThreadLocalCache(CacheFn cache_fn) PURE;
 };
 
 using HttpServerPropertiesCacheManagerSharedPtr = std::shared_ptr<HttpServerPropertiesCacheManager>;

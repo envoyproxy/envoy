@@ -165,20 +165,20 @@ REGISTER_FACTORY(TestSerializedStringFilterStateFactory, StreamInfo::FilterState
 // extracting tokens.
 TEST(SubstitutionFormatParser, commandParser) {
   std::vector<absl::string_view> tokens;
-  std::string token1;
+  absl::string_view token1;
 
   std::string command = "item1";
   SubstitutionFormatUtils::parseSubcommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
 
-  std::string token2;
+  absl::string_view token2;
   command = "item1:item2";
   SubstitutionFormatUtils::parseSubcommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
 
   // Three tokens.
-  std::string token3;
+  absl::string_view token3;
   command = "item1?item2?item3";
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
@@ -196,7 +196,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 2 tokens but 3 are expected.
   // The third extracted token should be empty.
   command = "item1?item2";
-  token3.erase();
+  token3 = {};
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
@@ -205,7 +205,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 4 tokens. Get first 2 into the strings
   // and remaining 2 into a vector of strings.
   command = "item1?item2?item3?item4";
-  std::vector<std::string> bucket;
+  std::vector<absl::string_view> bucket;
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
@@ -1087,7 +1087,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
           for (auto& precision : precisions) {
             const std::string sub_command =
                 absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
-            std::cout << sub_command << std::endl;
             StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
 
             if (start_index == end_index && start_index == 0) {
@@ -1165,7 +1164,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
             const std::string sub_command =
                 absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
-            std::cout << sub_command << std::endl;
 
             StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
 

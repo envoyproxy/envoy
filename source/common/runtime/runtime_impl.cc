@@ -439,9 +439,9 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
 
   Filesystem::Directory directory(path);
   Filesystem::DirectoryIteratorImpl it = directory.begin();
-  RETURN_IF_STATUS_NOT_OK(it);
+  RETURN_IF_NOT_OK_REF(it.status());
   for (; it != directory.end(); ++it) {
-    RETURN_IF_STATUS_NOT_OK(it);
+    RETURN_IF_NOT_OK_REF(it.status());
     Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
@@ -465,7 +465,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
-      RETURN_IF_STATUS_NOT_OK(file_or_error);
+      RETURN_IF_NOT_OK_REF(file_or_error.status());
       const std::string text_file{file_or_error.value()};
 
       const auto lines = StringUtil::splitToken(text_file, "\n");
@@ -492,7 +492,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
 #endif
     }
   }
-  RETURN_IF_STATUS_NOT_OK(it);
+  RETURN_IF_NOT_OK_REF(it.status());
   return absl::OkStatus();
 }
 
@@ -721,7 +721,7 @@ absl::Status RtdsSubscription::onConfigRemoved(
 
 absl::Status LoaderImpl::loadNewSnapshot() {
   auto snapshot_or_error = createNewSnapshot();
-  RETURN_IF_STATUS_NOT_OK(snapshot_or_error);
+  RETURN_IF_NOT_OK_REF(snapshot_or_error.status());
   std::shared_ptr<SnapshotImpl> ptr = std::move(snapshot_or_error.value());
   tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
