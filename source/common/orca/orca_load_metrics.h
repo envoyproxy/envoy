@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_COMMON_ORCA_ORCA_LOAD_METRICS_H_
-#define THIRD_PARTY_ENVOY_SRC_SOURCE_COMMON_ORCA_ORCA_LOAD_METRICS_H_
-
 #include "envoy/upstream/host_description.h"
 
 #include "xds/data/orca/v3/orca_load_report.pb.h"
@@ -30,5 +27,3 @@ void addOrcaLoadReportToLoadMetricStats(const OptRef<const LrsReportMetricNames>
 
 } // namespace Orca
 } // namespace Envoy
-
-#endif // THIRD_PARTY_ENVOY_SRC_SOURCE_COMMON_ORCA_ORCA_LOAD_METRICS_H_

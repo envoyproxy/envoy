@@ -2,12 +2,11 @@
 
 #include <string>
 
+#include "source/common/orca/orca_parser.h"
+
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-
-// #include "envoy/upstream/host_description.h"
-#include "source/common/orca/orca_parser.h"
 
 namespace Envoy {
 namespace Orca {
@@ -24,7 +23,7 @@ void addOrcaNamedMetricToLoadMetricStats(const Protobuf::Map<std::string, double
     }
   } else {
     // Add the metric if it exists in the map.
-    auto metric_it = metrics_map.find(metric_name_without_prefix);
+    const auto metric_it = metrics_map.find(metric_name_without_prefix);
     if (metric_it != metrics_map.end()) {
       stats.add(metric_name, metric_it->second);
     }

@@ -17,7 +17,6 @@ envoy_cc_test(
         "fmtlib",
     ],
     deps = [
-        "//source/common/common:base64_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/upstream:upstream_lib",
         "//test/test_common:status_utility_lib",
