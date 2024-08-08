@@ -53,8 +53,8 @@ public final class HttpTestServerFactory {
    * @param trailers the response headers
    * @return the `HttpTestServer` instance
    */
-  public static native HttpTestServer start(int type, Map<String, String> headers, String body,
-                                            Map<String, String> trailers);
+  public static native HttpTestServer start(int type, int port, Map<String, String> headers,
+                                            String body, Map<String, String> trailers);
 
   /**
    * A convenience method to start the server with an empty response headers, body, and trailers.
@@ -64,6 +64,6 @@ public final class HttpTestServerFactory {
    * @return the `HttpTestServer` instance
    */
   public static HttpTestServer start(int type) {
-    return start(type, Collections.emptyMap(), "", Collections.emptyMap());
+    return start(type, 0, Collections.emptyMap(), "", Collections.emptyMap());
   }
 }
