@@ -78,6 +78,10 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
     return std::make_unique<InternalAddressConfig>(config.internal_address_config(),
                                                    creation_status);
   }
+  ENVOY_LOG_ONCE_MISC(warn,
+                      "internal_address_config is not configured. The existing default behaviour "
+                      "will trust RFC1918 IP addresses, but this will be changed in next release. "
+                      "Please explictily config internal address config as the migration step.");
 
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
