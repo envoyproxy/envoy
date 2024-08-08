@@ -47,6 +47,9 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
               ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
+                                                 v3::DynamicMetadataInput::descriptor()
+                                                     ->full_name())},
       {TypeUtil::descriptorFullNameToTypeUrl(
           xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name())}};
   if (allowed_inputs_set.contains(type_url)) {

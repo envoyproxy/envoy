@@ -73,5 +73,12 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
   return new_cache;
 }
 
+void HttpServerPropertiesCacheManagerImpl::forEachThreadLocalCache(CacheFn cache_fn) {
+  for (auto& entry : (*slot_).caches_) {
+    HttpServerPropertiesCache& cache = *entry.second.cache_;
+    cache_fn(cache);
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

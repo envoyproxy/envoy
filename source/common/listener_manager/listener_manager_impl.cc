@@ -474,7 +474,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
     }
     if (!api_listener_ && !added_via_api) {
       auto listener_or_error = HttpApiListener::create(config, server_, config.name());
-      RETURN_IF_STATUS_NOT_OK(listener_or_error);
+      RETURN_IF_NOT_OK_REF(listener_or_error.status());
       api_listener_ = std::move(listener_or_error.value());
       return true;
     } else {
