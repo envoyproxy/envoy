@@ -1813,6 +1813,46 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, LocalReplyStopsDecoding) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    // Start POST request (end_stream = false)
+    decoder_->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  setupFilterChain(1, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
+                                                        absl::nullopt, "");
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  }));
+  expectOnDestroy();
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 // Verify that if an encoded stream has been ended, but gets stopped by a filter chain, we end
 // up resetting the stream in the doEndStream() path (e.g., via filter reset due to timeout, etc.),
 // we emit a reset to the codec.

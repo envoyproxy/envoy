@@ -527,6 +527,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
+  bool last_filter_saw_end_stream = false;
+
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
@@ -534,6 +536,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
+    last_filter_saw_end_stream =
+        (*entry)->end_stream_ && std::next(entry) == decoder_filters_.end();
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     if ((*entry)->end_stream_) {
@@ -606,6 +610,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   if (end_stream) {
     disarmRequestTimeout();
   }
+  maybeEndDecode(last_filter_saw_end_stream);
 }
 
 void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data,
@@ -625,6 +630,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, filter_iteration_start_state);
+  bool last_filter_saw_end_stream = false;
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame types, return now.
@@ -677,6 +683,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
+    last_filter_saw_end_stream =
+        (*entry)->end_stream_ && std::next(entry) == decoder_filters_.end();
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
@@ -720,6 +728,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   if (end_stream) {
     disarmRequestTimeout();
   }
+  maybeEndDecode(last_filter_saw_end_stream);
 }
 
 RequestTrailerMap& FilterManager::addDecodedTrailers() {
@@ -764,6 +773,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
+  bool last_filter_saw_end_stream = false;
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
@@ -775,6 +785,8 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
     (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
+    last_filter_saw_end_stream =
+        (*entry)->end_stream_ && std::next(entry) == decoder_filters_.end();
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
@@ -788,11 +800,13 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
 
     processNewlyAddedMetadata();
 
-    if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
+    if (!(*entry)->commonHandleAfterTrailersCallback(status) &&
+        std::next(entry) != decoder_filters_.end()) {
       return;
     }
   }
   disarmRequestTimeout();
+  maybeEndDecode(last_filter_saw_end_stream);
 }
 
 void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map) {
@@ -922,9 +936,9 @@ void DownstreamFilterManager::sendLocalReply(
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
-  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
-    state_.decoder_filter_chain_aborted_ = true;
-  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+  /*if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {*/
+  state_.decoder_filter_chain_aborted_ = true;
+  /*} else*/ if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
     state_.encoder_filter_chain_aborted_ = true;
   }
 
@@ -1243,14 +1257,6 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
-  if (filter_manager_callbacks_.isHalfCloseEnabled()) {
-    const uint64_t response_status = Http::Utility::getResponseStatus(headers);
-    if (!(Http::CodeUtility::is2xx(response_status) || Http::CodeUtility::is1xx(response_status))) {
-      // When the upstream half close is enabled the stream decoding is stopped on error responses
-      // from the server.
-      // stopDecoding();
-    }
-  }
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
   if (state_.saw_downstream_reset_) {
     return;
@@ -1464,16 +1470,45 @@ void FilterManager::maybeEndEncode(bool end_stream) {
   }
 }
 
+void FilterManager::maybeEndDecode(bool end_stream) {
+  if (end_stream) {
+    ASSERT(!state_.decoder_filter_chain_complete_);
+    state_.decoder_filter_chain_complete_ = true;
+    if (filter_manager_callbacks_.isHalfCloseEnabled() && !stopDecoderFilterChain()) {
+      checkAndCloseStreamIfFullyClosed();
+    }
+  }
+}
+
 void FilterManager::checkAndCloseStreamIfFullyClosed() {
   // This function is only used when half close semantics are enabled.
   if (!filter_manager_callbacks_.isHalfCloseEnabled()) {
     return;
   }
 
+  std::cout << typeid(*this).name() << "::checkAndCloseStreamIfFullyClosed() "
+            << state_.encoder_filter_chain_complete_ << " " << state_.decoder_filter_chain_complete_
+            << " " << state_.decoder_filter_chain_aborted_ << "\n";
+
+  // When the upstream half close is enabled the stream decoding is stopped on error responses
+  // from the server.
+  bool error_response = false;
+  if (filter_manager_callbacks_.responseHeaders().has_value()) {
+    const uint64_t response_status =
+        Http::Utility::getResponseStatus(filter_manager_callbacks_.responseHeaders().ref());
+    error_response =
+        !(Http::CodeUtility::is2xx(response_status) || Http::CodeUtility::is1xx(response_status));
+  }
+
   // If upstream half close is enabled then close the stream either when force close
   // is set (i.e local reply) or when both server and client half closed.
-  if (state_.encoder_filter_chain_complete_ && state_.decoder_filter_chain_complete_) {
+  if (state_.encoder_filter_chain_complete_ &&
+      (state_.decoder_filter_chain_complete_ || error_response ||
+       state_.decoder_filter_chain_aborted_)) {
     ENVOY_STREAM_LOG(trace, "closing stream", *this);
+    if (error_response) {
+      state_.decoder_filter_chain_aborted_ = true;
+    }
     filter_manager_callbacks_.endStream();
   }
 }

@@ -751,7 +751,6 @@ public:
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
     state_.observed_decode_end_stream_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
-    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -762,7 +761,6 @@ public:
   void decodeData(Buffer::Instance& data, bool end_stream) {
     state_.observed_decode_end_stream_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -772,7 +770,6 @@ public:
   void decodeTrailers(RequestTrailerMap& trailers) {
     state_.observed_decode_end_stream_ = true;
     decodeTrailers(nullptr, trailers);
-    checkAndCloseStreamIfFullyClosed();
   }
 
   /**
@@ -788,6 +785,12 @@ public:
    * @param end_stream whether encoding is complete.
    */
   void maybeEndEncode(bool end_stream);
+
+  /**
+   * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
+   * @param end_stream whether decoding is complete.
+   */
+  void maybeEndDecode(bool end_stream);
 
   void checkAndCloseStreamIfFullyClosed();
 
