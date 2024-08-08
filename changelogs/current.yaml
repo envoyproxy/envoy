@@ -35,7 +35,7 @@ minor_behavior_changes:
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
 - area: sni
   change: |
-    When computing SNI value via the auto-sni feature route host manipulation are now taken into account. This behavior can be reverted
+    When computing SNI value via the auto-sni feature, route host manipulations are now taken into account. This behavior can be reverted
     by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni`` to false.
 
 bug_fixes:

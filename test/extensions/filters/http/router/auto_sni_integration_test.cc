@@ -200,7 +200,7 @@ virtual_hosts:
   EXPECT_STREQ("foo", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
-TEST_P(AutoSniIntegrationTest, AutoSniTestWithAutoHostRewrite) {
+TEST_P(AutoSniIntegrationTest, AutoSniTestWithHostRewriteHeader) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service

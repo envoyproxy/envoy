@@ -906,7 +906,7 @@ public:
    * The value returned is computed with the following logic in order:
    *
    * 1. If a host rewrite is configured for the route, it returns that value.
-   * 2. If an auto host rewrite header is specified, it attempts to use the value from that header.
+   * 2. If a host rewrite header is specified, it attempts to use the value from that header.
    * 3. If a host rewrite path regex is configured, it applies the regex to the request path and
    *    returns the result.
    * 4. If none of the above apply, it returns the original host value from the request headers.
