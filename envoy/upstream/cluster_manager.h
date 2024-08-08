@@ -42,6 +42,7 @@ namespace Envoy {
 namespace Quic {
 
 class EnvoyQuicNetworkObserverRegistryFactory;
+class EnvoyQuicNetworkObserverRegistry;
 
 } // namespace Quic
 
@@ -534,7 +535,8 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state,
-                   Http::PersistentQuicInfoPtr& quic_info) PURE;
+                   Http::PersistentQuicInfoPtr& quic_info,
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

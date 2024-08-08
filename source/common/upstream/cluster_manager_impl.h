@@ -47,10 +47,11 @@
 #else
 namespace Envoy {
 
-// A dumb definition if QUICHE is compiled out.
+// Dumb definitions of QUIC classes if QUICHE is compiled out.
 namespace Quic {
 
 class EnvoyQuicNetworkObserverRegistryFactory {};
+class EnvoyQuicNetworkObserverRegistry {};
 
 } // namespace Quic
 
@@ -82,15 +83,16 @@ public:
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, std::vector<Http::Protocol>& protocol,
-                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-                       alternate_protocol_options,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state,
-                   Http::PersistentQuicInfoPtr& quic_info) override;
+  Http::ConnectionPool::InstancePtr allocateConnPool(
+      Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+      std::vector<Http::Protocol>& protocol,
+      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+          alternate_protocol_options,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      TimeSource& time_source, ClusterConnectivityState& state,
+      Http::PersistentQuicInfoPtr& quic_info,
+      OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
@@ -713,11 +715,15 @@ private:
      */
     ClusterEntry* initializeClusterInlineIfExists(absl::string_view cluster);
 
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> getNetworkObserverRegistry() {
 #ifdef ENVOY_ENABLE_QUIC
-    Quic::EnvoyQuicNetworkObserverRegistry* getNetworkObserverRegistry() {
-      return network_observer_registry_.get();
+      return makeOptRefFromPtr(network_observer_registry_.get());
+#else
+      return {};
+#endif
     }
 
+#ifdef ENVOY_ENABLE_QUIC
     void createThreadLocalNetworkObserverRegistry(
         Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) {
       network_observer_registry_ =
