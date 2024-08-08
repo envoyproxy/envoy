@@ -42,7 +42,7 @@ public:
 
   void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
     if (decode_callback_ != nullptr) {
-      // Sidestream stop subscribing to downstream watermark events.
+      // Sidestream stops subscribing to downstream watermark events.
       decoder_callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
     }
   }
