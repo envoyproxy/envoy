@@ -14,7 +14,7 @@ namespace Orca {
 namespace {
 
 // Returns an example OrcaLoadReport proto with all fields populated.
-static xds::data::orca::v3::OrcaLoadReport ExampleOrcaLoadReport() {
+static xds::data::orca::v3::OrcaLoadReport exampleOrcaLoadReport() {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_cpu_utilization(0.7);
   orca_load_report.set_application_utilization(0.8);
@@ -44,18 +44,18 @@ TEST(OrcaParserUtilTest, MissingOrcaHeaders) {
 
 TEST(OrcaParserUtilTest, BinaryHeader) {
   const std::string proto_string =
-      TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
+      TestUtility::getProtobufBinaryStringFromMessage(exampleOrcaLoadReport());
   const auto orca_load_report_header_bin =
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
   Http::TestRequestHeaderMapImpl headers{
       {std::string(kEndpointLoadMetricsHeaderBin), orca_load_report_header_bin}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
-              StatusHelpers::IsOkAndHolds(ProtoEq(ExampleOrcaLoadReport())));
+              StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }
 
 TEST(OrcaParserUtilTest, InvalidBinaryHeader) {
   const std::string proto_string =
-      TestUtility::getProtobufBinaryStringFromMessage(ExampleOrcaLoadReport());
+      TestUtility::getProtobufBinaryStringFromMessage(exampleOrcaLoadReport());
   // Force a bad base64 encoding by shortening the length of the output.
   const auto orca_load_report_header_bin =
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length() / 2);
