@@ -656,7 +656,11 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_) << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
+       << DUMP_MEMBER(state_.decoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.encoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.observed_decode_end_stream_)
+       << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -782,6 +786,14 @@ public:
    */
   void maybeEndEncode(bool end_stream);
 
+  /**
+   * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
+   * @param end_stream whether decoding is complete.
+   */
+  void maybeEndDecode(bool end_stream);
+
+  void checkAndCloseStreamIfFullyClosed();
+
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -868,13 +880,17 @@ public:
 protected:
   struct State {
     State()
-        : encoder_filter_chain_complete_(false), observed_decode_end_stream_(false),
-          observed_encode_end_stream_(false), has_1xx_headers_(false), created_filter_chain_(false),
-          is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false) {}
+        : decoder_filter_chain_complete_(false), encoder_filter_chain_complete_(false),
+          observed_decode_end_stream_(false), observed_encode_end_stream_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
+
+    // Set after decoder filter chain has completed iteration. Prevents further calls to decoder
+    // filters.
+    bool decoder_filter_chain_complete_ : 1;
 
     // Set after encoder filter chain has completed iteration. Prevents further calls to encoder
     // filters.

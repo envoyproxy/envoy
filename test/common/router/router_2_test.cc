@@ -199,6 +199,8 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   response_decoder_->decodeData(data, true);
+  // router filter no longer resets the stream due to upstream half closing first
+  router_->onDestroy();
 }
 
 // Tests that readDisabled are delayed till upstream response headers arrive.
@@ -252,6 +254,8 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse1) {
   Buffer::OwnedImpl data;
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_decoder_->decodeData(data, true);
+  // router filter no longer resets the stream due to upstream half closing first
+  router_->onDestroy();
 }
 
 // Tests that delayed readDisable is triggered only once if there is 1xx response followed by
@@ -302,6 +306,8 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse2) {
   Buffer::OwnedImpl data;
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_decoder_->decodeData(data, true);
+  // router filter no longer resets the stream due to upstream half closing first
+  router_->onDestroy();
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {

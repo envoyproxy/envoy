@@ -6,6 +6,13 @@ behavior_changes:
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
     <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
+- area: http
+  change: |
+    Allow HTTP/2 (and HTTP/3) upstream servers to half close the stream before the downstream. This enables bidirectional
+    gRPC streams where server completes streaming before the client. Behavior of HTTP/1 or TCP proxy upstream servers is
+    unchanged and the stream is reset if the upstream server completes response before the downstream. The stream is also
+    reset if the upstream server responds with an error status before the downstream. This behavior is disabled by default
+    and can be enabled by setting the ``envoy.reloadable_features.allow_multiplexed_upstream_half_close`` runtime key to true.
 - area: stats scoped_rds
   change: |
     Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
