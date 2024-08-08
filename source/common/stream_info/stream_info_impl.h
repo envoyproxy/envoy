@@ -377,10 +377,7 @@ struct StreamInfoImpl : public StreamInfo {
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
     bytes_retransmitted_ = info.bytesRetransmitted();
     packets_retransmitted_ = info.packetsRetransmitted();
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
-      should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
-    }
+    should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a

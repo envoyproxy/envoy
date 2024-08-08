@@ -85,6 +85,10 @@ removed_config_or_runtime:
   change: |
     Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
     code path.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.http1_connection_close_header_in_redirect`` and
+    legacy code paths.
 - area: grpc reverse bridge
   change: |
     Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` runtime
