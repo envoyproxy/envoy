@@ -281,9 +281,6 @@ message ExternalProcessor {
   // It only works for STREAMED body processing mode. For any other body processing modes, it is ignored.
   // Setting this flag to true is required in cases where the side stream server must wait for at least one
   // chunk of body before sending the response.
-  // If configured to be true, this flag is encoded in the header request
-  // [#comment:TODO :ref:`send_body_before_recv_header_resp <envoy_v3_api_field_service.ext_proc.v3.HttpHeaders.send_body_before_recv_header_resp>`]
-  // sent to the side stream server.
   bool send_body_before_recv_header_resp = 21;
 }
 
