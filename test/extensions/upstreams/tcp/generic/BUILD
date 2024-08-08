@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/extensions/upstreams/tcp/generic:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
