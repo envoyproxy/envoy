@@ -50,8 +50,10 @@ public:
         quic_connection_(connection_helper_, alarm_factory_, writer_,
                          quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_,
                          connection_id_generator_),
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
-                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
+                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2, quic_stat_names_,
+                      listener_config_.listenerScope()),
         stats_(
             {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
                                    POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
@@ -222,6 +224,7 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
+  Envoy::Quic::QuicStatNames quic_stat_names_;
   MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_{kStreamId};
   Http::Http3::CodecStats stats_;

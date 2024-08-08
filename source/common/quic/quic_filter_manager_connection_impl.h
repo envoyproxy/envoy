@@ -13,6 +13,7 @@
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "source/common/quic/quic_network_connection.h"
 #include "source/common/quic/quic_ssl_connection_info.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/send_buffer_monitor.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
@@ -35,7 +36,8 @@ public:
                                   const quic::QuicConnectionId& connection_id,
                                   Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                                   std::shared_ptr<QuicSslConnectionInfo>&& info,
-                                  std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
+                                  std::unique_ptr<StreamInfo::StreamInfo>&& stream_info,
+                                  QuicStatNames& quic_stat_names, Stats::Scope& stats_scope);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -171,6 +173,9 @@ public:
     max_headers_count_ = max_headers_count;
   }
 
+  void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
+                                              bool is_upstream);
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -197,6 +202,8 @@ protected:
   OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
   std::shared_ptr<QuicSslConnectionInfo> quic_ssl_info_;
+  QuicStatNames& quic_stat_names_;
+  Stats::Scope& stats_scope_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
