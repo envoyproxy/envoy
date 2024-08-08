@@ -95,9 +95,12 @@ GoUint64 HttpFilterDsoImpl::envoyGoFilterOnHttpData(processState* p0, GoUint64 p
   return envoy_go_filter_on_http_data_(p0, p1, p2, p3);
 }
 
-void HttpFilterDsoImpl::envoyGoFilterOnHttpLog(httpRequest* p0, int p1) {
+void HttpFilterDsoImpl::envoyGoFilterOnHttpLog(httpRequest* p0, int p1, processState* p2,
+                                               processState* p3, GoUint64 p4, GoUint64 p5,
+                                               GoUint64 p6, GoUint64 p7, GoUint64 p8, GoUint64 p9,
+                                               GoUint64 p10, GoUint64 p11) {
   ASSERT(envoy_go_filter_on_http_log_ != nullptr);
-  envoy_go_filter_on_http_log_(p0, GoUint64(p1));
+  envoy_go_filter_on_http_log_(p0, GoUint64(p1), p2, p3, p4, p5, p6, p7, p8, p9, p10, p11);
 }
 
 void HttpFilterDsoImpl::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
