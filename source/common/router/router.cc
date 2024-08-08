@@ -582,7 +582,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // Default the header to Host/Authority header.
     std::string header_value = route_entry_->getRequestHostValue(headers);
     if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_route_host_mutation_for_auto_sni")) {
+            "envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san")) {
       header_value = std::string(headers.getHostValue());
     }
 

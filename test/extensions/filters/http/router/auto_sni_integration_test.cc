@@ -148,7 +148,7 @@ virtual_hosts:
   envoy::config::route::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_route_host_mutation_for_auto_sni", "false");
+      "envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san", "false");
   setup("", &route_config);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ = sendRequestAndWaitForResponse(
