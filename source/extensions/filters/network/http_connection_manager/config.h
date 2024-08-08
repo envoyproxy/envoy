@@ -149,7 +149,7 @@ public:
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
                                 Http::FilterChainManager& manager,
-                                const Http::FilterChainOptions& option) const override;
+                                const Http::FilterChainOptions& options) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
