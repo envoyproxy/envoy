@@ -600,6 +600,26 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsFailsOnBadIP) {
             "10.3.2.1, a.b.c.d, 198.51.100.1,198.51.100.10");
 }
 
+// Verify that when the XFF header has an empty value we use the remote IP,
+// set it in XFF, and it's not marked as internal.
+TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsEmptyXFFHeader) {
+  std::vector<Network::Address::CidrRange> cidrs = {
+      Network::Address::CidrRange::create("198.51.100.0", 24).value(),
+  };
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(cidrs, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.3.2.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", ""}};
+  EXPECT_EQ((MutateRequestRet{"10.3.2.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+  EXPECT_EQ(headers.getForwardedForValue(), "10.3.2.1");
+}
+
 // Verify we preserve hop by hop headers if configured to do so.
 TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
   TestRequestHeaderMapImpl request_headers;
