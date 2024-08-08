@@ -236,14 +236,14 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 namespace {
-// This function is used to validate the authority as is done in nghttp2 (based on
-// https://github.com/nghttp2/nghttp2/blob/d97bc7d8745ded136efa6e9e747f2310406893dd/lib/nghttp2_helper.c#L752).
-// Specifically, it permits the character "@" which is not permitted by oghttp2's
-// implementation. Note that this function is used for both H/1 and H/2.
+// This function is used to validate the authority.
+// Because it is used for both H/1 and H/2 validations, this function permits
+// the character "@" which is not permitted by oghttp2's implementation.
 // The H/1 spec allows "user-info@host:port" for the authority, and the H/2 spec doesn't.
-// Once UHV is used, this function should be removed.
-bool compliant_nghttp2_check_authority(const absl::string_view header_value) {
-  static constexpr char ValidAuthortiyChars[] = {
+// Once UHV is used, this function should be removed, and the H/1 and H/2
+// authority validations should be different..
+bool check_authority_h1_h2(const absl::string_view header_value) {
+  static constexpr char ValidAuthorityChars[] = {
       0 /* NUL  */, 0 /* SOH  */, 0 /* STX  */, 0 /* ETX  */,
       0 /* EOT  */, 0 /* ENQ  */, 0 /* ACK  */, 0 /* BEL  */,
       0 /* BS   */, 0 /* HT   */, 0 /* LF   */, 0 /* VT   */,
@@ -311,7 +311,7 @@ bool compliant_nghttp2_check_authority(const absl::string_view header_value) {
   };
 
   for (const uint8_t c : header_value) {
-    if (!ValidAuthortiyChars[c]) {
+    if (!ValidAuthorityChars[c]) {
       return false;
     }
   }
@@ -322,7 +322,7 @@ bool compliant_nghttp2_check_authority(const absl::string_view header_value) {
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.internal_authority_header_validator")) {
-    return compliant_nghttp2_check_authority(header_value);
+    return check_authority_h1_h2(header_value);
   }
 
 #ifdef ENVOY_NGHTTP2
