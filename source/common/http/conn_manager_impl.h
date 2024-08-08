@@ -606,6 +606,8 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
+  // When set to true, add Connection:close response header to nudge downstream client to reconnect.
+  bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
