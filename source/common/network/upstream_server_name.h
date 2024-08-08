@@ -16,6 +16,7 @@ class UpstreamServerName : public StreamInfo::FilterState::Object {
 public:
   UpstreamServerName(absl::string_view server_name) : server_name_(server_name) {}
   const std::string& value() const { return server_name_; }
+  absl::optional<std::string> serializeAsString() const override { return server_name_; }
   static const std::string& key();
 
 private:
