@@ -771,15 +771,10 @@ bool Utility::remoteAddressIsTrustedProxy(
 Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     const Http::RequestHeaderMap& request_headers,
     const std::vector<Network::Address::CidrRange> trusted_cidrs) {
-  const auto xff_header = request_headers.ForwardedFor();
-  if (xff_header == nullptr) {
-    return {nullptr, false};
-  }
-
-  absl::string_view xff_string(xff_header->value().getStringView());
+  const auto xff_header = request_headers.getForwardedForValue();
   static constexpr absl::string_view separator(",");
 
-  const auto xff_entries = StringUtil::splitToken(xff_string, separator, false, true);
+  const auto xff_entries = StringUtil::splitToken(xff_header, separator, false, true);
   Network::Address::InstanceConstSharedPtr last_valid_addr;
 
   for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {

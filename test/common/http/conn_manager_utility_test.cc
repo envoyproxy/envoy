@@ -537,8 +537,7 @@ TEST_F(ConnectionManagerUtilityTest, XFFTrustedHopsAppendsXFF) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
-  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(),
-            "198.51.100.2, 198.51.100.1,203.0.113.128");
+  EXPECT_EQ(headers.getForwardedForValue(), "198.51.100.2, 198.51.100.1,203.0.113.128");
 }
 
 // Verify that we use the first address in XFF and XFF is appended to.
@@ -557,8 +556,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRs) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
-  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(),
-            "198.51.100.2, 198.51.100.1,198.51.100.10");
+  EXPECT_EQ(headers.getForwardedForValue(), "198.51.100.2, 198.51.100.1,198.51.100.10");
 }
 
 // Verify that we use the last address from XFF when the remote address is in `xff_trusted_cidrs`
@@ -579,7 +577,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsSkipAppendXFF) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
-  EXPECT_EQ(headers.ForwardedFor()->value().getStringView(), "198.51.100.2, 198.51.100.1");
+  EXPECT_EQ(headers.getForwardedForValue(), "198.51.100.2, 198.51.100.1");
 }
 
 // Verify that we use the downstream address when XFF contains an invalid IP.
