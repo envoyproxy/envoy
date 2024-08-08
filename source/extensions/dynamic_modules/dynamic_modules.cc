@@ -32,9 +32,9 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
 
   DynamicModuleSharedPtr dynamic_module = std::make_shared<DynamicModule>(handle);
 
-  const auto init_function = dynamic_module->getFunctionPointer<
-      FunctionPointerTypeFromDeclaration<decltype(&envoy_dynamic_module_on_program_init)>>(
-      "envoy_dynamic_module_on_program_init");
+  const auto init_function =
+      dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
+          "envoy_dynamic_module_on_program_init");
 
   if (init_function == nullptr) {
     return absl::InvalidArgumentError(
