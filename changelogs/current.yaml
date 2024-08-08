@@ -58,6 +58,10 @@ bug_fixes:
   change: |
     Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
     ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
+- area: rbac
+  change: |
+    RBAC will now allow stat prefixes configured in per-route config to override the base config's
+    stat prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -85,6 +89,10 @@ removed_config_or_runtime:
   change: |
     Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
     code path.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.http1_connection_close_header_in_redirect`` and
+    legacy code paths.
 - area: grpc reverse bridge
   change: |
     Removed ``envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response`` runtime
@@ -114,6 +122,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
 
 new_features:
+- area: jwt_authn
+  change: |
+    Added missing implementation to jwt_authn matchers to allow glob pattern matching.
 - area: tls
   change: |
     Added :ref:`prefer_client_ciphers
@@ -159,5 +170,9 @@ new_features:
   change: |
     Prefer using IPv6 address when addresses from both families are available.
     Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
+- area: rbac
+  change: |
+    Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
+    the configured duration.
 
 deprecated:
