@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bits/types/time_t.h>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -15,6 +16,7 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/extensions/filters/network/redis_proxy/external_auth.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -61,6 +63,8 @@ public:
   ProxyStats stats_;
   const std::string downstream_auth_username_;
   std::vector<std::string> downstream_auth_passwords_;
+  const bool external_auth_enabled_;
+  const bool external_auth_expiration_enabled_;
 
   // DNS cache used for ASK/MOVED responses.
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
@@ -81,10 +85,11 @@ using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 class ProxyFilter : public Network::ReadFilter,
                     public Common::Redis::DecoderCallbacks,
                     public Network::ConnectionCallbacks,
-                    public Logger::Loggable<Logger::Id::redis> {
+                    public Logger::Loggable<Logger::Id::redis>,
+                    public ExternalAuth::AuthenticateCallback {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
+              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config, ExternalAuth::ExternalAuthClientPtr&& auth_client);
   ~ProxyFilter() override;
 
   // Network::ReadFilter
@@ -100,12 +105,17 @@ public:
   // Common::Redis::DecoderCallbacks
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
-  bool connectionAllowed() { return connection_allowed_; }
+  // AuthenticateCallback
+  void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request, ExternalAuth::AuthenticateResponsePtr&& response) override;
+
+  bool connectionAllowed();
 
   Common::Redis::Client::Transaction& transaction() { return transaction_; }
 
 private:
   friend class RedisProxyFilterTest;
+
+  enum class ExternalAuthCallStatus { Pending, Ready };
 
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
@@ -145,6 +155,10 @@ private:
   bool connection_allowed_;
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
+  RealTimeSource time_source_;
+  ExternalAuth::ExternalAuthClientPtr auth_client_;
+  ExternalAuthCallStatus external_auth_call_status_;
+  int64_t external_auth_expiration_epoch_;
 };
 
 } // namespace RedisProxy

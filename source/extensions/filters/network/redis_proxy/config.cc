@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -94,11 +95,32 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_,
           server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager));
-  return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
-    Common::Redis::DecoderFactoryImpl factory;
+
+  uint32_t timeout_ms = 200;
+  envoy::config::core::v3::GrpcService* auth_grpc_service = nullptr;
+  if (proto_config.has_external_auth_provider()) {
+    auto grpc_service = proto_config.external_auth_provider().grpc_service();
+    timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, 200);
+    auth_grpc_service = &grpc_service;
+  }
+
+  return [auth_grpc_service, &context, splitter, filter_config, timeout_ms](Network::FilterManager& filter_manager) -> void {
+    Common::Redis::DecoderFactoryImpl decoder_factory;
+
+    ExternalAuth::ExternalAuthClientPtr&& auth_client{nullptr};
+    if (auth_grpc_service != nullptr) {
+      absl::StatusOr<Grpc::AsyncClientFactoryPtr> auth_client_factory_or_error = context.serverFactoryContext()
+        .clusterManager()
+        .grpcAsyncClientManager()
+        .factoryForGrpcService(*auth_grpc_service, context.scope(), true);
+      THROW_IF_STATUS_NOT_OK(auth_client_factory_or_error, throw);
+
+      auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(auth_client_factory_or_error.value()->createUncachedRawAsyncClient(), std::chrono::milliseconds(timeout_ms));
+    }
+
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
-        factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
-        filter_config));
+        decoder_factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
+        filter_config, std::move(auth_client)));
   };
 }
 

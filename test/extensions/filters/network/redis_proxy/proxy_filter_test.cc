@@ -255,7 +255,7 @@ public:
     config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
                                                   drain_decision_, runtime_, api_, *this);
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
-                                            config_);
+                                            config_, nullptr);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
