@@ -258,6 +258,7 @@ envoy_cc_library(
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":quic_network_connection_lib",
         ":quic_ssl_connection_info_lib",
+        ":quic_stat_names_lib",
         ":send_buffer_monitor_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",

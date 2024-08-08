@@ -369,6 +369,8 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
 void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
   stats_.tx_reset_.inc();
+  filterManagerConnection()->incrementSentQuicResetStreamErrorStats(error, /*from_self*/ true,
+                                                                    /*is_upstream*/ true);
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(
       quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
