@@ -82,6 +82,7 @@ public:
   getFilterConfig(bool failure_mode_allow, bool http_client) {
     const std::string http_config = R"EOF(
     failure_mode_allow_header_add: true
+    emit_filter_state_stats: true
     http_service:
       server_uri:
         uri: "ext_authz:9000"
@@ -91,6 +92,7 @@ public:
 
     const std::string grpc_config = R"EOF(
     failure_mode_allow_header_add: true
+    emit_filter_state_stats: true
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
@@ -2929,6 +2931,116 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+TEST_P(HttpFilterTestParam, EmitFilterStateStats) {
+  InSequence s;
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  auto bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  // Copying the bytes meter so we can continue to update the bytes sent / received.
+  decoder_filter_callbacks_.stream_info_.upstream_bytes_meter_ = bytes_meter;
+
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->upstream_host_ = std::move(upstream_host);
+  decoder_filter_callbacks_.stream_info_.upstream_info_ = std::move(upstream_info);
+
+  decoder_filter_callbacks_.stream_info_.upstream_cluster_info_ =
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+
+  // ext_authz makes a single call to the external auth service once it sees the end of stream.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        decoder_filter_callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+            std::chrono::milliseconds(1));
+        bytes_meter->addWireBytesSent(1);
+        bytes_meter->addWireBytesReceived(1);
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto stats = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+
+  EXPECT_EQ(stats->latency().count(), 1000 /*==1ms*/);
+  if (std::get<1>(GetParam())) {
+    // HTTP client will not fill the following fields.
+    EXPECT_EQ(stats->upstreamHost(), nullptr);
+    EXPECT_EQ(stats->clusterInfo(), nullptr);
+    EXPECT_FALSE(stats->bytesSent().has_value());
+    EXPECT_FALSE(stats->bytesReceived().has_value());
+  } else {
+    EXPECT_NE(stats->upstreamHost(), nullptr);
+    EXPECT_NE(stats->clusterInfo(), nullptr);
+    ASSERT_TRUE(stats->bytesSent().has_value());
+    EXPECT_EQ(*stats->bytesSent(), 1);
+    ASSERT_TRUE(stats->bytesReceived().has_value());
+    EXPECT_EQ(*stats->bytesReceived(), 1);
+  }
+}
+
+// Test that when emit_filter_state_stats is false, stats are not emitted. There is no
+// filter_metadata configured either so ext_authz should add nothing to the filter state at all.
+TEST_F(HttpFilterTest, NoEmitFilterStateStats) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  emit_filter_state_stats: false
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  auto bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+  // Copying the bytes meter so we can continue to update the bytes sent / received.
+  decoder_filter_callbacks_.stream_info_.upstream_bytes_meter_ = bytes_meter;
+
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->upstream_host_ = std::move(upstream_host);
+  decoder_filter_callbacks_.stream_info_.upstream_info_ = std::move(upstream_info);
+
+  decoder_filter_callbacks_.stream_info_.upstream_cluster_info_ =
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+
+  // ext_authz makes a single call to the external auth service once it sees the end of stream.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        decoder_filter_callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+            std::chrono::milliseconds(1));
+        bytes_meter->addWireBytesSent(1);
+        bytes_meter->addWireBytesReceived(1);
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_FALSE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+}
+
 TEST_F(HttpFilterTest, LoggingInfoOK) {
   InSequence s;
 
@@ -2960,8 +3072,9 @@ TEST_F(HttpFilterTest, LoggingInfoOK) {
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 
   auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-  ASSERT_TRUE(logging_info->filterMetadata().fields().contains("foo"));
-  EXPECT_EQ(logging_info->filterMetadata().fields().at("foo").string_value(), "bar");
+  ASSERT_TRUE(logging_info->filterMetadata().has_value());
+  ASSERT_TRUE(logging_info->filterMetadata()->fields().contains("foo"));
+  EXPECT_EQ(logging_info->filterMetadata()->fields().at("foo").string_value(), "bar");
 }
 
 // Test that if no filter metadata is configured, filter state is not added to stream info.

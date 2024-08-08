@@ -53,10 +53,10 @@ struct ExtAuthzFilterStats {
 
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtAuthzLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+  explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata)
       : filter_metadata_(filter_metadata) {}
 
-  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
   std::chrono::microseconds latency() const { return latency_; };
   absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
   absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
@@ -74,7 +74,7 @@ public:
   }
 
 private:
-  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata_;
   std::chrono::microseconds latency_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
@@ -174,6 +174,7 @@ public:
   const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
+  bool clientIsEnvoyGrpc() const { return client_is_envoy_grpc_; }
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
@@ -227,6 +228,7 @@ private:
   LabelsMap destination_labels_;
   const absl::optional<ProtobufWkt::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
+  const bool client_is_envoy_grpc_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
@@ -361,6 +363,7 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
+  void updateLoggingInfo();
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
@@ -394,6 +397,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+  ExtAuthzLoggingInfo* logging_info_;
 
   // This is used to hold the final configs after we merge them with per-route configs.
   bool allow_partial_message_{};

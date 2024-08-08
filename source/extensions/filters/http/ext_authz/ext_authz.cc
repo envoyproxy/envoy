@@ -90,6 +90,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
+      client_is_envoy_grpc_(config.has_grpc_service() && config.grpc_service().has_envoy_grpc()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -381,12 +382,42 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if (config_->filterMetadata().has_value() &&
+  if ((config_->filterMetadata().has_value() || config_->emitFilterStateStats()) &&
       !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
     filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(*config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                          Envoy::StreamInfo::FilterState::StateType::Mutable,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+    logging_info_ =
+        filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+  }
+}
+
+void Filter::updateLoggingInfo() {
+  if (!config_->emitFilterStateStats()) {
+    return;
+  }
+
+  // Latency is the only stat available if we aren't using envoy grpc.
+  logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
+      decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
+
+  if (config_->clientIsEnvoyGrpc()) {
+    const auto& upstream_meter = decoder_callbacks_->streamInfo().getUpstreamBytesMeter();
+    if (upstream_meter != nullptr) {
+      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    }
+    if (decoder_callbacks_->streamInfo().upstreamInfo() != nullptr) {
+      logging_info_->setUpstreamHost(
+          decoder_callbacks_->streamInfo().upstreamInfo()->upstreamHost());
+    }
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+        decoder_callbacks_->streamInfo().upstreamClusterInfo();
+    if (cluster_info) {
+      logging_info_->setClusterInfo(std::move(*cluster_info));
+    }
   }
 }
 
@@ -416,6 +447,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
+
+  updateLoggingInfo();
 
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {
