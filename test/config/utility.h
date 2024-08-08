@@ -70,6 +70,16 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setPreferClientCiphers(bool prefer_client_ciphers) {
+      prefer_client_ciphers_ = prefer_client_ciphers;
+      return *this;
+    }
+
+    ServerSslOptions& setCiphers(const std::vector<std::string>& ciphers) {
+      ciphers_ = ciphers;
+      return *this;
+    }
+
     ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
       curves_ = curves;
       return *this;
@@ -121,15 +131,22 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTlsCertSelector(std::string yaml) {
+      tls_cert_selector_yaml_ = yaml;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
     bool ecdsa_cert_ocsp_staple_{false};
+    bool prefer_client_ciphers_{false};
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     std::vector<std::string> curves_;
+    std::vector<std::string> ciphers_;
     bool expect_client_ecdsa_cert_{false};
     bool keylog_local_filter_{false};
     bool keylog_remote_filter_{false};
@@ -140,6 +157,7 @@ public:
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
+    std::string tls_cert_selector_yaml_{""};
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};

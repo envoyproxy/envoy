@@ -1,1 +1,0 @@
-FROM confluentinc/cp-kafka:latest@sha256:29c57d630410981edb82a09806b2a7fbbcda51029e6e89283a843e64e68b29c1

@@ -9,7 +9,6 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -182,28 +181,22 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     grpc_status_ = grpcStatusFromHeaders(headers);
 
     // gRPC clients expect that the HTTP status will always be 200.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_http1_reverse_bridge_change_http_status")) {
-      headers.setStatus(enumToInt(Http::Code::OK));
-    }
+    headers.setStatus(enumToInt(Http::Code::OK));
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_http1_reverse_bridge_handle_empty_response")) {
-      // This is a header-only response, and we should prepend the gRPC frame
-      // header directly.
-      if (end_stream && withhold_grpc_frames_) {
-        Envoy::Buffer::OwnedImpl data;
-        buildGrpcFrameHeader(data, 0);
-        encoder_callbacks_->addEncodedData(data, false);
+    // This is a header-only response, and we should prepend the gRPC frame
+    // header directly.
+    if (end_stream && withhold_grpc_frames_) {
+      Envoy::Buffer::OwnedImpl data;
+      buildGrpcFrameHeader(data, 0);
+      encoder_callbacks_->addEncodedData(data, false);
 
-        // This call exists to ensure that the content-length is set correctly,
-        // regardless of whether we are withholding grpc frames above.
-        headers.setContentLength(Grpc::GRPC_FRAME_HEADER_SIZE);
+      // This call exists to ensure that the content-length is set correctly,
+      // regardless of whether we are withholding grpc frames above.
+      headers.setContentLength(Grpc::GRPC_FRAME_HEADER_SIZE);
 
-        // Insert grpc-status trailers to communicate the error code.
-        auto& trailers = encoder_callbacks_->addEncodedTrailers();
-        trailers.setGrpcStatus(grpc_status_);
-      }
+      // Insert grpc-status trailers to communicate the error code.
+      auto& trailers = encoder_callbacks_->addEncodedTrailers();
+      trailers.setGrpcStatus(grpc_status_);
     }
   }
 

@@ -62,10 +62,7 @@ DnsCacheImpl::DnsCacheImpl(
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
     const std::string host =
-        (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns"))
-            ? DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value())
-            : hostname.address();
+        DnsHostInfo::normalizeHostForDfp(hostname.address(), hostname.port_value());
     ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
     startCacheLoad(host, hostname.port_value(), false, false);
   }
@@ -465,10 +462,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setDetails(std::string(details));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.dns_cache_set_first_resolve_complete")) {
-      primary_host_info->host_info_->setFirstResolveComplete();
-    }
+    primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
   } else if (current_address == nullptr) {

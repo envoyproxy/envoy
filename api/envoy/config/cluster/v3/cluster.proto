@@ -1165,7 +1165,7 @@ message Cluster {
   // The metric names in LRS will follow the same semantics as this field. In other words, if this field
   // contains ``named_metrics.foo``, then the LRS load report will include the data with that same string
   // as the key.
-  repeated string lrs_report_endpoint_metric = 57;
+  repeated string lrs_report_endpoint_metrics = 57;
 
   // If track_timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each

@@ -33,6 +33,7 @@ envoy_extension_cc_test(
     srcs = ["substitution_formatter_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/fluentd:substitution_formatter_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",

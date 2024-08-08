@@ -5,7 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/http3_status_tracker_impl.h"
 
-#include "quiche/spdy/core/spdy_alt_svc_wire_format.h"
+#include "quiche/http2/core/spdy_alt_svc_wire_format.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -234,7 +234,9 @@ HttpServerPropertiesCacheImpl::addOriginData(const Origin& origin, OriginData&& 
   ASSERT(protocols_.find(origin) == protocols_.end());
   while (protocols_.size() >= max_entries_) {
     auto iter = protocols_.begin();
-    key_value_store_->remove(originToString(iter->first));
+    if (key_value_store_) {
+      key_value_store_->remove(originToString(iter->first));
+    }
     protocols_.erase(iter);
   }
   protocols_[origin] = std::move(origin_data);
@@ -292,6 +294,14 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   data.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
   auto it = setPropertiesImpl(origin, data);
   return *it->second.h3_status_tracker;
+}
+
+void HttpServerPropertiesCacheImpl::resetBrokenness() {
+  for (auto& protocol : protocols_) {
+    if (protocol.second.h3_status_tracker && protocol.second.h3_status_tracker->isHttp3Broken()) {
+      protocol.second.h3_status_tracker->markHttp3FailedRecently();
+    }
+  }
 }
 
 absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {
