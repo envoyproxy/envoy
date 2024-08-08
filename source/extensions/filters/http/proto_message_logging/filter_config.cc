@@ -52,9 +52,8 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
     auto* method = descriptor_pool_->FindMethodByName(it.first);
 
     if (method == nullptr) {
-      ENVOY_LOG_MISC(debug, "couldn't find the gRPC method `{}` defined in the proto descriptor",
-                     it.first);
-      return;
+      throw EnvoyException(fmt::format(
+          "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
     }
 
     auto extractor = extractor_factory.createExtractor(
@@ -62,9 +61,8 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
         Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->input_type()->full_name(),
         Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->output_type()->full_name(), it.second);
     if (!extractor.ok()) {
-      ENVOY_LOG_MISC(debug, "couldn't init extractor for method `{}`: {}", it.first,
-                     extractor.status().message());
-      return;
+      throw EnvoyException(fmt::format("couldn't init extractor for method `{}`: {}", it.first,
+                                       extractor.status().message()));
     }
 
     ENVOY_LOG_MISC(debug, "registered field extraction for gRPC method `{}`", it.first);
@@ -82,24 +80,23 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
     auto file_or_error = api.fileSystem().fileReadToEnd(descriptor_config.filename());
     if (!file_or_error.status().ok() || !descriptor_set.ParseFromString(file_or_error.value())) {
-      ENVOY_LOG_MISC(debug, "unable to parse proto descriptor from file `{}`",
-                     descriptor_config.filename());
-      return;
+      throw Envoy::EnvoyException(fmt::format("unable to parse proto descriptor from file `{}`",
+                                              descriptor_config.filename()));
     }
     break;
   }
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
     if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
-      ENVOY_LOG_MISC(debug, "unable to parse proto descriptor from inline bytes: {}",
-                     descriptor_config.inline_bytes());
-      return;
+      throw Envoy::EnvoyException(
+          fmt::format("unable to parse proto descriptor from inline bytes: {}",
+                      descriptor_config.inline_bytes()));
     }
     break;
   }
   default: {
-    ENVOY_LOG_MISC(debug, "unsupported DataSource case `{}` for configuring `descriptor_set`",
-                   descriptor_config.specifier_case());
-    return;
+    throw Envoy::EnvoyException(
+        fmt::format("unsupported DataSource case `{}` for configuring `descriptor_set`",
+                    descriptor_config.specifier_case()));
   }
   }
 

@@ -32,6 +32,7 @@ using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::ProtobufWkt::Struct;
+using ::testing::Eq;
 
 constexpr absl::string_view kFilterName = "envoy.filters.http.proto_message_logging";
 
@@ -301,6 +302,677 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
 
   // Inject data back and no data modification.
   checkSerializedData<CreateApiKeyRequest>(end_request_data, {request});
+}
+
+using FilterTestFieldTypes = FilterTestBase;
+
+TEST_F(FilterTestFieldTypes, SingularType) {
+  setUp(R"pb(
+mode: FIRST_AND_LAST
+logging_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_logging_by_field: {
+      key: "supported_types.string"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.uint32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.uint64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.int32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.int64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.sint32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.sint64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.fixed32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.fixed64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.sfixed32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.sfixed64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.float"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "supported_types.double"
+      value: LOG
+    }
+  }
+})pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(
+      R"pb(
+supported_types: {
+  string: "1"
+  uint32: 2
+  uint64: 3
+  int32: 4
+  int64: 5
+  sint32: 6
+  sint64: 7
+  fixed32: 8
+  fixed64: 9
+  sfixed32: 10
+  sfixed64: 11
+  float: 1.2
+  double: 1.3
+}
+)pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
+        checkProtoStruct(new_dynamic_metadata, R"pb(fields {
+  key: "requests"
+  value {
+    list_value {
+      values {
+        struct_value {
+          fields {
+            key: "@type"
+            value {
+              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+            }
+          }
+          fields {
+            key: "supportedTypes"
+            value {
+              struct_value {
+                fields {
+                  key: "double"
+                  value {
+                    number_value: 1.3
+                  }
+                }
+                fields {
+                  key: "fixed32"
+                  value {
+                    number_value: 8
+                  }
+                }
+                fields {
+                  key: "fixed64"
+                  value {
+                    string_value: "9"
+                  }
+                }
+                fields {
+                  key: "float"
+                  value {
+                    number_value: 1.2
+                  }
+                }
+                fields {
+                  key: "int32"
+                  value {
+                    number_value: 4
+                  }
+                }
+                fields {
+                  key: "int64"
+                  value {
+                    string_value: "5"
+                  }
+                }
+                fields {
+                  key: "sfixed32"
+                  value {
+                    number_value: 10
+                  }
+                }
+                fields {
+                  key: "sfixed64"
+                  value {
+                    string_value: "11"
+                  }
+                }
+                fields {
+                  key: "sint32"
+                  value {
+                    number_value: 6
+                  }
+                }
+                fields {
+                  key: "sint64"
+                  value {
+                    string_value: "7"
+                  }
+                }
+                fields {
+                  key: "string"
+                  value {
+                    string_value: "1"
+                  }
+                }
+                fields {
+                  key: "uint32"
+                  value {
+                    number_value: 2
+                  }
+                }
+                fields {
+                  key: "uint64"
+                  value {
+                    string_value: "3"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+})pb");
+      }));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
+TEST_F(FilterTestFieldTypes, RepeatedIntermediate) {
+  setUp(R"pb(
+mode: FIRST_AND_LAST
+logging_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_logging_by_field: {
+      key: "repeated_intermediate.values.list_value.values.string_value"
+      value: LOG
+    }
+  }
+})pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(
+      R"pb(
+repeated_intermediate: {
+  values: {
+    list_value: {
+      values: {
+        string_value: "1"
+      }
+      values: {
+        string_value: "2"
+      }
+    }
+  }
+  values: {
+    list_value: {
+      values: {
+        string_value: "3"
+      }
+      values: {
+        string_value: "4"
+      }
+    }
+  }
+}
+)pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+fields {
+  key: "requests"
+  value {
+    list_value {
+      values {
+        struct_value {
+          fields {
+            key: "@type"
+            value {
+              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+)pb");
+      }));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
+TEST_F(FilterTestFieldTypes, RepeatedTypes) {
+  setUp(R"pb(
+mode: FIRST_AND_LAST
+logging_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_logging_by_field: {
+      key: "repeated_supported_types.string"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.uint32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.uint64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.int32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.int64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.sint32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.sint64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.fixed32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.fixed64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.sfixed32"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.sfixed64"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.float"
+      value: LOG
+    }
+    request_logging_by_field: {
+      key: "repeated_supported_types.double"
+      value: LOG
+    }
+  }
+})pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(
+      R"pb(
+repeated_supported_types: {
+  string: "1"
+  uint32: 2
+  uint64: 3
+  int32: 4
+  int64: 5
+  sint32: 6
+  sint64: 7
+  fixed32: 8
+  fixed64: 9
+  sfixed32: 10
+  sfixed64: 11
+  float: 1.2
+  double: 1.3
+  string: "11"
+  uint32: 22
+  uint64: 33
+  int32: 44
+  int64: 55
+  sint32: 66
+  sint64: 77
+  fixed32: 88
+  fixed64: 99
+  sfixed32: 1010
+  sfixed64: 1111
+  float: 1.212
+  double: 1.313
+}
+
+)pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+fields {
+  key: "requests"
+  value {
+    list_value {
+      values {
+        struct_value {
+          fields {
+            key: "@type"
+            value {
+              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+            }
+          }
+          fields {
+            key: "repeatedSupportedTypes"
+            value {
+              struct_value {
+                fields {
+                  key: "double"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 1.3
+                      }
+                      values {
+                        number_value: 1.313
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "fixed32"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 8
+                      }
+                      values {
+                        number_value: 88
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "fixed64"
+                  value {
+                    list_value {
+                      values {
+                        string_value: "9"
+                      }
+                      values {
+                        string_value: "99"
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "float"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 1.2
+                      }
+                      values {
+                        number_value: 1.212
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "int32"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 4
+                      }
+                      values {
+                        number_value: 44
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "int64"
+                  value {
+                    list_value {
+                      values {
+                        string_value: "5"
+                      }
+                      values {
+                        string_value: "55"
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "sfixed32"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 10
+                      }
+                      values {
+                        number_value: 1010
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "sfixed64"
+                  value {
+                    list_value {
+                      values {
+                        string_value: "11"
+                      }
+                      values {
+                        string_value: "1111"
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "sint32"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 6
+                      }
+                      values {
+                        number_value: 66
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "sint64"
+                  value {
+                    list_value {
+                      values {
+                        string_value: "7"
+                      }
+                      values {
+                        string_value: "77"
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "string"
+                  value {
+                    list_value {
+                      values {
+                        string_value: "1"
+                      }
+                      values {
+                        string_value: "11"
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "uint32"
+                  value {
+                    list_value {
+                      values {
+                        number_value: 2
+                      }
+                      values {
+                        number_value: 22
+                      }
+                    }
+                  }
+                }
+                fields {
+                  key: "uint64"
+                  value {
+                    list_value {
+                      values {
+                        string_value: "3"
+                      }
+                      values {
+                        string_value: "33"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+})pb");
+      }));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
+using FilterTestExtractRejected = FilterTestBase;
+
+TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
+  setUp();
+  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(
+                  Http::Code::BadRequest, "Rejected because internal buffer limits are exceeded.",
+                  Eq(nullptr), Eq(Envoy::Grpc::Status::FailedPrecondition),
+                  "proto_message_logging_FAILED_PRECONDITION{REQUEST_BUFFER_CONVERSION_FAIL}"));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(*request_data, true));
+}
+
+TEST_F(FilterTestExtractRejected, NotEnoughData) {
+  setUp();
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+
+  Envoy::Buffer::OwnedImpl empty;
+
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "did not receive enough data to form a message.", Eq(nullptr),
+                             Eq(Envoy::Grpc::Status::InvalidArgument),
+                             "proto_message_logging_INVALID_ARGUMENT{REQUEST_OUT_OF_DATA}"));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty, true));
+}
+
+TEST_F(FilterTestExtractRejected, MisformedGrpcPath) {
+  setUp();
+  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/misformatted"}, {"content-type", "application/grpc"}};
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             ":path `/misformatted` should be in form of `/package.service/method`",
+                             Eq(nullptr), Eq(Envoy::Grpc::Status::InvalidArgument),
+                             "proto_message_logging_INVALID_ARGUMENT{BAD_REQUEST}"));
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, false));
+}
+
+using FilterTestPassThrough = FilterTestBase;
+
+TEST_F(FilterTestPassThrough, NotGrpc) {
+  setUp();
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "not-grpc"}};
+
+  // Pass through headers directly.
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+}
+
+TEST_F(FilterTestPassThrough, PathNotExist) {
+  setUp();
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"}, {"content-type", "application/grpc"}};
+
+  // Pass through headers directly.
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+}
+
+TEST_F(FilterTestPassThrough, UnconfiguredRequest) {
+  setUp();
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/pkg.svc/UnconfiguredRequest"},
+                               {"content-type", "application/grpc"}};
+
+  // Pass through headers directly.
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 } // namespace
 

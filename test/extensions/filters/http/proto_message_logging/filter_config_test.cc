@@ -26,17 +26,12 @@ protected:
   FilterConfigTestBase() : api_(Api::createApiForTest()) {}
 
   void parseConfigProto(absl::string_view str = R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        request_logging_by_field: {
-          key: "parent"
-          value: {}
-        }
-        response_logging_by_field: {
-          key: "key.name"
-          value: {}
-        }
+        request_logging_by_field: { key: "parent" value: LOG }
+        request_logging_by_field: { key: "key.name" value: LOG }
       }
     })pb") {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(str, &proto_config_));
@@ -48,11 +43,12 @@ protected:
 };
 
 using FilterConfigTestOk = FilterConfigTestBase;
+
 TEST_F(FilterConfigTestOk, DescriptorInline) {
   parseConfigProto();
-  *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() =
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
       api_->fileSystem()
-          .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
@@ -62,7 +58,7 @@ TEST_F(FilterConfigTestOk, DescriptorInline) {
 
 TEST_F(FilterConfigTestOk, DescriptorFromFile) {
   parseConfigProto();
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+  *proto_config_.mutable_data_source()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
@@ -72,57 +68,27 @@ TEST_F(FilterConfigTestOk, DescriptorFromFile) {
 
 TEST_F(FilterConfigTestOk, AllSupportedTypes) {
   parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        request_logging_by_field: {
-          key: "supported_types.string"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.uint32"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.uint64"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.int32"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.int64"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.sint32"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.sint64"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.fixed32"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.fixed64"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.float"
-          value: {}
-        }
-        request_logging_by_field: {
-          key: "supported_types.double"
-          value: {}
-        }
+        request_logging_by_field: { key: "supported_types.string" value: LOG }
+        request_logging_by_field: { key: "supported_types.uint32" value: LOG }
+        request_logging_by_field: { key: "supported_types.uint64" value: LOG }
+        request_logging_by_field: { key: "supported_types.int32" value: LOG }
+        request_logging_by_field: { key: "supported_types.int64" value: LOG }
+        request_logging_by_field: { key: "supported_types.sint32" value: LOG }
+        request_logging_by_field: { key: "supported_types.sint64" value: LOG }
+        request_logging_by_field: { key: "supported_types.fixed32" value: LOG }
+        request_logging_by_field: { key: "supported_types.fixed64" value: LOG }
+        request_logging_by_field: { key: "supported_types.float" value: LOG }
+        request_logging_by_field: { key: "supported_types.double" value: LOG }
       }
     })pb");
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
-      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
@@ -131,57 +97,60 @@ TEST_F(FilterConfigTestOk, AllSupportedTypes) {
 
 TEST_F(FilterConfigTestOk, RepeatedField) {
   parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
         request_logging_by_field: {
           key: "repeated_supported_types.string"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.uint32"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.uint64"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.int32"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.int64"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.sint32"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.sint64"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.fixed32"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.fixed64"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.float"
-          value: {}
+          value: LOG
         }
         request_logging_by_field: {
           key: "repeated_supported_types.double"
-          value: {}
+          value: LOG
         }
       }
     })pb");
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
-      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
   filter_config_ = std::make_unique<FilterConfig>(proto_config_,
                                                   std::make_unique<ExtractorFactoryImpl>(), *api_);
   EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
@@ -191,7 +160,7 @@ TEST_F(FilterConfigTestOk, RepeatedField) {
 using FilterConfigTestException = FilterConfigTestBase;
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
   parseConfigProto();
-  *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() = "123";
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() = "123";
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
                                      *api_),
@@ -200,7 +169,7 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
 
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
   parseConfigProto();
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+  *proto_config_.mutable_data_source()->mutable_filename() =
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem");
   EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
                                  proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
@@ -210,9 +179,9 @@ TEST_F(FilterConfigTestException, ErrorParsingDescriptorFromFile) {
 
 TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceType) {
   parseConfigProto();
-  *proto_config_.mutable_descriptor_set()->mutable_inline_string() =
+  *proto_config_.mutable_data_source()->mutable_inline_string() =
       api_->fileSystem()
-          .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
@@ -223,18 +192,16 @@ TEST_F(FilterConfigTestException, UnsupportedDescriptorSourceType) {
 
 TEST_F(FilterConfigTestException, GrpcMethodNotFoundInProtoDescriptor) {
   parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "not-found-in-proto-descriptor"
-      value: {
-        request_logging_by_field: {
-          key: "parent"
-          value: {}
-        }
-      }
+      value: { request_logging_by_field: { key: "parent" value: LOG } }
     }
   )pb");
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
-      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
 
   EXPECT_THAT_THROWS_MESSAGE(std::make_unique<FilterConfig>(
                                  proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_),
@@ -246,18 +213,16 @@ TEST_F(FilterConfigTestException, GrpcMethodNotFoundInProtoDescriptor) {
 
 TEST_F(FilterConfigTestException, UndefinedPath) {
   parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
-      value: {
-        request_logging_by_field: {
-          key: "undefined-path"
-          value: {}
-        }
-      }
+      value: { request_logging_by_field: { key: "undefined-path" value: LOG } }
     }
   )pb");
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
-      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
 
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
@@ -269,17 +234,15 @@ TEST_F(FilterConfigTestException, UndefinedPath) {
 
 TEST_F(FilterConfigTestException, UnsupportedTypeBool) {
   parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        request_logging_by_field: {
-          key: "unsupported_types.bool"
-          value: {}
-        }
+        request_logging_by_field: { key: "unsupported_types.bool" value: LOG }
       }
     }
   )pb");
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+  *proto_config_.mutable_data_source()->mutable_filename() =
       TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
 
   EXPECT_THAT_THROWS_MESSAGE(
@@ -292,18 +255,21 @@ TEST_F(FilterConfigTestException, UnsupportedTypeBool) {
 
 TEST_F(FilterConfigTestException, UnsupportedTypeMessage) {
   parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
     logging_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
         request_logging_by_field: {
           key: "unsupported_types.message"
-          value: {}
+          value: LOG
         }
       }
     }
   )pb");
-  *proto_config_.mutable_descriptor_set()->mutable_filename() =
-      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
 
   EXPECT_THAT_THROWS_MESSAGE(
       std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),

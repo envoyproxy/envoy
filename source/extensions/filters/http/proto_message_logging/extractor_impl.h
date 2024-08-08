@@ -21,11 +21,20 @@ namespace ProtoMessageLogging {
 
 class ExtractorImpl : public Extractor {
 public:
-  ExtractorImpl(const google::grpc::transcoding::TypeHelper& type_helper,
-                const ::Envoy::ProtobufWkt::Type* request_type,
-                const ::Envoy::ProtobufWkt::Type* response_type,
+  ExtractorImpl(const TypeFinder& type_finder,
+                const google::grpc::transcoding::TypeHelper& type_helper,
+                absl::string_view request_type_url, absl::string_view response_type_url,
+                // const Envoy::ProtobufWkt::Type* request_type,
+                // const Envoy::ProtobufWkt::Type* response_type,
                 const envoy::extensions::filters::http::proto_message_logging::v3::MethodLogging&
-                    method_logging);
+                    method_logging)
+      : method_logging_(method_logging), request_type_url_(request_type_url),
+        response_type_url_(response_type_url), type_finder_(type_finder),
+        type_helper_(type_helper) {}
+
+  //  The init method should be invoked right after the constructor has been
+  //  called.
+  absl::Status init();
 
   void processRequest(Protobuf::field_extraction::MessageData& message) override;
 
@@ -35,6 +44,12 @@ public:
 
 private:
   const envoy::extensions::filters::http::proto_message_logging::v3::MethodLogging& method_logging_;
+
+  std::string request_type_url_;
+  std::string response_type_url_;
+
+  const TypeFinder& type_finder_;
+  const google::grpc::transcoding::TypeHelper& type_helper_;
 
   FieldPathToScrubType request_field_path_to_scrub_type_;
 
@@ -53,8 +68,12 @@ public:
                   std::string response_type_url,
                   const envoy::extensions::filters::http::proto_message_logging::v3::MethodLogging&
                       method_logging) const override {
-    auto extractor = std::make_unique<ExtractorImpl>(
-        type_helper, type_finder(request_type_url), type_finder(response_type_url), method_logging);
+    auto extractor = std::make_unique<ExtractorImpl>(type_finder, type_helper, request_type_url,
+                                                     response_type_url, method_logging);
+    auto status = extractor->init();
+    if (!status.ok()) {
+      return status;
+    }
 
     return extractor;
   }

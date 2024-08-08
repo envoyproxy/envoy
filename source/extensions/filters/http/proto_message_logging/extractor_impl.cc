@@ -16,6 +16,8 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
+#include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
+#include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 
@@ -30,6 +32,7 @@ using ::Envoy::Extensions::HttpFilters::ProtoMessageLogging::AuditDirective;
 using ::Envoy::Extensions::HttpFilters::ProtoMessageLogging::AuditMetadata;
 using ::google::grpc::transcoding::TypeHelper;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
+using Protobuf::field_extraction::FieldValueExtractorFactory;
 
 // The type property value that will be included into the converted Struct.
 constexpr char kTypeProperty[] = "@type";
@@ -88,28 +91,37 @@ AuditDirective TypeMapping(const MethodLogging::LogDirective& type) {
 
 } // namespace
 
-ExtractorImpl::ExtractorImpl(const TypeHelper& type_helper,
-                             const ::Envoy::ProtobufWkt::Type* request_type,
-                             const ::Envoy::ProtobufWkt::Type* response_type,
-                             const MethodLogging& method_logging)
-    : method_logging_(method_logging) {
-  for (const auto& rl : method_logging.request_logging_by_field()) {
-    request_field_path_to_scrub_type_[rl.first].push_back(TypeMapping(rl.second));
+absl::Status ExtractorImpl::init() {
+  FieldValueExtractorFactory extractor_factory(type_finder_);
+  for (const auto& it : method_logging_.request_logging_by_field()) {
+    auto extractor = extractor_factory.Create(request_type_url_, it.first);
+    if (!extractor.ok()) {
+      return extractor.status();
+    }
+
+    request_field_path_to_scrub_type_[it.first].push_back(TypeMapping(it.second));
   }
 
-  for (const auto& rl : method_logging.response_logging_by_field()) {
-    response_field_path_to_scrub_type_[rl.first].push_back(TypeMapping(rl.second));
+  for (const auto& it : method_logging_.response_logging_by_field()) {
+    auto extractor = extractor_factory.Create(response_type_url_, it.first);
+    if (!extractor.ok()) {
+      return extractor.status();
+    }
+
+    response_field_path_to_scrub_type_[it.first].push_back(TypeMapping(it.second));
   }
 
-  request_scrubber_ = AuditProtoScrubber::Create(ScrubberContext::kRequestScrubbing, &type_helper,
-                                                 request_type, request_field_path_to_scrub_type_);
+  request_scrubber_ = AuditProtoScrubber::Create(ScrubberContext::kRequestScrubbing, &type_helper_,
+                                                 type_finder_(request_type_url_),
+                                                 request_field_path_to_scrub_type_);
 
-  response_scrubber_ =
-      AuditProtoScrubber::Create(ScrubberContext::kResponseScrubbing, &type_helper, response_type,
-                                 response_field_path_to_scrub_type_);
+  response_scrubber_ = AuditProtoScrubber::Create(ScrubberContext::kResponseScrubbing,
+                                                  &type_helper_, type_finder_(response_type_url_),
+                                                  response_field_path_to_scrub_type_);
 
-  FillStructWithType(*request_type, result_.request_type_struct);
-  FillStructWithType(*response_type, result_.response_type_struct);
+  FillStructWithType(*type_finder_(request_type_url_), result_.request_type_struct);
+  FillStructWithType(*type_finder_(response_type_url_), result_.response_type_struct);
+  return absl::OkStatus();
 }
 
 void ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) {

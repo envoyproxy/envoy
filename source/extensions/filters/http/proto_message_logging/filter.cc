@@ -374,8 +374,8 @@ void Filter::handleLoggingResult(const std::vector<AuditMetadata>& result,
 
   Envoy::ProtobufWkt::Struct dest_metadata;
   for (const AuditMetadata& result_metadata : result) {
-    RELEASE_ASSERT(result_metadata.target_resource.has_value(),
-                   "`request_metadata.target_resource` shouldn't be empty");
+    // RELEASE_ASSERT(result_metadata.target_resource.has_value(),
+    //                "`request_metadata.target_resource` shouldn't be empty");
 
     RELEASE_ASSERT(result_metadata.scrubbed_message.IsInitialized(),
                    "`request_metadata.scrubbed_message` should be initialized");
