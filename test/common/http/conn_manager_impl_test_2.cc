@@ -502,7 +502,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainConnectionUponCompletionVsOnDrainTime
       }));
 
   startRequest(true);
-  // invoke encodeHeaders -- note we don't end stream.
+  // Encode response, connection will not be closed since we're using http 1.1.
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
