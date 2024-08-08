@@ -9,6 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+const char kBucketMetadataNamespace[] = "envoy.extensions.http_filters.rate_limit_quota.bucket";
+
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
@@ -28,7 +30,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   // succeeds.
   const RateLimitOnMatchAction& match_action =
       match_result.value()->getTyped<RateLimitOnMatchAction>();
-  auto ret = match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
+  absl::StatusOr ret = match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
     // default (i.e., fail-open).
@@ -36,19 +38,26 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  BucketId bucket_id_proto = ret.value();
+  const BucketId& bucket_id_proto = *ret;
   const size_t bucket_id = MessageUtil::hash(bucket_id_proto);
   ENVOY_LOG(trace, "Generated the associated hashed bucket id: {} for bucket id proto:\n {}",
             bucket_id, bucket_id_proto.DebugString());
+
+  ProtobufWkt::Struct bucket_log;
+  auto* bucket_log_fields = bucket_log.mutable_fields();
+  for (const auto& bucket : bucket_id_proto.bucket())
+    (*bucket_log_fields)[bucket.first] = ValueUtil::stringValue(bucket.second);
+
+  callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
+
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // For first matched request, create a new bucket in the cache and sent the report to RLQS
     // server immediately.
     createNewBucket(bucket_id_proto, match_action, bucket_id);
     return sendImmediateReport(bucket_id, match_action);
-  } else {
-    // Found the cached bucket entry.
-    return processCachedBucket(bucket_id, match_action);
   }
+
+  return processCachedBucket(bucket_id, match_action);
 }
 
 void RateLimitQuotaFilter::createMatcher() {
