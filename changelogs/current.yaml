@@ -58,6 +58,10 @@ bug_fixes:
   change: |
     Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
     ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
+- area: rbac
+  change: |
+    RBAC will now allow stat prefixes configured in per-route config to override the base config's
+    stat prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
