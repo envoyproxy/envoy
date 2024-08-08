@@ -12,6 +12,9 @@
 
 namespace Envoy {
 namespace Upstream {
+
+std::ostream& operator<<(std::ostream& out, const ThreadAwareLoadBalancerPtr&);
+
 using ::testing::NiceMock;
 class MockClusterManagerFactory : public ClusterManagerFactory {
 public:

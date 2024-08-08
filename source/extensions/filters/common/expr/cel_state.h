@@ -13,6 +13,7 @@
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
 #include "eval/public/cel_value.h"
