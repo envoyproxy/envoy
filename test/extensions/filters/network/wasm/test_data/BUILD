@@ -14,7 +14,7 @@ wasm_rust_binary(
     srcs = ["close_stream_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -23,7 +23,7 @@ wasm_rust_binary(
     srcs = ["logging_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -32,7 +32,7 @@ wasm_rust_binary(
     srcs = ["panic_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -41,7 +41,7 @@ wasm_rust_binary(
     srcs = ["resume_call_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
