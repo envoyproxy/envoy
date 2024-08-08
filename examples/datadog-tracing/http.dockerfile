@@ -7,7 +7,7 @@ WORKDIR /opt/app
 # If WORKDIR is not set, then npm is installed at the container root,
 # which then causes `npm install` to fail later.
 RUN apk update && apk add nodejs npm
-RUN npm install dd-trace
+RUN npm install dd-trace@v4
 
 COPY ./http.js /opt/app/http.js
 
