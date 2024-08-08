@@ -1125,6 +1125,7 @@ void Filter::onResponseTimeout() {
     if (upstream_request->upstreamHost()) {
       upstream_request->upstreamHost()->stats().rq_timeout_.inc();
     }
+
     if (upstream_request->awaitingHeaders()) {
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into

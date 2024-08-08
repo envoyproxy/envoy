@@ -1,7 +1,5 @@
 #include "source/common/orca/orca_load_metrics.h"
 
-//#include "testing/base/public/gmock.h"
-//#include "testing/base/public/gunit.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 #include "source/common/upstream/upstream_impl.h"
