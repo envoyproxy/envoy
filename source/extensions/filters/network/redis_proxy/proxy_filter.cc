@@ -184,8 +184,15 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
   if (config_->external_auth_enabled_) {
-    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(), EMPTY_STRING, password);
-    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    if (external_auth_call_status_ == ExternalAuthCallStatus::Ready) {
+      auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(), EMPTY_STRING, password);
+      external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    } else {
+      Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+      response->type(Common::Redis::RespType::Error);
+      response->asString() = "ERR an existing authentication request is pending";
+      request.onResponse(std::move(response));
+    }
     return;
   }
 
@@ -208,7 +215,15 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
                          const std::string& password) {
   if (config_->external_auth_enabled_) {
-    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(), username, password);
+    if (external_auth_call_status_ == ExternalAuthCallStatus::Ready) {
+      auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(), username, password);
+      external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    } else {
+      Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+      response->type(Common::Redis::RespType::Error);
+      response->asString() = "ERR an existing authentication request is pending";
+      request.onResponse(std::move(response));
+    }
     return;
   }
 
