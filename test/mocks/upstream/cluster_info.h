@@ -172,6 +172,7 @@ public:
   MOCK_METHOD(
       OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
       happyEyeballsConfig, (), (const));
+  MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -235,6 +236,7 @@ public:
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
   absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
+  const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

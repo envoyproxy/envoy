@@ -1235,6 +1235,11 @@ public:
   virtual OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const PURE;
 
+  /**
+   * @return Reference to the optional config for LRS endpoint metric reporting.
+   */
+  virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

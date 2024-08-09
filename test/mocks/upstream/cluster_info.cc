@@ -171,6 +171,11 @@ MockClusterInfo::MockClusterInfo()
                                            protocol, codecStats(protocol))
                                      : nullptr;
   }));
+  ON_CALL(*this, lrsReportMetricNames())
+      .WillByDefault(Invoke([this]() -> OptRef<const Envoy::Orca::LrsReportMetricNames> {
+        return makeOptRefFromPtr<const Envoy::Orca::LrsReportMetricNames>(
+            lrs_report_metric_names_.get());
+      }));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

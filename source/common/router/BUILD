@@ -366,6 +366,8 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
+        "//source/common/orca:orca_load_metrics_lib",
+        "//source/common/orca:orca_parser",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
