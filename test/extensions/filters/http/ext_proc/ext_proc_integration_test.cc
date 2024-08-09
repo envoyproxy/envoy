@@ -182,6 +182,9 @@ protected:
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
+        // No need to check the bytes received for observability mode because it is a
+        // "send and go" mode.
+        logging_filter_config.set_check_received_bytes(!proto_config_.observability_mode());
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
