@@ -131,6 +131,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for publish.
 - area: jwt_authn
   change: |
     Added missing implementation to jwt_authn matchers to allow glob pattern matching.
