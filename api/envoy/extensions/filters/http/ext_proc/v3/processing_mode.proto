@@ -41,6 +41,7 @@ message ProcessingMode {
   // 1) STREAMED BodySendMode: header processing completes before body mutation comes back.
   // 2) BUFFERED_PARTIAL BodySendMode: body is buffered and could be injected in different phases.
   // 3) BUFFERED BodySendMode + SKIP HeaderSendMode: header processing (e.g., update content-length) is skipped.
+  // 4) STREAMED_BEFORE_HEADER_RESP BodySendMode: Sending body before header response comes back.
   //
   // In Envoy's http1 codec implementation, removing content length will enable chunked transfer
   // encoding whenever feasible. The recipient (either client or server) must be able
@@ -55,8 +56,8 @@ message ProcessingMode {
     // Do not send the body at all. This is the default.
     NONE = 0;
 
-    // Stream the body to the server in pieces as they arrive at the
-    // proxy.
+    // Stream the body to the server in pieces as they arrive at the proxy
+    // if Envoy is not waiting for a header response.
     STREAMED = 1;
 
     // Buffer the message body in memory and send the entire body at once.
@@ -68,6 +69,11 @@ message ProcessingMode {
     // chunk. If the body exceeds the configured buffer limit, then the body contents
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
+
+    // [#not-implemented-hide:]
+    // Stream the body to the server in pieces as they arrive at the proxy regardless
+    // the header processing state.
+    STREAMED_BEFORE_HEADER_RESP = 4;
   }
 
   // How to handle the request header. Default is "SEND".
