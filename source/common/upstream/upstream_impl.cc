@@ -42,6 +42,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/happy_eyeballs_connection_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
@@ -535,6 +536,54 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
                           transport_socket_options, shared_from_this());
 }
 
+absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
+    const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    HostDescriptionConstSharedPtr host) {
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    return transport_socket_options->http11ProxyInfo()->proxy_address;
+  }
+
+  // See if host metadata contains a proxy address and only check locality metadata if host
+  // metadata did not have the relevant key.
+  for (const auto& metadata : {host->metadata(), host->localityMetadata()}) {
+    if (metadata == nullptr) {
+      continue;
+    }
+
+    auto addr_it = metadata->typed_filter_metadata().find(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
+    if (addr_it == metadata->typed_filter_metadata().end()) {
+      continue;
+    }
+
+    // Parse an address from the metadata.
+    envoy::config::core::v3::Address proxy_addr;
+    auto status = MessageUtil::unpackTo(addr_it->second, proxy_addr);
+    if (!status.ok()) {
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to parse proto from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
+      return absl::nullopt;
+    }
+
+    // Resolve the parsed address proto.
+    auto resolve_status = Network::Address::resolveProtoAddress(proxy_addr);
+    if (!resolve_status.ok()) {
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to resolve address from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
+      return absl::nullopt;
+    }
+
+    // We successfully resolved, so return the instance ptr.
+    return resolve_status.value();
+  }
+
+  return absl::nullopt;
+}
+
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
@@ -545,17 +594,20 @@ Host::CreateConnectionData HostImplBase::createConnection(
     HostDescriptionConstSharedPtr host) {
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
+  absl::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
+      maybeGetProxyRedirectAddress(transport_socket_options, host);
+
   Network::ClientConnectionPtr connection;
-  // If the transport socket options indicate the connection should be
-  // redirected to a proxy, create the TCP connection to the proxy's address not
-  // the host's address.
-  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+  // If the transport socket options or endpoint/locality metadata indicate the connection should
+  // be redirected to a proxy, create the TCP connection to the proxy's address not the host's
+  // address.
+  if (proxy_address.has_value()) {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
-              transport_socket_options->http11ProxyInfo()->proxy_address->asString());
+              proxy_address.value()->asString());
     connection = dispatcher.createClientConnection(
-        transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
+        proxy_address.value(), upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
@@ -1238,8 +1290,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     optional_timeouts_.set<OptionalTimeoutNames::IdleTimeout>(*idle_timeout);
   }
 
-  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating that
-  // no timeout should be used.
+  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating
+  // that no timeout should be used.
   absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout(std::chrono::minutes(10));
   if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
     tcp_pool_idle_timeout = tcp_protocol_options_->idleTimeout();

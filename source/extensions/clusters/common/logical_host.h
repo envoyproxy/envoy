@@ -77,6 +77,9 @@ public:
   // Upstream:HostDescription observers are delegated to logical_host_.
   bool canary() const override { return logical_host_->canary(); }
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  const MetadataConstSharedPtr localityMetadata() const override {
+    return logical_host_->localityMetadata();
+  }
 
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();

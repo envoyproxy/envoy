@@ -205,6 +205,11 @@ public:
   virtual const envoy::config::core::v3::Locality& locality() const PURE;
 
   /**
+   * @return the metadata associated with the locality endpoints the host belongs to.
+   */
+  virtual const MetadataConstSharedPtr localityMetadata() const PURE;
+
+  /**
    * @return the human readable name of the host's locality zone as a StatName.
    */
   virtual Stats::StatName localityZoneStatName() const PURE;
