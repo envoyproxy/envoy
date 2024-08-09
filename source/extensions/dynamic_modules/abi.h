@@ -12,19 +12,6 @@
 // this restriction and hopefully provide a wider compatibility guarantee. Until then, Envoy
 // checks the hash of the ABI header files to ensure that the dynamic modules are built against the
 // same version of the ABI.
-//
-// TODO: revisit this section.
-// The ABI must be designed in a way that a single object file can be used at multiple extension
-// points (e.g., multiple TCP/HTTP filter chains) within the same Envoy process. The latter
-// requirement stems from the fact that some languages require exactly one shared library per
-// process, such as Go (https://github.com/golang/go/issues/65050). Additionally, it is important
-// to reduce the memory footprint of the entire Envoy process to avoid loading multiple copies of
-// the same language runtime in the same process.
-//
-// Each SDK can be used outside of the Envoy source tree with the normal build tools for the
-// language without needing to clone the Envoy source tree. To accomplish this, each SDK directory
-// contains identical hard copy of the ABI files (e.g., Go and Rust build systems don't work
-// well with symlinks).
 
 #ifdef __cplusplus
 #include <cstddef>
