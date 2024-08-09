@@ -1373,7 +1373,6 @@ envoy_cc_library(
     name = "http2_core_headers_handler_interface_lib",
     hdrs = [
         "quiche/http2/core/spdy_headers_handler_interface.h",
-        "quiche/spdy/core/spdy_headers_handler_interface.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
@@ -3929,6 +3928,7 @@ envoy_quic_cc_library(
         ":quic_platform",
         ":quic_server_session_lib",
         ":quiche_common_callbacks",
+        ":quiche_common_intrusive_list_lib",
         ":quiche_common_text_utils_lib",
     ],
 )

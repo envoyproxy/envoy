@@ -27,7 +27,8 @@ public:
 
 static std::string encodeHeaders(const spdy::Http2HeaderBlock& headers) {
   static Delegate delegate;
-  quic::QpackEncoder encoder(&delegate, quic::HuffmanEncoding::kEnabled);
+  quic::QpackEncoder encoder(&delegate, quic::HuffmanEncoding::kEnabled,
+                             quic::CookieCrumbling::kEnabled);
   return encoder.EncodeHeaderList(0, headers, nullptr);
 }
 
