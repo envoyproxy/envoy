@@ -2,8 +2,7 @@
 
 // NOLINT(namespace-envoy)
 
-// This is a pure single C header file that defines the ABI of the dynamic module
-// used by Envoy.
+// This is a pure C header file that defines the ABI of the core of dynamic modules used by Envoy.
 //
 // This must not contain any dependencies besides standard library since it is not only used by
 // Envoy itself but also by dynamic module SDKs written in non-C++ languages.
@@ -13,21 +12,17 @@
 // this restriction and hopefully provide a wider compatibility guarantee. Until then, we use the
 // simple symbol prefix "envoy_dynamic_module_" without any versioning at the symbol level.
 //
-// All ABI definitions, regardless of the area of usage, must be included in this single header
-// file. This is not only to ensure easy inclusion by any language bindings but also because the ABI
-// must be designed in a way that a single object file can be used at multiple extension points
-// (e.g., multiple TCP/HTTP filter chains) within the same Envoy process. The latter requirement
-// stems from the fact that some languages require exactly one shared library per process, such as
-// Go (https://github.com/golang/go/issues/65050). Additionally, it is important to reduce the
-// memory footprint of the entire Envoy process to avoid loading multiple copies of the same
-// language runtime in the same process.
-//
-// In other words, this file serves as the central reference point for any programming language to
-// build dynamic modules to interact with Envoy.
+// TODO: revisit this section.
+// The ABI must be designed in a way that a single object file can be used at multiple extension
+// points (e.g., multiple TCP/HTTP filter chains) within the same Envoy process. The latter
+// requirement stems from the fact that some languages require exactly one shared library per
+// process, such as Go (https://github.com/golang/go/issues/65050). Additionally, it is important
+// to reduce the memory footprint of the entire Envoy process to avoid loading multiple copies of
+// the same language runtime in the same process.
 //
 // Each SDK can be used outside of the Envoy source tree with the normal build tools for the
 // language without needing to clone the Envoy source tree. To accomplish this, each SDK directory
-// contains an identical hard copy of the `abi.h` file (e.g., Go and Rust build systems don't work
+// contains identical hard copy of the ABI files (e.g., Go and Rust build systems don't work
 // well with symlinks).
 
 #ifdef __cplusplus
