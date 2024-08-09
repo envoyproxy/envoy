@@ -1262,6 +1262,7 @@ serializable
 serializer
 serv
 servercert
+sess
 setenv
 setsockopt
 sfixed

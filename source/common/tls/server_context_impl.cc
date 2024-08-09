@@ -27,6 +27,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 #include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/session_cache/session_cache_impl.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -175,7 +177,86 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     if (config.disableStatefulSessionResumption()) {
       SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
     }
+    if (config.enableTlsSessionCache()) {
+      tls_session_cache_client_ =
+          SessionCache::tlsSessionCacheClient(factory_context, config.tlsSessionCacheGrpcService(),
+                                              config.tlsSessionCacheGrpcTimeout());
+      if (tls_session_cache_client_ != nullptr) {
+        int mode = SSL_CTX_get_session_cache_mode(ctx.ssl_ctx_.get());
+        ENVOY_LOG(info, "ssl session cache mode: {:x}", mode);
 
+        SSL_CTX_sess_set_new_cb(ctx.ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
+          (void)ssl;
+          /* https://www.openssl.org/docs/man1.0.2/man3/d2i_SSL_SESSION.html
+           * When using i2d_SSL_SESSION(), the memory location pointed to by pp must be large enough
+           * to hold the binary representation of the session. There is no known limit on the size
+           * of the created ASN1 representation, so the necessary amount of space should be obtained
+           * by first calling i2d_SSL_SESSION() with pp=NULL, and obtain the size needed, then
+           * allocate the memory and call i2d_SSL_SESSION() again. Note that this will advance the
+           * value contained in *pp so it is necessary to save a copy of the original allocation.
+           * For example: int i,j; char *p, *temp; i = i2d_SSL_SESSION(sess, NULL); p = temp =
+           * malloc(i); j = i2d_SSL_SESSION(sess, &temp); assert(i == j); assert(p+i == temp);
+           */
+          std::string session_id;
+          unsigned int session_id_len = 0;
+          uint8_t* temp_ptr = nullptr;
+          int session_data_len = i2d_SSL_SESSION(session, nullptr);
+          const uint8_t* p = nullptr;
+
+          uint8_t* session_data = new uint8_t[session_data_len];
+          temp_ptr = session_data;
+          session_data_len = i2d_SSL_SESSION(session, &temp_ptr);
+
+          p = SSL_SESSION_get_id(session, &session_id_len);
+          session_id = Hex::encode(p, session_id_len);
+
+          ENVOY_LOG(info, "new ssl session: id:{}, session data len: {}", session_id,
+                    session_data_len);
+
+          ContextImpl* context_impl =
+              static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+          ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
+          auto callbacks = static_cast<Network::TransportSocketCallbacks*>(
+              SSL_get_ex_data(ssl, sslSocketIndex()));
+
+          server_context_impl->tls_session_cache_client_->storeTlsSessionCache(
+              callbacks, ssl, sslSessionCacheIndex(), session_id, session_data, session_data_len);
+          return 1; // return 1 to take over session ownership and remove it from inner cache
+        });
+
+        SSL_CTX_sess_set_get_cb(
+            ctx.ssl_ctx_.get(),
+            [](SSL* ssl, const uint8_t* id, int id_len, int* out_copy) -> SSL_SESSION* {
+              (void)out_copy;
+              (void)ssl;
+              std::string session_id;
+              uint8_t* session_data = nullptr;
+              std::size_t len = 0;
+              auto callbacks = static_cast<Network::TransportSocketCallbacks*>(
+                  SSL_get_ex_data(ssl, sslSocketIndex()));
+              session_id = Hex::encode(id, id_len);
+
+              auto already_request_external = static_cast<Network::TransportSocketCallbacks*>(
+                  SSL_get_ex_data(ssl, sslSessionCacheIndex()));
+              ENVOY_LOG(info, "missing ssl session: id:{} from internal cache", session_id);
+              ENVOY_LOG(debug, "socket index:{}, session cache index:{}", sslSocketIndex(),
+                        sslSessionCacheIndex());
+              if (already_request_external == nullptr) {
+                // TBD: add a metrics to track the internal cache hit rate
+                ContextImpl* context_impl =
+                    static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+                ServerContextImpl* server_context_impl =
+                    dynamic_cast<ServerContextImpl*>(context_impl);
+                server_context_impl->tls_session_cache_client_->fetchTlsSessionCache(
+                    callbacks, ssl, sslSessionCacheIndex(), session_id, session_data, &len);
+                return SSL_magic_pending_session_ptr();
+              } else {
+                ENVOY_LOG(debug, "session not found, do not use session cache");
+                return nullptr;
+              }
+            });
+      }
+    }
     if (config.sessionTimeout() && !config.capabilities().handles_session_resumption) {
       auto timeout = config.sessionTimeout().value().count();
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));

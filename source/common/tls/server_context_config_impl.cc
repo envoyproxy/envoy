@@ -159,6 +159,15 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
 
+  if (config.has_session_cache_service()) {
+    tls_session_cache_grpc_timeout_ = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(config.session_cache_service().timeout()));
+    tls_session_cache_grpc_service_ = config.session_cache_service().grpc_service();
+    enable_tls_session_cache_ = true;
+  } else {
+    enable_tls_session_cache_ = false;
+  }
+
   if (config.common_tls_context().has_custom_tls_certificate_selector()) {
     // If a custom tls context provider is configured, derive the factory from the config.
     const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
