@@ -314,7 +314,7 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
   if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
     // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
     return {StatusCode::kUnimplemented,
-            "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
+            "Setting \"response_body\" is only supported for fields of type google.api.HttpBody: " +
                 descriptor->full_name()};
   }
 
