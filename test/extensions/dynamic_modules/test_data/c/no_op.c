@@ -1,4 +1,5 @@
 #include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi_version.h"
 
 int getSomeVariable() {
   static int some_variable = 0;
@@ -6,4 +7,4 @@ int getSomeVariable() {
   return some_variable;
 }
 
-envoy_dynamic_module_type_program_init_result envoy_dynamic_module_on_program_init() { return 0; }
+envoy_dynamic_module_type_abi_version envoy_dynamic_module_on_program_init() { return kAbiVersion; }

@@ -8,6 +8,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi_version.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,11 +42,15 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
         absl::StrCat("Failed to resolve envoy_dynamic_module_on_program_init: ", dlerror()));
   }
 
-  const size_t result = (*init_function)();
-  if (result != 0) {
+  const char* abi_version = (*init_function)();
+  if (abi_version == nullptr) {
     return absl::InvalidArgumentError(
-        absl::StrCat("envoy_dynamic_module_on_program_init failed: ", object_file_path,
-                     " : returned non-zero status: ", result));
+        absl::StrCat("Failed to initialize dynamic module: ", object_file_path));
+  }
+  // Checks the kAbiVersion and the version of the dynamic module.
+  if (absl::string_view(abi_version) != absl::string_view(kAbiVersion)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
   }
   return dynamic_module;
 }

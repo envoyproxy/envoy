@@ -14,10 +14,16 @@ envoy_cc_library(
         "abi.h",
         "dynamic_modules.cc",
     ],
-    hdrs = [
-        "dynamic_modules.h",
-    ],
+    hdrs = ["dynamic_modules.h"],
     deps = [
+        ":abi_version_lib",
         "//envoy/common:exception_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "abi_version_lib",
+    hdrs = [
+        "abi_version.h",
     ],
 )
