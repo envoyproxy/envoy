@@ -514,7 +514,15 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
   do {
-    send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
+    if (handle.isConnected()) {
+      // The socket is already connected, so the local and peer addresses should not be specified.
+      // Instead, a writev/send is called.
+      send_result = handle.writev(slices, num_slices);
+    } else {
+      // For non-connected sockets(), calling sendmsg with the peer address specified ensures the
+      // connection happens first.
+      send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
+    }
   } while (!send_result.ok() &&
            // Send again if interrupted.
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);

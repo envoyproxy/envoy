@@ -523,7 +523,11 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   }
 #endif
 
-  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  auto result = Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  if (result.return_value_ != -1) {
+    is_connected_ = true;
+  }
+  return result;
 }
 
 IoHandlePtr IoSocketHandleImpl::duplicate() {

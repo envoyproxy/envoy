@@ -167,7 +167,7 @@ Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const bool prefer_gro) {
+                       const bool prefer_gro, const bool connect) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
@@ -201,7 +201,18 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
   }
-  connection_socket->bind(local_addr);
+
+  if (connect) {
+    if (auto result = connection_socket->connect(peer_addr); result.return_value_ != 0) {
+      connection_socket->close();
+      ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
+                     errorDetails(result.errno_));
+      return connection_socket;
+    }
+  } else {
+    connection_socket->bind(local_addr);
+  }
+
   ASSERT(local_addr->ip());
   local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
