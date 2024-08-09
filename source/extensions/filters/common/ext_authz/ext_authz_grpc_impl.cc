@@ -114,11 +114,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       const auto& ok_response = response->ok_response();
       copyOkResponseMutations(authz_response, ok_response);
     }
-  } else if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::PermissionDenied ||
-             response->status().code() == Grpc::Status::WellKnownGrpcStatus::Unauthenticated ||
-             !Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.process_ext_authz_grpc_error_codes_as_errors")) {
-    // The request was explicitly forbidden by the external authz server.
+  } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
 
@@ -133,12 +129,6 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       }
       authz_response->body = response->denied_response().body();
     }
-  } else {
-    // Unexpected response from external authz server is interpreted as failure
-    ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
-              Grpc::Utility::grpcStatusToString(response->status().code()));
-    authz_response->status = CheckStatus::Error;
-    authz_response->status_code = Http::Code::Forbidden;
   }
 
   // OkHttpResponse.dynamic_metadata is deprecated. Until OkHttpResponse.dynamic_metadata is

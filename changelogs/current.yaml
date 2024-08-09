@@ -54,12 +54,6 @@ bug_fixes:
 - area: c-ares
   change: |
     Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
-- area: ext_authz
-  change: |
-    Fixed fail-open behavior of the :ref:`failure_mode_allow config option
-    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
-    when a grpc external authz server is used.
-    The behavior can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
 - area: websocket
   change: |
     Fixed a bug where the websocket upgrade filter would not take into account per-filter configs.
