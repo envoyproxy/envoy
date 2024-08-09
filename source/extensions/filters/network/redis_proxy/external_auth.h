@@ -87,7 +87,8 @@ public:
   /**
    * Authenticates a Redis AUTH command.
    * @param callback supplies the callback to invoke when the authentication is complete.
-   * @param request  the pending request to respond to.
+   * @param pending_request  the pending request to respond to.
+   * @param stream_info supplies the stream info for the request.
    * @param username supplies the username. (optional, can be empty)
    * @param password supplies the password.
    */
