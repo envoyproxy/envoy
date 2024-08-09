@@ -1701,6 +1701,109 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas{
+        "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f",
+        "1af1dfa857bf1d8814fe1af8983c18080019922e557f15a8a"};
+    auto joined_shas = absl::StrJoin(expected_shas, ",");
+    EXPECT_CALL(*connection_info, sha256PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(joined_shas, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(joined_shas)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas;
+    EXPECT_CALL(*connection_info, sha256PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas{
+        "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f",
+        "1af1dfa857bf1d8814fe1af8983c18080019922e557f15a8a"};
+    auto joined_shas = absl::StrJoin(expected_shas, ",");
+    EXPECT_CALL(*connection_info, sha1PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(joined_shas, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(joined_shas)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas;
+    EXPECT_CALL(*connection_info, sha1PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_SERIALS");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> serial_numbers{"b8b5ecc898f2124a", "9bf18bd79b46589902639871"};
+    auto joined_serials = absl::StrJoin(serial_numbers, ",");
+    EXPECT_CALL(*connection_info, serialNumbersPeerCertificates())
+        .WillRepeatedly(Return(serial_numbers));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(joined_serials, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(joined_serials)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_SERIALS");
+    std::vector<std::string> empty_vec;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, serialNumbersPeerCertificates())
+        .WillRepeatedly(Return(empty_vec));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_SERIALS");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string issuer_peer =

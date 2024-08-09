@@ -1,10 +1,14 @@
 #include "source/common/tls/connection_info_impl_base.h"
 
+#include <openssl/stack.h>
+
 #include "source/common/common/hex.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
+#include "openssl/safestack.h"
 #include "openssl/x509v3.h"
+#include "utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,6 +81,29 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   return cached_sha_256_peer_certificate_digest_;
 }
 
+absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChainDigests() const {
+  if (!cached_sha_256_peer_certificate_digests_.empty()) {
+    return cached_sha_256_peer_certificate_digests_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_sha_256_peer_certificate_digests_.empty());
+    return cached_sha_256_peer_certificate_digests_;
+  }
+
+  cached_sha_256_peer_certificate_digests_ =
+      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+        std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+        unsigned int n;
+        X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
+        RELEASE_ASSERT(n == computed_hash.size(), "");
+        return Hex::encode(computed_hash);
+      });
+
+  return cached_sha_256_peer_certificate_digests_;
+}
+
 const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
   if (!cached_sha_1_peer_certificate_digest_.empty()) {
     return cached_sha_1_peer_certificate_digest_;
@@ -93,6 +120,29 @@ const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
   RELEASE_ASSERT(n == computed_hash.size(), "");
   cached_sha_1_peer_certificate_digest_ = Hex::encode(computed_hash);
   return cached_sha_1_peer_certificate_digest_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
+  if (!cached_sha_1_peer_certificate_digests_.empty()) {
+    return cached_sha_1_peer_certificate_digests_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_sha_1_peer_certificate_digests_.empty());
+    return cached_sha_1_peer_certificate_digests_;
+  }
+
+  cached_sha_1_peer_certificate_digests_ =
+      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+        std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+        unsigned int n;
+        X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+        RELEASE_ASSERT(n == computed_hash.size(), "");
+        return Hex::encode(computed_hash);
+      });
+
+  return cached_sha_1_peer_certificate_digests_;
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate() const {
@@ -251,6 +301,25 @@ const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   }
   cached_serial_number_peer_certificate_ = Utility::getSerialNumberFromCertificate(*cert.get());
   return cached_serial_number_peer_certificate_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::serialNumbersPeerCertificates() const {
+  if (!cached_serial_numbers_peer_certificates_.empty()) {
+    return cached_serial_numbers_peer_certificates_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_serial_numbers_peer_certificates_.empty());
+    return cached_serial_numbers_peer_certificates_;
+  }
+
+  cached_serial_numbers_peer_certificates_ =
+      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+        return Utility::getSerialNumberFromCertificate(cert);
+      });
+
+  return cached_serial_numbers_peer_certificates_;
 }
 
 const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
