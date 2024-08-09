@@ -470,15 +470,24 @@ void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bo
                                               absl::string_view details) {
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
+  if (end_stream && end_stream_) {
+    parent_.state_.decoder_filter_chain_aborted_ = true;
+  }
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (end_stream && end_stream_) {
+    parent_.state_.decoder_filter_chain_aborted_ = true;
+  }
   parent_.encodeData(nullptr, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
+  if (end_stream_) {
+    parent_.state_.decoder_filter_chain_aborted_ = true;
+  }
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
 }
