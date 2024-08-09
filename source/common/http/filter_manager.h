@@ -283,6 +283,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
+  bool encoded_end_stream_{false};
 };
 
 using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;

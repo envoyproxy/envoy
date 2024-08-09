@@ -468,6 +468,7 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
+  encoded_end_stream_ = end_stream;
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   if (end_stream && end_stream_) {
@@ -477,6 +478,7 @@ void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bo
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  encoded_end_stream_ = end_stream;
   if (end_stream && end_stream_) {
     parent_.state_.decoder_filter_chain_aborted_ = true;
   }
@@ -485,6 +487,7 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 }
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
+  encoded_end_stream_ = true;
   if (end_stream_) {
     parent_.state_.decoder_filter_chain_aborted_ = true;
   }
@@ -545,8 +548,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
-    last_filter_saw_end_stream =
-        (*entry)->end_stream_ && std::next(entry) == decoder_filters_.end();
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     if ((*entry)->end_stream_) {
@@ -612,6 +613,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
+    last_filter_saw_end_stream =
+        (end_stream && continue_data_entry == decoder_filters_.end()) &&
+        (std::next(entry) == decoder_filters_.end() || (*entry)->encoded_end_stream_);
   }
 
   maybeContinueDecoding(continue_data_entry);
@@ -692,8 +696,6 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
-    last_filter_saw_end_stream =
-        (*entry)->end_stream_ && std::next(entry) == decoder_filters_.end();
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
@@ -718,6 +720,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       end_stream = false;
       trailers_added_entry = entry;
     }
+
+    last_filter_saw_end_stream =
+        end_stream && (std::next(entry) == decoder_filters_.end() || (*entry)->encoded_end_stream_);
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
         std::next(entry) != decoder_filters_.end()) {
@@ -794,8 +799,6 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
     (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
-    last_filter_saw_end_stream =
-        (*entry)->end_stream_ && std::next(entry) == decoder_filters_.end();
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
@@ -808,6 +811,12 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     }
 
     processNewlyAddedMetadata();
+    last_filter_saw_end_stream =
+        std::next(entry) == decoder_filters_.end() || (*entry)->encoded_end_stream_;
+
+    if (last_filter_saw_end_stream) {
+      break;
+    }
 
     if (!(*entry)->commonHandleAfterTrailersCallback(status) &&
         std::next(entry) != decoder_filters_.end()) {

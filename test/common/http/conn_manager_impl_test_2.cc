@@ -4348,7 +4348,7 @@ TEST_F(HttpConnectionManagerImplTest, PassMatchUpstreamSchemeHintToStreamInfo) {
 }
 
 // Validate that incomplete request is terminated when a non terminal filter
-// initates encoding of the response (i.e. the cache filter).
+// initiates encoding of the response (i.e. the cache filter).
 // This only works when independent half-close mode is DISABLED.
 TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilter) {
   TestScopedRuntime scoped_runtime;
@@ -4400,7 +4400,7 @@ TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilter) {
 }
 
 // Validate that when independent half-close is enabled, encoding end_stream by a
-// non-final filter ends the request iff the filter that intiated encoding of the end_stream has
+// non-final filter ends the request iff the filter that initiated encoding of the end_stream has
 // already observed the request end_stream.
 TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilterWithIndependentHalfClose) {
   TestScopedRuntime scoped_runtime;
@@ -4451,6 +4451,150 @@ TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilterWithIndependent
   // Second decoder filter then completes encoding with data
   Buffer::OwnedImpl fake_response("world");
   decoder_filters_[ecoder_filter_index]->callbacks_->encodeData(fake_response, true);
+}
+
+// Validate that when independent half-close is enabled, encoding end_stream by a
+// non-final filter with incomplete request makes the encoding filter the terminal filter.
+// In this case decoding end_stream from the client only reaches the filter that encoded the
+// end_stream after which the request is completed.
+TEST_F(HttpConnectionManagerImplTest, DecodingByNonTerminalEncoderFilterWithIndependentHalfClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
+  setup(false, "");
+  constexpr int total_filters = 3;
+  constexpr int ecoder_filter_index = 1;
+  setupFilterChain(total_filters, total_filters);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Send incomplete request.
+  startRequest(false);
+
+  // For encode direction
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+
+  // Second decoder filter (there are 3 in total) initiates encoding
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[ecoder_filter_index]->callbacks_->encodeHeaders(std::move(response_headers),
+                                                                   false, "details");
+
+  EXPECT_CALL(*encoder_filters_[2], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+
+  // Second decoder filter then completes encoding with data
+  Buffer::OwnedImpl fake_response("world");
+  decoder_filters_[ecoder_filter_index]->callbacks_->encodeData(fake_response, true);
+
+  // Request is still be alive with the half-close enabled.
+  // Verify that once the end_stream from the client reaches the filter that encoded the end_stream
+  // the request will end.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  expectOnDestroy();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_->decodeData(data, true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("5678");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Validate that when independent half-close is enabled, encoding end_stream by a
+// non-final filter with incomplete request makes the encoding filter the terminal filter.
+// In this case decoding end_stream from the client only reaches the filter that encoded the
+// end_stream after which the request is completed.
+TEST_F(HttpConnectionManagerImplTest, DecodingWithAddedTrailersByNonTerminalEncoderFilter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
+  setup(false, "");
+  constexpr int total_filters = 3;
+  constexpr int ecoder_filter_index = 1;
+  setupFilterChain(total_filters, total_filters);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Send incomplete request.
+  startRequest(false);
+
+  // For encode direction
+  EXPECT_CALL(*encoder_filters_[2], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+
+  // Second decoder filter (there are 3 in total) initiates encoding
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[ecoder_filter_index]->callbacks_->encodeHeaders(std::move(response_headers),
+                                                                   false, "details");
+
+  EXPECT_CALL(*encoder_filters_[2], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[2], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+
+  // Second decoder filter then completes encoding with data
+  Buffer::OwnedImpl fake_response("world");
+  decoder_filters_[ecoder_filter_index]->callbacks_->encodeData(fake_response, true);
+
+  // Request is still be alive with the half-close enabled.
+  // Verify that once the end_stream from the client reaches the filter that encoded the end_stream
+  // the request will end.
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterDataStatus {
+        decoder_filters_[1]->callbacks_->addDecodedTrailers().addCopy(Http::LowerCaseString("foo"),
+                                                                      "bar");
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  expectOnDestroy();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_->decodeData(data, true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("5678");
+  conn_manager_->onData(fake_input, false);
 }
 
 } // namespace Http
