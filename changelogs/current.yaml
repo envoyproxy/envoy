@@ -42,6 +42,10 @@ minor_behavior_changes:
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+- area: conn_handler
+  change: |
+    Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
+    but may return StopIteration in onAccept to wait for asynchronous callback.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

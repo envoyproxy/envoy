@@ -11,10 +11,10 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
                                                    ListenerFilterBufferOnDataCb on_data_cb,
                                                    uint64_t buffer_size)
     : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
-      on_data_cb_(on_data_cb), buffer_(std::make_unique<uint8_t[]>(buffer_size)),
-      base_(buffer_.get()), buffer_size_(buffer_size) {
+      on_data_cb_(on_data_cb), zero_buffer_size_(buffer_size == 0),
+      buffer_size_(zero_buffer_size_ ? 1 : buffer_size),
+      buffer_(std::make_unique<uint8_t[]>(buffer_size_)), base_(buffer_.get()) {
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
-  ASSERT(buffer_size > 0);
 
   io_handle_.initializeFileEvent(
       dispatcher_, [this](uint32_t events) { return onFileEvent(events); },
@@ -85,6 +85,7 @@ void ListenerFilterBufferImpl::resetCapacity(uint64_t size) {
   base_ = buffer_.get();
   buffer_size_ = size;
   data_size_ = 0;
+  zero_buffer_size_ = false;
 }
 
 void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) {
@@ -102,7 +103,9 @@ absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ASSERT(events == Event::FileReadyType::Read);
 
   auto state = peekFromSocket();
-  if (state == PeekState::Done) {
+  if (state == PeekState::Done && !zero_buffer_size_) {
+    // buffer_size_ will be set to 1 if the first listener filter in
+    // filter chain has maxReadBytes() of 0. Bypass onData callback of it.
     on_data_cb_(*this);
   } else if (state == PeekState::Error) {
     on_close_cb_(true);

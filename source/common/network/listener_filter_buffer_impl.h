@@ -56,14 +56,16 @@ private:
   ListenerFilterBufferOnCloseCb on_close_cb_;
   ListenerFilterBufferOnDataCb on_data_cb_;
 
-  // The buffer for the data peeked from the socket.
-  std::unique_ptr<uint8_t[]> buffer_;
-  // The start of buffer.
-  uint8_t* base_;
+  bool zero_buffer_size_{};
   // The size of buffer;
   uint64_t buffer_size_;
   // The size of valid data.
   uint64_t data_size_{0};
+
+  // The buffer for the data peeked from the socket.
+  std::unique_ptr<uint8_t[]> buffer_;
+  // The start of buffer.
+  uint8_t* base_;
 };
 
 using ListenerFilterBufferImplPtr = std::unique_ptr<ListenerFilterBufferImpl>;
