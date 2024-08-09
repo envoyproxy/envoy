@@ -576,56 +576,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (upstream_http_protocol_options.has_value() &&
-      (upstream_http_protocol_options.value().auto_sni() ||
-       upstream_http_protocol_options.value().auto_san_validation())) {
-    // Default the header to Host/Authority header.
-    std::string header_value = route_entry_->getRequestHostValue(headers);
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san")) {
-      header_value = std::string(headers.getHostValue());
-    }
-
-    // Check whether `override_auto_sni_header` is specified.
-    const auto override_auto_sni_header =
-        upstream_http_protocol_options.value().override_auto_sni_header();
-    if (!override_auto_sni_header.empty()) {
-      // Use the header value from `override_auto_sni_header` to set the SNI value.
-      const auto overridden_header_value = Http::HeaderUtility::getAllOfHeaderAsString(
-          headers, Http::LowerCaseString(override_auto_sni_header));
-      if (overridden_header_value.result().has_value() &&
-          !overridden_header_value.result().value().empty()) {
-        header_value = overridden_header_value.result().value();
-      }
-    }
-    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
-    bool should_set_sni = !parsed_authority.is_ip_address_;
-    // `host_` returns a string_view so doing this should be safe.
-    absl::string_view sni_value = parsed_authority.host_;
-
-    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
-            Network::UpstreamServerName::key())) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(sni_value),
-          StreamInfo::FilterState::StateType::Mutable);
-    }
-
-    if (upstream_http_protocol_options.value().auto_san_validation() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
-            Network::UpstreamSubjectAltNames::key())) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamSubjectAltNames::key(),
-          std::make_unique<Network::UpstreamSubjectAltNames>(
-              std::vector<std::string>{std::string(sni_value)}),
-          StreamInfo::FilterState::StateType::Mutable);
-    }
-  }
-
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
-
   if (auto downstream_connection = downstreamConnection(); downstream_connection != nullptr) {
     if (auto typed_state = downstream_connection->streamInfo()
                                .filterState()
@@ -724,8 +674,61 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
+  std::string original_host_value = std::string(headers.getHostValue());
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
+
+  // Configure SNI and SAN
+  if (upstream_http_protocol_options.has_value() &&
+      (upstream_http_protocol_options.value().auto_sni() ||
+       upstream_http_protocol_options.value().auto_san_validation())) {
+    // Default the header to Host/Authority header.
+    absl::string_view header_value = headers.getHostValue();
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san")) {
+      header_value = original_host_value;
+    }
+
+    // Check whether `override_auto_sni_header` is specified.
+    const auto override_auto_sni_header =
+        upstream_http_protocol_options.value().override_auto_sni_header();
+    if (!override_auto_sni_header.empty()) {
+      // Use the header value from `override_auto_sni_header` to set the SNI value.
+      const auto overridden_header_value = Http::HeaderUtility::getAllOfHeaderAsString(
+          headers, Http::LowerCaseString(override_auto_sni_header));
+      if (overridden_header_value.result().has_value() &&
+          !overridden_header_value.result().value().empty()) {
+        header_value = overridden_header_value.result().value();
+      }
+    }
+    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
+    bool should_set_sni = !parsed_authority.is_ip_address_;
+    // `host_` returns a string_view so doing this should be safe.
+    absl::string_view sni_value = parsed_authority.host_;
+
+    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamServerName::key())) {
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamServerName::key(),
+          std::make_unique<Network::UpstreamServerName>(sni_value),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+
+    if (upstream_http_protocol_options.value().auto_san_validation() &&
+        !callbacks_->streamInfo().filterState()->hasDataWithName(
+            Network::UpstreamSubjectAltNames::key())) {
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamSubjectAltNames::key(),
+          std::make_unique<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(sni_value)}),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+  }
+
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      *callbacks_->streamInfo().filterState());
+
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
       host->transportSocketFactory().sslCtx() != nullptr,
