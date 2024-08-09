@@ -108,7 +108,7 @@ public:
     // ConnectingToPrimary, which ensures that only the primary stream will be
     // established.
     if (connection_state_ == ConnectionState::ConnectingToFailover) {
-      connection_state_ = ConnectionState::ConnectingToFailover;
+      ASSERT(!ever_connected_to_primary_);
       failover_grpc_stream_->establishNewStream();
     } else {
       ASSERT(connection_state_ == ConnectionState::None ||
@@ -130,6 +130,7 @@ public:
   // Sends a message using the underlying stream.
   void sendMessage(const RequestType& request) override {
     if (connectingToOrConnectedToFailover()) {
+      ASSERT(!ever_connected_to_primary_);
       failover_grpc_stream_->sendMessage(request);
       return;
     }
@@ -271,6 +272,7 @@ private:
       // Calling the onStreamEstablished() callback on the GrpcMux object will
       // trigger the GrpcMux to start sending requests.
       ASSERT(parent_.connection_state_ == ConnectionState::ConnectingToFailover);
+      ASSERT(!parent_.ever_connected_to_primary_);
       parent_.grpc_mux_callbacks_.onStreamEstablished();
     }
 
@@ -304,6 +306,7 @@ private:
     void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
                              ControlPlaneStats& control_plane_stats) override {
       ASSERT(parent_.connectingToOrConnectedToFailover());
+      ASSERT(!parent_.ever_connected_to_primary_);
       // Received a response from the failover. The failover is now considered available (no going
       // back to the primary will be attempted).
       parent_.connection_state_ = ConnectionState::ConnectedToFailover;

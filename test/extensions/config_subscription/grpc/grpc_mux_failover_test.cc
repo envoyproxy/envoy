@@ -621,6 +621,29 @@ TEST_F(GrpcMuxFailoverTest, OnWriteableConnectedToPrimaryInvoked) {
   primary_callbacks_->onWriteable();
 }
 
+// Validates that when connected to primary, a subsequent call to establishNewStream
+// will not try to recreate the stream.
+TEST_F(GrpcMuxFailoverTest, NoRecreateStreamWhenConnectedToPrimary) {
+  // Validate connected to primary.
+  {
+    connectToPrimary();
+    EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
+    EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
+    grpc_mux_failover_->establishNewStream();
+  }
+}
+
+// Validates that when connected to failover, a subsequent call to establishNewStream
+// will not try to recreate the stream.
+TEST_F(GrpcMuxFailoverTest, NoRecreateStreamWhenConnectedToFailover) {
+  // Validate connected to failover.
+  {
+    connectToFailover();
+    EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
+    EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
+    grpc_mux_failover_->establishNewStream();
+  }
+}
 } // namespace
 } // namespace Config
 } // namespace Envoy
