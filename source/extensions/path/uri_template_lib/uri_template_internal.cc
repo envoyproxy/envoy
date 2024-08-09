@@ -49,6 +49,8 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
 
+constexpr absl::string_view kPathSeparator = "/";
+
 // Visitor for displaying debug info of a ParsedSegment/Variable.var_match.
 struct ToStringVisitor {
   template <typename T> std::string operator()(const T& val) const;
@@ -90,8 +92,7 @@ std::string toString(const Variable val) {
     return absl::StrCat("{", val.name_, "}");
   }
 
-  return absl::StrCat("{", val.name_, "=", absl::StrJoin(val.match_, "/", ToStringFormatter()),
-                      "}");
+  return absl::StrCat("{", val.name_, "=", absl::StrJoin(val.match_, "", ToStringFormatter()), "}");
 }
 
 template <typename T> std::string ToStringVisitor::operator()(const T& val) const {
@@ -118,7 +119,7 @@ alsoUpdatePattern(absl::FunctionRef<absl::StatusOr<ParsedResult<T>>(absl::string
 std::string Variable::debugString() const { return toString(*this); }
 
 std::string ParsedPathPattern::debugString() const {
-  return absl::StrCat("/", absl::StrJoin(parsed_segments_, "/", ToStringFormatter()), suffix_);
+  return absl::StrCat(absl::StrJoin(parsed_segments_, "", ToStringFormatter()), suffix_);
 }
 
 bool isValidLiteral(absl::string_view literal) {
@@ -130,7 +131,7 @@ bool isValidLiteral(absl::string_view literal) {
 
 bool isValidRewriteLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
-      new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
+      new std::string(absl::StrCat("^[", kLiteral, kPathSeparator, "]+$"));
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
   return RE2::FullMatch(literal, *literal_regex);
 }
@@ -141,13 +142,33 @@ bool isValidVariableName(absl::string_view variable) {
 }
 
 absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
-  absl::string_view literal =
-      std::vector<absl::string_view>(absl::StrSplit(pattern, absl::MaxSplits('/', 1)))[0];
-  absl::string_view unparsed_pattern = pattern.substr(literal.size());
-  if (!isValidLiteral(literal)) {
-    return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", literal));
+  // Treat path separator as a normal literal.
+  if (pattern[0] == '/') {
+    return ParsedResult<Literal>(kPathSeparator, pattern.substr(1));
   }
-  return ParsedResult<Literal>(literal, unparsed_pattern);
+
+  absl::string_view literal = std::vector<absl::string_view>(
+      absl::StrSplit(pattern, absl::MaxSplits(kPathSeparator, 1)))[0];
+
+  // Does the literal contain a `{` ? then stop parsing the literal at that position
+  size_t n = literal.find('{');
+
+  // No parens found, treat the whole pattern as literal
+  if (n == absl::string_view::npos) {
+    absl::string_view unparsed_pattern = pattern.substr(literal.size());
+    if (!isValidLiteral(literal)) {
+      return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", literal));
+    }
+    return ParsedResult<Literal>(literal, unparsed_pattern);
+  } else {
+    // We found a pathParam, treat everything left of the start as literal and yield.
+    absl::string_view left_of_pathparam = literal.substr(0, n);
+    absl::string_view unparsed_pattern = pattern.substr(n);
+    if (!isValidLiteral(left_of_pathparam)) {
+      return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", left_of_pathparam));
+    }
+    return ParsedResult<Literal>(left_of_pathparam, unparsed_pattern);
+  }
 }
 
 absl::StatusOr<ParsedResult<Operator>> parseOperator(absl::string_view pattern) {
@@ -189,7 +210,9 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
   }
   while (!pattern_item.empty()) {
     absl::variant<Operator, Literal> match;
-    if (pattern_item[0] == '*') {
+    // This must be the first match of glob, otherwise we never allow multiple operators in a row
+    if (pattern_item[0] == '*' &&
+        (var.match_.empty() || !absl::holds_alternative<Operator>(var.match_.back()))) {
 
       absl::StatusOr<Operator> status = alsoUpdatePattern<Operator>(parseOperator, &pattern_item);
       if (!status.ok()) {
@@ -197,6 +220,11 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
       }
       match = *std::move(status);
 
+    } else if (pattern_item[0] != '/' &&
+               (!var.match_.empty() && absl::holds_alternative<Operator>(var.match_.back()))) {
+      // A literal cannot be prepended by operator in variable match
+      return absl::InvalidArgumentError("Invalid variable match, path cannot directly be prepended "
+                                        "by operator, is a slash missing?");
     } else {
       absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &pattern_item);
       if (!status.ok()) {
@@ -205,13 +233,6 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
       match = *std::move(status);
     }
     var.match_.push_back(match);
-    if (!pattern_item.empty()) {
-      if (pattern_item[0] != '/' || pattern_item.size() == 1) {
-        return absl::InvalidArgumentError(
-            fmt::format("Invalid variable match: \"{}\"", pattern_item));
-      }
-      pattern_item = pattern_item.substr(1);
-    }
   }
 
   return ParsedResult<Variable>(var, unparsed_pattern);
@@ -278,6 +299,27 @@ absl::Status validateNoOperatorAfterTextGlob(const struct ParsedPathPattern& pat
   return absl::OkStatus();
 }
 
+absl::Status validateNoDoublePathSeparator(const struct ParsedPathPattern& pattern) {
+  bool previous_was_path_separator = false;
+  for (const ParsedSegment& segment : pattern.parsed_segments_) {
+    bool current_is_separator = false;
+    if (absl::holds_alternative<Literal>(segment)) {
+      current_is_separator = (absl::get<Literal>(segment) == kPathSeparator);
+    } else if (absl::holds_alternative<Variable>(segment)) {
+      Variable v = absl::get<Variable>(segment);
+      if (!v.match_.empty() && absl::holds_alternative<Literal>(v.match_.front())) {
+        current_is_separator = (absl::get<Literal>(v.match_.front()) == kPathSeparator);
+      }
+    }
+    if (previous_was_path_separator && current_is_separator) {
+      return absl::InvalidArgumentError(
+          "Double slashes (/) detected in uri_template, this is not allowed.");
+    }
+    previous_was_path_separator = current_is_separator;
+  }
+  return absl::OkStatus();
+}
+
 absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path) {
   struct ParsedPathPattern parsed_pattern;
 
@@ -285,9 +327,6 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
   if (!RE2::FullMatch(path, *printable_regex)) {
     return absl::InvalidArgumentError(fmt::format("Invalid pattern: \"{}\"", path));
   }
-
-  // Parse the leading '/'
-  path = path.substr(1);
 
   // Do the initial lexical parsing.
   while (!path.empty()) {
@@ -312,31 +351,8 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
       segment = *std::move(status);
     }
     parsed_pattern.parsed_segments_.push_back(segment);
-
-    // Deal with trailing '/' or suffix.
-    if (!path.empty()) {
-      if (path == "/") {
-        // Single trailing '/' at the end, mark this with empty literal.
-        parsed_pattern.parsed_segments_.emplace_back("");
-        break;
-      } else if (path[0] == '/') {
-        // Have '/' followed by more text, parse the '/'.
-        path = path.substr(1);
-      } else {
-        // Not followed by '/', treat as suffix.
-        absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &path);
-        if (!status.ok()) {
-          return status.status();
-        }
-        parsed_pattern.suffix_ = *std::move(status);
-        if (!path.empty()) {
-          // Suffix didn't parse whole remaining pattern ('/' in path).
-          return absl::InvalidArgumentError("Prefix match not supported.");
-        }
-        break;
-      }
-    }
   }
+
   absl::StatusOr<absl::flat_hash_set<absl::string_view>> status =
       gatherCaptureNames(parsed_pattern);
   if (!status.ok()) {
@@ -347,6 +363,10 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
   absl::Status validate_status = validateNoOperatorAfterTextGlob(parsed_pattern);
   if (!validate_status.ok()) {
     return validate_status;
+  }
+  absl::Status validate_double_path_status = validateNoDoublePathSeparator(parsed_pattern);
+  if (!validate_double_path_status.ok()) {
+    return validate_double_path_status;
   }
 
   return parsed_pattern;
@@ -359,7 +379,8 @@ std::string toRegexPattern(absl::string_view pattern) {
 
 std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
-  static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
+  static const std::string* kTextGlobRegex =
+      new std::string(absl::StrCat("[", kLiteral, kPathSeparator, "]*"));
   switch (pattern) {
   case Operator::PathGlob: // "*"
     return *kPathGlobRegex;
@@ -373,12 +394,12 @@ std::string toRegexPattern(const Variable& pattern) {
   return absl::StrCat("(?P<", pattern.name_, ">",
                       pattern.match_.empty()
                           ? toRegexPattern(kDefaultVariableOperator)
-                          : absl::StrJoin(pattern.match_, "/", ToRegexPatternFormatter()),
+                          : absl::StrJoin(pattern.match_, "", ToRegexPatternFormatter()),
                       ")");
 }
 
 std::string toRegexPattern(const struct ParsedPathPattern& pattern) {
-  return absl::StrCat("/", absl::StrJoin(pattern.parsed_segments_, "/", ToRegexPatternFormatter()),
+  return absl::StrCat(absl::StrJoin(pattern.parsed_segments_, "", ToRegexPatternFormatter()),
                       toRegexPattern(pattern.suffix_));
 }
 
