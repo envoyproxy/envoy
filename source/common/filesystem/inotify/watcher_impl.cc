@@ -54,7 +54,10 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
 
 absl::Status WatcherImpl::onInotifyEvent() {
   while (true) {
-    uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
+    // The buffer needs to be suitably aligned to store the first inotify_event structure.
+    // If there are multiple events returned by the read call, the kernel is responsible for
+    // properly aligning subsequent inotify_event structures (per `man inotify`).
+    alignas(inotify_event) uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
     ssize_t rc = read(inotify_fd_, &buffer, sizeof(buffer));
     if (rc == -1 && errno == EAGAIN) {
       return absl::OkStatus();
