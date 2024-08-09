@@ -53,7 +53,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   auto filter_config = std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
-      server_context.api(), cache_manager_factory);
+      server_context.api(), context.serverFactoryContext(), cache_manager_factory);
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
@@ -104,18 +104,22 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     auth_grpc_service = &grpc_service;
   }
 
-  return [auth_grpc_service, &context, splitter, filter_config, timeout_ms](Network::FilterManager& filter_manager) -> void {
+  return [auth_grpc_service, &context, splitter, filter_config,
+          timeout_ms](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl decoder_factory;
 
     ExternalAuth::ExternalAuthClientPtr&& auth_client{nullptr};
     if (auth_grpc_service != nullptr) {
-      absl::StatusOr<Grpc::AsyncClientFactoryPtr> auth_client_factory_or_error = context.serverFactoryContext()
-        .clusterManager()
-        .grpcAsyncClientManager()
-        .factoryForGrpcService(*auth_grpc_service, context.scope(), true);
+      absl::StatusOr<Grpc::AsyncClientFactoryPtr> auth_client_factory_or_error =
+          context.serverFactoryContext()
+              .clusterManager()
+              .grpcAsyncClientManager()
+              .factoryForGrpcService(*auth_grpc_service, context.scope(), true);
       THROW_IF_STATUS_NOT_OK(auth_client_factory_or_error, throw);
 
-      auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(auth_client_factory_or_error.value()->createUncachedRawAsyncClient(), std::chrono::milliseconds(timeout_ms));
+      auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(
+          auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+          std::chrono::milliseconds(timeout_ms));
     }
 
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(

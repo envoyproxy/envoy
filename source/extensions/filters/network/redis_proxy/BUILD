@@ -111,10 +111,10 @@ envoy_cc_library(
     hdrs = ["external_auth.h"],
     deps = [
         ":command_splitter_lib",
-        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
+        "//source/common/grpc:async_client_lib",
         "//source/common/grpc:typed_async_client_lib",
-        "//source/common/grpc:async_client_lib"
-    ]
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

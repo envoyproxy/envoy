@@ -1,10 +1,14 @@
+#pragma once
+
 #include <string>
 
-#include "command_splitter.h"
-#include "envoy/service/redis_auth/v3/redis_external_auth.pb.h"
 #include "envoy/grpc/async_client.h"
-#include "google/protobuf/timestamp.pb.h"
+#include "envoy/service/redis_auth/v3/redis_external_auth.pb.h"
+
 #include "source/common/grpc/typed_async_client.h"
+#include "source/common/protobuf/protobuf.h"
+
+#include "command_splitter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,12 +61,15 @@ public:
   virtual ~AuthenticateCallback() = default;
 
   /**
-   * Called when the authenticate request is complete. The resulting AuthenticateResponsePtr is supplied.
+   * Called when the authenticate request is complete. The resulting AuthenticateResponsePtr is
+   * supplied.
    */
-  virtual void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request, AuthenticateResponsePtr&& response) PURE;
+  virtual void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
+                                      AuthenticateResponsePtr&& response) PURE;
 };
 
-using GrpcExternalAuthClientAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>;
+using GrpcExternalAuthClientAsyncCallbacks =
+    Grpc::AsyncRequestCallbacks<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>;
 
 /**
  * External authentication client.
@@ -84,7 +91,10 @@ public:
    * @param username supplies the username. (optional, can be empty)
    * @param password supplies the password.
    */
-  virtual void authenticateExternal(AuthenticateCallback& callback, CommandSplitter::SplitCallbacks& pending_request, const StreamInfo::StreamInfo& stream_info, std::string username, std::string password) PURE;
+  virtual void authenticateExternal(AuthenticateCallback& callback,
+                                    CommandSplitter::SplitCallbacks& pending_request,
+                                    const StreamInfo::StreamInfo& stream_info, std::string username,
+                                    std::string password) PURE;
 };
 
 using ExternalAuthClientPtr = std::unique_ptr<ExternalAuthClient>;
@@ -97,22 +107,27 @@ class GrpcExternalAuthClient : public GrpcExternalAuthClientAsyncCallbacks,
                                public ExternalAuthClient {
 public:
   GrpcExternalAuthClient(const Grpc::RawAsyncClientSharedPtr& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                         const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcExternalAuthClient() override;
 
   void cancel() override;
 
-  void authenticateExternal(AuthenticateCallback& callback, CommandSplitter::SplitCallbacks& pending_request, const StreamInfo::StreamInfo& stream_info, std::string username, std::string password) override;
+  void authenticateExternal(AuthenticateCallback& callback,
+                            CommandSplitter::SplitCallbacks& pending_request,
+                            const StreamInfo::StreamInfo& stream_info, std::string username,
+                            std::string password) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
-                 Tracing::Span& span) override;
+  void onSuccess(
+      std::unique_ptr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
+      Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
 private:
-  Grpc::AsyncClient<envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest, envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>
+  Grpc::AsyncClient<envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest,
+                    envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;

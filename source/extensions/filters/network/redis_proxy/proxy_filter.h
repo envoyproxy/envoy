@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bits/types/time_t.h>
+
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -13,6 +14,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/real_time_system.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
@@ -53,7 +55,7 @@ public:
   ProxyFilterConfig(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
       Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-      Api::Api& api,
+      Api::Api& api, Server::Configuration::CommonFactoryContext& context,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   const Network::DrainDecision& drain_decision_;
@@ -63,6 +65,7 @@ public:
   ProxyStats stats_;
   const std::string downstream_auth_username_;
   std::vector<std::string> downstream_auth_passwords_;
+  TimeSource& timeSource() const { return time_source_; };
   const bool external_auth_enabled_;
   const bool external_auth_expiration_enabled_;
 
@@ -74,6 +77,7 @@ private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
   getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
+  TimeSource& time_source_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -89,7 +93,8 @@ class ProxyFilter : public Network::ReadFilter,
                     public ExternalAuth::AuthenticateCallback {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config, ExternalAuth::ExternalAuthClientPtr&& auth_client);
+              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config,
+              ExternalAuth::ExternalAuthClientPtr&& auth_client);
   ~ProxyFilter() override;
 
   // Network::ReadFilter
@@ -106,7 +111,8 @@ public:
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
   // AuthenticateCallback
-  void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request, ExternalAuth::AuthenticateResponsePtr&& response) override;
+  void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
+                              ExternalAuth::AuthenticateResponsePtr&& response) override;
 
   bool connectionAllowed();
 
@@ -155,7 +161,6 @@ private:
   bool connection_allowed_;
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
-  RealTimeSource time_source_;
   ExternalAuth::ExternalAuthClientPtr auth_client_;
   ExternalAuthCallStatus external_auth_call_status_;
   int64_t external_auth_expiration_epoch_;
