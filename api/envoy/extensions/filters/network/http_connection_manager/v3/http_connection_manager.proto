@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 58]
+// [#next-free-field: 59]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -446,6 +446,21 @@ message HttpConnectionManager {
   // applicable to both HTTP1 and HTTP2 requests.
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+
+  // If set to true, Envoy will not start a drain timer for downstream HTTP1 connections after
+  // :ref:`common_http_protocol_options.max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` passes.
+  // Instead, Envoy will wait for the next downstream request, add connection:close to the response
+  // headers, then close the connection after the stream ends.
+  //
+  // This behavior is compliant with `RFC 9112 section 9.6 <https://www.rfc-editor.org/rfc/rfc9112#name-tear-down>`_
+  //
+  // If set to false, ``max_connection_duration`` will cause Envoy to enter the normal drain
+  // sequence for HTTP1 with Envoy eventually closing the connection (once there are no active
+  // streams).
+  //
+  // Has no effect if ``max_connection_duration`` is unset. Defaults to false.
+  bool http1_safe_max_connection_duration = 58;
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   // [#comment:TODO: The following fields are ignored when the

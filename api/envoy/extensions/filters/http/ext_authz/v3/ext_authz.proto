@@ -57,12 +57,11 @@ message ExtAuthz {
   //
   //  1. When set to true, the filter will ``accept`` client request even if the communication with
   //  the authorization service has failed, or if the authorization service has returned a HTTP 5xx
-  //  error. In case with GRPC authorization service, only PermissionDenied (7) and Unauthenticated (16)
-  //  status codes will ``reject`` client requests. And other GRPC statuses will ``accept`` client requests.
+  //  error.
   //
   //  2. When set to false, ext-authz will ``reject`` client requests and return a ``Forbidden``
   //  response if the communication with the authorization service has failed, or if the
-  //  authorization service has returned a HTTP 5xx error or any non-Ok GRPC status.
+  //  authorization service has returned a HTTP 5xx error.
   //
   // Note that errors can be ``always`` tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
