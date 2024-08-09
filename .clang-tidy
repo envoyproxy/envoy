@@ -83,6 +83,7 @@ CheckOptions:
     |Returns(Default)?WorkerId$|
     |^sched_getaffinity$|
     |^shutdownThread_$|
+    |^envoy_dynamic_module(.*)$|
     |TEST|
     |^use_count$)
 - key: readability-identifier-naming.ParameterCase
