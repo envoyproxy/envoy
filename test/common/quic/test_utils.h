@@ -277,7 +277,8 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header)
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
-                                                            quic::HuffmanEncoding::kEnabled);
+                                                            quic::HuffmanEncoding::kEnabled,
+                                                            quic::CookieCrumbling::kEnabled);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.
