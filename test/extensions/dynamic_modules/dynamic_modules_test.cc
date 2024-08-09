@@ -76,7 +76,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages,
-                         testing::Values("c", "go"), // TODO: Rust.
+                         testing::Values("c"), // TODO: Other languages.
                          DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModuleTestLanguages, LoadNoOp) {

@@ -25,16 +25,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-sh_test(
-    name = "ensure_Go_SDK_identical_abi_header",
-    srcs = ["ensure_identical_abi_headers.sh"],
-    args = [
-        "$(location //source/extensions/dynamic_modules:abi.h)",
-        "$(location //source/extensions/dynamic_modules/sdk/go:abi.h)",
-    ],
-    data = [
-        "//source/extensions/dynamic_modules:abi.h",
-        "//source/extensions/dynamic_modules/sdk/go:abi.h",
-    ],
-)
