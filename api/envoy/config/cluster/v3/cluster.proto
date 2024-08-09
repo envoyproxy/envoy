@@ -750,8 +750,7 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
-  // Refer to :ref:`delayed_dns <envoy_v3_api_field_config.cluster.v3.Cluster.delayed_dns>`
-  // for more information.
+  // [#not-implemented-hide:]
   message DelayedDns {
   }
 
@@ -1022,7 +1021,7 @@ message Cluster {
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
   // [#not-implemented-hide:]
-  // Optionally configures on-demand DNS resolution configuration. Note that this field controls the behavior of the cluster,
+  // Configures on-demand DNS resolution configuration. Note that this field controls the behavior of the cluster,
   // not the DNS resolver itself (use
   // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
   // for those use-cases). At present there are 2 modes: DISABLED and DELAYED. DISABLED mode persists the background,
