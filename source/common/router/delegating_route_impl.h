@@ -74,6 +74,7 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
   absl::optional<std::string>
