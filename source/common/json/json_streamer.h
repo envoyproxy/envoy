@@ -6,11 +6,38 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Json {
+
+class BufferTemplate {
+public:
+  BufferTemplate(Buffer::Instance& buffer) : buffer_(buffer) {}
+
+  void add(absl::string_view a) { buffer_.addFragments({a}); }
+
+  void add(absl::string_view a, absl::string_view b, absl::string_view c) {
+    buffer_.addFragments({a, b, c});
+  }
+
+  Buffer::Instance& buffer_;
+};
+
+class StringTemplate {
+public:
+  StringTemplate(std::string& buffer) : string_(buffer) {}
+
+  void add(absl::string_view a) { absl::StrAppend(&string_, a); }
+  void add(absl::string_view a, absl::string_view b, absl::string_view c) {
+    absl::StrAppend(&string_, a, b, c);
+  }
+
+private:
+  std::string& string_;
+};
 
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
@@ -19,7 +46,7 @@ namespace Json {
  * require building an intermediate data structure with redundant copies of all
  * strings, maps, and arrays.
  */
-class Streamer {
+template <class StringBuffer> class Streamer {
 public:
   using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool>;
 
@@ -29,7 +56,7 @@ public:
    *                 the entire json structure in memory before streaming it to
    *                 the network.
    */
-  explicit Streamer(Buffer::Instance& response) : response_(response) {}
+  explicit Streamer(StringBuffer& response) : response_(response) {}
 
   class Array;
   using ArrayPtr = std::unique_ptr<Array>;
@@ -220,7 +247,7 @@ private:
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) { response_.addFragments({str}); }
+  void addConstantString(absl::string_view str) { response_.add(str); }
 
 #ifndef NDEBUG
   /**
@@ -239,7 +266,7 @@ private:
   void pop(Level* level);
 #endif
 
-  Buffer::Instance& response_;
+  StringBuffer& response_;
   std::string sanitize_buffer_;
 
 #ifndef NDEBUG
@@ -251,3 +278,5 @@ private:
 
 } // namespace Json
 } // namespace Envoy
+
+#include "source/common/json/json_streamer.cc"
