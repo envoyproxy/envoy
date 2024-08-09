@@ -35,15 +35,10 @@ public:
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
   }
-  std::string rulesStatPrefix() const { return rules_stat_prefix_; }
-
-  std::string shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
 
   bool perRuleStatsEnabled() const { return per_rule_stats_; }
 
 private:
-  const std::string rules_stat_prefix_;
-  const std::string shadow_rules_stat_prefix_;
   ActionValidationVisitor action_validation_visitor_;
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
@@ -62,11 +57,23 @@ public:
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
-  std::string shadowEffectivePolicyIdField(const Http::StreamFilterCallbacks* callbacks) const;
-  std::string shadowEngineResultField(const Http::StreamFilterCallbacks* callbacks) const;
+  std::string shadowEffectivePolicyIdField() const {
+    return shadow_rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField;
+  }
+  std::string shadowEngineResultField() const {
+    return shadow_rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
+  }
 
-  std::string enforcedEffectivePolicyIdField(const Http::StreamFilterCallbacks* callbacks) const;
-  std::string enforcedEngineResultField(const Http::StreamFilterCallbacks* callbacks) const;
+  std::string enforcedEffectivePolicyIdField() const {
+    return rules_stat_prefix_ + Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
+                                    .EnforcedEffectivePolicyIdField;
+  }
+  std::string enforcedEngineResultField() const {
+    return rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EnforcedEngineResultField;
+  }
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(const Http::StreamFilterCallbacks* callbacks,
