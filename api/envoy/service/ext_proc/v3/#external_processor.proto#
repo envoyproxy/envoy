@@ -281,10 +281,10 @@ message CommonResponse {
   // If set, provide additional direction on how the Envoy proxy should
   // handle the rest of the HTTP filter chain.
   ResponseStatus status = 1 [(validate.rules).enum = {defined_only: true}];
-
-  // Instructions on how to manipulate the headers. When responding to an
   // HttpBody request, header mutations will only take effect if
-  // the current processing mode for the body is BUFFERED or STREAMED_BEFORE_HEADER_RESP.
+  // the current processing mode for the body is: 1) BUFFERED; 2) or STREAMED and
+  // the below filter configuration is enabled:
+  // [#comment:TODO :ref:`continue_body_streaming_without_header_resp <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.continue_body_streaming_without_header_resp>]`
   HeaderMutation header_mutation = 2;
 
   // Replace the body of the last message sent to the remote server on this
