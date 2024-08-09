@@ -155,6 +155,9 @@ new_features:
   change: |
     Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
     ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
+- area: http_11_proxy
+  change: |
+    Added the option to configure the transport socket via locality or endpoint metadata.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
