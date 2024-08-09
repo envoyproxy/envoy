@@ -1849,8 +1849,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response->waitForEndStream());
   }
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
@@ -1884,8 +1882,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response->waitForEndStream());
   }
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
