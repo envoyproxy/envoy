@@ -328,7 +328,6 @@ steps:
     else
         sudo chown -R azure-pipelines:azure-pipelines ${{ parameters.pathCacheTemp }}/all
     fi
-
   displayName: "Cache/save (${{ parameters.cacheName}})"
   condition: and(succeeded(), ne('${{ parameters.cacheName }}', ''), ne(variables.CACHE_RESTORED, 'true'))
 
