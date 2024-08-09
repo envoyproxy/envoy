@@ -42,11 +42,13 @@ namespace Config {
  * used. Any future reconnection attempts will be to the primary source only.
  * However, if no response is received from the primary source, and accessing the primary has
  * failed 2 times in a row, the GrpcMuxFailover will attempt to establish a connection to the
- * failover source. If a response from the failover source is received, it will be the source of
- * configuration until the connection is closed. In case the connection is closed, Envoy will
- * attempt to connect to the primary, before retrying to connect to the failover source.
- * If the failover source is unavailable or a connection to it is closed, the GrpcMuxFailover
- * will alternate between attempts to reconnect to the primary source and the failover source.
+ * failover source. Envoy will keep alternating between the primary and failover sources attempting
+ * to connect to one of them. If a response from the failover source is received, it will be the
+ * source of configuration until the connection is closed. In case the failover connection is
+ * closed, Envoy will attempt to connect to the primary, before retrying to connect to the failover
+ * source. If the failover source is unavailable or a connection to it is closed, the
+ * GrpcMuxFailover will alternate between attempts to reconnect to the primary source and the
+ * failover source.
  * TODO(adisuissa): The number of consecutive failures is currently statically
  * defined, and may be converted to a config field in the future.
  */
