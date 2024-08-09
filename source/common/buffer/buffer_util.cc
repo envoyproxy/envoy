@@ -1,14 +1,7 @@
-#include "source/common/buffer/buffer_util.h"
-
-#include <charconv>
-#include <cstddef>
-
-#include "source/common/common/macros.h"
-
 namespace Envoy {
 namespace Buffer {
 
-void Util::serializeDouble(double number, Buffer::Instance& buffer) {
+template <class T> void Util::serializeDouble(double number, T& buffer) {
   // Converting a double to a string: who would think it would be so complex?
   // It's easy if you don't care about speed or accuracy :). Here we are measuring
   // the speed with test/server/admin/stats_handler_speed_test --benchmark_filter=BM_HistogramsJson
@@ -26,9 +19,9 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   // This version is awkward, and doesn't work on all platforms used in Envoy CI
   // as of August 2023, but it is the fastest correct option on modern compilers.
   char buf[100];
-  std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
-  ENVOY_BUG(result.ec == std::errc{}, std::make_error_code(result.ec).message());
-  buffer.addFragments({absl::string_view(buf, result.ptr - buf)});
+  ::std::to_chars_result result = ::std::to_chars(buf, buf + sizeof(buf), number);
+  ENVOY_BUG(result.ec == ::std::errc{}, ::std::make_error_code(result.ec).message());
+  buffer.add(absl::string_view(buf, result.ptr - buf));
 
   // Note: there is room to speed this up further by serializing the number directly
   // into the buffer. However, buffer does not currently make it easy and fast
@@ -37,7 +30,7 @@ void Util::serializeDouble(double number, Buffer::Instance& buffer) {
   // On older compilers, such as those found on Apple, and gcc, std::to_chars
   // does not work with 'double', so we revert to the next fastest correct
   // implementation.
-  buffer.addFragments({fmt::to_string(number)});
+  buffer.add(fmt::to_string(number));
 #endif
 }
 

@@ -1,6 +1,11 @@
 #pragma once
 
+#include <charconv>
+#include <cstddef>
+
 #include "envoy/buffer/buffer.h"
+
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -20,8 +25,10 @@ public:
    * @param number the number to convert.
    * @param buffer the buffer in which to write the double.
    */
-  static void serializeDouble(double number, Buffer::Instance& buffer);
+  template <class T> static void serializeDouble(double number, T& buffer);
 };
 
 } // namespace Buffer
 } // namespace Envoy
+
+#include "source/common/buffer/buffer_util.cc"
