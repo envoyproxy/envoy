@@ -44,7 +44,7 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
     }
     auto filter = std::make_shared<Filter>(config, dso_lib, worker_id);
     callbacks.addStreamFilter(filter);
-    callbacks.addAccessLogHandler(filter);
+    callbacks.prependAccessLogHandler(filter);
   };
 }
 

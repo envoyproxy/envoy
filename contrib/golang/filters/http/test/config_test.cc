@@ -67,7 +67,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamFilter(_))
       .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); }));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
   std::string str;
   EXPECT_TRUE(plugin_config.SerializeToString(&str));
@@ -96,7 +96,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamFilter(_))
       .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); }));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
   std::string str;
   EXPECT_TRUE(plugin_config.SerializeToString(&str));

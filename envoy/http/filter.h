@@ -1248,6 +1248,13 @@ public:
   virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 
   /**
+   * Prepend an access log handler that is called when the stream is destroyed.
+   * The handler will be called before any previously added handlers.
+   * @param handler supplies the handler to prepend.
+   */
+  virtual void prependAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
+
+  /**
    * Allows filters to access the thread local dispatcher.
    * @param return the worker thread's dispatcher.
    */

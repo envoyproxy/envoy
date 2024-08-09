@@ -122,4 +122,6 @@ func (f *filter) OnLog() {
 	}()
 
 	counter++
+
+	f.callbacks.StreamInfo().DynamicMetadata().Set("golang", "access_log_var", "access_log_var written by Golang filter")
 }
