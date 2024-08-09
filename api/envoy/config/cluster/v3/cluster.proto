@@ -159,17 +159,6 @@ message Cluster {
     USE_DOWNSTREAM_PROTOCOL = 1;
   }
 
-  // Refer to :ref:`on_demand_dns_mode <envoy_v3_api_field_config.cluster.v3.Cluster.on_demand_dns_mode>`
-  // for an explanation of each type.
-  enum OnDemandDNSMode {
-    // On-demand DNS resolution is disabled.
-    DISABLED = 0;
-
-    // Refer to :ref:`on_demand_dns_mode <envoy_v3_api_field_config.cluster.v3.Cluster.on_demand_dns_mode>`
-    // for an explanation of this type.
-    DELAYED = 1;
-  }
-
   // TransportSocketMatch specifies what transport socket config will be used
   // when the match conditions are satisfied.
   message TransportSocketMatch {
@@ -761,6 +750,11 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
+  // Refer to :ref:`delayed_dns <envoy_v3_api_field_config.cluster.v3.Cluster.delayed_dns>`
+  // for more information.
+  message DelayedDns {
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -1027,6 +1021,7 @@ message Cluster {
   // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
+  // [#not-implemented-hide:]
   // Optionally configures on-demand DNS resolution configuration. Note that this field controls the behavior of the cluster,
   // not the DNS resolver itself (use
   // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
@@ -1034,10 +1029,10 @@ message Cluster {
   // asynchronous DNS resolution behavior that, at time of writing, is the default for STRICT_DNS and LOGICAL_DNS clusters.
   // DELAYED mode will delay async DNS resolution until the first connection is made to the cluster in question.
   // Once DNS resolution is complete, async resolution will continue periodically in the background as usual. Note that the latency of
-  // the DNS resolution will affect the first connection's RTT. Consequently, failure to resolve DNS before the connection's idle timeout
+  // the DNS resolution will affect the first connection's RTT. Consequently, failure to resolve DNS before the connect timeout
   // will result in a connection reset. This mode is useful for scenarios where large numbers of clusters must be sent to Envoy for config
   // practicality reasons, but traffic distribution is not uniform across all clusters.
-  OnDemandDNSMode on_demand_dns_mode = 58;
+  DelayedDns delayed_dns = 58;
 
   // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
