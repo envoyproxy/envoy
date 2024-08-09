@@ -228,7 +228,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                               kRcDetailErrorRequestProtoMessageLoggingFailed));
         return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }
-      handleLoggingResult(result.request_data, MetadataType::RQUEST);
+      handleRequestLoggingResult(result.request_data);
     }
 
     auto buf_convert_status = request_msg_converter_->convertBackToBuffer(std::move(message_data));
@@ -258,26 +258,35 @@ Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHead
   ENVOY_STREAM_LOG(debug, "Called Proto Message Logging Filter : {}", *decoder_callbacks_,
                    __func__);
 
+  if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
+    ENVOY_STREAM_LOG(
+        debug,
+        "Response headers is NOT application/grpc content-type. Response is passed through "
+        "without message logging.",
+        *encoder_callbacks_);
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
   if (!extractor_ || response_logging_done_) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  if (end_stream) {
-    const auto status = Envoy::Grpc::Common::getGrpcStatus(headers, true);
-    if (status) {
-      // grpc_backend_status_ = status;
-    }
-  } else if (Envoy::Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
-    // If it is grpc response type and need audit_extraction,
-    // create response_msg_converter to convert response body.
+  // if (end_stream) {
+  //   const auto status = Envoy::Grpc::Common::getGrpcStatus(headers, true);
+  //   if (status) {
+  //     // grpc_backend_status_ = status;
+  //   }
+  //   return Http::FilterHeadersStatus::Continue;
+  // } else {
+    // Create response_msg_converter to convert response body.
     auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
         []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
     response_msg_converter_ = std::make_unique<MessageConverter>(
         std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
-  }
+  // }
 
-  return Envoy::Http::FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Envoy::Http::FilterDataStatus Filter::encodeData(Envoy::Buffer::Instance& data, bool end_stream) {
@@ -343,7 +352,7 @@ Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance&
                               kRcDetailErrorRequestProtoMessageLoggingFailed));
         return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }
-      handleLoggingResult(result.response_data, MetadataType::RESPONSE);
+      handleResponseLoggingResult(result.response_data);
     }
 
     auto buf_convert_status =
@@ -368,42 +377,76 @@ Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance&
   return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::Continue);
 }
 
-void Filter::handleLoggingResult(const std::vector<AuditMetadata>& result,
-                                 MetadataType metadata_type) {
-  RELEASE_ASSERT(extractor_, "`extractor_ should be inited when extracting fields");
+void Filter::handleRequestLoggingResult(const std::vector<AuditMetadata>& result) {
+  RELEASE_ASSERT(extractor_, "`extractor_` should be initialized when extracting fields");
+
+  if (result.empty()) {
+    ENVOY_STREAM_LOG(debug, "No audit fields extracted from request.", *decoder_callbacks_);
+    return;
+  }
 
   Envoy::ProtobufWkt::Struct dest_metadata;
-  for (const AuditMetadata& result_metadata : result) {
-    // RELEASE_ASSERT(result_metadata.target_resource.has_value(),
-    //                "`request_metadata.target_resource` shouldn't be empty");
 
-    RELEASE_ASSERT(result_metadata.scrubbed_message.IsInitialized(),
-                   "`request_metadata.scrubbed_message` should be initialized");
+  auto addResultToMetadata = [&](const std::string& key, const AuditMetadata& metadata) {
+    RELEASE_ASSERT(metadata.scrubbed_message.IsInitialized(),
+                   "`scrubbed_message` should be initialized");
 
-    Envoy::ProtobufWkt::ListValue* list;
-
-    if (metadata_type == MetadataType::RESPONSE) {
-      list = (*dest_metadata.mutable_fields())["responses"].mutable_list_value();
-    } else {
-      list = (*dest_metadata.mutable_fields())["requests"].mutable_list_value();
-    }
-
-    auto struct_value_copy = new Envoy::ProtobufWkt::Struct(result_metadata.scrubbed_message);
+    Envoy::ProtobufWkt::ListValue* list =
+        (*dest_metadata.mutable_fields())[key].mutable_list_value();
+    auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
     list->add_values()->set_allocated_struct_value(struct_value_copy);
+  };
+
+  const auto& first_metadata = result[0];
+  addResultToMetadata("requests.first", first_metadata);
+
+  if (result.size() == 2) {
+    const auto& last_metadata = result[1];
+    addResultToMetadata("requests.last", last_metadata);
   }
 
   if (dest_metadata.fields_size() > 0) {
-    if (metadata_type == MetadataType::RESPONSE) {
-      ENVOY_STREAM_LOG(debug, "injected response dynamic metadata `{}` with `{}`",
-                       *encoder_callbacks_, kFilterName, dest_metadata.DebugString());
-      encoder_callbacks_->streamInfo().setDynamicMetadata(kFilterName, dest_metadata);
-    } else {
-      ENVOY_STREAM_LOG(debug, "injected request dynamic metadata `{}` with `{}`",
-                       *decoder_callbacks_, kFilterName, dest_metadata.DebugString());
-      decoder_callbacks_->streamInfo().setDynamicMetadata(kFilterName, dest_metadata);
-    }
+    ENVOY_STREAM_LOG(debug, "Injected request dynamic metadata `{}` with `{}`", *decoder_callbacks_,
+                     kFilterName, dest_metadata.DebugString());
+    decoder_callbacks_->streamInfo().setDynamicMetadata(kFilterName, dest_metadata);
   }
 }
+
+void Filter::handleResponseLoggingResult(const std::vector<AuditMetadata>& result) {
+  RELEASE_ASSERT(extractor_, "`extractor_` should be initialized when extracting fields");
+
+  if (result.empty()) {
+    ENVOY_STREAM_LOG(debug, "No audit fields extracted from response.", *decoder_callbacks_);
+    return;
+  }
+
+  Envoy::ProtobufWkt::Struct dest_metadata;
+
+  auto addResultToMetadata = [&](const std::string& key, const AuditMetadata& metadata) {
+    RELEASE_ASSERT(metadata.scrubbed_message.IsInitialized(),
+                   "`scrubbed_message` should be initialized");
+
+    Envoy::ProtobufWkt::ListValue* list =
+        (*dest_metadata.mutable_fields())[key].mutable_list_value();
+    auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
+    list->add_values()->set_allocated_struct_value(struct_value_copy);
+  };
+
+  const auto& first_metadata = result[0];
+  addResultToMetadata("responses.first", first_metadata);
+
+  if (result.size() == 2) {
+    const auto& last_metadata = result[1];
+    addResultToMetadata("responses.last", last_metadata);
+  }
+
+  if (dest_metadata.fields_size() > 0) {
+    ENVOY_STREAM_LOG(debug, "Injected response dynamic metadata `{}` with `{}`",
+                     *decoder_callbacks_, kFilterName, dest_metadata.DebugString());
+    encoder_callbacks_->streamInfo().setDynamicMetadata(kFilterName, dest_metadata);
+  }
+}
+
 } // namespace ProtoMessageLogging
 } // namespace HttpFilters
 } // namespace Extensions

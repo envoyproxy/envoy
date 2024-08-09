@@ -55,12 +55,9 @@ private:
 
   HandleDecodeDataStatus handleEncodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
-  enum class MetadataType {
-    RQUEST = 0,
-    RESPONSE = 1,
-  };
+  void handleRequestLoggingResult(const std::vector<AuditMetadata>& result);
 
-  void handleLoggingResult(const std::vector<AuditMetadata>& result, MetadataType metadata_type);
+  void handleResponseLoggingResult(const std::vector<AuditMetadata>& result);
 
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
