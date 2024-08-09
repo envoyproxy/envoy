@@ -208,7 +208,7 @@ void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_nam
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
   std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                  message.DebugString());
+                                  message.GetTypeName());
   throwEnvoyExceptionOrPanic(error);
 }
 
