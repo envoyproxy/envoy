@@ -156,6 +156,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change)
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
+// A flag to enable the usage of the latest JSON formatter for logging.
+// TODO(wbpcode): flip to true after Envoy v1.32.0 is released.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

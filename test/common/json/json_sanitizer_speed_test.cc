@@ -31,6 +31,16 @@ static void BM_NlohmannNoEscape(benchmark::State& state) {
 BENCHMARK(BM_NlohmannNoEscape);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_NlohmannNoEscapeAndExeptionFree(benchmark::State& state) {
+  std::string buffer;
+
+  for (auto _ : state) { // NOLINT
+    Envoy::Json::Utility::escape(pass_through_encoding).toStringView();
+  }
+}
+BENCHMARK(BM_NlohmannNoEscapeAndExeptionFree);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_ProtoEncoderWithEscape(benchmark::State& state) {
   const std::string str = std::string(escaped_encoding);
 
@@ -50,3 +60,13 @@ static void BM_NlohmannWithEscape(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_NlohmannWithEscape);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_NlohmannWithEscapeAndExeptionFree(benchmark::State& state) {
+  std::string buffer;
+
+  for (auto _ : state) { // NOLINT
+    Envoy::Json::Utility::escape(escaped_encoding).toStringView();
+  }
+}
+BENCHMARK(BM_NlohmannWithEscapeAndExeptionFree);

@@ -181,6 +181,15 @@ new_features:
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: access_log
+  change: |
+    Added new JSON access log formatter implementation which provides 16-25x performance improvement over the old
+    implementation. The legacy implementation will be enabled by default for now but will be deprecated and removed
+    in a future release.
+    The :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>` field will
+    be ignored in the new implementation because the new implementation always sorts properties.
+    The new JSON formatter could be enabled by setting the runtime guard
+    ``envoy.reloadable_features.logging_with_fast_json_formatter`` to true.
 - area: dns
   change: |
     Prefer using IPv6 address when addresses from both families are available.
