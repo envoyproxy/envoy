@@ -25,7 +25,7 @@ using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callback
 
 /**
  * Simple struct of additional contextual information of HTTP filter, e.g. filter config name
- * from configuration, canonical filter name, etc.
+ * from configuration, etc.
  */
 struct FilterContext {
   // The name of the filter configuration that used to create related filter factory function.
