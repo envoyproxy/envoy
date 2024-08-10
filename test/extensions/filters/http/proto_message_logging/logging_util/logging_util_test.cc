@@ -33,10 +33,12 @@ namespace HttpFilters {
 namespace ProtoMessageLogging {
 namespace {
 
+using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::FieldMask;
 using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::CordMessageData;
 using ::Envoy::Protobuf::field_extraction::testing::TypeHelper;
+using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
@@ -340,22 +342,86 @@ TEST_F(AuditLoggingUtilTest, RedactStructRecursively_NullptrMessageStruct) {
 }
 
 TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyPath) {
-  Protobuf::Type type;
-  EXPECT_EQ(IsMessageFieldPathPresent(type, type_finder_, "", test_request_raw_proto_).status(),
-            absl::InvalidArgumentError("Field path cannot be empty."));
+  EXPECT_EQ(
+      IsMessageFieldPathPresent(*request_type_, type_finder_, "", test_request_raw_proto_).status(),
+      absl::InvalidArgumentError("Field path cannot be empty."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyType) {
+  Type empty_type;
+  EXPECT_EQ(
+      IsMessageFieldPathPresent(empty_type, type_finder_, "id", test_request_raw_proto_).status(),
+      absl::InvalidArgumentError("Cannot find field 'id' in '' message."));
 }
 
 TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_InvalidPath) {
-  Protobuf::Type type;
-  EXPECT_EQ(IsMessageFieldPathPresent(type, type_finder_, "invalid_path", test_request_raw_proto_)
+  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "invalid_path",
+                                      test_request_raw_proto_)
                 .status(),
-            absl::InvalidArgumentError("Cannot find field 'invalid_path' in '' message."));
+            absl::InvalidArgumentError(
+                "Cannot find field 'invalid_path' in 'logging.TestRequest' message."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_ValidPath) {
+  EXPECT_TRUE(
+      IsMessageFieldPathPresent(*request_type_, type_finder_, "bucket", test_request_raw_proto_)
+          .status()
+          .ok());
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_NotMessageField) {
+  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "repeated_strings",
+                                      test_request_raw_proto_)
+                .status(),
+            absl::InvalidArgumentError("Field 'repeated_strings' is not a message type field."));
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
   EXPECT_EQ(3,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("bucket.objects"), test_request_raw_proto_));
+}
+
+TEST_F(AuditLoggingUtilTest, FindSingularLastValue_SingleStringField) {
+  Field field;
+  field.set_name("id");
+  field.set_number(1);
+  field.set_kind(Field::TYPE_INT64);
+
+  std::string data = "123445";
+  auto result = FindSingularLastValue(
+      &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(result.value(), "");
+}
+
+TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedStringField) {
+  Field field;
+  field.set_name("repeated_strings");
+  field.set_number(3);
+  field.set_kind(Field::TYPE_STRING);
+  field.set_cardinality(Field::CARDINALITY_REPEATED);
+
+  std::string data = "repeated-string-0";
+  auto result = FindSingularLastValue(
+      &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value(), "repeated-string-0");
+}
+
+TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedMessageField) {
+  Field field;
+  field.set_name("bucket");
+  field.set_number(2);
+  field.set_kind(Field::TYPE_STRING);
+
+  std::string data = "test-bucket";
+  auto result = FindSingularLastValue(
+      &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(
+      result.value(),
+      "\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-1\x1A\rtest-object-2\x1A\rtest-object-3");
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_string) {

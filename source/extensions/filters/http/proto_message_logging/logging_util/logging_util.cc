@@ -296,8 +296,7 @@ absl::StatusOr<std::string> FindSignularLastValue(const Field* field,
   while (FieldExtractor::SearchField(*field, input_stream)) {
     if (input_stream->CurrentPosition() == position) {
       return absl::InvalidArgumentError(
-          "The request message is malformed with endless values for a "
-          "single field.");
+          "The request message is malformed with endless values for a single field.");
     }
     position = input_stream->CurrentPosition();
     if (field->kind() == Field::TYPE_STRING) {
@@ -402,7 +401,7 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
           absl::Substitute("Field '$0' is not a message type field.", field->name()));
     } else if (field->cardinality() == Field::CARDINALITY_REPEATED) {
       return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is not a sigular field.", field->name()));
+          absl::Substitute("Field '$0' is not a singular field.", field->name()));
     } else { // singular message field
       return FieldExtractor::SearchField(*field, input_stream);
     }
