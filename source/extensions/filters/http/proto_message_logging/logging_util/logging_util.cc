@@ -289,7 +289,7 @@ void RedactPaths(absl::Span<const std::string> paths_to_redact, Struct* proto_st
 // Finds the last value of the non-repeated string field after the first value.
 // Returns an empty string if there is only one string field. Returns an error
 // if the resource is malformed in case that the search goes forever.
-absl::StatusOr<std::string> FindSignularLastValue(const Field* field,
+absl::StatusOr<std::string> FindSingularLastValue(const Field* field,
                                                   CodedInputStream* input_stream) {
   std::string resource;
   int position = input_stream->CurrentPosition();
@@ -316,7 +316,7 @@ absl::StatusOr<std::string> FindSignularLastValue(const Field* field,
 absl::StatusOr<std::string> SingularFieldUseLastValue(const std::string first_value,
                                                       const Field* field,
                                                       CodedInputStream* input_stream) {
-  ASSIGN_OR_RETURN(std::string last_value, FindSignularLastValue(field, input_stream));
+  ASSIGN_OR_RETURN(std::string last_value, FindSingularLastValue(field, input_stream));
   if (last_value.empty())
     return first_value;
   return last_value;
