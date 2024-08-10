@@ -137,6 +137,8 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
 };
 
+using GrpcExternalAuthClientPtr = std::unique_ptr<GrpcExternalAuthClient>;
+
 } // namespace ExternalAuth
 } // namespace RedisProxy
 } // namespace NetworkFilters

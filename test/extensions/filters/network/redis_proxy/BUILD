@@ -88,6 +88,19 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "external_auth_test",
+    srcs = ["external_auth_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    deps = [
+        ":redis_mocks",
+        "//source/extensions/filters/network/redis_proxy:external_auth_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_mock(
     name = "redis_mocks",
     srcs = ["mocks.cc"],

@@ -165,11 +165,11 @@ public:
 
   void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
                               AuthenticateResponsePtr&& response) override {
-    onAuthenticateExternal_(request, std::move(response));
+    onAuthenticateExternal_(request, response);
   }
 
   MOCK_METHOD(void, onAuthenticateExternal_,
-              (CommandSplitter::SplitCallbacks & request, AuthenticateResponsePtr&& response));
+              (CommandSplitter::SplitCallbacks & request, AuthenticateResponsePtr& response));
 };
 
 } // namespace ExternalAuth

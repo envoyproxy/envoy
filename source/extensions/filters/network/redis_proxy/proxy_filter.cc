@@ -174,7 +174,7 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
   } else if (response->status == ExternalAuth::AuthenticationRequestStatus::Unauthorized) {
     redis_response->type(Common::Redis::RespType::Error);
     std::string message = response->message.empty() ? "unauthorized" : response->message;
-    redis_response->asString() = fmt::format("ERR {}", message);
+    redis_response->asString() = fmt::format("WRONGPASS {}", message);
     connection_allowed_ = false;
   } else {
     redis_response->type(Common::Redis::RespType::Error);

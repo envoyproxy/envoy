@@ -1,8 +1,10 @@
+#include <chrono>
 #include <memory>
 #include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -29,6 +31,7 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::WithArg;
+using testing::WithArgs;
 
 namespace Envoy {
 namespace Extensions {
@@ -230,6 +233,51 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword2");
 }
 
+TEST_F(RedisProxyFilterConfigTest, ExternalAuthBasic) {
+  const std::string yaml_string = R"EOF(
+  prefix_routes:
+    catch_all_route:
+      cluster: fake_cluster
+  stat_prefix: foo
+  settings:
+    op_timeout: 0.01s
+  external_auth_provider:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake_cluster
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+      parseProtoFromYaml(yaml_string);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           context_.server_factory_context_, *this);
+  EXPECT_TRUE(config.external_auth_enabled_);
+  EXPECT_FALSE(config.external_auth_expiration_enabled_);
+}
+
+TEST_F(RedisProxyFilterConfigTest, ExternalAuthWithExpiration) {
+  const std::string yaml_string = R"EOF(
+  prefix_routes:
+    catch_all_route:
+      cluster: fake_cluster
+  stat_prefix: foo
+  settings:
+    op_timeout: 0.01s
+  external_auth_provider:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake_cluster
+    enable_auth_expiration: true
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+      parseProtoFromYaml(yaml_string);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           context_.server_factory_context_, *this);
+  EXPECT_TRUE(config.external_auth_enabled_);
+  EXPECT_TRUE(config.external_auth_expiration_enabled_);
+}
+
 class RedisProxyFilterTest
     : public testing::Test,
       public Common::Redis::DecoderFactory,
@@ -257,8 +305,17 @@ public:
     config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
                                                   drain_decision_, runtime_, api_,
                                                   context_.server_factory_context_, *this);
-    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
-                                            config_, nullptr);
+
+    if (config_->external_auth_enabled_) {
+      external_auth_client_ = new ExternalAuth::MockExternalAuthClient();
+      filter_ = std::make_unique<ProxyFilter>(
+          *this, Common::Redis::EncoderPtr{encoder_}, splitter_, config_,
+          ExternalAuth::ExternalAuthClientPtr{external_auth_client_});
+    } else {
+      filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
+                                              config_, nullptr);
+    }
+
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
@@ -296,6 +353,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Api::MockApi> api_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  ExternalAuth::MockExternalAuthClient* external_auth_client_;
 };
 
 class RedisProxyFilterTestWithTwoCallbacks : public RedisProxyFilterTest {
@@ -927,6 +985,231 @@ TEST_F(RedisProxyFilterWithAuthAclMultiplePasswordsTest, AuthAclPasswordIncorrec
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
         callbacks.onAuth("someusername", "wrongpassword");
         // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+const std::string external_auth_expiration_config = R"EOF(
+prefix_routes:
+  catch_all_route:
+      cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.01s
+external_auth_provider:
+  grpc_service:
+    envoy_grpc:
+      cluster_name: fake_cluster
+  enable_auth_expiration: true
+)EOF";
+
+class RedisProxyFilterWithExternalAuthAndExpiration : public RedisProxyFilterTest {
+public:
+  RedisProxyFilterWithExternalAuthAndExpiration()
+      : RedisProxyFilterTest(external_auth_expiration_config) {}
+
+protected:
+  Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
+};
+
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordWrong) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_CALL(*external_auth_client_,
+                    authenticateExternal(_, _, _, EMPTY_STRING, "wrongpassword"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>(
+                          ExternalAuth::AuthenticateResponse{});
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Unauthorized;
+                  auth_response->message = "sorry, invalid password";
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS sorry, invalid password";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("wrongpassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswordWrong) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_CALL(*external_auth_client_,
+                    authenticateExternal(_, _, _, "wrongusername", "wrongpassword"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>(
+                          ExternalAuth::AuthenticateResponse{});
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Unauthorized;
+                  auth_response->message = "ooops, invalid password and username";
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::Error);
+        reply->asString() = "WRONGPASS ooops, invalid password and username";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("wrongusername", "wrongpassword");
+        // callbacks cannot be accessed now.
+        EXPECT_FALSE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswordCorrect) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, "username", "password"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>(
+                          ExternalAuth::AuthenticateResponse{});
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
+                  auto time = mock_time_source_.systemTime() + std::chrono::hours(1);
+                  auth_response->expiration.set_seconds(
+                      duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("username", "password");
+        // callbacks can be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrect) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, EMPTY_STRING, "password"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>(
+                          ExternalAuth::AuthenticateResponse{});
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
+                  auto time = mock_time_source_.systemTime() + std::chrono::hours(1);
+                  auth_response->expiration.set_seconds(
+                      duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("password");
+        // callbacks can be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrectButThenExpires) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(request));
+  }));
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        EXPECT_FALSE(callbacks.connectionAllowed());
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, EMPTY_STRING, "password"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>(
+                          ExternalAuth::AuthenticateResponse{});
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
+                  auto time = mock_time_source_.systemTime() + std::chrono::hours(1);
+                  auth_response->expiration.set_seconds(
+                      duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+        reply->type(Common::Redis::RespType::SimpleString);
+        reply->asString() = "OK";
+        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+        callbacks.onAuth("password");
+        // callbacks can be accessed now.
+        EXPECT_TRUE(filter_->connectionAllowed());
+        // but then expiration passes
+        mock_time_source_.advanceTimeWait(std::chrono::hours(2));
+        // and callbacks are not accessible anymore
         EXPECT_FALSE(filter_->connectionAllowed());
         return nullptr;
       }));
