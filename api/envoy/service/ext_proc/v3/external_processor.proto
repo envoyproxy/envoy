@@ -284,7 +284,7 @@ message CommonResponse {
 
   // Instructions on how to manipulate the headers. When responding to an
   // HttpBody request, header mutations will only take effect if
-  // the current processing mode for the body is BUFFERED or STREAMED_BEFORE_HEADER_RESP.
+  // the current processing mode for the body is BUFFERED or STREAMED_AS_ARRIVE.
   HeaderMutation header_mutation = 2;
 
   // Replace the body of the last message sent to the remote server on this
