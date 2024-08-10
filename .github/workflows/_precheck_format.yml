@@ -1,4 +1,4 @@
-name: Precheck/deps
+name: Precheck/format
 
 permissions:
   contents: read
@@ -6,9 +6,6 @@ permissions:
 on:
   workflow_call:
     inputs:
-      dependency-review:
-        type: boolean
-        default: false
       request:
         type: string
         required: true
@@ -17,17 +14,17 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-deps
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-format
   cancel-in-progress: true
 
 
 jobs:
-  deps:
+  format:
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
-    name: ${{ matrix.target }}
+    name: ${{ matrix.name || matrix.target }}
     with:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
@@ -37,23 +34,18 @@ jobs:
         ERROR
         error:
         Error:
-      rbe: ${{ matrix.rbe }}
+      rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
+      upload-name: ${{ matrix.upload-name }}
+      upload-path: ${{ matrix.upload-path }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-        - target: deps
-          rbe: false
-
-  dependency-review:
-    runs-on: ubuntu-22.04
-    if: ${{ inputs.dependency-review }}
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
-      with:
-        ref: ${{ fromJSON(inputs.request).request.sha }}
-        persist-credentials: false
-    - name: Dependency Review
-      uses: actions/dependency-review-action@5a2ce3f5b92ee19cbb1541a4984c76d921601d7c  # v4.3.4
+        - target: format
+          upload-name: fix_format.diff
+          upload-path: /home/runner/work/_temp/fix_format.diff
+        - target: format-api
+          upload-name: fix_proto_format.diff
+          upload-path: /home/runner/work/_temp/fix_proto_format.diff

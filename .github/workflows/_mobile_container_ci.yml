@@ -22,6 +22,9 @@ on:
       command:
         type: string
         default: ./bazelw
+      concurrency-suffix:
+        type: string
+        default: -mobile
       container:
         type: string
       container-output:
@@ -137,6 +140,7 @@ jobs:
       container-command: ${{ inputs.container-command }} ${{ inputs.container || fromJSON(inputs.request).request.build-image.default }}
       container-output: ${{ inputs.container-output }}
       command: ${{ inputs.command }}
+      concurrency-suffix: ${{ inputs.concurrency-suffix }}
       entrypoint: ${{ inputs.entrypoint || inputs.entrypoint-DEFAULT }}
       downloads: ${{ inputs.downloads }}
       error-match: ${{ inputs.error-match }}
