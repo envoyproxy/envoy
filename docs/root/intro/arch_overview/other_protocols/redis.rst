@@ -130,7 +130,7 @@ Use pipelining wherever possible for the best performance.
 At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
-configured. If an external authentication provider is set, Envoy will instead send the authentication arguments 
+configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
 to an external service and act according to the authentication response. If a downstream password is set together
 with external authentication, the validation will be done still externally and the downstream password used for
 upstream authentication. Envoy will transparently issue AUTH commands upon connecting to upstream servers,
