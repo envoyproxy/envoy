@@ -80,8 +80,9 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
       config_(config), transaction_(this) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
-  connection_allowed_ =
-      config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty() && !config_->external_auth_enabled_;
+  connection_allowed_ = config_->downstream_auth_username_.empty() &&
+                        config_->downstream_auth_passwords_.empty() &&
+                        !config_->external_auth_enabled_;
   connection_quit_ = false;
   external_auth_call_status_ = ExternalAuthCallStatus::Ready;
   if (auth_client != nullptr) {
