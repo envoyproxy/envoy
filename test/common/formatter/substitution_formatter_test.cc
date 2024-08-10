@@ -165,20 +165,20 @@ REGISTER_FACTORY(TestSerializedStringFilterStateFactory, StreamInfo::FilterState
 // extracting tokens.
 TEST(SubstitutionFormatParser, commandParser) {
   std::vector<absl::string_view> tokens;
-  std::string token1;
+  absl::string_view token1;
 
   std::string command = "item1";
   SubstitutionFormatUtils::parseSubcommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
 
-  std::string token2;
+  absl::string_view token2;
   command = "item1:item2";
   SubstitutionFormatUtils::parseSubcommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
 
   // Three tokens.
-  std::string token3;
+  absl::string_view token3;
   command = "item1?item2?item3";
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
@@ -196,7 +196,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 2 tokens but 3 are expected.
   // The third extracted token should be empty.
   command = "item1?item2";
-  token3.erase();
+  token3 = {};
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
@@ -205,7 +205,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 4 tokens. Get first 2 into the strings
   // and remaining 2 into a vector of strings.
   command = "item1?item2?item3?item4";
-  std::vector<std::string> bucket;
+  std::vector<absl::string_view> bucket;
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
@@ -1087,7 +1087,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
           for (auto& precision : precisions) {
             const std::string sub_command =
                 absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
-            std::cout << sub_command << std::endl;
             StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
 
             if (start_index == end_index && start_index == 0) {
@@ -1165,7 +1164,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
             const std::string sub_command =
                 absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
-            std::cout << sub_command << std::endl;
 
             StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
 
@@ -4185,16 +4183,21 @@ TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
   absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
       {"test_time", fmt::format("{}", expected_time_in_epoch)},
+      {"test_time_local", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
       {"default", "2018-03-28T23:35:58.000Z"},
+      {"default_local",
+       absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time), absl::LocalTimeZone())},
       {"all_zeroes", "000000000.0.00.000"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     simple_date: '%START_TIME(%Y/%m/%d)%'
     test_time: '%START_TIME(%s)%'
+    test_time_local: '%START_TIME_LOCAL(%s)%'
     bad_format: '%START_TIME(bad_format)%'
     default: '%START_TIME%'
+    default_local: '%START_TIME_LOCAL%'
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);

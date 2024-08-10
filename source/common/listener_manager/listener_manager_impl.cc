@@ -112,11 +112,11 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
-    Config::Utility::validateTerminalFilters(
+    RETURN_IF_NOT_OK(Config::Utility::validateTerminalFilters(
         filters[i].name(), factory.name(), "network",
         factory.isTerminalFilterByProto(*message,
                                         filter_chain_factory_context.serverFactoryContext()),
-        is_terminal);
+        is_terminal));
     auto callback_or_error =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     RETURN_IF_NOT_OK(callback_or_error.status());
@@ -474,7 +474,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
     }
     if (!api_listener_ && !added_via_api) {
       auto listener_or_error = HttpApiListener::create(config, server_, config.name());
-      RETURN_IF_STATUS_NOT_OK(listener_or_error);
+      RETURN_IF_NOT_OK_REF(listener_or_error.status());
       api_listener_ = std::move(listener_or_error.value());
       return true;
     } else {

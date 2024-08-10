@@ -503,7 +503,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // stats.
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  RETURN_IF_NOT_OK_REF(producer_or_error.status());
   stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
@@ -739,6 +739,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
+
+  http_server_properties_cache_manager_ =
+      std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+          serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
+          thread_local_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
