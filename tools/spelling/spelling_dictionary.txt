@@ -38,6 +38,8 @@ BPF
 Bdecoded
 Bencoded
 CIO
+cbegin
+cend
 deadcode
 DFP
 Dynatrace
