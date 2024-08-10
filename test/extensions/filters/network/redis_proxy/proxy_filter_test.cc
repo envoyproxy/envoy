@@ -1112,7 +1112,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswo
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
                   auto time = context_.server_factory_context_.time_system_.systemTime() +
-                              std::chrono::hours(1);
+                              std::chrono::hours(12);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1153,7 +1153,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
                   auto time = context_.server_factory_context_.time_system_.systemTime() +
-                              std::chrono::hours(1);
+                              std::chrono::hours(12);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
