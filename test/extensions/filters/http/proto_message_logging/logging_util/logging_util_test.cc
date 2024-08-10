@@ -162,6 +162,18 @@ protected:
     return &field_mask_;
   }
 
+  // Helper function to create a Struct with nested fields
+  Struct CreateNestedStruct(const std::vector<std::string>& path, const std::string& final_value) {
+    Struct root;
+    Struct* current = &root;
+    for (const auto& piece : path) {
+      (*current->mutable_fields())[piece].mutable_struct_value();
+      current = (*current->mutable_fields())[piece].mutable_struct_value();
+    }
+    (*current->mutable_fields())[final_value].mutable_string_value();
+    return root;
+  }
+
   // A TypeHelper for testing.
   std::unique_ptr<TypeHelper> type_helper_ = nullptr;
 
@@ -270,9 +282,75 @@ TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_EmptyLabelExtractor) {
   EXPECT_EQ(labels_.size(), 0);
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively) {}
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_EmptyPath) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
+}
 
-TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent) {}
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_InvalidPath) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  std::vector<std::string> path_pieces = {"invalid", "path_end"};
+  EXPECT_TRUE(
+      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+
+  // Verify that the field "level2" has been replaced with an empty Struct
+  const auto& level1_field = message_struct.fields().at("level1");
+  EXPECT_TRUE(level1_field.has_struct_value());
+  const auto& level2_field = level1_field.struct_value().fields().at("level2");
+  EXPECT_TRUE(level2_field.has_struct_value());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_ValidPath) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  std::vector<std::string> path_pieces = {"level1", "level2"};
+  EXPECT_TRUE(
+      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+
+  // Verify that the field "level2" has been replaced with an empty Struct
+  const auto& level1_field = message_struct.fields().at("level1");
+  EXPECT_TRUE(level1_field.has_struct_value());
+  const auto& level2_field = level1_field.struct_value().fields().at("level2");
+  EXPECT_TRUE(level2_field.has_struct_value());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_MissingIntermediateField) {
+  Struct message_struct = CreateNestedStruct({"level1"}, "value");
+  std::vector<std::string> path_pieces = {"level1", "level2"};
+  EXPECT_TRUE(
+      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+
+  // Verify that "level2" field is created as an empty Struct
+  const auto& level1_field = message_struct.fields().at("level1");
+  EXPECT_TRUE(level1_field.has_struct_value());
+  const auto& level2_field = level1_field.struct_value().fields().at("level2");
+  EXPECT_TRUE(level2_field.has_struct_value());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_EmptyPathPiece) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  std::vector<std::string> path_pieces = {"level1", ""};
+  EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct),
+            absl::InvalidArgumentError("path piece cannot be empty."));
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_NullptrMessageStruct) {
+  std::vector<std::string> path_pieces = {"level1"};
+  EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), nullptr),
+            absl::InvalidArgumentError("message_struct cannot be nullptr."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyPath) {
+  Protobuf::Type type;
+  EXPECT_EQ(IsMessageFieldPathPresent(type, type_finder_, "", test_request_raw_proto_).status(),
+            absl::InvalidArgumentError("Field path cannot be empty."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_InvalidPath) {
+  Protobuf::Type type;
+  EXPECT_EQ(IsMessageFieldPathPresent(type, type_finder_, "invalid_path", test_request_raw_proto_)
+                .status(),
+            absl::InvalidArgumentError("Cannot find field 'invalid_path' in '' message."));
+}
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
   EXPECT_EQ(3,
