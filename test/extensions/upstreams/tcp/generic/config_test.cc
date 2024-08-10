@@ -36,6 +36,8 @@ public:
                                   GetParam() ? "true" : "false"}});
   }
 
+  bool useUpstreamFilters() { return GetParam(); }
+
   TestScopedRuntime scoped_runtime_;
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
   GenericConnPoolFactory factory_;
@@ -86,7 +88,7 @@ TEST_P(TcpConnPoolTest, TestTunnelingNotDisabledIfFilterStateHasFalseValue) {
       std::make_shared<StreamInfo::BoolAccessorImpl>(false),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
-  if (!GetParam()) {
+  if (!useUpstreamFilters()) {
     EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   }
 
@@ -99,7 +101,7 @@ TEST_P(TcpConnPoolTest, TestNoConnPool) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
-  if (!GetParam()) {
+  if (!useUpstreamFilters()) {
     EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   }
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
@@ -114,7 +116,7 @@ TEST_P(TcpConnPoolTest, Http2Config) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
-  if (!GetParam()) {
+  if (!useUpstreamFilters()) {
     EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   }
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
@@ -132,7 +134,7 @@ TEST_P(TcpConnPoolTest, Http3Config) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_proto;
   tcp_proxy_.mutable_tunneling_config()->set_hostname("host");
   const TcpProxy::TunnelingConfigHelperImpl config(scope_, tcp_proxy_, context_);
-  if (!GetParam()) {
+  if (!useUpstreamFilters()) {
     EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   }
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
