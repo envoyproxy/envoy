@@ -1010,9 +1010,6 @@ class RedisProxyFilterWithExternalAuthAndExpiration : public RedisProxyFilterTes
 public:
   RedisProxyFilterWithExternalAuthAndExpiration()
       : RedisProxyFilterTest(external_auth_expiration_config) {}
-
-protected:
-  Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
 };
 
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordWrong) {
@@ -1042,7 +1039,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordWrong)
                 })));
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "WRONGPASS sorry, invalid password";
+        reply->asString() = "ERR sorry, invalid password";
         EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
         callbacks.onAuth("wrongpassword");
@@ -1081,7 +1078,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswo
                 })));
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "WRONGPASS ooops, invalid password and username";
+        reply->asString() = "ERR ooops, invalid password and username";
         EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
         EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
         callbacks.onAuth("wrongusername", "wrongpassword");
@@ -1114,7 +1111,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswo
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = mock_time_source_.systemTime() + std::chrono::hours(1);
+                  auto time = context_.server_factory_context_.time_system_.systemTime() +
+                              std::chrono::hours(1);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1154,7 +1152,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = mock_time_source_.systemTime() + std::chrono::hours(1);
+                  auto time = context_.server_factory_context_.time_system_.systemTime() +
+                              std::chrono::hours(1);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1194,7 +1193,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = mock_time_source_.systemTime() + std::chrono::hours(1);
+                  auto time = context_.server_factory_context_.time_system_.systemTime() +
+                              std::chrono::hours(1);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1208,7 +1208,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
         // callbacks can be accessed now.
         EXPECT_TRUE(filter_->connectionAllowed());
         // but then expiration passes
-        mock_time_source_.advanceTimeWait(std::chrono::hours(2));
+        context_.server_factory_context_.time_system_.advanceTimeWait(std::chrono::hours(2));
         // and callbacks are not accessible anymore
         EXPECT_FALSE(filter_->connectionAllowed());
         return nullptr;

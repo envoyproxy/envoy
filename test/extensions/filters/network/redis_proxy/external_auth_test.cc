@@ -172,6 +172,24 @@ TEST_F(GrpcExternalAuthClientTest, Failure) {
   EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_error")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _));
   client_->onFailure(Grpc::Status::Unknown, "error message", span_);
+
+  // no-op
+  Http::RequestHeaderMapPtr hm = Http::RequestHeaderMapImpl::create();
+  client_->onCreateInitialMetadata(*hm);
+}
+
+TEST_F(GrpcExternalAuthClientTest, Cancel) {
+  initialize();
+
+  envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest request;
+  request.set_username("username");
+  request.set_password("password");
+  expectCallSend(request);
+  client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "username",
+                                "password");
+
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
 }
 
 } // namespace ExternalAuth
