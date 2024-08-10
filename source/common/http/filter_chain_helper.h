@@ -16,10 +16,10 @@ namespace Envoy {
 namespace Http {
 
 using DownstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
 // Allows graceful handling of missing configuration for ECDS.
@@ -42,7 +42,7 @@ static Http::FilterFactoryCb MissingConfigFilterFactory =
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
   struct FilterFactoryProvider {
-    Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb> provider;
+    Filter::FilterConfigProviderPtr<Filter::HttpFilterFactoryCb> provider;
     // If true, this filter is disabled by default and must be explicitly enabled by
     // route configuration.
     bool disabled{};
@@ -70,7 +70,7 @@ class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
 public:
   using FilterFactoriesList = FilterChainUtility::FilterFactoriesList;
   using FilterConfigProviderManager =
-      Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb, FilterCtx>;
+      Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb, FilterCtx>;
 
   FilterChainHelper(FilterConfigProviderManager& filter_config_provider_manager,
                     Server::Configuration::ServerFactoryContext& server_context,

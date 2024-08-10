@@ -11,8 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-using HttpExtensionConfigProviderSharedPtr = std::shared_ptr<
-    Config::DynamicExtensionConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>;
+using HttpExtensionConfigProviderSharedPtr =
+    std::shared_ptr<Config::DynamicExtensionConfigProvider<Envoy::Filter::HttpFilterFactoryCb>>;
 
 class ExecuteFilterAction
     : public Matcher::ActionBase<
