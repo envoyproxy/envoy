@@ -1,0 +1,37 @@
+{
+  "tests": [
+    {
+      "test_name": "Test1",
+      "input": {
+        "authority": "some_cluster",
+        "path": "/foo",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "some_cluster"}
+    },
+    {
+      "test_name": "Test2",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/bar",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": ""}
+    },
+    {
+      "test_name": "Test3",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/bar",
+        "method": "GET",
+        "additional_request_headers": [
+          {
+            "key": "some_header",
+            "value": "some_cluster"
+          }
+        ]
+      },
+      "validate": {"cluster_name": "some_cluster"}
+    }
+  ]
+}

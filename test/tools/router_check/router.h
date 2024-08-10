@@ -66,7 +66,8 @@ public:
    * config file.
    * */
   static RouterCheckTool create(const std::string& router_config_file,
-                                const bool disable_deprecation_check);
+                                const bool disable_deprecation_check,
+                                const std::string& listener_name);
 
   /**
    * @param expected_route_json tool config json file.
@@ -101,6 +102,12 @@ private:
       std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
 
+  /**
+   * Extracts the route configuration from the listener with the given name.
+   */
+  static absl::optional<envoy::config::route::v3::RouteConfiguration>
+  extractRouteConfigFromListener(envoy::config::bootstrap::v3::Bootstrap bootstrap_config,
+                                 const std::string& listener_name);
   /**
    * Set UUID as the name for each route for detecting missing tests during the coverage check.
    */
@@ -250,6 +257,11 @@ public:
    */
   const std::string& outputPath() const { return output_path_; }
 
+  /**
+   * @return the name of the listener to use.
+   */
+  const std::string& listenerName() const { return listener_name_; }
+
 private:
   std::string test_path_;
   std::string config_path_;
@@ -260,5 +272,6 @@ private:
   bool disable_deprecation_check_;
   bool detailed_coverage_report_;
   std::string output_path_;
+  std::string listener_name_;
 };
 } // namespace Envoy

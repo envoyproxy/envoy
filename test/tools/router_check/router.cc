@@ -16,6 +16,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
@@ -126,17 +127,44 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_h
       random_value_(random_value) {}
 
 // static
-RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
-                                        const bool disable_deprecation_check) {
-  // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
+RouterCheckTool RouterCheckTool::create(const std::string& config_file,
+                                        const bool disable_deprecation_check,
+                                        const std::string& listener_name) {
   envoy::config::route::v3::RouteConfiguration route_config;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
+
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  TestUtility::loadFromFile(router_config_file, route_config, *api);
-  assignUniqueRouteNames(route_config);
-  assignRuntimeFraction(route_config);
+  try {
+    TestUtility::loadFromFile(config_file, route_config, *api);
+  } catch (const EnvoyException& _) {
+    TestUtility::loadFromFile(config_file, bootstrap_config, *api);
+  }
+
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
+
+  auto extracted_route_config =
+      RouterCheckTool::extractRouteConfigFromListener(bootstrap_config, listener_name);
+  if (extracted_route_config.has_value()) {
+    route_config = extracted_route_config.value();
+  }
+
+  if (bootstrap_config.has_layered_runtime()) {
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+        Envoy::Runtime::LoaderImpl::create(
+            factory_context->dispatcher_, factory_context->thread_local_,
+            bootstrap_config.layered_runtime(), factory_context->local_info_,
+            factory_context->api_.stats_store_, factory_context->api_.random_,
+            factory_context->validation_context_.dynamicValidationVisitor(),
+            factory_context->api());
+    if (!loader.ok()) {
+      std::cerr << "Failed to initialize runtime: " << loader.status().ToString() << std::endl;
+    }
+  }
+
+  assignUniqueRouteNames(route_config);
+  assignRuntimeFraction(route_config);
   auto config = *Router::ConfigImpl::create(route_config, *factory_context,
                                             ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
@@ -147,6 +175,55 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
   return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
           Coverage(route_config)};
+}
+
+absl::optional<envoy::config::route::v3::RouteConfiguration>
+RouterCheckTool::extractRouteConfigFromListener(
+    envoy::config::bootstrap::v3::Bootstrap bootstrap_config, const std::string& listener_name) {
+  if (bootstrap_config.static_resources().listeners_size() == 0) {
+    return absl::nullopt;
+  }
+
+  if (listener_name.empty()) {
+    std::cerr << "No listener name provided" << std::endl;
+    return absl::nullopt;
+  }
+  envoy::config::listener::v3::Listener* listener = nullptr;
+  for (int i = 0; i < bootstrap_config.mutable_static_resources()->listeners_size(); i++) {
+    if (bootstrap_config.mutable_static_resources()->mutable_listeners(i)->name() ==
+        listener_name) {
+      listener = bootstrap_config.mutable_static_resources()->mutable_listeners(i);
+      break;
+    }
+  }
+
+  if (listener == nullptr) {
+    std::cerr << "No listener found with name: " << listener_name << std::endl;
+    return absl::nullopt;
+  }
+  if (listener->filter_chains_size() == 0) {
+    std::cerr << "No filter chains found in listener" << std::endl;
+    return absl::nullopt;
+  }
+  for (int i = 0; i < listener->filter_chains_size(); i++) {
+    for (int j = 0; j < listener->filter_chains(i).filters_size(); j++) {
+      auto filter = listener->filter_chains(i).filters(j);
+      if (!filter.typed_config()
+               .Is<envoy::extensions::filters::network::http_connection_manager::v3::
+                       HttpConnectionManager>()) {
+        continue;
+      }
+      auto hcm_config = MessageUtil::anyConvert<
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+          listener->filter_chains(i).filters(j).typed_config());
+      if (!hcm_config.has_route_config()) {
+        continue;
+      }
+      return hcm_config.route_config();
+    }
+  }
+  std::cerr << "No route configuration found in listener" << std::endl;
+  return absl::nullopt;
 }
 
 void RouterCheckTool::assignUniqueRouteNames(
@@ -631,8 +708,14 @@ Options::Options(int argc, char** argv) {
                                      0.0, "float", cmd);
   TCLAP::SwitchArg comprehensive_coverage(
       "", "covall", "Measure coverage by checking all route fields", cmd, false);
-  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
+  TCLAP::ValueArg<std::string> config_path("c", "config-path",
+                                           "Path to bootstrap or route configuration file.", false,
                                            "", "string", cmd);
+  TCLAP::ValueArg<std::string> listener_name(
+      "l", "listener-name",
+      "Name of the listener to use the route configuration. This is only used if config-path is a "
+      "bootstrap configuration.",
+      false, "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
                                          "string", cmd);
   TCLAP::ValueArg<std::string> output_path(
@@ -656,6 +739,7 @@ Options::Options(int argc, char** argv) {
   detailed_coverage_report_ = detailed_coverage.getValue();
 
   config_path_ = config_path.getValue();
+  listener_name_ = listener_name.getValue();
   test_path_ = test_path.getValue();
   output_path_ = output_path.getValue();
   if (config_path_.empty() || test_path_.empty()) {

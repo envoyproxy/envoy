@@ -1,0 +1,78 @@
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 15000
+
+layered_runtime:
+  layers:
+  - name: global config
+    static_layer:
+      envoy.deprecated_features:envoy.config.listener.v3.Listener.hidden_envoy_deprecated_use_original_dst: true
+      re2.max_program_size.error_level: 32768
+      overload.global_downstream_max_connections: 2147483647
+      envoy.reloadable_features.http_reject_path_with_fragment: false
+
+static_resources:
+  listeners:
+  - name: main
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.extensions.filters.network.ratelimit.v3.RateLimit
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.ratelimit.v3.RateLimit
+          stat_prefix: rate_limit
+          domain: foo
+          descriptors:
+          - entries:
+            - key: generic_key
+              value: descriptor_value
+          rate_limit_service:
+            grpc_service:
+              envoy_grpc:
+                cluster_name: rate_limit_cluster
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          generate_request_id: true
+          tracing: {}
+          stat_prefix: ingress
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/foo"
+                  headers:
+                  - name: ":authority"
+                route:
+                  cluster_header: ":authority"
+              - match:
+                  prefix: "/bar"
+                route:
+                  cluster_header: "some_header"
+                  timeout:
+                    nanos: 0
+              - match:
+                  safe_regex:
+                    # 100+ chars regex to test re2.max_program_size.error_level runtime override.
+                    regex: (?:[a-zA-Z]{3,6}[0-9]{2,4}[A-Z]{1,3}\d{0,2}\W{0,2}){10,20}|(?:[a-zA-Z0-9!@#\$%\^\&\*\)\(+=._-]{25,50})|(?:[A-Z])
+                route:
+                  cluster_header: "some_header"
+                  timeout:
+                    nanos: 0
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

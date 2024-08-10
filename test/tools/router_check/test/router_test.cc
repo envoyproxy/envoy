@@ -18,7 +18,11 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+
+  const std::string listener_name = "";
+  const bool disable_deprecation_check = false;
+  RouterCheckTool checktool =
+      RouterCheckTool::create(config_filename_, disable_deprecation_check, listener_name);
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
   EXPECT_EQ(test_results.size(), 33);
@@ -33,7 +37,11 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+
+  const std::string listener_name = "";
+  const bool disable_deprecation_check = false;
+  RouterCheckTool checktool =
+      RouterCheckTool::create(config_filename_, disable_deprecation_check, listener_name);
   checktool.setOnlyShowFailures();
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
@@ -45,7 +53,11 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutesFailures.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+
+  const std::string listener_name = "";
+  const bool disable_deprecation_check = false;
+  RouterCheckTool checktool =
+      RouterCheckTool::create(config_filename_, disable_deprecation_check, listener_name);
   checktool.setOnlyShowFailures();
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
