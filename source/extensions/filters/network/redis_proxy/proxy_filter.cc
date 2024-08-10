@@ -81,7 +81,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
-      config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty();
+      config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty() && !config_->external_auth_enabled_;
   connection_quit_ = false;
   external_auth_call_status_ = ExternalAuthCallStatus::Ready;
   if (auth_client != nullptr) {
@@ -168,7 +168,7 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
     connection_allowed_ = true;
 
     if (config_->external_auth_expiration_enabled_) {
-      external_auth_expiration_epoch_ = response->expiration.seconds();
+      external_auth_expiration_epoch_ = response->expiration.seconds() * 1000000;
     }
   } else if (response->status == ExternalAuth::AuthenticationRequestStatus::Unauthorized) {
     redis_response->type(Common::Redis::RespType::Error);

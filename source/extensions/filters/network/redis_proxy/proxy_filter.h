@@ -163,7 +163,7 @@ private:
   bool connection_quit_;
   ExternalAuth::ExternalAuthClientPtr auth_client_;
   ExternalAuthCallStatus external_auth_call_status_;
-  int64_t external_auth_expiration_epoch_;
+  long external_auth_expiration_epoch_;
 };
 
 } // namespace RedisProxy
