@@ -361,6 +361,7 @@ message RedisProxy {
   // Expiration is also supported, which will disable any further commands from the client after the expiration time, unless a new AUTH command is received and the external auth service returns a new expiration time.
   // If the external auth service returns an error, authentication is considered failed.
   // If this setting is set together with ``downstream_auth_username`` and ``downstream_auth_password``, the external auth service will be source of truth, but those fields will still be used for downstream authentication to the cluster.
+  // The API is defined by :ref:`RedisProxyExternalAuth <envoy_v3_api_msg_service.redis_auth.v3.RedisProxyExternalAuth>`.
   RedisExternalAuthProvider external_auth_provider = 10;
 }
 
