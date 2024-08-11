@@ -146,14 +146,13 @@ private:
     if (!callback_or_error.status().ok()) {
       return callback_or_error.status();
     }
-    Http::FilterFactoryCb callback = callback_or_error.value();
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
     const bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
     RETURN_IF_NOT_OK(Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
                                                               filter_chain_type, is_terminal,
                                                               last_filter_in_current_config));
     auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-        {factory->name(), callback}, proto_config.name());
+        callback_or_error.value(), proto_config.name());
 #ifdef ENVOY_ENABLE_YAML
     ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
     ENVOY_LOG(debug, "    config: {}",
