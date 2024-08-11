@@ -305,7 +305,7 @@ public:
         parseProtoFromYaml(yaml_string);
     config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this);
-    time_source_.setMonotonicTime(std::chrono::milliseconds(10000));
+    time_source_.setMonotonicTime(std::chrono::seconds(0));
     if (config_->external_auth_enabled_) {
       external_auth_client_ = new ExternalAuth::MockExternalAuthClient();
       filter_ = std::make_unique<ProxyFilter>(
