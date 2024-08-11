@@ -28,7 +28,7 @@ namespace Upstream {
 
 DnsSrvCluster::DnsSrvCluster(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig& dns_srv_cluster,
+    const envoy::extensions::clusters::dns_srv::v3::Cluster& dns_srv_cluster,
     ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
     absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, context, creation_status), cluster_(cluster),
@@ -272,7 +272,7 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 DnsSrvClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig& proto_config,
+    const envoy::extensions::clusters::dns_srv::v3::Cluster& proto_config,
     Upstream::ClusterFactoryContext& context) {
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
   THROW_IF_NOT_OK(dns_resolver_or_error.status());

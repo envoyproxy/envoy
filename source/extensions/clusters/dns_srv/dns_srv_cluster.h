@@ -9,8 +9,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/extensions/clusters/dns_srv/v3/dns_srv_cluster.pb.h"
-#include "envoy/extensions/clusters/dns_srv/v3/dns_srv_cluster.pb.validate.h"
+#include "envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dns_srv/v3/cluster.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/empty_string.h"
@@ -34,11 +34,10 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 protected:
-  DnsSrvCluster(
-      const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig& dns_srv_cluster,
-      ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
-      absl::Status& creation_status);
+  DnsSrvCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                const envoy::extensions::clusters::dns_srv::v3::Cluster& dns_srv_cluster,
+                ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
+                absl::Status& creation_status);
 
 private:
   friend class DnsSrvClusterFactory;
@@ -98,7 +97,7 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
   envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
-  const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig dns_srv_cluster_;
+  const envoy::extensions::clusters::dns_srv::v3::Cluster dns_srv_cluster_;
   ResolveListPtr active_resolve_list_;
   // Host map for current resolve target. When we have multiple resolve targets, multiple targets
   // may contain two different hosts with the same address. This has two effects:
@@ -111,17 +110,16 @@ private:
 };
 
 class DnsSrvClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                                 envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig> {
+                                 envoy::extensions::clusters::dns_srv::v3::Cluster> {
 public:
   DnsSrvClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.dns_srv") {}
 
 private:
   friend class DnsSrvClusterTest;
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterWithConfig(
-      const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig& proto_config,
-      Upstream::ClusterFactoryContext& context) override;
+  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
+                          const envoy::extensions::clusters::dns_srv::v3::Cluster& proto_config,
+                          Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(DnsSrvClusterFactory);

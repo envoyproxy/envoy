@@ -21,19 +21,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //     cluster_type:
 //       name: envoy.clusters.dns_srv
 //       typed_config:
-//     	  "@type": type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.ClusterConfig
+//     	  "@type": "type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.Cluster"
 //     	  srv_names:
 //            - srv_name: _unique_name._tcp.example.com
 //     respect_dns_ttl: true
-//     dns_resolvers:
-//     - address:
-//         socket_address:
-//          address: 8.8.8.8
-//          port_value: 53
+//     typed_dns_resolver_config:
+//       name: envoy.network.dns_resolver.cares
+//       typed_config:
+//         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+//         resolvers:
+//           - socket_address:
+//               address: 127.0.0.1
+//               port_value: 8600
 // [#extension: envoy.clusters.dns_srv]
 
 // [#next-free-field: 2]
-message DnsSrvClusterConfig {
+message Cluster {
   repeated SrvName srv_names = 1;
 }
 

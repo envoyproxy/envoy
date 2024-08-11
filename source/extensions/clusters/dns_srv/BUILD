@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "dns_srv_cluster_lib",
+    name = "cluster",
     srcs = ["dns_srv_cluster.cc"],
     hdrs = ["dns_srv_cluster.h"],
     # prevously considered core code.
