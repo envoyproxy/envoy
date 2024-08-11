@@ -1208,7 +1208,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
         EXPECT_TRUE(filter_->connectionAllowed());
         // but then expiration passes
         time_source_.advanceTimeWait(std::chrono::hours(2));
-        // and callbacks are not accessible anymore
+        // and callbacks are not accessible anymore.
         EXPECT_FALSE(filter_->connectionAllowed());
         return nullptr;
       }));
