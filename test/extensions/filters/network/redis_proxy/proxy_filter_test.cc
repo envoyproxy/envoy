@@ -305,7 +305,7 @@ public:
         parseProtoFromYaml(yaml_string);
     config_ = std::make_shared<ProxyFilterConfig>(
         proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this);
-    time_source_.setMonotonicTime(std::chrono::seconds(0));
+    time_source_.setSystemTime(std::chrono::seconds(0));
     if (config_->external_auth_enabled_) {
       external_auth_client_ = new ExternalAuth::MockExternalAuthClient();
       filter_ = std::make_unique<ProxyFilter>(
@@ -1112,7 +1112,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswo
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = time_source_.monotonicTime() + std::chrono::hours(12);
+                  auto time = time_source_.systemTime() + std::chrono::hours(12);
 
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
@@ -1153,7 +1153,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = time_source_.monotonicTime() + std::chrono::hours(12);
+                  auto time = time_source_.systemTime() + std::chrono::hours(12);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1193,7 +1193,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = time_source_.monotonicTime() + std::chrono::hours(1);
+                  auto time = time_source_.systemTime() + std::chrono::hours(1);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
