@@ -303,9 +303,8 @@ public:
   RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
-                                                  drain_decision_, runtime_, api_,
-                                                  time_source_, *this);
+    config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, *store_.rootScope(), drain_decision_, runtime_, api_, time_source_, *this);
     time_source_.setSystemTime(std::chrono::milliseconds(1723365827426));
     if (config_->external_auth_enabled_) {
       external_auth_client_ = new ExternalAuth::MockExternalAuthClient();
