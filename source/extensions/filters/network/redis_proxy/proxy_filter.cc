@@ -150,7 +150,7 @@ void ProxyFilter::onQuit(PendingRequest& request) {
 bool ProxyFilter::connectionAllowed() {
   // Check for external auth expiration.
   if (connection_allowed_ && config_->external_auth_expiration_enabled_) {
-    const auto now_epoch = config_->timeSource().systemTime().time_since_epoch().count();
+    const auto now_epoch = config_->timeSource().monotonicTime().time_since_epoch().count();
     if (now_epoch > external_auth_expiration_epoch_) {
       ENVOY_LOG(info, "Redis external authentication expired. Disallowing further commands.");
       connection_allowed_ = false;
