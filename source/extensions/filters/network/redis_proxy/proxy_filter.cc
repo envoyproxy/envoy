@@ -19,7 +19,7 @@ namespace RedisProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-    Api::Api& api, Server::Configuration::CommonFactoryContext& context,
+    Api::Api& api, TimeSource& time_source,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
@@ -30,7 +30,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       external_auth_expiration_enabled_(external_auth_enabled_ &&
                                         config.external_auth_provider().enable_auth_expiration()),
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
-      time_source_(context.timeSource()) {
+      time_source_(time_source) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
     ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
@@ -152,6 +152,7 @@ bool ProxyFilter::connectionAllowed() {
   if (connection_allowed_ && config_->external_auth_expiration_enabled_) {
     const auto now_epoch = config_->timeSource().systemTime().time_since_epoch().count();
     if (now_epoch > external_auth_expiration_epoch_) {
+      ENVOY_LOG(info, "Redis external authentication expired. Disallowing further commands.");
       connection_allowed_ = false;
     }
   }

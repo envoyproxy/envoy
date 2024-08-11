@@ -55,7 +55,7 @@ public:
   ProxyFilterConfig(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
       Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-      Api::Api& api, Server::Configuration::CommonFactoryContext& context,
+      Api::Api& api, TimeSource& time_source,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   const Network::DrainDecision& drain_decision_;
