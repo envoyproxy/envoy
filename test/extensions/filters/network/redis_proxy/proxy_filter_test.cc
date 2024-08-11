@@ -30,9 +30,9 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 using testing::WithArg;
 using testing::WithArgs;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -303,7 +303,8 @@ public:
   RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    EXPECT_CALL(context_.server_factory_context_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
+    EXPECT_CALL(context_.server_factory_context_, timeSource())
+        .WillRepeatedly(ReturnRef(time_system_));
     config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
                                                   drain_decision_, runtime_, api_,
                                                   context_.server_factory_context_, *this);
@@ -1114,8 +1115,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthUsernamePasswo
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = time_system_.systemTime() +
-                              std::chrono::hours(12);
+                  auto time = time_system_.systemTime() + std::chrono::hours(12);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1155,8 +1155,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = time_system_.systemTime() +
-                              std::chrono::hours(12);
+                  auto time = time_system_.systemTime() + std::chrono::hours(12);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1196,8 +1195,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
                       std::make_unique<ExternalAuth::AuthenticateResponse>(
                           ExternalAuth::AuthenticateResponse{});
                   auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
-                  auto time = time_system_.systemTime() +
-                              std::chrono::hours(1);
+                  auto time = time_system_.systemTime() + std::chrono::hours(1);
                   auth_response->expiration.set_seconds(
                       duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
                   callback.onAuthenticateExternal(pending_request, std::move(auth_response));
@@ -1233,7 +1231,8 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPendingRequest
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
                            const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
-        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, EMPTY_STRING, "password"));
+        EXPECT_CALL(*external_auth_client_,
+                    authenticateExternal(_, _, _, EMPTY_STRING, "password"));
         Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
         reply->type(Common::Redis::RespType::Error);
         reply->asString() = "ERR an existing authentication request is pending";
@@ -1289,8 +1288,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthError) {
                            CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
                            const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
         EXPECT_FALSE(callbacks.connectionAllowed());
-        EXPECT_CALL(*external_auth_client_,
-                    authenticateExternal(_, _, _, EMPTY_STRING, "password"))
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, EMPTY_STRING, "password"))
             .WillOnce(WithArgs<0, 1>(
                 Invoke([&](ExternalAuth::AuthenticateCallback& callback,
                            CommandSplitter::SplitCallbacks& pending_request) -> void {
