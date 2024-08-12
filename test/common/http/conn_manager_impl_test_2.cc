@@ -490,7 +490,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainConnectionUponCompletionVsOnDrainTime
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   // Set up connection.
-  setup(false, "");
+  setup();
 
   // Create a filter so we can encode responses.
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
