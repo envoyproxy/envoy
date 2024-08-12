@@ -42,6 +42,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/happy_eyeballs_connection_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
@@ -380,6 +381,20 @@ createUpstreamLocalAddressSelector(
   return selector_or_error.value();
 }
 
+class LoadBalancerFactoryContextImpl : public Upstream::LoadBalancerFactoryContext {
+public:
+  explicit LoadBalancerFactoryContextImpl(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : server_context_(server_context) {}
+
+  Event::Dispatcher& mainThreadDispatcher() override {
+    return server_context_.mainThreadDispatcher();
+  }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+};
+
 } // namespace
 
 // Allow disabling ALPN checks for transport sockets. See
@@ -521,6 +536,54 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
                           transport_socket_options, shared_from_this());
 }
 
+absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
+    const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    HostDescriptionConstSharedPtr host) {
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    return transport_socket_options->http11ProxyInfo()->proxy_address;
+  }
+
+  // See if host metadata contains a proxy address and only check locality metadata if host
+  // metadata did not have the relevant key.
+  for (const auto& metadata : {host->metadata(), host->localityMetadata()}) {
+    if (metadata == nullptr) {
+      continue;
+    }
+
+    auto addr_it = metadata->typed_filter_metadata().find(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
+    if (addr_it == metadata->typed_filter_metadata().end()) {
+      continue;
+    }
+
+    // Parse an address from the metadata.
+    envoy::config::core::v3::Address proxy_addr;
+    auto status = MessageUtil::unpackTo(addr_it->second, proxy_addr);
+    if (!status.ok()) {
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to parse proto from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
+      return absl::nullopt;
+    }
+
+    // Resolve the parsed address proto.
+    auto resolve_status = Network::Address::resolveProtoAddress(proxy_addr);
+    if (!resolve_status.ok()) {
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to resolve address from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
+      return absl::nullopt;
+    }
+
+    // We successfully resolved, so return the instance ptr.
+    return resolve_status.value();
+  }
+
+  return absl::nullopt;
+}
+
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
@@ -531,17 +594,20 @@ Host::CreateConnectionData HostImplBase::createConnection(
     HostDescriptionConstSharedPtr host) {
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
+  absl::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
+      maybeGetProxyRedirectAddress(transport_socket_options, host);
+
   Network::ClientConnectionPtr connection;
-  // If the transport socket options indicate the connection should be
-  // redirected to a proxy, create the TCP connection to the proxy's address not
-  // the host's address.
-  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+  // If the transport socket options or endpoint/locality metadata indicate the connection should
+  // be redirected to a proxy, create the TCP connection to the proxy's address not the host's
+  // address.
+  if (proxy_address.has_value()) {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
-              transport_socket_options->http11ProxyInfo()->proxy_address->asString());
+              proxy_address.value()->asString());
     connection = dispatcher.createClientConnection(
-        transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
+        proxy_address.value(), upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
@@ -987,7 +1053,8 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
@@ -1030,12 +1097,13 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+  return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
   // In this case the subset load balancer should not be used.
@@ -1043,12 +1111,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+      return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
     }
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(lb_factory_context, cluster, visitor);
 }
 
 using ProtocolOptionsHashMap =
@@ -1188,9 +1256,10 @@ ClusterInfoImpl::ClusterInfoImpl(
   } else {
     // If load_balancing_policy is not set, we will try to convert legacy lb_policy
     // to load_balancing_policy and use it.
+    LoadBalancerFactoryContextImpl lb_factory_context(server_context);
 
     auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-        config, server_context.messageValidationVisitor());
+        lb_factory_context, config, server_context.messageValidationVisitor());
 
     if (!lb_pair.ok()) {
       throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
@@ -1221,8 +1290,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     optional_timeouts_.set<OptionalTimeoutNames::IdleTimeout>(*idle_timeout);
   }
 
-  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating that
-  // no timeout should be used.
+  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating
+  // that no timeout should be used.
   absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout(std::chrono::minutes(10));
   if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
     tcp_pool_idle_timeout = tcp_protocol_options_->idleTimeout();
@@ -1357,13 +1426,14 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
+      LoadBalancerFactoryContextImpl lb_factory_context(context);
       auto proto_message = factory->createEmptyConfigProto();
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              context.messageValidationVisitor(), *proto_message);
 
       load_balancer_factory_ = factory;
-      load_balancer_config_ =
-          factory->loadConfig(*proto_message, context.messageValidationVisitor());
+      load_balancer_config_ = factory->loadConfig(lb_factory_context, *proto_message,
+                                                  context.messageValidationVisitor());
 
       break;
     }

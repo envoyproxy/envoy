@@ -25,7 +25,15 @@ private:
   static constexpr uint64_t DefaultTimeout = 200;
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stats_prefix,
+                                                              context.serverFactoryContext());
+  }
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& server_context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
