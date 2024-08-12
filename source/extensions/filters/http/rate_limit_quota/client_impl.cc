@@ -64,16 +64,13 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 // This function covers both periodical report and immediate report case, with the difference that
 // bucked id in periodical report case is empty.
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
-  // Don't send any reports if stream has already been closed.
-  if (stream_closed_) {
-    ENVOY_LOG(debug, "The stream has already been closed; no reports will be sent.");
-    return;
-  }
-
   if (stream_ != nullptr) {
     // Build the report and then send the report to RLQS server.
     // `end_stream` should always be set to false as we don't want to close the stream locally.
     stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
+  } else {
+    // Don't send any reports if stream has already been closed.
+    ENVOY_LOG(debug, "The stream has already been closed; no reports will be sent.");
   }
 }
 
