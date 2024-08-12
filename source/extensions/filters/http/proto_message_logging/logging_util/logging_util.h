@@ -95,7 +95,7 @@ void RedactPaths(absl::Span<const std::string> paths_to_redact, ProtobufWkt::Str
 // value. Returns an empty string if there is only one string field. Returns
 // an error if the resource is malformed in case that the search goes forever.
 absl::StatusOr<std::string>
-FindSignularLastValue(const Protobuf::Field* field,
+FindSingularLastValue(const Protobuf::Field* field,
                       Envoy::Protobuf::io::CodedInputStream* input_stream);
 
 // Non-repeated fields can be repeat in a wire-format, in that case use the

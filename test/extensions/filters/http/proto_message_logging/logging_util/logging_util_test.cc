@@ -33,10 +33,12 @@ namespace HttpFilters {
 namespace ProtoMessageLogging {
 namespace {
 
+using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::FieldMask;
 using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::CordMessageData;
 using ::Envoy::Protobuf::field_extraction::testing::TypeHelper;
+using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
@@ -46,6 +48,9 @@ using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::testing::ValuesIn;
+
+// The type property value that will be included into the converted Struct.
+constexpr char kTypeProperty[] = "@type";
 
 const char kTestRequest[] = R"pb(
   id: 123445
@@ -149,12 +154,26 @@ protected:
     test_response_raw_proto_ = CordMessageData(test_response_proto_.SerializeAsCord());
     response_type_ = type_finder_("type.googleapis.com/"
                                   "logging.TestResponse");
+
+    labels_.clear();
   }
 
   FieldMask* GetFieldMaskWith(const std::string& path) {
     field_mask_.clear_paths();
     field_mask_.add_paths(path);
     return &field_mask_;
+  }
+
+  // Helper function to create a Struct with nested fields
+  Struct CreateNestedStruct(const std::vector<std::string>& path, const std::string& final_value) {
+    Struct root;
+    Struct* current = &root;
+    for (const auto& piece : path) {
+      (*current->mutable_fields())[piece].mutable_struct_value();
+      current = (*current->mutable_fields())[piece].mutable_struct_value();
+    }
+    (*current->mutable_fields())[final_value].mutable_string_value();
+    return root;
   }
 
   // A TypeHelper for testing.
@@ -171,12 +190,238 @@ protected:
   const Type* response_type_;
 
   FieldMask field_mask_;
+
+  Envoy::Protobuf::Map<std::string, std::string> labels_;
 };
+
+TEST_F(AuditLoggingUtilTest, IsEmptyStruct_EmptyStruct) {
+  ProtobufWkt::Struct message_struct;
+  message_struct.mutable_fields()->insert({kTypeProperty, ProtobufWkt::Value()});
+  EXPECT_TRUE(IsEmptyStruct(message_struct));
+}
+
+TEST_F(AuditLoggingUtilTest, IsEmptyStruct_NonEmptyStruct) {
+  ProtobufWkt::Struct message_struct;
+  message_struct.mutable_fields()->insert({kTypeProperty, ProtobufWkt::Value()});
+  message_struct.mutable_fields()->insert({"another_field", ProtobufWkt::Value()});
+  EXPECT_FALSE(IsEmptyStruct(message_struct));
+}
+
+TEST_F(AuditLoggingUtilTest, IsLabelName_ValidLabel) { EXPECT_TRUE(IsLabelName("{label}")); }
+
+TEST_F(AuditLoggingUtilTest, IsLabelName_EmptyString) { EXPECT_FALSE(IsLabelName("")); }
+
+TEST_F(AuditLoggingUtilTest, GetLabelName_RemovesCurlyBraces) {
+  EXPECT_EQ(GetLabelName("{test}"), "test");
+}
+
+TEST_F(AuditLoggingUtilTest, GetLabelName_NoCurlyBraces) {
+  EXPECT_EQ(GetLabelName("test"), "test");
+}
+
+TEST_F(AuditLoggingUtilTest, GetLabelName_EmptyString) { EXPECT_EQ(GetLabelName(""), ""); }
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_BasicExtraction) {
+  GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
+                             "project/myproject/bucket/mybucket/object/myobject", &labels_);
+
+  EXPECT_EQ(labels_.size(), 2);
+  EXPECT_EQ(labels_["bucket"], "mybucket");
+  EXPECT_EQ(labels_["object"], "myobject");
+}
+
+TEST_F(AuditLoggingUtilTest, StringToDirectiveMap_CorrectMapping) {
+  const auto& map = StringToDirectiveMap();
+
+  EXPECT_EQ(map.size(), 2);
+  EXPECT_EQ(map.at(kAuditRedact), AuditDirective::AUDIT_REDACT);
+  EXPECT_EQ(map.at(kAudit), AuditDirective::AUDIT);
+}
+
+TEST_F(AuditLoggingUtilTest, AuditDirectiveFromString_ValidDirective) {
+  auto directive = AuditDirectiveFromString(kAuditRedact);
+  ASSERT_TRUE(directive.has_value());
+  EXPECT_EQ(directive.value(), AuditDirective::AUDIT_REDACT);
+
+  directive = AuditDirectiveFromString(kAudit);
+  ASSERT_TRUE(directive.has_value());
+  EXPECT_EQ(directive.value(), AuditDirective::AUDIT);
+}
+
+TEST_F(AuditLoggingUtilTest, AuditDirectiveFromString_InvalidDirective) {
+  auto directive = AuditDirectiveFromString("invalid_directive");
+  EXPECT_FALSE(directive.has_value());
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_MissingLabelsInResource) {
+  GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
+                             "project/myproject/bucket/mybucket", &labels_);
+
+  EXPECT_EQ(labels_.size(), 1);
+  EXPECT_EQ(labels_["bucket"], "mybucket");
+  EXPECT_EQ(labels_.find("object"), labels_.end());
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_ExtraSegmentsInResource) {
+  GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
+                             "project/myproject/bucket/mybucket/object/myobject/extra", &labels_);
+
+  EXPECT_EQ(labels_.size(), 2);
+  EXPECT_EQ(labels_["bucket"], "mybucket");
+  EXPECT_EQ(labels_["object"], "myobject");
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_WithNoLabels) {
+  GetMonitoredResourceLabels("project/*/bucket/*/object/*",
+                             "project/myproject/bucket/mybucket/object/myobject", &labels_);
+
+  EXPECT_EQ(labels_.size(), 0);
+}
+
+TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_EmptyLabelExtractor) {
+  GetMonitoredResourceLabels("", "project/myproject/bucket/mybucket/object/myobject", &labels_);
+
+  EXPECT_EQ(labels_.size(), 0);
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_EmptyPath) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_InvalidPath) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  std::vector<std::string> path_pieces = {"invalid", "path_end"};
+  EXPECT_TRUE(
+      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+
+  // Verify that the field "level2" has been replaced with an empty Struct
+  const auto& level1_field = message_struct.fields().at("level1");
+  EXPECT_TRUE(level1_field.has_struct_value());
+  const auto& level2_field = level1_field.struct_value().fields().at("level2");
+  EXPECT_TRUE(level2_field.has_struct_value());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_ValidPath) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  std::vector<std::string> path_pieces = {"level1", "level2"};
+  EXPECT_TRUE(
+      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+
+  // Verify that the field "level2" has been replaced with an empty Struct
+  const auto& level1_field = message_struct.fields().at("level1");
+  EXPECT_TRUE(level1_field.has_struct_value());
+  const auto& level2_field = level1_field.struct_value().fields().at("level2");
+  EXPECT_TRUE(level2_field.has_struct_value());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_MissingIntermediateField) {
+  Struct message_struct = CreateNestedStruct({"level1"}, "value");
+  std::vector<std::string> path_pieces = {"level1", "level2"};
+  EXPECT_TRUE(
+      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+
+  // Verify that "level2" field is created as an empty Struct
+  const auto& level1_field = message_struct.fields().at("level1");
+  EXPECT_TRUE(level1_field.has_struct_value());
+  const auto& level2_field = level1_field.struct_value().fields().at("level2");
+  EXPECT_TRUE(level2_field.has_struct_value());
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_EmptyPathPiece) {
+  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  std::vector<std::string> path_pieces = {"level1", ""};
+  EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct),
+            absl::InvalidArgumentError("path piece cannot be empty."));
+}
+
+TEST_F(AuditLoggingUtilTest, RedactStructRecursively_NullptrMessageStruct) {
+  std::vector<std::string> path_pieces = {"level1"};
+  EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), nullptr),
+            absl::InvalidArgumentError("message_struct cannot be nullptr."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyPath) {
+  EXPECT_EQ(
+      IsMessageFieldPathPresent(*request_type_, type_finder_, "", test_request_raw_proto_).status(),
+      absl::InvalidArgumentError("Field path cannot be empty."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyType) {
+  Type empty_type;
+  EXPECT_EQ(
+      IsMessageFieldPathPresent(empty_type, type_finder_, "id", test_request_raw_proto_).status(),
+      absl::InvalidArgumentError("Cannot find field 'id' in '' message."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_InvalidPath) {
+  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "invalid_path",
+                                      test_request_raw_proto_)
+                .status(),
+            absl::InvalidArgumentError(
+                "Cannot find field 'invalid_path' in 'logging.TestRequest' message."));
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_ValidPath) {
+  EXPECT_TRUE(
+      IsMessageFieldPathPresent(*request_type_, type_finder_, "bucket", test_request_raw_proto_)
+          .status()
+          .ok());
+}
+
+TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_NotMessageField) {
+  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "repeated_strings",
+                                      test_request_raw_proto_)
+                .status(),
+            absl::InvalidArgumentError("Field 'repeated_strings' is not a message type field."));
+}
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
   EXPECT_EQ(3,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("bucket.objects"), test_request_raw_proto_));
+}
+
+TEST_F(AuditLoggingUtilTest, FindSingularLastValue_SingleStringField) {
+  Field field;
+  field.set_name("id");
+  field.set_number(1);
+  field.set_kind(Field::TYPE_INT64);
+
+  std::string data = "123445";
+  auto result = FindSingularLastValue(
+      &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(result.value(), "");
+}
+
+TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedStringField) {
+  Field field;
+  field.set_name("repeated_strings");
+  field.set_number(3);
+  field.set_kind(Field::TYPE_STRING);
+  field.set_cardinality(Field::CARDINALITY_REPEATED);
+
+  std::string data = "repeated-string-0";
+  auto result = FindSingularLastValue(
+      &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value(), "repeated-string-0");
+}
+
+TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedMessageField) {
+  Field field;
+  field.set_name("bucket");
+  field.set_number(2);
+  field.set_kind(Field::TYPE_STRING);
+
+  std::string data = "test-bucket";
+  auto result = FindSingularLastValue(
+      &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(
+      result.value(),
+      "\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-1\x1A\rtest-object-2\x1A\rtest-object-3");
 }
 
 TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_string) {

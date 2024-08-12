@@ -59,7 +59,7 @@ using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::ProtobufWkt::Value;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 
-constexpr LazyRE2 kLocationRegionExtractorPattern = {R"((?:^|/)(?:locations|regions)/([^/]+))"};
+std::string kLocationRegionExtractorPattern = R"((?:^|/)(?:locations|regions)/([^/]+))";
 
 } // namespace
 
@@ -237,7 +237,7 @@ int64_t ExtractRepeatedFieldSize(const Type& type,
 
 absl::string_view ExtractLocationIdFromResourceName(absl::string_view resource_name) {
   absl::string_view location;
-  RE2::PartialMatch(resource_name, *kLocationRegionExtractorPattern, &location);
+  RE2::PartialMatch(resource_name, kLocationRegionExtractorPattern, &location);
   return location;
 }
 
@@ -289,15 +289,14 @@ void RedactPaths(absl::Span<const std::string> paths_to_redact, Struct* proto_st
 // Finds the last value of the non-repeated string field after the first value.
 // Returns an empty string if there is only one string field. Returns an error
 // if the resource is malformed in case that the search goes forever.
-absl::StatusOr<std::string> FindSignularLastValue(const Field* field,
+absl::StatusOr<std::string> FindSingularLastValue(const Field* field,
                                                   CodedInputStream* input_stream) {
   std::string resource;
   int position = input_stream->CurrentPosition();
   while (FieldExtractor::SearchField(*field, input_stream)) {
     if (input_stream->CurrentPosition() == position) {
       return absl::InvalidArgumentError(
-          "The request message is malformed with endless values for a "
-          "single field.");
+          "The request message is malformed with endless values for a single field.");
     }
     position = input_stream->CurrentPosition();
     if (field->kind() == Field::TYPE_STRING) {
@@ -317,7 +316,7 @@ absl::StatusOr<std::string> FindSignularLastValue(const Field* field,
 absl::StatusOr<std::string> SingularFieldUseLastValue(const std::string first_value,
                                                       const Field* field,
                                                       CodedInputStream* input_stream) {
-  ASSIGN_OR_RETURN(std::string last_value, FindSignularLastValue(field, input_stream));
+  ASSIGN_OR_RETURN(std::string last_value, FindSingularLastValue(field, input_stream));
   if (last_value.empty())
     return first_value;
   return last_value;
@@ -402,7 +401,7 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
           absl::Substitute("Field '$0' is not a message type field.", field->name()));
     } else if (field->cardinality() == Field::CARDINALITY_REPEATED) {
       return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is not a sigular field.", field->name()));
+          absl::Substitute("Field '$0' is not a singular field.", field->name()));
     } else { // singular message field
       return FieldExtractor::SearchField(*field, input_stream);
     }
