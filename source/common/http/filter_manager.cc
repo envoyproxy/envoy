@@ -467,9 +467,13 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
 }
 
 void ActiveStreamDecoderFilter::maybeMarkDecoderFilterTerminal(bool encoded_end_stream) {
-  filter_encoded_end_stream_ = encoded_end_stream;
   // If this filter encoded end_stream and the decoder filter chain has not yet been finished
   // then make this filter terminal. Decoding will not go past this filter.
+  filter_encoded_end_stream_ = encoded_end_stream;
+
+  // If the filter that encoded end_stream has also already observed request (downstream)
+  // end_stream, but the decoder filter chain has not been completed, then decoding is aborted as
+  // there is no need to iterate over remaining decoder filters any more.
   if (encoded_end_stream && end_stream_ && !parent_.state_.decoder_filter_chain_complete_) {
     parent_.state_.decoder_filter_chain_aborted_ = true;
   }
