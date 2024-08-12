@@ -54,12 +54,6 @@ bug_fixes:
 - area: c-ares
   change: |
     Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
-- area: ext_authz
-  change: |
-    Fixed fail-open behavior of the :ref:`failure_mode_allow config option
-    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
-    when a grpc external authz server is used.
-    The behavior can be enabled by ``envoy_reloadable_features_process_ext_authz_grpc_error_codes_as_errors``.
 - area: websocket
   change: |
     Fixed a bug where the websocket upgrade filter would not take into account per-filter configs.
@@ -67,10 +61,6 @@ bug_fixes:
   change: |
     Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
     ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
-- area: rbac
-  change: |
-    RBAC will now allow stat prefixes configured in per-route config to override the base config's
-    stat prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -131,6 +121,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for publish.
 - area: jwt_authn
   change: |
     Added missing implementation to jwt_authn matchers to allow glob pattern matching.
@@ -152,6 +145,9 @@ new_features:
   change: |
     Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
     ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
+- area: http_11_proxy
+  change: |
+    Added the option to configure the transport socket via locality or endpoint metadata.
 - area: sockets
   change: |
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
