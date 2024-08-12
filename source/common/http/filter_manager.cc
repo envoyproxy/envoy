@@ -466,29 +466,31 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
   }
 }
 
-void ActiveStreamDecoderFilter::maybeStopDecoderFilterChain(bool end_stream) {
-  filter_encoded_end_stream_ = end_stream;
-  if (end_stream && end_stream_ && !parent_.state_.decoder_filter_chain_complete_) {
+void ActiveStreamDecoderFilter::maybeMarkDecoderFilterTerminal(bool encoded_end_stream) {
+  filter_encoded_end_stream_ = encoded_end_stream;
+  // If this filter encoded end_stream and the decoder filter chain has not yet been finished
+  // then make this filter terminal. Decoding will not go past this filter.
+  if (encoded_end_stream && end_stream_ && !parent_.state_.decoder_filter_chain_complete_) {
     parent_.state_.decoder_filter_chain_aborted_ = true;
   }
 }
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
-  maybeStopDecoderFilterChain(end_stream);
+  maybeMarkDecoderFilterTerminal(end_stream);
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  maybeStopDecoderFilterChain(end_stream);
+  maybeMarkDecoderFilterTerminal(end_stream);
   parent_.encodeData(nullptr, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
-  maybeStopDecoderFilterChain(true);
+  maybeMarkDecoderFilterTerminal(true);
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
 }

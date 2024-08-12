@@ -49,7 +49,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestCompleteWithUpstreamH
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
-  setup(false, "envoy-server-test");
+  setup();
   setupFilterChain(1, 0);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -541,7 +541,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainConnectionUponCompletionVsOnDrainTime
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   // Set up connection.
-  setup(false, "");
+  setup();
 
   // Create a filter so we can encode responses.
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
@@ -1910,7 +1910,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
 
 TEST_F(HttpConnectionManagerImplTest, LocalReplyStopsDecoding) {
   InSequence s;
-  setup(false, "");
+  setup();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -4449,7 +4449,7 @@ TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilter) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
-  setup(false, "");
+  setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);
@@ -4501,7 +4501,7 @@ TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilterWithIndependent
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
-  setup(false, "");
+  setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);
@@ -4556,7 +4556,7 @@ TEST_F(HttpConnectionManagerImplTest, DecodingByNonTerminalEncoderFilterWithInde
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
-  setup(false, "");
+  setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);
@@ -4625,7 +4625,7 @@ TEST_F(HttpConnectionManagerImplTest, DecodingWithAddedTrailersByNonTerminalEnco
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
-  setup(false, "");
+  setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);

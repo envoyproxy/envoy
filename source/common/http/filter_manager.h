@@ -286,7 +286,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // This allows non-terminal filters (i.e. cache filter) to encode responses when independent
   // half-close is enabled. Encoding end_stream effectively makes the filter terminal - decoder
   // filer chain will not go past this filter.
-  void maybeStopDecoderFilterChain(bool end_stream);
+  void maybeMarkDecoderFilterTerminal(bool encoded_end_stream);
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
