@@ -271,7 +271,7 @@ template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::handleEstablishedStream() {
   ENVOY_LOG(debug, "GrpcMuxImpl stream successfully established");
   for (auto& [type_url, subscription_state] : subscriptions_) {
-    subscription_state->markStreamFresh();
+    subscription_state->markStreamFresh(should_send_initial_resource_versions_);
   }
   setAnyRequestSentYetInCurrentStream(false);
   maybeUpdateQueueSizeStat(0);
@@ -280,7 +280,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleEstablishedStream() {
 }
 
 template <class S, class F, class RQ, class RS>
-void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure() {
+void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure(bool nextAttemptToTheSameSource) {
   ENVOY_LOG(debug, "GrpcMuxImpl stream failed to establish");
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
@@ -299,6 +299,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure() {
       }
     }
   } while (all_subscribed.size() != subscriptions_.size());
+  should_send_initial_resource_versions_ = nextAttemptToTheSameSource;
 }
 
 template <class S, class F, class RQ, class RS>

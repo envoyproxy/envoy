@@ -134,8 +134,11 @@ public:
   /**
    * For the GrpcStream to prompt the context to take appropriate action in response to
    * failure to establish the gRPC stream.
+   * @param a flag indicating whether the next reconnection attempt will be to
+   *        the same source that was successful or not (used to pass
+   *        primary/failover reconnections information to the GrpcMux).
    */
-  virtual void onEstablishmentFailure() PURE;
+  virtual void onEstablishmentFailure(bool nextAttemptToTheSameSource) PURE;
 
   /**
    * For the GrpcStream to pass received protos to the context.

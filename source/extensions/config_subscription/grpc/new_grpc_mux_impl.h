@@ -69,7 +69,7 @@ public:
 
   void onStreamEstablished() override;
 
-  void onEstablishmentFailure() override;
+  void onEstablishmentFailure(bool nextAttemptToTheSameSource) override;
 
   void onWriteable() override;
 
@@ -210,6 +210,9 @@ private:
   XdsConfigTrackerOptRef xds_config_tracker_;
   EdsResourcesCachePtr eds_resources_cache_;
 
+  // Used to track whether initial_resource_versions should be populated on the
+  // next reconnection.
+  bool should_send_initial_resource_versions_{false};
   bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

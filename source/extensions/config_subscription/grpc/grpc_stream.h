@@ -61,7 +61,7 @@ public:
     if (stream_ == nullptr) {
       ENVOY_LOG(debug, "Unable to establish new stream to configuration server {}",
                 async_client_.destination());
-      callbacks_->onEstablishmentFailure();
+      callbacks_->onEstablishmentFailure(true);
       setRetryTimer();
       return;
     }
@@ -103,7 +103,7 @@ public:
     logClose(status, message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
-    callbacks_->onEstablishmentFailure();
+    callbacks_->onEstablishmentFailure(true);
     // Only retry the timer if not intentionally closed by Envoy.
     if (!stream_intentionally_closed_) {
       setRetryTimer();

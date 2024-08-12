@@ -175,13 +175,13 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 void NewGrpcMuxImpl::onStreamEstablished() {
   for (auto& [type_url, subscription] : subscriptions_) {
     UNREFERENCED_PARAMETER(type_url);
-    subscription->sub_state_.markStreamFresh();
+    subscription->sub_state_.markStreamFresh(should_send_initial_resource_versions_);
   }
   pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::onEstablishmentFailure() {
+void NewGrpcMuxImpl::onEstablishmentFailure(bool nextAttemptToTheSameSource) {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -199,6 +199,7 @@ void NewGrpcMuxImpl::onEstablishmentFailure() {
       }
     }
   } while (all_subscribed.size() != subscriptions_.size());
+  should_send_initial_resource_versions_ = nextAttemptToTheSameSource;
 }
 
 void NewGrpcMuxImpl::onWriteable() { trySendDiscoveryRequests(); }
