@@ -111,7 +111,8 @@ void Filter::rejectResponse(Status::GrpcStatus grpc_status, absl::string_view er
 
 Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                        bool) {
-  ENVOY_STREAM_LOG(debug, "In decodeHeaders", *decoder_callbacks_);
+  ENVOY_STREAM_LOG(debug, "Called Proto Message Logging Filter : {}", *decoder_callbacks_,
+                   __func__);
 
   if (!Envoy::Grpc::Common::isGrpcRequestHeaders(headers)) {
     ENVOY_STREAM_LOG(debug,
@@ -122,6 +123,7 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
                      *decoder_callbacks_);
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
+
   // Grpc::Common::isGrpcRequestHeaders above already ensures the existence of
   // ":path" header.
   auto proto_path = grpcPathToProtoPath(headers.Path()->value().getStringView());
@@ -159,7 +161,7 @@ Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, 
   ENVOY_STREAM_LOG(debug, "decodeData: data size={} end_stream={}", *decoder_callbacks_,
                    data.length(), end_stream);
 
-  if (!extractor_ || request_logging_done_) {
+  if (!extractor_) {
     return Envoy::Http::FilterDataStatus::Continue;
   }
 
@@ -170,7 +172,7 @@ Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, 
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
-Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
+Filter::HandleDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
                                                         bool end_stream) {
   RELEASE_ASSERT(extractor_ && request_msg_converter_,
                  "`extractor_` and request_msg_converter_ both should be "
@@ -183,13 +185,13 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                   generateRcDetails(kRcDetailFilterProtoMessageLogging,
                                     absl::StatusCodeToString(status.code()),
                                     kRcDetailErrorRequestBufferConversion));
-    return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+    return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
 
   if (buffering->empty()) {
     ENVOY_STREAM_LOG(debug, "not a complete msg", *decoder_callbacks_);
     // Not a complete message.
-    return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+    return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
 
   // Buffering returns a list of messages.
@@ -211,12 +213,12 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
       // Skip the empty message
       continue;
     }
+    // Set the request_logging_done_ to true since we have received a message for logging.
+    request_logging_done_ = true;
 
-    if (!request_logging_done_) {
-      request_logging_done_ = true;
+    extractor_->processRequest(*message_data->message());
 
-      extractor_->processRequest(*message_data->message());
-
+    if (end_stream) {
       AuditResult result = extractor_->GetResult();
 
       if (result.request_data.empty()) {
@@ -226,7 +228,7 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
             generateRcDetails(kRcDetailFilterProtoMessageLogging,
                               absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
                               kRcDetailErrorRequestProtoMessageLoggingFailed));
-        return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+        return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }
       handleRequestLoggingResult(result.request_data);
     }
@@ -248,17 +250,17 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                   generateRcDetails(kRcDetailFilterProtoMessageLogging,
                                     absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
                                     kRcDetailErrorRequestOutOfData));
-    return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+    return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
-  return {};
+  return HandleDataStatus(Envoy::Http::FilterDataStatus::Continue);
 }
 
 Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
                                                        bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "Called Proto Message Logging Filter : {}", *decoder_callbacks_,
+  ENVOY_STREAM_LOG(debug, "Called Proto Message Logging Filter : {}", *encoder_callbacks_,
                    __func__);
 
-  if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
+  if (!Envoy::Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     ENVOY_STREAM_LOG(
         debug,
         "Response headers is NOT application/grpc content-type. Response is passed through "
@@ -267,24 +269,16 @@ Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHead
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  if (!extractor_ || response_logging_done_) {
+  if (!extractor_) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  // if (end_stream) {
-  //   const auto status = Envoy::Grpc::Common::getGrpcStatus(headers, true);
-  //   if (status) {
-  //     // grpc_backend_status_ = status;
-  //   }
-  //   return Http::FilterHeadersStatus::Continue;
-  // } else {
-    // Create response_msg_converter to convert response body.
-    auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
-        []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+  // Create response_msg_converter to convert response body.
+  auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
+      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
-    response_msg_converter_ = std::make_unique<MessageConverter>(
-        std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
-  // }
+  response_msg_converter_ = std::make_unique<MessageConverter>(
+      std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
 
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -304,8 +298,12 @@ Envoy::Http::FilterDataStatus Filter::encodeData(Envoy::Buffer::Instance& data, 
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
-Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
+Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
                                                         bool end_stream) {
+  RELEASE_ASSERT(extractor_ && response_msg_converter_,
+                 "`extractor_` and response_msg_converter_ both should be "
+                 "initiated when logging proto messages");
+
   auto buffering = response_msg_converter_->accumulateMessages(data, end_stream);
 
   if (!buffering.ok()) {
@@ -314,12 +312,13 @@ Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance&
                    generateRcDetails(kRcDetailFilterProtoMessageLogging,
                                      absl::StatusCodeToString(status.code()),
                                      kRcDetailErrorResponseBufferConversion));
-    return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+    return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
 
-  if (buffering.value().empty()) {
+  if (buffering->empty()) {
+    ENVOY_STREAM_LOG(debug, "not a complete msg", *encoder_callbacks_);
     // Not a complete message.
-    return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationAndBuffer);
+    return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
 
   // Buffering returns a list of messages.
@@ -336,11 +335,12 @@ Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance&
       continue;
     }
 
-    if (extractor_ && !response_logging_done_) {
-      response_logging_done_ = true;
-      ENVOY_STREAM_LOG(debug, "audit extract response message.", *decoder_callbacks_);
-      extractor_->processResponse(*stream_message->message());
+    // Set the response_logging_done_ to true since we have received a message for logging.
+    response_logging_done_ = true;
 
+    extractor_->processResponse(*stream_message->message());
+
+    if (end_stream) {
       AuditResult result = extractor_->GetResult();
 
       if (result.response_data.empty()) {
@@ -350,7 +350,7 @@ Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance&
             generateRcDetails(kRcDetailFilterProtoMessageLogging,
                               absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
                               kRcDetailErrorRequestProtoMessageLoggingFailed));
-        return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+        return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }
       handleResponseLoggingResult(result.response_data);
     }
@@ -372,9 +372,9 @@ Filter::HandleDecodeDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance&
                    generateRcDetails(kRcDetailFilterProtoMessageLogging,
                                      absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
                                      kRcDetailErrorResponseOutOfData));
-    return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
+    return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
   }
-  return HandleDecodeDataStatus(Envoy::Http::FilterDataStatus::Continue);
+  return HandleDataStatus(Envoy::Http::FilterDataStatus::Continue);
 }
 
 void Filter::handleRequestLoggingResult(const std::vector<AuditMetadata>& result) {

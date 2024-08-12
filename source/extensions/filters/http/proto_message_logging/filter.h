@@ -39,9 +39,9 @@ public:
   Envoy::Http::FilterDataStatus encodeData(Envoy::Buffer::Instance& data, bool end_stream) override;
 
 private:
-  struct HandleDecodeDataStatus {
-    HandleDecodeDataStatus() : got_messages(true) {}
-    explicit HandleDecodeDataStatus(Envoy::Http::FilterDataStatus status)
+  struct HandleDataStatus {
+    HandleDataStatus() : got_messages(true) {}
+    explicit HandleDataStatus(Envoy::Http::FilterDataStatus status)
         : got_messages(false), filter_status(status) {}
 
     // If true, the function has processed at least one message.
@@ -51,9 +51,9 @@ private:
     Envoy::Http::FilterDataStatus filter_status;
   };
 
-  HandleDecodeDataStatus handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream);
+  HandleDataStatus handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
-  HandleDecodeDataStatus handleEncodeData(Envoy::Buffer::Instance& data, bool end_stream);
+  HandleDataStatus handleEncodeData(Envoy::Buffer::Instance& data, bool end_stream);
 
   void handleRequestLoggingResult(const std::vector<AuditMetadata>& result);
 
