@@ -62,7 +62,7 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.publish }}
     needs:
     - load
-    uses: ./.github/workflows/_stage_publish.yml
+    uses: ./.github/workflows/_publish_publish.yml
     name: Publish
     with:
       request: ${{ needs.load.outputs.request }}
@@ -75,7 +75,7 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.verify }}
     needs:
     - load
-    uses: ./.github/workflows/_stage_verify.yml
+    uses: ./.github/workflows/_publish_verify.yml
     name: Verify
     with:
       request: ${{ needs.load.outputs.request }}
