@@ -64,6 +64,10 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 // This function covers both periodical report and immediate report case, with the difference that
 // bucked id in periodical report case is empty.
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
+  // Don't send any reports if stream has already been closed.
+  if (stream_closed_) {
+    return;
+  }
   ASSERT(stream_ != nullptr);
   // Build the report and then send the report to RLQS server.
   // `end_stream` should always be set to false as we don't want to close the stream locally.
@@ -138,10 +142,9 @@ void RateLimitClientImpl::closeStream() {
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                         const std::string& message) {
-  // TODO(tyxia) Revisit later, maybe add some logging.
-  stream_closed_ = true;
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  closeStream();
+  stream_closed_ = true;
+  stream_ = nullptr;
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
