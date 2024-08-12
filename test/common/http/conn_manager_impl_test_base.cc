@@ -53,6 +53,9 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
+  bool http1SafeMaxConnectionDuration() const override {
+    return parent_.http1SafeMaxConnectionDuration();
+  }
   uint32_t maxRequestHeadersKb() const override { return parent_.maxRequestHeadersKb(); }
   uint32_t maxRequestHeadersCount() const override { return parent_.maxRequestHeadersCount(); }
   std::chrono::milliseconds streamIdleTimeout() const override {
@@ -183,14 +186,14 @@ HttpConnectionManagerImplMixin::requestHeaderCustomTag(const std::string& header
   return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
 }
 
-void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_name, bool tracing,
-                                           bool use_srds) {
-  use_srds_ = use_srds;
-  if (ssl) {
+void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
+  use_srds_ = opts.use_srds_;
+  http1_safe_max_connection_duration_ = opts.http1_safe_max_connection_duration_;
+  if (opts.ssl_) {
     ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
   }
 
-  server_name_ = server_name;
+  server_name_ = opts.server_name_;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_)
@@ -214,7 +217,7 @@ void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_n
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
-  if (tracing) {
+  if (opts.tracing_) {
     envoy::type::v3::FractionalPercent percent1;
     percent1.set_numerator(100);
     envoy::type::v3::FractionalPercent percent2;
@@ -421,7 +424,7 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
-  setup(false, "");
+  setup();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
