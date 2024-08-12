@@ -280,10 +280,20 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestDataTooLarge();
   void requestDataDrained();
+  // Check if the filter that encoded end_stream has also decoded end_stream and if true
+  // stop the decoder filter chain. This will end the request after encoder filter chain
+  // is completed.
+  // This allows non-terminal filters (i.e. cache filter) to encode responses when independent
+  // half-close is enabled. Encoding end_stream effectively makes the filter terminal - decoder
+  // filer chain will not go past this filter.
+  void maybeStopDecoderFilterChain(bool end_stream);
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
-  bool encoded_end_stream_{false};
+  // Indicates that this filter called an encodeXXX method with end_stream == true.
+  // When independent half close is enabled this filter becomes the terminal filter
+  // in the decoder filter chain.
+  bool filter_encoded_end_stream_{false};
 };
 
 using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
@@ -788,10 +798,11 @@ public:
   void maybeEndEncode(bool end_stream);
 
   /**
-   * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
+   * If terminal_filter_decoded_end_stream is true, marks decoding as complete. This is a noop if
+   * terminal_filter_decoded_end_stream is false.
    * @param end_stream whether decoding is complete.
    */
-  void maybeEndDecode(bool end_stream);
+  void maybeEndDecode(bool terminal_filter_decoded_end_stream);
 
   void checkAndCloseStreamIfFullyClosed();
 
