@@ -901,11 +901,13 @@ protected:
     uint32_t filter_call_state_{0};
 
     // Set after decoder filter chain has completed iteration. Prevents further calls to decoder
-    // filters.
+    // filters. This flag is used to determine stream completion when the independent half-close is
+    // enabled.
     bool decoder_filter_chain_complete_ : 1;
 
     // Set after encoder filter chain has completed iteration. Prevents further calls to encoder
-    // filters.
+    // filters. This flag is used to determine stream completion when the independent half-close is
+    // enabled.
     bool encoder_filter_chain_complete_ : 1;
 
     // Set `true` when the filter manager observes end stream on the decoder path (from downstream
