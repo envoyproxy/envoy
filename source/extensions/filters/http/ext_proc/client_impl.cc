@@ -24,6 +24,11 @@ ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
                                              sidestream_watermark_callbacks);
 }
 
+void ExternalProcessorClientImpl::cancel() {
+  // TBD
+  ;
+}
+
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
     ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,

@@ -57,6 +57,14 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
+    name = "client_base_interface",
+    hdrs = ["client_base.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
     tags = ["skip_on_windows"],
@@ -123,6 +131,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/extensions/filters/http/ext_proc:client_base_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
