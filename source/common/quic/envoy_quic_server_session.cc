@@ -43,11 +43,12 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(
-          *connection, connection->connection_id(), dispatcher, send_buffer_limit,
-          std::make_shared<QuicSslConnectionInfo>(*this), std::move(stream_info)),
-      quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
-      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
+      QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
+                                      send_buffer_limit,
+                                      std::make_shared<QuicSslConnectionInfo>(*this),
+                                      std::move(stream_info), quic_stat_names, listener_scope),
+      quic_connection_(std::move(connection)),
+      crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_stats_(connection_stats) {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
@@ -175,18 +176,10 @@ void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
-void EnvoyQuicServerSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
-                                                     quic::QuicResetStreamError error,
-                                                     quic::QuicStreamOffset bytes_written) {
-  QuicServerSessionBase::MaybeSendRstStreamFrame(id, error, bytes_written);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, error, /*from_self*/ true,
-                                                   /*is_upstream*/ false);
-}
-
 void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicServerSessionBase::OnRstStream(frame);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error(),
-                                                   /*from_self*/ false, /*is_upstream*/ false);
+  incrementSentQuicResetStreamErrorStats(frame.error(),
+                                         /*from_self*/ false, /*is_upstream*/ false);
 }
 
 void EnvoyQuicServerSession::setHttp3Options(
