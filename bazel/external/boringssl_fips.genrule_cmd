@@ -124,6 +124,11 @@ cd boringssl
 # because the FIPS module itself is already built with -fPIC.
 mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-fPIC" -DCMAKE_CXX_FLAGS="-fPIC" ..
 ninja
+
+# The `HostMatching` test contains hard-coded expired certificates and always fails due to the expiration.
+# This should be removed during the next FIPS version upgrade, as the test code is fixed in later versions.
+export GTEST_FILTER="-SSLTest.HostMatching"
+
 ninja run_tests
 ./crypto/crypto_test
 
