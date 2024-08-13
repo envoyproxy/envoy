@@ -55,6 +55,8 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
+GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+
 retry () {
     local n wait iterations
     wait="${1}"
@@ -481,7 +483,16 @@ case $CI_TARGET in
         else
             TARGET=coverage
         fi
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "/source/generated/${TARGET}" "$TARGET"
+        GCS_LOCATION=$(
+            bazel run //tools/gcs:upload \
+                  "${GCS_ARTIFACT_BUCKET}" \
+                  "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+                  "/source/generated/${TARGET}" \
+                  "$TARGET" \
+                  "${GCS_REDIRECT_PATH}")
+        if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
+            echo "##vso[task.logissue type=error]Coverage failed, check artifact at: ${GCS_LOCATION}"
+        fi
         ;;
 
     debug)
@@ -642,7 +653,12 @@ case $CI_TARGET in
 
     docker-upload)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              "${BUILD_DIR}/build_images" \
+              "docker" \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     dockerhub-publish)
@@ -684,7 +700,12 @@ case $CI_TARGET in
 
     docs-upload)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              /source/generated/docs \
+              docs \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     fetch|fetch-*)
@@ -907,7 +928,12 @@ case $CI_TARGET in
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              "${BUILD_DIR}/envoy" \
+              "release" \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     sizeopt)
