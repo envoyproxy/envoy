@@ -132,18 +132,17 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
-  if (stream_ != nullptr && !stream_closed_) {
+  if (stream_ != nullptr) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     stream_->closeStream();
-    stream_closed_ = true;
     stream_->resetStream();
+    stream_ = nullptr;
   }
 }
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                         const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  stream_closed_ = true;
   stream_ = nullptr;
 }
 
