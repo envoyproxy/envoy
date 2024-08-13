@@ -57,7 +57,7 @@ message ProcessingMode {
     NONE = 0;
 
     // Stream the body to the server in pieces as they arrive at the proxy
-    // if Envoy is not waiting for a header response.
+    // after Envoy has received header response from the ext_proc server.
     STREAMED = 1;
 
     // Buffer the message body in memory and send the entire body at once.
@@ -71,8 +71,8 @@ message ProcessingMode {
     BUFFERED_PARTIAL = 3;
 
     // [#not-implemented-hide:]
-    // Stream the body to the server in pieces as they arrive at the proxy regardless
-    // of the header response.
+    // Stream the body to the server in pieces as they arrive at the proxy
+    // without waiting for header response from the ext_proc server.
     STREAMED_NO_HEADER_WAIT = 4;
   }
 
