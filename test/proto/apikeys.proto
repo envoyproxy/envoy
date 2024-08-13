@@ -94,6 +94,8 @@ message RepeatedSupportedTypes {
   repeated float float = 12;
 
   repeated double double = 13;
+
+  map<string, string> map = 14;
 }
 
 message UnsupportedTypes {
