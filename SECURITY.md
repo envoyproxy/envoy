@@ -472,6 +472,7 @@ and security team to ensure they still qualify for inclusion on the list.
 | Google        | No       | 07/24       |
 | Istio         | No       | 07/24       |
 | Microsoft     | No       | 07/24       |
+| Red Hat       | No       | 07/24       |
 | VMware        | No       | 07/24       |
 | Tetrate       | No       | 07/24       |
 | solo.io       | No       | 07/24       |
