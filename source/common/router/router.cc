@@ -2113,7 +2113,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   // callbacks.
   auto host = upstream_request.upstreamHost();
   const bool need_to_send_load_report =
-      (host != nullptr) && (cluster_ != nullptr) && cluster_->lrsReportMetricNames().has_value();
+      (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
   if (!need_to_send_load_report) {
     return;
   }

@@ -10,6 +10,18 @@
 
 namespace Envoy {
 namespace Orca {
+namespace {
+// The following fields are the names of the metrics tracked in the ORCA load
+// report proto.
+static constexpr absl::string_view kApplicationUtilizationField = "application_utilization";
+static constexpr absl::string_view kCpuUtilizationField = "cpu_utilization";
+static constexpr absl::string_view kMemUtilizationField = "mem_utilization";
+static constexpr absl::string_view kEpsField = "eps";
+static constexpr absl::string_view kRpsFractionalField = "rps_fractional";
+static constexpr absl::string_view kNamedMetricsFieldPrefix = "named_metrics.";
+static constexpr absl::string_view kRequestCostFieldPrefix = "request_cost.";
+static constexpr absl::string_view kUtilizationFieldPrefix = "utilization.";
+} // namespace
 
 void addOrcaNamedMetricToLoadMetricStats(const Protobuf::Map<std::string, double>& metrics_map,
                                          const absl::string_view metric_name,
