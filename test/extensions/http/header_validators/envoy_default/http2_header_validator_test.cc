@@ -438,6 +438,15 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersAllowUnderscoreHeadersByDefault) {
+  TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}, {"x_foo", "bar"}};
+  auto uhv = createH2ServerUhv(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestTrailers(trailers));
+  EXPECT_ACCEPT(uhv->transformRequestTrailers(trailers));
+  EXPECT_EQ(trailers, TestRequestTrailerMapImpl({{"trailer1", "value1"}, {"x_foo", "bar"}}));
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderNameRejectConnectionHeaders) {
   std::string connection_headers[] = {"transfer-encoding", "connection", "keep-alive", "upgrade",
                                       "proxy-connection"};
