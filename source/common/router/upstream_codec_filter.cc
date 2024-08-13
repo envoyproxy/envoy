@@ -148,10 +148,7 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       filter_.callbacks_->dispatcher().timeSource());
 
   if (filter_.callbacks_->upstreamCallbacks()->pausedForConnect() &&
-      ((Http::Utility::getResponseStatus(*headers) == 200) ||
-       ((Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.upstream_allow_connect_with_2xx")) &&
-        (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers)))))) {
+      ((Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
     filter_.callbacks_->continueDecoding();
   }

@@ -81,8 +81,8 @@ public:
    * @return FormattterProviderPtr substitution provider for the parsed command.
    */
   virtual FormatterProviderBasePtr<FormatterContext>
-  parse(const std::string& command, const std::string& command_arg,
-        absl::optional<size_t>& max_length) const PURE;
+  parse(absl::string_view command, absl::string_view command_arg,
+        absl::optional<size_t> max_length) const PURE;
 };
 
 template <class FormatterContext>

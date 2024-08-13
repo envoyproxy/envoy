@@ -94,6 +94,15 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForDifferentOptions) {
   HttpServerPropertiesCacheSharedPtr cache2 = manager_->getCache(options2_, dispatcher_);
   EXPECT_NE(nullptr, cache2);
   EXPECT_NE(cache1, cache2);
+
+  int num_caches = 0;
+  Http::HttpServerPropertiesCacheManager::CacheFn count_caches =
+      [&](Http::HttpServerPropertiesCache& cache) {
+        EXPECT_TRUE(&cache == cache1.get() || &cache == cache2.get());
+        ++num_caches;
+      };
+  manager_->forEachThreadLocalCache(count_caches);
+  EXPECT_EQ(num_caches, 2);
 }
 
 TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForConflictingOptions) {
