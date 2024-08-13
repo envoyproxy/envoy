@@ -773,8 +773,17 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     const std::vector<Network::Address::CidrRange> trusted_cidrs) {
   const auto xff_header = request_headers.getForwardedForValue();
   static constexpr absl::string_view separator(",");
+  static constexpr size_t MAX_ALLOWED_XFF_ENTRIES = 20;
 
   const auto xff_entries = StringUtil::splitToken(xff_header, separator, false, true);
+  // If there are more than 20 entries in the XFF header, refuse to parse.
+  // There are very few valid use cases for this many entries and parsing too many has
+  // a performance impact.
+  if (xff_entries.size() > MAX_ALLOWED_XFF_ENTRIES) {
+    ENVOY_LOG_MISC(trace, "Too many entries in x-forwarded-for header");
+    return {nullptr, false};
+  }
+
   Network::Address::InstanceConstSharedPtr last_valid_addr;
 
   for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
