@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class ExtProcHttpClient : public Client,
+class ExtProcHttpClient : public ClientBase,
                           public Http::AsyncClient::Callbacks,
                           public Logger::Loggable<Logger::Id::init> {
 public:
@@ -24,7 +24,6 @@ public:
   ~ExtProcHttpClient() { cancel(); }
 
   void cancel() override;
-  void onComplete() override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   // Http::AsyncClient::Callbacks implemented by this class.
@@ -33,13 +32,12 @@ public:
   void onFailure(const Http::AsyncClient::Request& request,
                  Http::AsyncClient::FailureReason reason) override;
   Server::Configuration::ServerFactoryContext& context() const { return context_;}
-  RequestCallbacks* callbacks_{};
 
 private:
-  void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
-  Http::AsyncClient::Request* active_request_{};
+  //  Http::AsyncClient::Request* active_request_{};
+  //  RequestCallbacks* callbacks_{};
 };
 
 

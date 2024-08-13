@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -17,13 +19,11 @@ public:
 };
 
 /**
- * Async client used during external processing.
+ * Async client base class used during external processing.
  */
-class Client {
+class ClientBase {
 public:
-  // Destructor
-
-  virtual ~Client() = default;
+  virtual ~ClientBase() = default;
   virtual void cancel() PURE;
 };
 
@@ -31,4 +31,3 @@ public:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

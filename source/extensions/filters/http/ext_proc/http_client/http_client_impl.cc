@@ -10,18 +10,13 @@ void ExtProcHttpClient::cancel() {
   ;
 }
 
-void ExtProcHttpClient::onComplete() {
-  // TBD
-  ;
-}
-
-void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request& request,
+void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&/* request*/,
                                   Http::ResponseMessagePtr&&/* response*/) {
   // TBD
   ;
 }
 
-void ExtProcHttpClient::onFailure(const Http::AsyncClient::Request& request,
+void ExtProcHttpClient::onFailure(const Http::AsyncClient::Request& /*request*/,
                                   Http::AsyncClient::FailureReason/* reason*/) {
   // TBD
   ;

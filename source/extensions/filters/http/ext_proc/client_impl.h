@@ -25,7 +25,7 @@ namespace ExternalProcessing {
 using ProcessingResponsePtr = std::unique_ptr<ProcessingResponse>;
 
 class ExternalProcessorClientImpl : public ExternalProcessorClient,
-                                    public Client {
+                                    public ClientBase {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
@@ -35,7 +35,7 @@ public:
         const Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override;
 
-  void cancel() override;
+  void cancel() override {}
 
 private:
   Grpc::AsyncClientManager& client_manager_;
