@@ -412,6 +412,8 @@ public:
 
   // Router::Config
   MOCK_METHOD(const std::string&, clusterName, (), (const));
+  MOCK_METHOD(const std::string, getRequestHostValue, (const Http::RequestHeaderMap& headers),
+              (const));
   MOCK_METHOD(Http::Code, clusterNotFoundResponseCode, (), (const));
   MOCK_METHOD(void, finalizeRequestHeaders,
               (Http::RequestHeaderMap & headers, const StreamInfo::StreamInfo& stream_info,
