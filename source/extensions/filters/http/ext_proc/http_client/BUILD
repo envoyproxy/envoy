@@ -15,6 +15,8 @@ envoy_cc_library(
     hdrs = ["http_client_impl.h"],
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/common:enum_to_int",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http/ext_proc",
         "//source/extensions/filters/http/ext_proc:client_base_interface",
     ],

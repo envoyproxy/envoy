@@ -31,13 +31,15 @@ public:
                  Http::ResponseMessagePtr&& response) override;
   void onFailure(const Http::AsyncClient::Request& request,
                  Http::AsyncClient::FailureReason reason) override;
+
   Server::Configuration::ServerFactoryContext& context() const { return context_;}
 
 private:
+  void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
-  //  Http::AsyncClient::Request* active_request_{};
-  //  RequestCallbacks* callbacks_{};
+  Http::AsyncClient::Request* active_request_{};
+  RequestCallbacks* callbacks_{};
 };
 
 
