@@ -906,6 +906,32 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
+const std::string
+RouteEntryImplBase::getRequestHostValue(const Http::RequestHeaderMap& headers) const {
+  if (!host_rewrite_.empty()) {
+    return host_rewrite_;
+  }
+
+  if (auto_host_rewrite_header_) {
+    const auto& header = headers.get(*auto_host_rewrite_header_);
+    if (!header.empty()) {
+      const absl::string_view header_value = header[0]->value().getStringView();
+      if (!header_value.empty()) {
+        return std::string(header_value);
+      }
+    }
+  }
+
+  if (host_rewrite_path_regex_) {
+    absl::string_view path = headers.getPathValue();
+    return host_rewrite_path_regex_->replaceAll(Http::PathUtil::removeQueryAndFragment(path),
+                                                host_rewrite_path_regex_substitution_);
+  }
+
+  // Fallback to original host value
+  return std::string(headers.getHostValue());
+}
+
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
@@ -926,25 +952,9 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  if (!host_rewrite_.empty()) {
-    Http::Utility::updateAuthority(headers, host_rewrite_, append_xfh_);
-  } else if (auto_host_rewrite_header_) {
-    const auto header = headers.get(*auto_host_rewrite_header_);
-    if (!header.empty()) {
-      // This is an implicitly untrusted header, so per the API documentation only the first
-      // value is used.
-      const absl::string_view header_value = header[0]->value().getStringView();
-      if (!header_value.empty()) {
-        Http::Utility::updateAuthority(headers, header_value, append_xfh_);
-      }
-    }
-  } else if (host_rewrite_path_regex_ != nullptr) {
-    const std::string path(headers.getPathValue());
-    absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(path));
-    Http::Utility::updateAuthority(
-        headers,
-        host_rewrite_path_regex_->replaceAll(just_path, host_rewrite_path_regex_substitution_),
-        append_xfh_);
+  auto final_host_value = getRequestHostValue(headers);
+  if (final_host_value != headers.getHostValue()) {
+    Http::Utility::updateAuthority(headers, final_host_value, append_xfh_);
   }
 
   // Handle path rewrite
