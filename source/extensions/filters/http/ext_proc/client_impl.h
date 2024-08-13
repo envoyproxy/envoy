@@ -11,7 +11,6 @@
 
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
@@ -24,8 +23,7 @@ namespace ExternalProcessing {
 
 using ProcessingResponsePtr = std::unique_ptr<ProcessingResponse>;
 
-class ExternalProcessorClientImpl : public ExternalProcessorClient,
-                                    public ClientBase {
+class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
@@ -34,8 +32,6 @@ public:
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override;
-
-  void cancel() override {}
 
 private:
   Grpc::AsyncClientManager& client_manager_;

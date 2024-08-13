@@ -24,6 +24,8 @@ public:
 class ClientBase {
 public:
   virtual ~ClientBase() = default;
+
+  virtual void sendRequest() PURE;
   virtual void cancel() PURE;
 };
 

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "source/extensions/filters/http/ext_proc/client_base.h"
+#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 #include "envoy/http/async_client.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -23,6 +23,7 @@ public:
 
   ~ExtProcHttpClient() { cancel(); }
 
+  void sendRequest() override {}
   void cancel() override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
