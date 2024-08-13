@@ -172,8 +172,7 @@ Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, 
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
-Filter::HandleDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
-                                                        bool end_stream) {
+Filter::HandleDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data, bool end_stream) {
   RELEASE_ASSERT(extractor_ && request_msg_converter_,
                  "`extractor_` and request_msg_converter_ both should be "
                  "initiated when logging proto messages");
@@ -298,8 +297,7 @@ Envoy::Http::FilterDataStatus Filter::encodeData(Envoy::Buffer::Instance& data, 
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
-Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
-                                                        bool end_stream) {
+Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data, bool end_stream) {
   RELEASE_ASSERT(extractor_ && response_msg_converter_,
                  "`extractor_` and response_msg_converter_ both should be "
                  "initiated when logging proto messages");
@@ -387,22 +385,31 @@ void Filter::handleRequestLoggingResult(const std::vector<AuditMetadata>& result
 
   Envoy::ProtobufWkt::Struct dest_metadata;
 
-  auto addResultToMetadata = [&](const std::string& key, const AuditMetadata& metadata) {
+  auto addResultToMetadata = [&](const std::string& category, const std::string& key,
+                                 const AuditMetadata& metadata) {
     RELEASE_ASSERT(metadata.scrubbed_message.IsInitialized(),
                    "`scrubbed_message` should be initialized");
 
-    Envoy::ProtobufWkt::ListValue* list =
-        (*dest_metadata.mutable_fields())[key].mutable_list_value();
-    auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
-    list->add_values()->set_allocated_struct_value(struct_value_copy);
+    auto* category_field = (*dest_metadata.mutable_fields())[category].mutable_struct_value();
+
+    auto* key_field = (*category_field->mutable_fields())[key].mutable_struct_value();
+
+    for (const auto& field : metadata.scrubbed_message.fields()) {
+      (*key_field->mutable_fields())[field.first] = field.second;
+    }
+
+    // Envoy::ProtobufWkt::ListValue* list =
+    //     (*dest_metadata.mutable_fields())[key].mutable_list_value();
+    // auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
+    // list->add_values()->set_allocated_struct_value(struct_value_copy);
   };
 
   const auto& first_metadata = result[0];
-  addResultToMetadata("requests.first", first_metadata);
+  addResultToMetadata("requests", "first", first_metadata);
 
   if (result.size() == 2) {
     const auto& last_metadata = result[1];
-    addResultToMetadata("requests.last", last_metadata);
+    addResultToMetadata("requests", "last", last_metadata);
   }
 
   if (dest_metadata.fields_size() > 0) {
@@ -422,22 +429,31 @@ void Filter::handleResponseLoggingResult(const std::vector<AuditMetadata>& resul
 
   Envoy::ProtobufWkt::Struct dest_metadata;
 
-  auto addResultToMetadata = [&](const std::string& key, const AuditMetadata& metadata) {
+  auto addResultToMetadata = [&](const std::string& category, const std::string& key,
+                                 const AuditMetadata& metadata) {
     RELEASE_ASSERT(metadata.scrubbed_message.IsInitialized(),
                    "`scrubbed_message` should be initialized");
 
-    Envoy::ProtobufWkt::ListValue* list =
-        (*dest_metadata.mutable_fields())[key].mutable_list_value();
-    auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
-    list->add_values()->set_allocated_struct_value(struct_value_copy);
+    auto* category_field = (*dest_metadata.mutable_fields())[category].mutable_struct_value();
+
+    auto* key_field = (*category_field->mutable_fields())[key].mutable_struct_value();
+
+    for (const auto& field : metadata.scrubbed_message.fields()) {
+      (*key_field->mutable_fields())[field.first] = field.second;
+    }
+
+    // Envoy::ProtobufWkt::ListValue* list =
+    //     (*dest_metadata.mutable_fields())[key].mutable_list_value();
+    // auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
+    // list->add_values()->set_allocated_struct_value(struct_value_copy);
   };
 
   const auto& first_metadata = result[0];
-  addResultToMetadata("responses.first", first_metadata);
+  addResultToMetadata("responses", "first", first_metadata);
 
   if (result.size() == 2) {
     const auto& last_metadata = result[1];
-    addResultToMetadata("responses.last", last_metadata);
+    addResultToMetadata("responses", "last", last_metadata);
   }
 
   if (dest_metadata.fields_size() > 0) {

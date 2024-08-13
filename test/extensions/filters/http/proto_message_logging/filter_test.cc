@@ -38,20 +38,25 @@ constexpr absl::string_view kFilterName = "envoy.filters.http.proto_message_logg
 
 constexpr absl::string_view kExpectedRequestMetadata = R"pb(
 fields {
-  key: "requests.first"
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
-          }
-          fields {
-            key: "parent"
-            value { string_value: "project-id" }
+            fields {
+              key: "parent"
+              value {
+                string_value: "project-id"
+              }
+            }
           }
         }
       }
@@ -62,18 +67,25 @@ fields {
 
 constexpr absl::string_view kExpectedResponseMetadata = R"pb(
 fields {
-  key: "responses.first"
+  key: "responses"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value { string_value: "type.googleapis.com/apikeys.ApiKey" }
-          }
-          fields {
-            key: "name"
-            value { string_value: "apikey-name" }
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
+            }
+            fields {
+              key: "name"
+              value {
+                string_value: "apikey-name"
+              }
+            }
           }
         }
       }
@@ -262,40 +274,43 @@ TEST_F(FilterTestExtractOk, UnarySingleBufferWithMultipleFields) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "requests.first"
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
-          }
-          fields {
-            key: "key"
-            value {
-              struct_value {
-                fields {
-                  key: "currentKey"
-                  value {
-                    string_value: "current-key"
+            fields {
+              key: "key"
+              value {
+                struct_value {
+                  fields {
+                    key: "currentKey"
+                    value {
+                      string_value: "current-key"
+                    }
                   }
-                }
-                fields {
-                  key: "displayName"
-                  value {
-                    string_value: "Display Name"
+                  fields {
+                    key: "displayName"
+                    value {
+                      string_value: "Display Name"
+                    }
                   }
                 }
               }
             }
-          }
-          fields {
-            key: "parent"
-            value {
-              string_value: "project-id"
+            fields {
+              key: "parent"
+              value {
+                string_value: "project-id"
+              }
             }
           }
         }
@@ -328,33 +343,36 @@ fields {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "responses.first"
+  key: "responses"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.ApiKey"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
             }
-          }
-          fields {
-            key: "currentKey"
-            value {
-              string_value: "current-key"
+            fields {
+              key: "currentKey"
+              value {
+                string_value: "current-key"
+              }
             }
-          }
-          fields {
-            key: "displayName"
-            value {
-              string_value: "Display Name"
+            fields {
+              key: "displayName"
+              value {
+                string_value: "Display Name"
+              }
             }
-          }
-          fields {
-            key: "name"
-            value {
-              string_value: "apikey-name"
+            fields {
+              key: "name"
+              value {
+                string_value: "apikey-name"
+              }
             }
           }
         }
@@ -399,15 +417,18 @@ TEST_F(FilterTestExtractOk, UnarySingleBufferWithMultipleFieldsforResponseOnly) 
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "requests.first"
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
           }
         }
@@ -440,33 +461,36 @@ fields {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "responses.first"
+  key: "responses"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.ApiKey"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
             }
-          }
-          fields {
-            key: "currentKey"
-            value {
-              string_value: "current-key"
+            fields {
+              key: "currentKey"
+              value {
+                string_value: "current-key"
+              }
             }
-          }
-          fields {
-            key: "displayName"
-            value {
-              string_value: "Display Name"
+            fields {
+              key: "displayName"
+              value {
+                string_value: "Display Name"
+              }
             }
-          }
-          fields {
-            key: "name"
-            value {
-              string_value: "apikey-name"
+            fields {
+              key: "name"
+              value {
+                string_value: "apikey-name"
+              }
             }
           }
         }
@@ -500,15 +524,18 @@ TEST_F(FilterTestExtractOk, EmptyFields) {
         EXPECT_EQ(ns, kFilterName);
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "requests.first"
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
           }
         }
@@ -540,15 +567,18 @@ fields {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "responses.first"
+  key: "responses"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.ApiKey"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
             }
           }
         }
@@ -712,44 +742,43 @@ logging_by_method: {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "requests.first"
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
-          }
-          fields {
-            key: "parent"
-            value {
-              string_value: "project-id"
+            fields {
+              key: "parent"
+              value {
+                string_value: "project-id"
+              }
             }
           }
         }
       }
-    }
-  }
-}
-fields {
-  key: "requests.last"
-  value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+      fields {
+        key: "last"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
-          }
-          fields {
-            key: "parent"
-            value {
-              string_value: "from-req4"
+            fields {
+              key: "parent"
+              value {
+                string_value: "from-req4"
+              }
             }
           }
         }
@@ -814,7 +843,6 @@ fields {
   // Inject data back and no data modification.
   checkSerializedData<apikeys::ApiKey>(response_data, {response1, response2, response3});
 
-  // No op for the following messages.
   apikeys::ApiKey response4 = makeCreateApiKeyResponse(
       R"pb(
   name: "last-apikey-name"
@@ -832,44 +860,43 @@ fields {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "responses.first"
+  key: "responses"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.ApiKey"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
             }
-          }
-          fields {
-            key: "name"
-            value {
-              string_value: "apikey-name"
+            fields {
+              key: "name"
+              value {
+                string_value: "apikey-name"
+              }
             }
           }
         }
       }
-    }
-  }
-}
-fields {
-  key: "responses.last"
-  value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.ApiKey"
+      fields {
+        key: "last"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
             }
-          }
-          fields {
-            key: "name"
-            value {
-              string_value: "last-apikey-name"
+            fields {
+              key: "name"
+              value {
+                string_value: "last-apikey-name"
+              }
             }
           }
         }
@@ -982,98 +1009,102 @@ supported_types: {
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
-        checkProtoStruct(new_dynamic_metadata, R"pb(fields {
-  key: "requests.first"
+        checkProtoStruct(new_dynamic_metadata, R"pb(
+fields {
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
-          }
-          fields {
-            key: "supportedTypes"
-            value {
-              struct_value {
-                fields {
-                  key: "double"
-                  value {
-                    number_value: 1.3
+            fields {
+              key: "supportedTypes"
+              value {
+                struct_value {
+                  fields {
+                    key: "double"
+                    value {
+                      number_value: 1.3
+                    }
                   }
-                }
-                fields {
-                  key: "fixed32"
-                  value {
-                    number_value: 8
+                  fields {
+                    key: "fixed32"
+                    value {
+                      number_value: 8
+                    }
                   }
-                }
-                fields {
-                  key: "fixed64"
-                  value {
-                    string_value: "9"
+                  fields {
+                    key: "fixed64"
+                    value {
+                      string_value: "9"
+                    }
                   }
-                }
-                fields {
-                  key: "float"
-                  value {
-                    number_value: 1.2
+                  fields {
+                    key: "float"
+                    value {
+                      number_value: 1.2
+                    }
                   }
-                }
-                fields {
-                  key: "int32"
-                  value {
-                    number_value: 4
+                  fields {
+                    key: "int32"
+                    value {
+                      number_value: 4
+                    }
                   }
-                }
-                fields {
-                  key: "int64"
-                  value {
-                    string_value: "5"
+                  fields {
+                    key: "int64"
+                    value {
+                      string_value: "5"
+                    }
                   }
-                }
-                fields {
-                  key: "sfixed32"
-                  value {
-                    number_value: 10
+                  fields {
+                    key: "sfixed32"
+                    value {
+                      number_value: 10
+                    }
                   }
-                }
-                fields {
-                  key: "sfixed64"
-                  value {
-                    string_value: "11"
+                  fields {
+                    key: "sfixed64"
+                    value {
+                      string_value: "11"
+                    }
                   }
-                }
-                fields {
-                  key: "sint32"
-                  value {
-                    number_value: 6
+                  fields {
+                    key: "sint32"
+                    value {
+                      number_value: 6
+                    }
                   }
-                }
-                fields {
-                  key: "sint64"
-                  value {
-                    string_value: "7"
+                  fields {
+                    key: "sint64"
+                    value {
+                      string_value: "7"
+                    }
                   }
-                }
-                fields {
-                  key: "string"
-                  value {
-                    string_value: "1"
+                  fields {
+                    key: "string"
+                    value {
+                      string_value: "1"
+                    }
                   }
-                }
-                fields {
-                  key: "uint32"
-                  value {
-                    number_value: 2
+                  fields {
+                    key: "uint32"
+                    value {
+                      number_value: 2
+                    }
                   }
-                }
-                fields {
-                  key: "uint64"
-                  value {
-                    string_value: "3"
+                  fields {
+                    key: "uint64"
+                    value {
+                      string_value: "3"
+                    }
                   }
                 }
               }
@@ -1107,27 +1138,30 @@ supported_types: {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "responses.first"
+  key: "responses"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.ApiKey"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.ApiKey"
+              }
             }
-          }
-          fields {
-            key: "kmsKey"
-            value {
-              string_value: "projects/my-project/locations/my-location"
+            fields {
+              key: "kmsKey"
+              value {
+                string_value: "projects/my-project/locations/my-location"
+              }
             }
-          }
-          fields {
-            key: "location"
-            value {
-              string_value: "global"
+            fields {
+              key: "location"
+              value {
+                string_value: "global"
+              }
             }
           }
         }
@@ -1249,186 +1283,189 @@ repeated_supported_types: {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_logging");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
-  key: "requests.first"
+  key: "requests"
   value {
-    list_value {
-      values {
-        struct_value {
-          fields {
-            key: "@type"
-            value {
-              string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+    struct_value {
+      fields {
+        key: "first"
+        value {
+          struct_value {
+            fields {
+              key: "@type"
+              value {
+                string_value: "type.googleapis.com/apikeys.CreateApiKeyRequest"
+              }
             }
-          }
-          fields {
-            key: "repeatedSupportedTypes"
-            value {
-              struct_value {
-                fields {
-                  key: "double"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 1.3
-                      }
-                      values {
-                        number_value: 1.313
-                      }
-                    }
-                  }
-                }
-                fields {
-                  key: "fixed32"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 8
-                      }
-                      values {
-                        number_value: 88
+            fields {
+              key: "repeatedSupportedTypes"
+              value {
+                struct_value {
+                  fields {
+                    key: "double"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 1.3
+                        }
+                        values {
+                          number_value: 1.313
+                        }
                       }
                     }
                   }
-                }
-                fields {
-                  key: "fixed64"
-                  value {
-                    list_value {
-                      values {
-                        string_value: "9"
-                      }
-                      values {
-                        string_value: "99"
-                      }
-                    }
-                  }
-                }
-                fields {
-                  key: "float"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 1.2
-                      }
-                      values {
-                        number_value: 1.212
+                  fields {
+                    key: "fixed32"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 8
+                        }
+                        values {
+                          number_value: 88
+                        }
                       }
                     }
                   }
-                }
-                fields {
-                  key: "int32"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 4
-                      }
-                      values {
-                        number_value: 44
-                      }
-                    }
-                  }
-                }
-                fields {
-                  key: "int64"
-                  value {
-                    list_value {
-                      values {
-                        string_value: "5"
-                      }
-                      values {
-                        string_value: "55"
+                  fields {
+                    key: "fixed64"
+                    value {
+                      list_value {
+                        values {
+                          string_value: "9"
+                        }
+                        values {
+                          string_value: "99"
+                        }
                       }
                     }
                   }
-                }
-                fields {
-                  key: "sfixed32"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 10
-                      }
-                      values {
-                        number_value: 1010
-                      }
-                    }
-                  }
-                }
-                fields {
-                  key: "sfixed64"
-                  value {
-                    list_value {
-                      values {
-                        string_value: "11"
-                      }
-                      values {
-                        string_value: "1111"
+                  fields {
+                    key: "float"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 1.2
+                        }
+                        values {
+                          number_value: 1.212
+                        }
                       }
                     }
                   }
-                }
-                fields {
-                  key: "sint32"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 6
-                      }
-                      values {
-                        number_value: 66
-                      }
-                    }
-                  }
-                }
-                fields {
-                  key: "sint64"
-                  value {
-                    list_value {
-                      values {
-                        string_value: "7"
-                      }
-                      values {
-                        string_value: "77"
+                  fields {
+                    key: "int32"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 4
+                        }
+                        values {
+                          number_value: 44
+                        }
                       }
                     }
                   }
-                }
-                fields {
-                  key: "string"
-                  value {
-                    list_value {
-                      values {
-                        string_value: "1"
-                      }
-                      values {
-                        string_value: "11"
-                      }
-                    }
-                  }
-                }
-                fields {
-                  key: "uint32"
-                  value {
-                    list_value {
-                      values {
-                        number_value: 2
-                      }
-                      values {
-                        number_value: 22
+                  fields {
+                    key: "int64"
+                    value {
+                      list_value {
+                        values {
+                          string_value: "5"
+                        }
+                        values {
+                          string_value: "55"
+                        }
                       }
                     }
                   }
-                }
-                fields {
-                  key: "uint64"
-                  value {
-                    list_value {
-                      values {
-                        string_value: "3"
+                  fields {
+                    key: "sfixed32"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 10
+                        }
+                        values {
+                          number_value: 1010
+                        }
                       }
-                      values {
-                        string_value: "33"
+                    }
+                  }
+                  fields {
+                    key: "sfixed64"
+                    value {
+                      list_value {
+                        values {
+                          string_value: "11"
+                        }
+                        values {
+                          string_value: "1111"
+                        }
+                      }
+                    }
+                  }
+                  fields {
+                    key: "sint32"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 6
+                        }
+                        values {
+                          number_value: 66
+                        }
+                      }
+                    }
+                  }
+                  fields {
+                    key: "sint64"
+                    value {
+                      list_value {
+                        values {
+                          string_value: "7"
+                        }
+                        values {
+                          string_value: "77"
+                        }
+                      }
+                    }
+                  }
+                  fields {
+                    key: "string"
+                    value {
+                      list_value {
+                        values {
+                          string_value: "1"
+                        }
+                        values {
+                          string_value: "11"
+                        }
+                      }
+                    }
+                  }
+                  fields {
+                    key: "uint32"
+                    value {
+                      list_value {
+                        values {
+                          number_value: 2
+                        }
+                        values {
+                          number_value: 22
+                        }
+                      }
+                    }
+                  }
+                  fields {
+                    key: "uint64"
+                    value {
+                      list_value {
+                        values {
+                          string_value: "3"
+                        }
+                        values {
+                          string_value: "33"
+                        }
                       }
                     }
                   }
