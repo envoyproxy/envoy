@@ -347,6 +347,7 @@ envoy_cc_test_binary(
         "abseil_symbolize",
     ],
     deps = [
+        ":common_extensions_lib",
         "//source/common/http:rds_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -369,6 +370,7 @@ envoy_cc_test_binary(
     ],
     linkstatic = envoy_select_linkstatic(),
     deps = [
+        ":common_extensions_lib",
         "//source/exe:main_common_lib",
         "//source/exe:platform_impl_lib",
         "//source/exe:process_wide_lib",
@@ -1117,6 +1119,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "common_extensions_lib",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/extensions/clusters/eds:eds_lib",

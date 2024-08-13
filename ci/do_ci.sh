@@ -55,6 +55,8 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
+GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+
 retry () {
     local n wait iterations
     wait="${1}"
@@ -233,16 +235,6 @@ function bazel_contrib_binary_build() {
   bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
 }
 
-function run_ci_verify () {
-    export DOCKER_NO_PULL=1
-    export DOCKER_RMI_CLEANUP=1
-    # This is set to simulate an environment where users have shared home drives protected
-    # by a strong umask (ie only group readable by default).
-    umask 027
-    chmod -R o-rwx examples/
-    "${ENVOY_SRCDIR}/ci/verify_examples.sh" "${@}"
-}
-
 CI_TARGET=$1
 shift
 
@@ -258,7 +250,7 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  if [[ "${CI_TARGET}" == "release" ]]; then
+  if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
   elif [[ "${CI_TARGET}" == "msan" ]]; then
@@ -491,7 +483,16 @@ case $CI_TARGET in
         else
             TARGET=coverage
         fi
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "/source/generated/${TARGET}" "$TARGET"
+        GCS_LOCATION=$(
+            bazel run //tools/gcs:upload \
+                  "${GCS_ARTIFACT_BUCKET}" \
+                  "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+                  "/source/generated/${TARGET}" \
+                  "$TARGET" \
+                  "${GCS_REDIRECT_PATH}")
+        if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
+            echo "##vso[task.logissue type=error]Coverage failed, check artifact at: ${GCS_LOCATION}"
+        fi
         ;;
 
     debug)
@@ -652,7 +653,12 @@ case $CI_TARGET in
 
     docker-upload)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              "${BUILD_DIR}/build_images" \
+              "docker" \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     dockerhub-publish)
@@ -694,7 +700,12 @@ case $CI_TARGET in
 
     docs-upload)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              /source/generated/docs \
+              docs \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     fetch|fetch-*)
@@ -714,10 +725,14 @@ case $CI_TARGET in
             fetch-gcc)
                 targets=("${FETCH_GCC_TARGETS[@]}")
                 ;;
-            fetch-release)
+            fetch-release|fetch-release.test_only)
                 targets=(
                     "${FETCH_BUILD_TARGETS[@]}"
                     "${FETCH_ALL_TEST_TARGETS[@]}")
+                ;;
+            fetch-release.server_only)
+                targets=(
+                    "${FETCH_BUILD_TARGETS[@]}")
                 ;;
             fetch-*coverage)
                 targets=("${FETCH_TEST_TARGETS[@]}")
@@ -828,8 +843,8 @@ case $CI_TARGET in
                  "${PUBLISH_ARGS[@]}"
         ;;
 
-    release|release.server_only)
-        if [[ "$CI_TARGET" == "release" ]]; then
+    release|release.server_only|release.test_only)
+        if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # When testing memory consumption, we want to test against exact byte-counts
             # where possible. As these differ between platforms and compile options, we
             # define the 'release' builds as canonical and test them only in CI, so the
@@ -841,19 +856,13 @@ case $CI_TARGET in
             fi
         fi
         setup_clang_toolchain
-        ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
-        if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
-            echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
-            rm -rf "${ENVOY_BINARY_DIR}"
-        fi
-        mkdir -p "$ENVOY_BINARY_DIR"
         # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
         # reuse settings and any already compiled artefacts, the bundle itself will always be compiled
         # `--stripopt=--strip-all -c opt`
         BAZEL_RELEASE_OPTIONS=(
             --stripopt=--strip-all
             -c opt)
-        if [[ "$CI_TARGET" == "release" ]]; then
+        if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
             # Run release tests
             echo "Testing with:"
             echo "  targets: ${TEST_TARGETS[*]}"
@@ -865,6 +874,22 @@ case $CI_TARGET in
                 "${BAZEL_RELEASE_OPTIONS[@]}" \
                 "${TEST_TARGETS[@]}"
         fi
+
+        if [[ "$CI_TARGET" == "release.test_only" ]]; then
+            exit 0
+        fi
+
+        ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
+        if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
+            echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
+            rm -rf "${ENVOY_BINARY_DIR}"
+        fi
+        mkdir -p "$ENVOY_BINARY_DIR"
+
+        # Build
+        echo "Building with:"
+        echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_RELEASE_OPTIONS[@]}" \
@@ -903,7 +928,12 @@ case $CI_TARGET in
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              "${BUILD_DIR}/envoy" \
+              "release" \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     sizeopt)
@@ -960,7 +990,13 @@ case $CI_TARGET in
         ;;
 
     verify_examples)
-        run_ci_verify "*" "win32-front-proxy|shared"
+        DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
+        bazel run --config=ci \
+                  --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --sandbox_writable_path="${HOME}/.docker/" \
+                  --sandbox_writable_path="$HOME" \
+                  @envoy_examples//:verify_examples
         ;;
 
     verify.trigger)

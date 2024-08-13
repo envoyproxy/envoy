@@ -2,6 +2,7 @@
 
 #include "envoy/server/instance.h"
 
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 
@@ -22,6 +23,7 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
+  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
@@ -79,6 +81,8 @@ public:
   Event::GlobalTimeSystem time_system_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<Http::MockHttpServerPropertiesCacheManager>
+      http_server_properties_cache_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

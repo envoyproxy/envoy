@@ -1,6 +1,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -603,6 +604,25 @@ TEST(AccessLogDateTimeFormatter, fromTime) {
   EXPECT_EQ("2018-04-03T23:06:08.999Z", AccessLogDateTimeFormatter::fromTime(time4));
 }
 
+TEST(AccessLogDateTimeFormatter, fromTimeLocalTimeZone) {
+  SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time1), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time1, true));
+  SystemTime time2(std::chrono::milliseconds(1522796769123));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time2), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time2, true));
+  SystemTime time3(std::chrono::milliseconds(1522796769999));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time3), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time3, true));
+  SystemTime time4(std::chrono::milliseconds(1522796768999));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time4), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time4, true));
+}
+
 TEST(Primes, isPrime) {
   EXPECT_FALSE(Primes::isPrime(0));
   EXPECT_TRUE(Primes::isPrime(67));
@@ -1024,6 +1044,75 @@ TEST(DateFormatter, FromTime) {
   const SystemTime time2(std::chrono::seconds(0));
   EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time2));
   EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+
+  const SystemTime time3(std::chrono::milliseconds(1522796769321));
+  EXPECT_EQ("2018-04-03T23:06:09.321Z", DateFormatter("%Y-%m-%dT%H:%M:%E3SZ").fromTime(time3));
+  EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
+  const SystemTime time4(std::chrono::seconds(0));
+  EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%E3SZ").fromTime(time4));
+  EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+
+  const SystemTime time5(std::chrono::milliseconds(321));
+  EXPECT_EQ("1970-01-01T00:00:00.321Z", DateFormatter("%Y-%m-%dT%H:%M:%E3SZ").fromTime(time5));
+  EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+}
+
+TEST(DateFormatter, DateFormatterVsAbslFormatTime) {
+  const std::string format = "%Y-%m-%dT%H:%M:%E3SZ %Ez %E*z %E8S %E*S %E5f %E*f %E4Y %ET";
+
+  SystemTime zero_time(std::chrono::seconds(0));
+
+  EXPECT_EQ(DateFormatter(format).fromTime(zero_time),
+            absl::FormatTime(format, absl::FromChrono(zero_time), absl::UTCTimeZone()));
+
+  std::mt19937 prng(1);
+  std::uniform_int_distribution<long> distribution(-10, 20);
+
+  SystemTime now = std::chrono::system_clock::now(); // NO_CHECK_FORMAT(real_time)
+
+  for (size_t i = 0; i < 20; i++) {
+    auto time = now + std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    // UTC time zone.
+    EXPECT_EQ(DateFormatter(format).fromTime(time),
+              absl::FormatTime(format, absl::FromChrono(time), absl::UTCTimeZone()));
+
+    // Local time zone.
+    EXPECT_EQ(DateFormatter(format, true).fromTime(time),
+              absl::FormatTime(format, absl::FromChrono(time), absl::LocalTimeZone()));
+  }
+}
+
+TEST(DateFormatter, HybridAbsl) {
+  const std::string format = "%Y-%m-%dT%H:%M:%E3SZ %E6S %E*S %E4f %E*f %S. %s %3f %6f %9f";
+
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::microseconds(123450));
+
+  EXPECT_EQ(
+      "2018-04-03T23:06:09.123Z 09.123450 09.12345 1234 12345 09. 1522796769 123 123450 123450000",
+      DateFormatter(format).fromTime(time1));
+
+  const SystemTime time2(std::chrono::seconds(0));
+  EXPECT_EQ("1970-01-01T00:00:00.000Z 00.000000 00 0000 0 00. 0 000 000000 000000000",
+            DateFormatter(format).fromTime(time2));
+}
+
+TEST(DateFormatter, FromTimeLocalTimeZone) {
+  const SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%S.000Z", absl::FromChrono(time1), absl::LocalTimeZone()),
+      DateFormatter("%Y-%m-%dT%H:%M:%S.000Z", true).fromTime(time1));
+  EXPECT_EQ(absl::FormatTime("aaa%H", absl::FromChrono(time1), absl::LocalTimeZone()),
+            DateFormatter(std::string(3, 'a') + "%H", true).fromTime(time1));
+  const SystemTime time2(std::chrono::seconds(0));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%S.000Z", absl::FromChrono(time2), absl::LocalTimeZone()),
+      DateFormatter("%Y-%m-%dT%H:%M:%S.000Z", true).fromTime(time2));
+  EXPECT_EQ(absl::FormatTime("aaa%H", absl::FromChrono(time2), absl::LocalTimeZone()),
+            DateFormatter(std::string(3, 'a') + "%H", true).fromTime(time2));
+  SystemTime time3(std::chrono::milliseconds(1522796769999));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time3), absl::LocalTimeZone()),
+      DateFormatter("%Y-%m-%dT%H:%M:%S.%3f%z", true).fromTime(time3));
 }
 
 // Check the time complexity. Make sure DateFormatter can finish parsing long messy string without
@@ -1046,9 +1135,6 @@ TEST(DateFormatter, ParseLongString) {
   EXPECT_EQ(expected_output, output);
 }
 
-// Verify that two DateFormatter patterns with the same ??? patterns but
-// different format strings don't false share cache entries. This is a
-// regression test for when they did.
 TEST(DateFormatter, FromTimeSameWildcard) {
   const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
   EXPECT_EQ("2018-04-03T23:06:09.000Z142",

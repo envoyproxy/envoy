@@ -11,7 +11,11 @@ import java.nio.ByteBuffer
  */
 class MockEnvoyHTTPStream(val callbacks: EnvoyHTTPCallbacks, val explicitFlowControl: Boolean) :
   EnvoyHTTPStream(0, 0, callbacks, explicitFlowControl) {
-  override fun sendHeaders(headers: MutableMap<String, MutableList<String>>?, endStream: Boolean) {}
+  override fun sendHeaders(
+    headers: MutableMap<String, MutableList<String>>?,
+    endStream: Boolean,
+    idempotent: Boolean
+  ) {}
 
   override fun sendData(data: ByteBuffer?, endStream: Boolean) {}
 
