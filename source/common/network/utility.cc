@@ -513,8 +513,10 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
                                                const Address::Instance& peer_address) {
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
+
+  const bool is_connected = handle.isConnected();
   do {
-    if (handle.isConnected()) {
+    if (is_connected) {
       // The socket is already connected, so the local and peer addresses should not be specified.
       // Instead, a writev/send is called.
       send_result = handle.writev(slices, num_slices);
@@ -528,9 +530,10 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.return_value_);
+    ENVOY_LOG_MISC(trace, "{} bytes {}", is_connected ? "send" : "sendmsg",
+                   send_result.return_value_);
   } else {
-    ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
+    ENVOY_LOG_MISC(debug, "{} failed with error code {}: {}", is_connected ? "send" : "sendmsg",
                    static_cast<int>(send_result.err_->getErrorCode()),
                    send_result.err_->getErrorDetails());
   }
