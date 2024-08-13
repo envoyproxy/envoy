@@ -784,15 +784,15 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     }
     last_valid_addr = addr;
 
-    bool remoteAddressIsTrustedProxy = false;
+    bool remote_address_is_trusted_proxy = false;
     for (const auto& cidr : trusted_cidrs) {
       if (cidr.isInRange(*addr.get())) {
-        remoteAddressIsTrustedProxy = true;
+        remote_address_is_trusted_proxy = true;
         break;
       }
     }
 
-    if (remoteAddressIsTrustedProxy) {
+    if (remote_address_is_trusted_proxy) {
       continue;
     }
 
