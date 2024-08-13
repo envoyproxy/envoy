@@ -173,7 +173,7 @@ private:
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
-  bool should_send_initial_resource_versions_{};
+  bool should_send_initial_resource_versions_{true};
   bool must_send_discovery_request_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.

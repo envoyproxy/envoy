@@ -212,7 +212,7 @@ private:
 
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.
-  bool should_send_initial_resource_versions_{false};
+  bool should_send_initial_resource_versions_{true};
   bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

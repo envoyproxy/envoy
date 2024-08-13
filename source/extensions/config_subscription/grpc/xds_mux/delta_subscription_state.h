@@ -100,7 +100,7 @@ private:
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
-  bool should_send_initial_resource_versions_{};
+  bool should_send_initial_resource_versions_{true};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.
