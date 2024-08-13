@@ -1089,13 +1089,16 @@ public:
   struct WeightedClustersConfig {
     WeightedClustersConfig(const std::vector<WeightedClusterEntrySharedPtr>&& weighted_clusters,
                            uint64_t total_cluster_weight,
-                           const std::string& random_value_header_name)
+                           const std::string& random_value_header_name,
+                           const std::string& runtime_key_prefix)
         : weighted_clusters_(std::move(weighted_clusters)),
           total_cluster_weight_(total_cluster_weight),
-          random_value_header_name_(random_value_header_name) {}
+          random_value_header_name_(random_value_header_name),
+          runtime_key_prefix_(runtime_key_prefix) {}
     const std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
     const uint64_t total_cluster_weight_;
     const std::string random_value_header_name_;
+    const std::string runtime_key_prefix_;
   };
 
 protected:
@@ -1207,8 +1210,8 @@ private:
                               const Http::HeaderMap& headers,
                               const RouteEntryAndRoute* route_selector_override) const;
 
-  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
-                                          bool ignore_overflow) const;
+  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers,
+                                          uint64_t random_value) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

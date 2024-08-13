@@ -21,11 +21,16 @@ on:
         default: 75
       cache-build-image:
         type: string
+      cache-build-image-key-suffix:
+        type: string
       catch-errors:
         type: boolean
         default: false
       checkout-extra:
         type: string
+      concurrency-suffix:
+        type: string
+        default:
       container-command:
         type: string
         default: ./ci/run_envoy_docker.sh
@@ -141,7 +146,7 @@ concurrency:
     ${{ github.actor != 'trigger-release-envoy[bot]'
         && github.head_ref
         || github.run_id
-    }}-${{ github.workflow }}-${{ inputs.target }}
+    }}-${{ github.workflow }}-${{ inputs.target }}${{ inputs.concurrency-suffix }}
   cancel-in-progress: true
 
 env:
@@ -190,6 +195,7 @@ jobs:
       uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.35
       with:
         image_tag: ${{ inputs.cache-build-image }}
+        key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.35
       id: appauth
@@ -259,11 +265,11 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
-        ENVOY_RBE: ${{ inputs.rbe != 'false' && 1 || '' }}
+        ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
         RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-
           --config=remote-ci
           ${{ inputs.bazel-extra }}
-          ${{ inputs.rbe != 'false' && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
+          ${{ inputs.rbe == true && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
         BAZEL_FAKE_SCM_REVISION: ${{ github.event_name == 'pull_request' && 'e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9' || '' }}
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
