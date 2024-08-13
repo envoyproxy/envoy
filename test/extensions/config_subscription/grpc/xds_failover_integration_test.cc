@@ -309,6 +309,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverBasic) {
 
   // Ensure basic flow using the primary (when failover is not defined) works.
   validateAllXdsResponsesAndDataplaneRequest(xds_stream_.get());
+
+  EXPECT_EQ(1, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validate that when there's failover defined and the primary is available,
@@ -473,6 +475,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailureAfterHeaders) {
 
   // Ensure basic flow using the failover source works.
   validateAllXdsResponsesAndDataplaneRequest(failover_xds_stream_.get());
+
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validate that once primary answers, failover will not be used, even after disconnecting.
@@ -565,6 +569,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
   EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"cluster_0"}, {"cluster_0"}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       xds_stream_.get()));
+
+  EXPECT_EQ(1, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validate that once failover responds, and then disconnects, primary will be attempted.
@@ -625,6 +631,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
   test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
@@ -677,6 +684,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"primary_cluster_0"}, {"primary_cluster_0"},
                                       {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       xds_stream_.get()));
+  EXPECT_EQ(1, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validates that if failover is used, and then disconnected, and the primary
@@ -739,6 +747,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
   test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
@@ -792,6 +801,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_1"}, {"failover_cluster_1"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validate that once failover responds, and then disconnects, Envoy
@@ -855,6 +865,7 @@ TEST_P(XdsFailoverAdsIntegrationTest,
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
   test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
