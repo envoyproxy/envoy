@@ -8,6 +8,7 @@
 #include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/test_runtime.h"
@@ -25,6 +26,8 @@ namespace Envoy {
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
+constexpr char ExtAuthzFilterName[] = "envoy.filters.http.ext_authz";
+
 struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
@@ -32,6 +35,7 @@ struct GrpcInitializeConfigOpts {
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
+  bool emit_filter_state_stats = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -119,6 +123,8 @@ public:
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
+      proto_config_.set_emit_filter_state_stats(opts.emit_filter_state_stats);
+
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
       labels["label_1"] = "value_1";
@@ -137,9 +143,23 @@ public:
       *bootstrap.mutable_node()->mutable_metadata() = metadata;
 
       envoy::config::listener::v3::Filter ext_authz_filter;
-      ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+      ext_authz_filter.set_name(ExtAuthzFilterName);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+
+      if (opts.emit_filter_state_stats) {
+        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        logging_filter_config.set_logging_id("envoy.filters.http.ext_authz");
+        logging_filter_config.set_upstream_cluster_name("ext_authz_cluster");
+        logging_filter_config.set_expect_stats(true);
+        logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
+                                                                   Grpc::ClientType::EnvoyGrpc);
+
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
+        logging_filter.set_name("logging_filter");
+        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
+      }
     });
   }
 
@@ -1053,6 +1073,54 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
                                                  {"set-cookie", "cookie1=snickerdoodle"}},
                  expected_body);
 
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, EmitFilterStateStats) {
+  // Set up ext_authz filter.
+  GrpcInitializeConfigOpts opts;
+  opts.emit_filter_state_stats = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  // Wait for the ext_authz request as a result of the client request.
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Send back an ext_authz response with response_headers_to_add set.
+  sendExtAuthzResponse(
+      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+      Http::TestRequestHeaderMapImpl{},
+      Headers{{"downstream2", "should-be-added"}, {"set-cookie", "cookie2=gingerbread"}},
+      Headers{{"replaceable", "set-by-ext-authz"}},
+      Headers{{"downstream3", "should-be-added"}, {"set-cookie", "cookie3=peanutbutter"}},
+      Headers{{"replaceable2", "set-by-ext-authz"}, {"new-header", "should-not-be-added"}});
+
+  // Wait for the upstream response.
+  waitForSuccessfulUpstreamResponse("200");
+
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_->headers(),
+                                                        Http::LowerCaseString("set-cookie"))
+                .result()
+                .value(),
+            "cookie1=snickerdoodle,cookie2=gingerbread");
+
+  // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.
+  const std::string expected_body(response_size_, 'a');
+  verifyResponse(std::move(response_), "200",
+                 Http::TestResponseHeaderMapImpl{
+                     {":status", "200"},
+                     {"downstream2", "should-be-added"},
+                     {"downstream3", "should-be-added"},
+                     {"replaceable", "set-by-ext-authz"},
+                     {"replaceable2", "set-by-ext-authz"},
+                 },
+                 expected_body);
   cleanup();
 }
 

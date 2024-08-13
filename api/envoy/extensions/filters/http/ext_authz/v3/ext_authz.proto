@@ -301,7 +301,11 @@ message ExtAuthz {
   // state.
   google.protobuf.Struct filter_metadata = 28;
 
-  // When set to true, the filter will emit per-stream stats for accessing logging.
+  // When set to true, the filter will emit per-stream stats for access logging. The filter state
+  // key will be the same as the filter name.
+  //
+  // If using Envoy GRPC, emits latency, bytes sent / received, upstream info, and upstream cluster
+  // info. If not using Envoy GRPC, emits only latency.
   //
   // If this is false and ``filter_metadata`` is unset, the filter will not emit any filter state.
   bool emit_filter_state_stats = 29;

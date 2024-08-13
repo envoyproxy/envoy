@@ -403,21 +403,26 @@ void Filter::updateLoggingInfo() {
   logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
       decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
 
-  if (config_->clientIsEnvoyGrpc()) {
-    const auto& upstream_meter = decoder_callbacks_->streamInfo().getUpstreamBytesMeter();
-    if (upstream_meter != nullptr) {
-      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
-      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
-    }
-    if (decoder_callbacks_->streamInfo().upstreamInfo() != nullptr) {
-      logging_info_->setUpstreamHost(
-          decoder_callbacks_->streamInfo().upstreamInfo()->upstreamHost());
-    }
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-        decoder_callbacks_->streamInfo().upstreamClusterInfo();
-    if (cluster_info) {
-      logging_info_->setClusterInfo(std::move(*cluster_info));
-    }
+  if (!config_->clientIsEnvoyGrpc()) {
+    return;
+  }
+  auto const* stream_info = client_->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  const auto& bytes_meter = stream_info->getUpstreamBytesMeter();
+  if (bytes_meter != nullptr) {
+    logging_info_->setBytesSent(bytes_meter->wireBytesSent());
+    logging_info_->setBytesReceived(bytes_meter->wireBytesReceived());
+  }
+  if (stream_info->upstreamInfo().has_value()) {
+    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      stream_info->upstreamClusterInfo();
+  if (cluster_info) {
+    logging_info_->setClusterInfo(std::move(*cluster_info));
   }
 }
 

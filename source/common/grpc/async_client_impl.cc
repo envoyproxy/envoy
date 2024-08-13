@@ -333,6 +333,10 @@ void AsyncRequestImpl::cancel() {
   this->resetStream();
 }
 
+const StreamInfo::StreamInfo& AsyncRequestImpl::streamInfo() const {
+  return AsyncStreamImpl::streamInfo();
+}
+
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
   Tracing::UpstreamContext upstream_context(nullptr,                         // host_

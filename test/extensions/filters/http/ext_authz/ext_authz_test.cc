@@ -70,7 +70,7 @@ public:
   void initialize(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
                                              "ext_authz_prefix", factory_context_);
-    client_ = new Filters::Common::ExtAuthz::MockClient();
+    client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -195,6 +195,53 @@ public:
   static std::string ParamsToString(const testing::TestParamInfo<std::tuple<bool, bool>>& info) {
     return absl::StrCat(std::get<0>(info.param) ? "FailOpen" : "FailClosed", "_",
                         std::get<1>(info.param) ? "HttpClient" : "GrpcClient");
+  }
+
+  // Convenience function to save a few tests from having the same boilerplate code.
+  void testEmitFilterStateStatsCase(StreamInfo::StreamInfo const* stream_info,
+                                    std::function<void()> check_cb,
+                                    const ExtAuthzLoggingInfo& expected_output) {
+    InSequence s;
+
+    prepareCheck();
+
+    Filters::Common::ExtAuthz::Response response{};
+    response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+    auto bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+    // ext_authz makes a single call to the external auth service once it sees the end of stream.
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                             const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                             const StreamInfo::StreamInfo&) -> void {
+          if (check_cb) {
+            check_cb();
+          }
+          decoder_filter_callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+              std::chrono::milliseconds(1));
+          callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+        }));
+
+    if (std::get<1>(GetParam())) {
+      EXPECT_CALL(*client_, streamInfo()).Times(0);
+    } else {
+      // Could be nullptr, have null fields, etc.
+      EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(stream_info));
+    }
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+    auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+    ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+    auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+
+    EXPECT_EQ(actual->latency().count(), expected_output.latency().count());
+    EXPECT_EQ(actual->upstreamHost(), expected_output.upstreamHost());
+    EXPECT_EQ(actual->clusterInfo(), expected_output.clusterInfo());
+    EXPECT_EQ(actual->bytesSent(), expected_output.bytesSent());
+    EXPECT_EQ(actual->bytesReceived(), expected_output.bytesReceived());
   }
 };
 
@@ -2932,62 +2979,90 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponse) {
 }
 
 TEST_P(HttpFilterTestParam, EmitFilterStateStats) {
-  InSequence s;
-
-  prepareCheck();
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-
   auto bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+
+  auto check_cb = [&]() -> void {
+    bytes_meter->addWireBytesSent(123);
+    bytes_meter->addWireBytesReceived(456);
+  };
+
+  // client_.streamInfo() returns a pointer. unique_ptr so it gets freed at the end of the test.
+  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
   // Copying the bytes meter so we can continue to update the bytes sent / received.
-  decoder_filter_callbacks_.stream_info_.upstream_bytes_meter_ = bytes_meter;
-
-  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  stream_info->upstream_bytes_meter_ = bytes_meter;
   auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
-  upstream_info->upstream_host_ = std::move(upstream_host);
-  decoder_filter_callbacks_.stream_info_.upstream_info_ = std::move(upstream_info);
+  stream_info->upstream_info_ = upstream_info;
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  upstream_info->upstream_host_ = upstream_host;
+  auto upstream_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  stream_info->upstream_cluster_info_ = upstream_cluster_info;
 
-  decoder_filter_callbacks_.stream_info_.upstream_cluster_info_ =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-
-  // ext_authz makes a single call to the external auth service once it sees the end of stream.
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
-        decoder_filter_callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
-            std::chrono::milliseconds(1));
-        bytes_meter->addWireBytesSent(1);
-        bytes_meter->addWireBytesReceived(1);
-        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
-
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-
-  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
-  auto stats = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-
-  EXPECT_EQ(stats->latency().count(), 1000 /*==1ms*/);
-  if (std::get<1>(GetParam())) {
-    // HTTP client will not fill the following fields.
-    EXPECT_EQ(stats->upstreamHost(), nullptr);
-    EXPECT_EQ(stats->clusterInfo(), nullptr);
-    EXPECT_FALSE(stats->bytesSent().has_value());
-    EXPECT_FALSE(stats->bytesReceived().has_value());
-  } else {
-    EXPECT_NE(stats->upstreamHost(), nullptr);
-    EXPECT_NE(stats->clusterInfo(), nullptr);
-    ASSERT_TRUE(stats->bytesSent().has_value());
-    EXPECT_EQ(*stats->bytesSent(), 1);
-    ASSERT_TRUE(stats->bytesReceived().has_value());
-    EXPECT_EQ(*stats->bytesReceived(), 1);
+  ExtAuthzLoggingInfo expected(absl::nullopt);
+  expected.setLatency(std::chrono::milliseconds(1));
+  if (!std::get<1>(GetParam())) {
+    expected.setUpstreamHost(upstream_host);
+    expected.setClusterInfo(upstream_cluster_info);
+    expected.setBytesSent(123);
+    expected.setBytesReceived(456);
   }
+
+  testEmitFilterStateStatsCase(stream_info.get(), check_cb, expected);
+}
+
+// Tests that if for whatever reason the client's stream info is null, it doesn't result in a null
+// pointer dereference or other issue.
+TEST_P(HttpFilterTestParam, EmitFilterStateStatsNullStreamInfo) {
+  ExtAuthzLoggingInfo expected(absl::nullopt);
+  expected.setLatency(std::chrono::milliseconds(1));
+
+  testEmitFilterStateStatsCase(nullptr, nullptr, expected);
+}
+
+// Tests that if any stream info fields are null, it doesn't result in a null pointer dereference or
+// other issue.
+TEST_P(HttpFilterTestParam, EmitFilterStateStatsNullStreamInfoFields) {
+  // client_.streamInfo() returns a pointer. unique_ptr so it gets freed at the end of the test.
+  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
+  stream_info->upstream_bytes_meter_ = nullptr;
+  stream_info->upstream_info_ = nullptr;
+  stream_info->upstream_cluster_info_ = nullptr;
+
+  ExtAuthzLoggingInfo expected(absl::nullopt);
+  expected.setLatency(std::chrono::milliseconds(1));
+
+  testEmitFilterStateStatsCase(nullptr, nullptr, expected);
+}
+
+// Tests that if upstream host is null, it doesn't result in a null pointer dereference or other
+// issue.
+TEST_P(HttpFilterTestParam, EmitFilterStateStatsNullUpstreamHost) {
+  auto bytes_meter = std::make_shared<StreamInfo::BytesMeter>();
+
+  auto check_cb = [&]() -> void {
+    bytes_meter->addWireBytesSent(123);
+    bytes_meter->addWireBytesReceived(456);
+  };
+
+  // client_.streamInfo() returns a pointer. unique_ptr so it gets freed at the end of the test.
+  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
+  // Copying the bytes meter so we can continue to update the bytes sent / received.
+  stream_info->upstream_bytes_meter_ = bytes_meter;
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  stream_info->upstream_info_ = upstream_info;
+  upstream_info->upstream_host_ = nullptr;
+  auto upstream_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  stream_info->upstream_cluster_info_ = upstream_cluster_info;
+
+  ExtAuthzLoggingInfo expected(absl::nullopt);
+  expected.setLatency(std::chrono::milliseconds(1));
+  if (!std::get<1>(GetParam())) {
+    expected.setUpstreamHost(nullptr);
+    expected.setClusterInfo(upstream_cluster_info);
+    expected.setBytesSent(123);
+    expected.setBytesReceived(456);
+  }
+
+  testEmitFilterStateStatsCase(stream_info.get(), check_cb, expected);
 }
 
 // Test that when emit_filter_state_stats is false, stats are not emitted. There is no
