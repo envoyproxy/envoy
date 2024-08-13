@@ -51,6 +51,7 @@ void addOrcaLoadReportToLoadMetricStats(const OptRef<const LrsReportMetricNames>
                                         kNamedMetricsFieldPrefix, stats);
     return;
   }
+  // TODO(efimki): Use InlineMap to speed up this loop.
   for (const std::string& metric_name : metric_names.value().get()) {
     if (metric_name == kCpuUtilizationField) {
       stats.add(metric_name, report.cpu_utilization());
