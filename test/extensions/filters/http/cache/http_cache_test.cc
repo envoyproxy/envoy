@@ -174,12 +174,12 @@ public:
 
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
                               const Http::TestResponseHeaderMapImpl& response_headers,
-                              uint64_t content_length = 0, bool has_trailers = false) {
+                              uint64_t content_length = 0) {
   // For the purpose of the test, set the response_time to the date header value.
   ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(
       std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), std::move(metadata),
-      content_length, has_trailers);
+      content_length);
 }
 
 INSTANTIATE_TEST_SUITE_P(ResultMatchesExpectation, LookupRequestTest,
@@ -202,7 +202,6 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   EXPECT_THAT(*lookup_response.headers_,
               HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
-  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
@@ -223,7 +222,6 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   EXPECT_THAT(*lookup_response.headers_,
               HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
-  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
@@ -346,7 +344,7 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
        {"date", formatter_.fromTime(response_date)}});
   const uint64_t content_length = 5;
   const LookupResult lookup_response =
-      makeLookupResult(lookup_request, response_headers, content_length, /*has_trailers=*/true);
+      makeLookupResult(lookup_request, response_headers, content_length);
 
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_ != nullptr);
@@ -355,7 +353,6 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
   EXPECT_THAT(*lookup_response.headers_,
               HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
-  EXPECT_TRUE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, HttpScheme) {

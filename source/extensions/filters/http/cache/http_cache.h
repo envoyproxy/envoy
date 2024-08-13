@@ -39,16 +39,13 @@ struct LookupResult {
   // header with this value, replacing any preexisting content-length header.
   // (This lets us dechunk responses as we insert them, then later serve them
   // with a content-length header.)
+  // May be 0 if the cache entry is streaming.
   uint64_t content_length_;
 
   // If the request is a range request, this struct indicates if the ranges can
   // be satisfied and which ranges are requested. nullopt indicates that this is
   // not a range request or the range header has been ignored.
   absl::optional<RangeDetails> range_details_;
-
-  // TODO(toddmgreer): Implement trailer support.
-  // True if the cached response has trailers.
-  bool has_trailers_ = false;
 
   // Update the content length of the object and its response headers.
   void setContentLength(uint64_t new_length) {
@@ -97,8 +94,7 @@ public:
   // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                ResponseMetadata&& metadata, uint64_t content_length,
-                                bool has_trailers) const;
+                                ResponseMetadata&& metadata, uint64_t content_length) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
@@ -123,8 +119,8 @@ struct CacheInfo {
   bool supports_range_requests_ = false;
 };
 
-using LookupBodyCallback = std::function<void(Buffer::InstancePtr&&)>;
-using LookupHeadersCallback = std::function<void(LookupResult&&)>;
+using LookupBodyCallback = std::function<void(Buffer::InstancePtr&&, bool end_stream)>;
+using LookupHeadersCallback = std::function<void(LookupResult&&, bool end_stream)>;
 using LookupTrailersCallback = std::function<void(Http::ResponseTrailerMapPtr&&)>;
 using InsertCallback = std::function<void(bool success_ready_for_more)>;
 
@@ -213,7 +209,8 @@ public:
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
   virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) PURE;
 
-  // Get the trailers from the cache. Only called if LookupResult::has_trailers == true. The
+  // Get the trailers from the cache. Only called if the request reached the end of
+  // the body and LookupBodyCallback did not pass true for end_stream. The
   // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 

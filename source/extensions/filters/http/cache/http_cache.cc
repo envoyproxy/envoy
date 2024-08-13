@@ -130,8 +130,8 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                             ResponseMetadata&& metadata, uint64_t content_length,
-                                             bool has_trailers) const {
+                                             ResponseMetadata&& metadata,
+                                             uint64_t content_length) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
@@ -147,7 +147,6 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   result.range_details_ = RangeUtils::createRangeDetails(requestHeaders(), content_length);
-  result.has_trailers_ = has_trailers;
 
   return result;
 }
