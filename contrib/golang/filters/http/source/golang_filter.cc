@@ -77,6 +77,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   ProcessorState& state = decoding_state_;
   ENVOY_LOG(debug, "golang filter decodeTrailers, decoding state: {}", state.stateStr());
 
+  request_trailers_ = &trailers;
+
   bool done = doTrailer(state, trailers);
 
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
@@ -91,10 +93,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   activation_response_headers_ = dynamic_cast<const Http::ResponseHeaderMap*>(&headers);
 
   // NP: may enter encodeHeaders in any state,
-  // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any time.
-  // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
-  // with "Sending local reply with details // http1.invalid_scheme" details.
-  // This means DecodeXXX & EncodeXXX may run concurrently in Golang side.
+  // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any
+  // time. eg. filtermanager may invoke sendLocalReply, when scheme is invalid, with "Sending
+  // local reply with details // http1.invalid_scheme" details. This means DecodeXXX & EncodeXXX
+  // may run concurrently in Golang side.
 
   bool done = doHeaders(encoding_state_, headers, end_stream);
 
@@ -159,6 +161,18 @@ void Filter::onDestroy() {
 // access_log is executed before the log of the stream filter
 void Filter::log(const Formatter::HttpFormatterContext& log_context,
                  const StreamInfo::StreamInfo&) {
+  uint64_t req_header_num = 0;
+  uint64_t req_header_bytes = 0;
+  uint64_t req_trailer_num = 0;
+  uint64_t req_trailer_bytes = 0;
+  uint64_t resp_header_num = 0;
+  uint64_t resp_header_bytes = 0;
+  uint64_t resp_trailer_num = 0;
+  uint64_t resp_trailer_bytes = 0;
+
+  auto decoding_state = dynamic_cast<processState*>(&decoding_state_);
+  auto encoding_state = dynamic_cast<processState*>(&encoding_state_);
+
   // `log` may be called multiple times with different log type
   switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
@@ -166,14 +180,42 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
     if (initRequest()) {
-      request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-          const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
+      request_headers_ = const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders());
     }
 
-    // This only run in the work thread, it's safe even without lock.
-    is_golang_processing_log_ = true;
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
-    is_golang_processing_log_ = false;
+    if (request_headers_ != nullptr) {
+      req_header_num = request_headers_->size();
+      req_header_bytes = request_headers_->byteSize();
+      decoding_state_.headers = request_headers_;
+    }
+
+    if (request_trailers_ != nullptr) {
+      req_trailer_num = request_trailers_->size();
+      req_trailer_bytes = request_trailers_->byteSize();
+      decoding_state_.trailers = request_trailers_;
+    }
+
+    activation_response_headers_ = &log_context.responseHeaders();
+    if (activation_response_headers_ != nullptr) {
+      resp_header_num = activation_response_headers_->size();
+      resp_header_bytes = activation_response_headers_->byteSize();
+      encoding_state_.headers = const_cast<Http::ResponseHeaderMap*>(activation_response_headers_);
+    }
+
+    activation_response_trailers_ = &log_context.responseTrailers();
+    if (activation_response_trailers_ != nullptr) {
+      resp_trailer_num = activation_response_trailers_->size();
+      resp_trailer_bytes = activation_response_trailers_->byteSize();
+      encoding_state_.trailers =
+          const_cast<Http::ResponseTrailerMap*>(activation_response_trailers_);
+    }
+
+    req_->is_golang_processing_log = 1;
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()), decoding_state,
+                                         encoding_state, req_header_num, req_header_bytes,
+                                         req_trailer_num, req_trailer_bytes, resp_header_num,
+                                         resp_header_bytes, resp_trailer_num, resp_trailer_bytes);
+    req_->is_golang_processing_log = 0;
     break;
   default:
     // skip calling with unsupported log types
@@ -1127,7 +1169,7 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
   }
 
   // to access the headers_ and its friends we need to hold the lock
-  activation_request_headers_ = dynamic_cast<const Http::RequestHeaderMap*>(request_headers_);
+  activation_request_headers_ = request_headers_;
 
   if (isThreadSafe()) {
     return getStringPropertyCommon(path, value_data, value_len);
