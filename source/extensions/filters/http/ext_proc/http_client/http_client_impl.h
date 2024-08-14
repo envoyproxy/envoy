@@ -24,7 +24,7 @@ public:
   ~ExtProcHttpClient() { cancel(); }
 
   void sendRequest() override {}
-  void cancel() override;
+  void cancel() override {}
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   // Http::AsyncClient::Callbacks implemented by this class.
@@ -39,8 +39,6 @@ private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
-  Http::AsyncClient::Request* active_request_{};
-  RequestCallbacks* callbacks_{};
 };
 
 } // namespace ExternalProcessing

@@ -33,15 +33,29 @@ TEST_F(ExtProcHttpClientTest, Basic) {
   SetUp();
   client_->sendRequest();
   client_->cancel();
-
+  client_->context();
+  Tracing::MockSpan parent_span;
+  client_->onBeforeFinalizeUpstreamSpan(parent_span, nullptr);
   Http::AsyncClient::FailureReason reason = Envoy::Http::AsyncClient::FailureReason::Reset;
   client_->onFailure(async_request_, reason);
 
-  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
+  Http::ResponseHeaderMapPtr resp_headers_ok(new Http::TestResponseHeaderMapImpl({
       {":status", "200"},
+  }));
+  Http::ResponseMessagePtr response_ok(new Http::ResponseMessageImpl(std::move(resp_headers_ok)));
+  client_->onSuccess(async_request_, std::move(response_ok));
+
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
+      {":status", "403"},
   }));
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
   client_->onSuccess(async_request_, std::move(response));
+
+  Http::ResponseHeaderMapPtr resp_headers_foo(new Http::TestResponseHeaderMapImpl({
+      {":status", "foo"},
+  }));
+  Http::ResponseMessagePtr response_foo(new Http::ResponseMessageImpl(std::move(resp_headers_foo)));
+  client_->onSuccess(async_request_, std::move(response_foo));
 }
 
 } // namespace
