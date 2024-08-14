@@ -1,7 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 
-#include "source/common/http/utility.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
