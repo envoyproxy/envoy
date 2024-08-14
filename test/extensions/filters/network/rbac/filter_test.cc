@@ -10,6 +10,7 @@
 #include "source/extensions/filters/network/rbac/rbac_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 
@@ -29,7 +30,8 @@ class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
   void
   setupPolicy(bool with_policy = true, bool continuous = false,
-              envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW) {
+              envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW,
+              int64_t delay_deny_duration_ms = 0) {
 
     envoy::extensions::filters::network::rbac::v3::RBAC config;
     config.set_stat_prefix("tcp.");
@@ -58,11 +60,14 @@ public:
       config.set_enforcement_type(envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS);
     }
 
+    if (delay_deny_duration_ms > 0) {
+      (*config.mutable_delay_deny()) =
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(delay_deny_duration_ms);
+    }
+
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
         config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
-
-    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
-    filter_->initializeReadFilterCallbacks(callbacks_);
+    initFilter();
   }
 
   void setupMatcher(bool with_matcher = true, bool continuous = false, std::string action = "ALLOW",
@@ -163,12 +168,10 @@ on_no_match:
 
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
         config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
-
-    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
-    filter_->initializeReadFilterCallbacks(callbacks_);
+    initFilter();
   }
 
-  RoleBasedAccessControlNetworkFilterTest() {
+  void initFilter() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
     EXPECT_CALL(callbacks_.connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
@@ -345,6 +348,28 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
       filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("allowed",
             filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
+  int64_t delay_deny_duration_ms = 500;
+  setupPolicy(true, false, envoy::config::rbac::v3::RBAC::ALLOW, delay_deny_duration_ms);
+  setDestinationPort(789);
+
+  // Only call close() once since the connection is delay denied.
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+
+  Event::MockTimer* delay_timer =
+      new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _));
+
+  // Call onData() twice, should only increase stats once.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+
+  delay_timer->invokeCallback();
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowedWithOneTimeEnforcement) {
