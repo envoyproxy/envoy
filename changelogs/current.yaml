@@ -42,6 +42,11 @@ minor_behavior_changes:
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+- area: sni
+  change: |
+    When computing SNI and SAN value for the auto-sni and auto-san verification feature,
+    route host manipulations are now taken into account. This behavior can be reverted
+    by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -175,6 +180,9 @@ new_features:
   change: |
     Prefer using IPv6 address when addresses from both families are available.
     Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
+- area: grpc_field_extraction
+  change: |
+    Added ``map<string, string>`` support: Target fields of type ``map<string, string>`` can be extracted and added to dynamic metadata.
 - area: rbac
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
