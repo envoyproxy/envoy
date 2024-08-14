@@ -192,4 +192,9 @@ new_features:
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
 
+- area: cluster
+  change: |
+    Enabled: make happy eyeballs alforithm configurable.
+    Can be reverted by flip ``envoy_reloadable_features_use_config_in_happy_eyeballs`` to false.
+
 deprecated:
