@@ -282,15 +282,15 @@ protected:
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
     Network::Address::InstanceConstSharedPtr dest_address =
-        dual_stack ? std::make_shared<const Network::Address::Ipv4Instance>(
-                         "127.0.0.1",
-                         listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-                         &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()))
-                  : listen_socket_->connectionInfoProvider().localAddress();
+        dual_stack
+            ? std::make_shared<const Network::Address::Ipv4Instance>(
+                  "127.0.0.1",
+                  listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+                  &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()))
+            : listen_socket_->connectionInfoProvider().localAddress();
     // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc = Network::Utility::writeToSocket(
-        client_sockets_.back()->ioHandle(), slice.data(), 1, nullptr,
-        *dest_address);
+    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
+                                                   1, nullptr, *dest_address);
     ASSERT_EQ(slice[0].len_, send_rc.return_value_);
   }
 
