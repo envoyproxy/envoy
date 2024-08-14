@@ -2865,7 +2865,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
-
+  EXPECT_CALL(request_decoder_, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
