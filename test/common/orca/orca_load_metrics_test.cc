@@ -79,23 +79,6 @@ TEST(OrcaLoadMetricsTest, AddWildcardUtilization) {
                              Field(&LoadMetricStats::Stat::total_metric_value, DoubleEq(0.7))))));
 }
 
-TEST(OrcaLoadMetricsTest, AddDefaultNamedMetrics) {
-  Envoy::Upstream::LoadMetricStatsImpl stats;
-  // Pass nullopt for config to add all `named_metrics`.
-  Envoy::Orca::addOrcaLoadReportToLoadMetricStats(/*metric_names=*/std::nullopt, makeOrcaReport(),
-                                                  stats);
-  auto load_stats_map = stats.latch();
-  ASSERT_NE(load_stats_map, nullptr);
-  EXPECT_THAT(*load_stats_map,
-              UnorderedElementsAre(
-                  Pair("named_metrics.nm_foo",
-                       AllOf(Field(&LoadMetricStats::Stat::num_requests_with_metric, 1),
-                             Field(&LoadMetricStats::Stat::total_metric_value, DoubleEq(0.1)))),
-                  Pair("named_metrics.nm_bar",
-                       AllOf(Field(&LoadMetricStats::Stat::num_requests_with_metric, 1),
-                             Field(&LoadMetricStats::Stat::total_metric_value, DoubleEq(0.2))))));
-}
-
 TEST(OrcaLoadMetricsTest, AddAllReportedMetrics) {
   Envoy::Orca::LrsReportMetricNames metric_names;
   metric_names.push_back("application_utilization");

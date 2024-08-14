@@ -45,12 +45,6 @@ void addOrcaNamedMetricToLoadMetricStats(const Protobuf::Map<std::string, double
 void addOrcaLoadReportToLoadMetricStats(const OptRef<const LrsReportMetricNames>& metric_names,
                                         const xds::data::orca::v3::OrcaLoadReport& report,
                                         Upstream::LoadMetricStats& stats) {
-  // If there is no config, then add all `named_metrics`.
-  if (!metric_names.has_value()) {
-    addOrcaNamedMetricToLoadMetricStats(report.named_metrics(), "named_metrics.*",
-                                        kNamedMetricsFieldPrefix, stats);
-    return;
-  }
   // TODO(efimki): Use InlineMap to speed up this loop.
   for (const std::string& metric_name : metric_names.value().get()) {
     if (metric_name == kCpuUtilizationField) {
