@@ -480,8 +480,9 @@ std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
     X509* cert = sk_X509_value(&stack, i);
     if (!cert) {
       result.push_back(""); // Add an empty string so it's clear something was omitted.
+    } else {
+      result.push_back(field_extractor(*cert));
     }
-    result.push_back(field_extractor(*cert));
   }
 
   return result;

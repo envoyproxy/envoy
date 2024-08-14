@@ -225,6 +225,9 @@ TEST(UtilityTest, TestMapX509Stack) {
 
   EXPECT_ENVOY_BUG(Utility::mapX509Stack(*sk_X509_new_null(), func), "x509 stack is empty or NULL");
   EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "field_extractor is nullptr");
+  bssl::UniquePtr<STACK_OF(X509)> fakeCertChain(sk_X509_new_null());
+  sk_X509_push(fakeCertChain.get(), nullptr);
+  EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fakeCertChain, func));
 }
 
 } // namespace
