@@ -648,7 +648,7 @@ using UdpListenerFilterFactoryCb = std::function<void(
     UdpListenerFilterManager& udp_listener_filter_manager, UdpReadFilterCallbacks& callbacks)>;
 
 /**
- * Common interface for ReadFilterCallbacks and WriteFilterCallbacks.
+ * Common interface for UdpSessionReadFilterCallbacks and UdpSessionWriteFilterCallbacks.
  */
 class UdpSessionFilterCallbacks {
 public:
