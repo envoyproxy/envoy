@@ -628,6 +628,7 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   // Check the IPv4 version of the sockopt if the socket is v4 or dual-stack.
   // Platform/ APIs for ECN reporting are poorly documented, but this test
   // should uncover any issues.
+  optval = 0;
   rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
   EXPECT_EQ(rv.return_value_, 0);
   EXPECT_EQ(optval, 1);
