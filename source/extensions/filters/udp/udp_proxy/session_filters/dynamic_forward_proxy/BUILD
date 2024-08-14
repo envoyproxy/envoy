@@ -19,7 +19,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

@@ -7,7 +7,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/header_utility.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,6 +61,10 @@ private:
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
+
+using ReadFilter = Network::UdpSessionReadFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
 
 class ProxyFilter
     : public ReadFilter,
