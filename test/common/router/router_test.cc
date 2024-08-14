@@ -6724,8 +6724,7 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder,
-                                      Http::Protocol::Http10);
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -6740,7 +6739,7 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
       {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
- response_decoder->decodeHeaders(std::move(response_headers), true);
+  response_decoder->decodeHeaders(std::move(response_headers), true);
   auto load_metric_stats_map =
       cm_.thread_local_cluster_.conn_pool_.host_->loadMetricStats().latch();
   ASSERT_EQ(load_metric_stats_map, nullptr);
