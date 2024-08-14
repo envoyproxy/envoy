@@ -3,10 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_message_logging.v3;
 
 import "envoy/config/core/v3/base.proto";
-
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_message_logging.v3";
 option java_outer_classname = "ConfigProto";
@@ -15,20 +13,26 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#not-implemented-hide:]
 // [#protodoc-title: Proto Message Logging]
-// Proto Message Logging :ref:`configuration overview
-// <config_http_filters_proto_message_logging>`.
+//
 // [#extension: envoy.filters.http.proto_message_logging]
 //
-// ProtoMessageLogging filter supports logging scrubbed gRPC requests/responses(proto messages)
-// as google.protobuf.Struct and storing results
-// in the dynamic metadata `envoy.filters.http.proto_message_logging` for later access.
+// Overview
+// --------
 //
-// # Assumptions
+// ProtoMessageLogging filter supports logging scrubbed gRPC
+// requests/responses(proto messages) as google.protobuf.Struct and storing
+// results in the dynamic metadata `envoy.filters.http.proto_message_logging`
+// for later access.
+//
+// Assumptions
+// -----------
+//
 // This filter assumes it is only applicable for gRPC with Protobuf as payload.
 //
-// # Process Flow
+// Process Flow
+// ------------
+//
 // On the request path, it will check
 //
 // 1. if the incoming gRPC request is configured, the filter tries to:
@@ -51,17 +55,24 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // 2. otherwise, pass through the response.
 //
-// # Config Requirements
+// Config Requirements
+// -------------------
+//
 // Here are config requirements
 //
-// 1. the log target field should be among the following primitive types: `string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`, `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
+// 1. the log target field should be among the following primitive types:
+// `string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`,
+// `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
 //
 // 2. the target field could be repeated.
 //
 // 3. the intermediate type could also be repeated.
 //
-// # Output Format
-// The logged requests and responses will be  will be added in the dynamic ``metadata<google.protobuf.Struct>`` with the same layout of the message.
+// Output Format
+// -------------
+//
+// The logged requests and responses will be  will be added in the dynamic
+// ``metadata<google.protobuf.Struct>`` with the same layout of the message.
 //
 // For the default `FIRST_AND_LAST` mode, it will be like:
 //   {
@@ -87,8 +98,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //     }
 //   }
 //
+// Example for `FIRST_AND_LAST` mode
+// ---------------------------------
 //
-// # Example for `FIRST_AND_LAST` mode
 // Let's say we have the following definition for the bi-streaming request
 // `pkg.svc.Method`.
 //
@@ -142,18 +154,18 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 //   {
 //     "foo": "val_foo1",
-//     "nested": { "double_nested": {"bar": "val_bar1", "not_logged": "val_not_logged1"},
-//     "redacted": { "bar": "val_redacted_bar1"}
+//     "nested": { "double_nested": {"bar": "val_bar1", "not_logged":
+//     "val_not_logged1"}, "redacted": { "bar": "val_redacted_bar1"}
 //   }
 //   {
 //     "foo": "val_foo2",
-//     "nested": { "double_nested": {"bar": "val_bar2", "not_logged": "val_not_logged2"},
-//     "redacted": { "bar": "val_redacted_bar2"}
+//     "nested": { "double_nested": {"bar": "val_bar2", "not_logged":
+//     "val_not_logged2"}, "redacted": { "bar": "val_redacted_bar2"}
 //   }
 //   {
 //     "foo": "val_foo3",
-//     "nested": { "double_nested": {"bar": "val_bar3", "not_logged": "val_not_logged3"},
-//     "redacted": { "bar": "val_redacted_bar3"}
+//     "nested": { "double_nested": {"bar": "val_bar3", "not_logged":
+//     "val_not_logged3"}, "redacted": { "bar": "val_redacted_bar3"}
 //   }
 //
 // the filter receives the following `MethodResponse` message in
@@ -216,9 +228,9 @@ message ProtoMessageLoggingConfig {
     config.core.v3.DataSource data_source = 1;
 
     // Unimplemented, the key of proto descriptor TypedMetadata.
-    // Among filters depending on the proto descriptor, we can have a TypedMetadata
-    // for proto descriptors, so that these filters can share one copy of proto
-    // descriptor in memory.
+    // Among filters depending on the proto descriptor, we can have a
+    // TypedMetadata for proto descriptors, so that these filters can share one
+    // copy of proto descriptor in memory.
     string proto_descriptor_typed_metadata = 2;
   }
 
