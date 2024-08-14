@@ -308,7 +308,7 @@ public:
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
                                                "envoy.reloadable_features.streaming_shadow")),
-        upstream_request_started_(false) {}
+        upstream_request_started_(false), orca_load_report_received_(false) {}
 
   ~Filter() override;
 
