@@ -32,6 +32,7 @@ protected:
       value: {
         request_logging_by_field: { key: "parent" value: LOG }
         request_logging_by_field: { key: "key.name" value: LOG }
+        response_logging_by_field: { key: "name" value: LOG }
       }
     })pb") {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(str, &proto_config_));
@@ -46,6 +47,69 @@ using FilterConfigTestOk = FilterConfigTestBase;
 
 TEST_F(FilterConfigTestOk, DescriptorInline) {
   parseConfigProto();
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
+                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+}
+
+TEST_F(FilterConfigTestOk, LogRedact) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    logging_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_logging_by_field: { key: "parent" value: LOG_REDACT }
+        request_logging_by_field: { key: "key.name" value: LOG_REDACT }
+        response_logging_by_field: { key: "name" value: LOG_REDACT }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
+                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+}
+
+TEST_F(FilterConfigTestOk, LogDirectiveUnspecified) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    logging_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_logging_by_field: { key: "parent" value: LogDirective_UNSPECIFIED }
+        request_logging_by_field: { key: "key.name" value: LogDirective_UNSPECIFIED }
+        response_logging_by_field: { key: "name" value: LogDirective_UNSPECIFIED }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
+                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
+  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+}
+
+TEST_F(FilterConfigTestOk, LogModeUnspecified) {
+  parseConfigProto(R"pb(
+    mode: LogMode_UNSPECIFIED
+    logging_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_logging_by_field: { key: "parent" value: LOG }
+        request_logging_by_field: { key: "key.name" value: LOG }
+        response_logging_by_field: { key: "name" value: LOG }
+      }
+    })pb");
   *proto_config_.mutable_data_source()->mutable_inline_bytes() =
       api_->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
@@ -211,7 +275,7 @@ TEST_F(FilterConfigTestException, GrpcMethodNotFoundInProtoDescriptor) {
                                                 "the proto descriptor"));
 }
 
-TEST_F(FilterConfigTestException, UndefinedPath) {
+TEST_F(FilterConfigTestException, UndefinedPathInRequest) {
   parseConfigProto(R"pb(
     mode: FIRST_AND_LAST
     logging_by_method: {
@@ -230,6 +294,30 @@ TEST_F(FilterConfigTestException, UndefinedPath) {
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.CreateApiKeyRequest' message)"));
+}
+
+TEST_F(FilterConfigTestException, UndefinedPathInResponse) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    logging_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_logging_by_field: { key: "parent" value: LOG }
+        response_logging_by_field: { key: "undefined-path" value: LOG }
+      }
+    }
+  )pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+
+  EXPECT_THAT_THROWS_MESSAGE(
+      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
+                                     *api_),
+      EnvoyException,
+      testing::HasSubstr(
+          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: Invalid fieldPath (undefined-path): no 'undefined-path' field in 'type.googleapis.com/apikeys.ApiKey' message)"));
 }
 
 TEST_F(FilterConfigTestException, UnsupportedTypeBool) {

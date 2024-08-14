@@ -114,55 +114,6 @@ bool ScrubToStruct(const ProtoScrubber* scrubber, const Envoy::ProtobufWkt::Type
 
   return !IsEmptyStruct(*message_struct);
 }
-
-// bool ScrubToStruct(
-//     const ProtoScrubber* scrubber, const google::protobuf::Type& type,
-//     const TypeHelper& type_helper,
-//     const std::function<const google::protobuf::Type*(const std::string&)>&
-//         type_finder,
-//     const google::protobuf::FieldMask* redact_message_field_mask,
-//     Protobuf::field_extraction::MessageData* message,
-//     Struct* message_struct) {
-//   // Collect the present redact field paths before scrubbing the message.
-//   std::vector<std::string> present_redact_fields;
-//   if (redact_message_field_mask != nullptr) {
-//     for (const std::string& path : redact_message_field_mask->paths()) {
-//       absl::StatusOr<bool> is_present_status =
-//           IsMessageFieldPathPresent(type, type_finder, path, *message);
-//       if (!is_present_status.ok()) {
-//         LOG(WARNING) << "Failed to determine message field path " << path
-//                      << " for cloud audit "
-//                         "logging: "
-//                      << is_present_status.status().ToString();
-//         return false;
-//       }
-//       if (*is_present_status) {
-//         present_redact_fields.push_back(path);
-//       }
-//     }
-//   }
-
-//   // Scrub the message.
-//   if (!ScrubToStruct(scrubber, type, type_helper, message, message_struct)) {
-//     return false;
-//   }
-
-//   // Add empty Struct to the redact field paths (camel case).
-//   for (const std::string& path : present_redact_fields) {
-//     std::vector<std::string> path_pieces = absl::StrSplit(
-//         google::protobuf::util::converter::ToCamelCase(path), '.');
-//     absl::Status status = RedactStructRecursively(
-//         path_pieces.begin(), path_pieces.end(), message_struct);
-//     if (!status.ok()) {
-//       LOG(WARNING) << "Failed to redact " << path
-//                    << " message field for cloud audit logging: "
-//                    << status.ToString();
-//       return false;
-//     }
-//   }
-
-//   return true;
-// }
 } // namespace
 
 const google::protobuf::FieldMask& AuditProtoScrubber::FindWithDefault(AuditDirective directive) {

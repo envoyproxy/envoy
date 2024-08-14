@@ -62,20 +62,6 @@ void FillStructWithType(const ::Envoy::ProtobufWkt::Type& type, ::Envoy::Protobu
   (*out.mutable_fields())[kTypeProperty].set_string_value(GetFullTypeWithUrl(type.name()));
 }
 
-// std::vector<AuditDirective> GetAuditDirectives(absl::string_view audittings)
-// {
-//   std::vector<AuditDirective> audit_directives;
-//   for (absl::string_view auditting :
-//        absl::StrSplit(audittings, ',', absl::SkipWhitespace())) {
-//     if (auditting == "AUDIT") {
-//       audit_directives.push_back(AuditDirective::AUDIT);
-//     } else if (auditting == "AUDIT_REDACT") {
-//       audit_directives.push_back(AuditDirective::AUDIT_REDACT);
-//     }
-//   }
-//   return audit_directives;
-// }
-
 AuditDirective TypeMapping(const MethodLogging::LogDirective& type) {
   switch (type) {
   case MethodLogging::LOG:

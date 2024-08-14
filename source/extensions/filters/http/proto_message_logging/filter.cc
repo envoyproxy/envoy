@@ -397,11 +397,6 @@ void Filter::handleRequestLoggingResult(const std::vector<AuditMetadata>& result
     for (const auto& field : metadata.scrubbed_message.fields()) {
       (*key_field->mutable_fields())[field.first] = field.second;
     }
-
-    // Envoy::ProtobufWkt::ListValue* list =
-    //     (*dest_metadata.mutable_fields())[key].mutable_list_value();
-    // auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
-    // list->add_values()->set_allocated_struct_value(struct_value_copy);
   };
 
   const auto& first_metadata = result[0];
@@ -441,11 +436,6 @@ void Filter::handleResponseLoggingResult(const std::vector<AuditMetadata>& resul
     for (const auto& field : metadata.scrubbed_message.fields()) {
       (*key_field->mutable_fields())[field.first] = field.second;
     }
-
-    // Envoy::ProtobufWkt::ListValue* list =
-    //     (*dest_metadata.mutable_fields())[key].mutable_list_value();
-    // auto* struct_value_copy = new Envoy::ProtobufWkt::Struct(metadata.scrubbed_message);
-    // list->add_values()->set_allocated_struct_value(struct_value_copy);
   };
 
   const auto& first_metadata = result[0];

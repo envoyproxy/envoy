@@ -266,22 +266,37 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
     auto* repeated_values = field_value.mutable_list_value()->mutable_values();
     for (int i = 0; i < repeated_values->size(); ++i) {
       Value* value = repeated_values->Mutable(i);
-      CHECK(value->has_struct_value()) << "Cannot redact non-message-type field " << field;
+      if (!value->has_struct_value()) {
+        LOG(ERROR) << "Cannot redact non-message-type field: " << field;
+        return;
+      }
       RedactPath(path_begin, path_end, value->mutable_struct_value());
     }
     return;
   }
 
+  if (!field_value.has_struct_value()) {
+    LOG(ERROR) << "Cannot redact non-message-type field: " << field;
+    return;
+  }
+
   // Fail if trying to redact non-message-type field.
-  CHECK(field_value.has_struct_value()) << "Cannot redact non-message-type field " << field;
+  if (!field_value.has_struct_value()) {
+    LOG(ERROR) << "Cannot redact non-message-type field: " << field;
+    return;
+  }
+
   RedactPath(path_begin, path_end, field_value.mutable_struct_value());
 }
 
 void RedactPaths(absl::Span<const std::string> paths_to_redact, Struct* proto_struct) {
   for (const std::string& path : paths_to_redact) {
     std::vector<std::string> path_pieces = absl::StrSplit(path, '.', absl::SkipEmpty());
-    CHECK(path_pieces.size() < kMaxRedactedPathDepth)
-        << "Attempting to redact path with depth >= " << kMaxRedactedPathDepth << ": " << path;
+    if (path_pieces.size() >= kMaxRedactedPathDepth) {
+      LOG(ERROR) << "Attempting to redact path with depth >= " << kMaxRedactedPathDepth << ": "
+                 << path;
+      return;
+    }
     RedactPath(path_pieces.begin(), path_pieces.end(), proto_struct);
   }
 }

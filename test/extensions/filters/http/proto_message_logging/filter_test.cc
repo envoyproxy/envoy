@@ -1613,6 +1613,189 @@ TEST_F(FilterTestPassThrough, UnconfiguredRequest) {
   // Pass through headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
+
+using FilterTestWithLogModeUnspecified = FilterTestBase;
+
+TEST_F(FilterTestWithLogModeUnspecified, ModeUnspecified) {
+  // Mode unspecified is treated as FIRST_AND_LAST.
+  setUp(R"pb(
+      mode: LogMode_UNSPECIFIED
+      logging_by_method: {
+        key: "apikeys.ApiKeys.CreateApiKey"
+        value: {
+          request_logging_by_field: { key: "parent" value: LOG }
+          response_logging_by_field: { key: "name" value: LOG }
+        }
+      }
+    )pb");
+
+  Envoy::Http::TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+            EXPECT_EQ(ns, kFilterName);
+            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+          }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse();
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+            EXPECT_EQ(ns, kFilterName);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+          }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+
+  // No data modification.
+  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
+}
+
+using FilterTestWithLogRedacted = FilterTestBase;
+
+// TODO: Add test case for non-repeated numerical/string or timestamp field.
+TEST_F(FilterTestWithLogRedacted, StringField) {
+  setUp(R"pb(
+      mode: FIRST_AND_LAST
+      logging_by_method: {
+        key: "apikeys.ApiKeys.CreateApiKey"
+        value: {
+          request_logging_by_field: { key: "parent" value: LOG_REDACT }
+          response_logging_by_field: { key: "name" value: LOG_REDACT }
+        }
+      }
+    )pb");
+
+  Envoy::Http::TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+            EXPECT_EQ(ns, kFilterName);
+            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+          }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse();
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+            EXPECT_EQ(ns, kFilterName);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+          }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+
+  // No data modification.
+  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
+}
+
+// LogDirective_UNSPECIFIED is treated as LOG.
+using FilterTestWithLogDirectiveUnspecified = FilterTestBase;
+
+TEST_F(FilterTestWithLogDirectiveUnspecified, HappyPath) {
+  setUp(R"pb(
+      mode: FIRST_AND_LAST
+      logging_by_method: {
+        key: "apikeys.ApiKeys.CreateApiKey"
+        value: {
+          request_logging_by_field: { key: "parent" value: LogDirective_UNSPECIFIED }
+          response_logging_by_field: { key: "name" value: LogDirective_UNSPECIFIED }
+        }
+      }
+    )pb");
+
+  Envoy::Http::TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+            EXPECT_EQ(ns, kFilterName);
+            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+          }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse();
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+            EXPECT_EQ(ns, kFilterName);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+          }));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+
+  // No data modification.
+  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
+}
 } // namespace
 
 } // namespace ProtoMessageLogging

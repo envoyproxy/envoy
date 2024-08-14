@@ -223,6 +223,7 @@ paths:
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/proto_message_logging/logging_util/audit_proto_scrubber.cc
     - test/extensions/bootstrap/wasm/test_data
 
   # Files that are allowed to use try without main thread assertion.
