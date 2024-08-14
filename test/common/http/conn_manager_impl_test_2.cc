@@ -3819,7 +3819,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationBeforeResponse) {
-  codec_->protocol_ = Protocol::Http2;
+  codec_->protocol_ = Protocol::Http11;
   setup();
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
