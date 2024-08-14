@@ -75,25 +75,24 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // ``metadata<google.protobuf.Struct>`` with the same layout of the message.
 //
 // For the default `FIRST_AND_LAST` mode, it will be like:
+//
+// .. code-block:: json
+//
 //   {
 //     "requests":{
 //        "first":{
 //           "foo": "val_foo1",
-//           ...
 //        }
 //        "last":{
 //           "foo": "val_foo3",
-//           ...
 //        }
 //     },
 //     "responses":{
 //        "first":{
 //           "baz": "val_baz1",
-//           ...
 //        }
 //        "last":{
 //           "baz": "val_foo3",
-//           ...
 //        }
 //     }
 //   }
