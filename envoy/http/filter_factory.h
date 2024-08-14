@@ -25,15 +25,12 @@ using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callback
 
 /**
  * Simple struct of additional contextual information of HTTP filter, e.g. filter config name
- * from configuration, canonical filter name, etc.
+ * from configuration, etc.
  */
 struct FilterContext {
   // The name of the filter configuration that used to create related filter factory function.
   // This could be any legitimate non-empty string.
   std::string config_name;
-  // Filter extension qualified name. This is used as a fallback of `config_name`. E.g.,
-  // "envoy.filters.http.buffer" for the HTTP buffer filter.
-  std::string filter_name;
 };
 
 /**
