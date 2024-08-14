@@ -259,14 +259,12 @@ protected:
     }
   }
 
-  void sendCHLO(quic::QuicConnectionId connection_id) {
-    sendCHLO(connection_id, false);
-  }
+  void sendCHLO(quic::QuicConnectionId connection_id) { sendCHLO(connection_id, false); }
 
   void sendCHLO(quic::QuicConnectionId connection_id, bool dual_stack) {
-    Network::Address::InstanceConstSharedPtr client_address = dual_stack
-        ? Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)
-        : local_address_;
+    Network::Address::InstanceConstSharedPtr client_address =
+        dual_stack ? Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)
+                   : local_address_;
     client_sockets_.push_back(
         std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, client_address,
                                               nullptr, Network::SocketCreationOptions{}));
@@ -283,12 +281,12 @@ protected:
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
-    Network::Address::InstanceConstSharedPtr dest_address = dual_stack
-        ? std::make_shared<const Network::Address::Ipv4Instance>(
-            "127.0.0.1",
-            listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
-            &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()))
-        : listen_socket_->connectionInfoProvider().localAddress();
+    Network::Address::InstanceConstSharedPtr dest_address =
+        dual_stack ? std::make_shared<const Network::Address::Ipv4Instance>(
+                         "127.0.0.1",
+                         listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+                         &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()))
+                  : listen_socket_->connectionInfoProvider().localAddress();
     // Send a full CHLO to finish 0-RTT handshake.
     auto send_rc = Network::Utility::writeToSocket(
         client_sockets_.back()->ioHandle(), slice.data(), 1, nullptr,
@@ -657,7 +655,7 @@ TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id, /*dualstack=*/true);
+  sendCHLO(connection_id, /*dual_stack=*/true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   quic::QuicConnection* connection =
       quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
