@@ -230,6 +230,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
     )
     external_http_archive("com_google_protofieldextraction")
+    external_http_archive("com_google_protoprocessinglib")
     external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
@@ -361,6 +362,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    external_http_archive(name = "envoy_examples")
+
     _com_github_maxmind_libmaxminddb()
 
     external_http_archive("rules_pkg")
@@ -443,11 +446,6 @@ def _com_github_c_ares_c_ares():
     external_http_archive(
         name = "com_github_c_ares_c_ares",
         build_file_content = BUILD_ALL_CONTENT,
-        # Patch c-ares library aith commit
-        # https://github.com/c-ares/c-ares/commit/a070d7835d667b2fae5266fe1b790677dae47d25
-        # This commit fixes an issue when the gRPC library attempts to resolve a domain name.
-        patches = ["@envoy//bazel/foreign_cc:cares.patch"],
-        patch_args = ["-p1"],
     )
     native.bind(
         name = "ares",

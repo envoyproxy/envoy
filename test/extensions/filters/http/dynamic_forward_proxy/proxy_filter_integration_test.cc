@@ -291,12 +291,16 @@ typed_config:
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+    std::string access_log = waitForAccessLog(access_log_name_);
+    EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+    EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 
     response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+    access_log = waitForAccessLog(access_log_name_, 1);
+    EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+    EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
   }
 
   void multipleRequestsMaybeReresolve(bool reresolve) {
@@ -528,12 +532,16 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+  std::string access_log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+  access_log = waitForAccessLog(access_log_name_, 1);
+  EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with

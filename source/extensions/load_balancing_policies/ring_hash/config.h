@@ -28,7 +28,8 @@ public:
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
-  Upstream::LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
+  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
+                                             const Protobuf::Message& config,
                                              ProtobufMessage::ValidationVisitor&) override {
     auto active_or_legacy =
         Common::ActiveOrLegacy<Upstream::RingHashLbProto, Upstream::ClusterProto>::get(&config);

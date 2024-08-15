@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.input_matchers.metadata.v3;
+
+import "envoy/type/matcher/v3/value.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.metadata.v3";
+option java_outer_classname = "MetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/input_matchers/metadata/v3;metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: metadata matcher]
+// [#extension: envoy.matching.matchers.metadata_matcher]
+
+// Metadata matcher for metadata from http matching input data.
+message Metadata {
+  // The Metadata is matched if the value retrieved by metadata matching input is matched to this value.
+  type.matcher.v3.ValueMatcher value = 1 [(validate.rules).message = {required: true}];
+
+  // If true, the match result will be inverted.
+  bool invert = 4;
+}
