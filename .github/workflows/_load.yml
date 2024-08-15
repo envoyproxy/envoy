@@ -157,9 +157,25 @@ jobs:
     secrets:
       app-id: ${{ secrets.lock-app-id }}
       app-key: ${{ secrets.lock-app-key }}
-    uses: ./.github/workflows/_cache.yml
+    name: ${{ matrix.name || matrix.target }}
     needs: request
+    uses: ./.github/workflows/_cache.yml
     if: ${{ inputs.cache-docker && ! fromJSON(needs.request.outputs.skip) }}
     with:
-      request: ${{ toJSON(needs.request.outputs) }}
+      arch: ${{ matrix.arch }}
+      cache-suffix: ${{ matrix.cache-suffix }}
       image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}
+      request: ${{ toJSON(needs.request.outputs) }}
+      runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: docker-x64
+          name: Docker (x64)
+          arch: x64
+        - target: docker-arm64
+          name: Docker (arm64)
+          arch: arm64
+          cache-suffix: -arm64
+          runs-on: envoy-arm64-small

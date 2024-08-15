@@ -230,6 +230,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
     )
     external_http_archive("com_google_protofieldextraction")
+    external_http_archive("com_google_protoprocessinglib")
     external_http_archive("ocp")
     native.bind(
         name = "path_matcher",

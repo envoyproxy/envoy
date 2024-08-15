@@ -145,10 +145,12 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(filter.typed_config()), true));
 
-    auto& factory = Config::Utility::getAndCheckFactory<NamedUdpSessionFilterConfigFactory>(filter);
+    auto& factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedUdpSessionFilterConfigFactory>(filter);
     ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
         filter, context.messageValidationVisitor(), factory);
-    FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
+    Network::UdpSessionFilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, context);
     filter_factories_.push_back(callback);
   }
 }
