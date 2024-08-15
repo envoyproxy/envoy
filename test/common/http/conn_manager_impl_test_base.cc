@@ -261,7 +261,7 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
             std::string name = absl::StrCat(req * num_decoder_filters + i);
-            manager.applyFilterFactoryCb({name, name}, factory);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
 
@@ -269,7 +269,7 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
             std::string name = absl::StrCat(req * num_decoder_filters + i);
-            manager.applyFilterFactoryCb({name, name}, factory);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
           return applied_filters;
