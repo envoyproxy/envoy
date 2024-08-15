@@ -508,13 +508,19 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->serialNumbersPeerCertificates());
       }
       if (!options.expectedPeerIssuer().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
       }
       if (!options.expectedPeerSubject().empty()) {
         EXPECT_EQ(options.expectedPeerSubject(),
                   server_connection->ssl()->subjectPeerCertificate());
+        EXPECT_EQ(options.expectedPeerSubject(),
+                  server_connection->ssl()->subjectPeerCertificate());
       }
       if (!options.expectedLocalSubject().empty()) {
+        EXPECT_EQ(options.expectedLocalSubject(),
+                  server_connection->ssl()->subjectLocalCertificate());
         EXPECT_EQ(options.expectedLocalSubject(),
                   server_connection->ssl()->subjectLocalCertificate());
       }
@@ -864,6 +870,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       if (!options.expectedALPNProtocol().empty()) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
+      // Assert twice to ensure a cached value is returned and still valid.
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertIpSans(),
                 server_connection->ssl()->ipSansPeerCertificate());
