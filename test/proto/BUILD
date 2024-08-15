@@ -66,18 +66,18 @@ envoy_proto_descriptor(
 )
 
 envoy_proto_library(
-    name = "logging_proto",
+    name = "scrubbing_proto",
     srcs = [
-        "logging.proto",
+        "scrubbing.proto",
     ],
 )
 
 envoy_proto_descriptor(
-    name = "logging_proto_descriptor",
+    name = "scrubbing_proto_descriptor",
     srcs = [
-        "logging.proto",
+        "scrubbing.proto",
     ],
-    out = "logging.descriptor",
+    out = "scrubbing.descriptor",
 )
 
 envoy_proto_library(
