@@ -39,8 +39,10 @@ struct LookupResult {
   // header with this value, replacing any preexisting content-length header.
   // (This lets us dechunk responses as we insert them, then later serve them
   // with a content-length header.)
-  // May be 0 if the cache entry is streaming.
-  uint64_t content_length_;
+  // If the cache entry is still populating, and the cache supports streaming,
+  // and the response had no content-length header, the content length may be
+  // unknown at lookup-time.
+  absl::optional<uint64_t> content_length_;
 
   // If the request is a range request, this struct indicates if the ranges can
   // be satisfied and which ranges are requested. nullopt indicates that this is
@@ -94,7 +96,8 @@ public:
   // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                ResponseMetadata&& metadata, uint64_t content_length) const;
+                                ResponseMetadata&& metadata,
+                                absl::optional<uint64_t> content_length) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
@@ -195,9 +198,12 @@ public:
   //
   // The cache must call cb with a range of bytes starting at range.start() and
   // ending at or before range.end(). Caller is responsible for tracking what
-  // ranges have been received, what to request next, and when to stop. A cache
-  // can report an error, and cause the response to be aborted, by calling cb
-  // with nullptr.
+  // ranges have been received, what to request next, and when to stop.
+  //
+  // A request may have a range that exceeds the size of the content, in support
+  // of a "shared stream" cache entry, where the request may not know the size of
+  // the content in advance. In this case the cache should call cb with
+  // end_stream=true when the end of the body is reached.
   //
   // If a cache happens to load data in fragments of a set size, it may be
   // efficient to respond with fewer than the requested number of bytes. For
@@ -241,6 +247,12 @@ class HttpCache {
 public:
   // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
   // miss, the returned LookupContext will be given to the insert call (if any).
+  //
+  // It is possible for a cache to make a "shared stream" of responses allowing
+  // read access to a cache entry before its write is complete. In the case that
+  // a cache is supporting this and a range request is made for an entry that
+  // didn't have a content-length header from upstream, range requests may be
+  // required to block until the content-length is known.
   virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
                                              Http::StreamDecoderFilterCallbacks& callbacks) PURE;
 

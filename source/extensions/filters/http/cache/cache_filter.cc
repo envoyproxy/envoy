@@ -318,14 +318,9 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   lookup_->getHeaders([self, &request_headers, &dispatcher = decoder_callbacks_->dispatcher()](
                           LookupResult&& result, bool end_stream) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post([self, &request_headers, status = result.cache_entry_status_,
-                     headers = std::move(result.headers_),
-                     range_details = std::move(result.range_details_),
-                     content_length = result.content_length_, end_stream]() mutable {
+    dispatcher.post([self, &request_headers, result = std::move(result), end_stream]() mutable {
       if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onHeaders(
-            LookupResult{status, std::move(headers), content_length, range_details},
-            request_headers, end_stream);
+        cache_filter->onHeaders(std::move(result), request_headers, end_stream);
       }
     });
   });
@@ -446,6 +441,11 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body, bool end_stream) {
   ASSERT(!remaining_ranges_.empty(),
          "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
          "bogus callback.");
+  if (remaining_ranges_[0].end() == std::numeric_limits<uint64_t>::max() && body == nullptr) {
+    ASSERT(!end_stream);
+    getTrailers();
+    return;
+  }
   ASSERT(body, "Cache said it had a body, but isn't giving it to us.");
 
   const uint64_t bytes_from_cache = body->length();
@@ -506,16 +506,22 @@ void CacheFilter::handleCacheHit(bool end_stream_after_headers) {
 void CacheFilter::handleCacheHitWithRangeRequest() {
   if (!lookup_result_->range_details_.has_value()) {
     ENVOY_LOG(error, "handleCacheHitWithRangeRequest() should not be called without "
-                     "range_details being populated in lookup_result_");
+                     "range_details_ being populated in lookup_result_");
     return;
   }
+  ENVOY_BUG(lookup_result_->content_length_.has_value(),
+            "handleCacheHitWithRangeRequest() should not be called without "
+            "content_length_ being populated in lookup_result_. cache implementation should "
+            "be blocking until content_length_ is known, declaring a miss, or stripping "
+            "range_details_ from the lookup result.");
   if (!lookup_result_->range_details_->satisfiable_) {
     filter_state_ = FilterState::DecodeServingFromCache;
     insert_status_ = InsertStatus::NoInsertCacheHit;
     lookup_result_->headers_->setStatus(
         static_cast<uint64_t>(Envoy::Http::Code::RangeNotSatisfiable));
-    lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
-                                      absl::StrCat("bytes */", lookup_result_->content_length_));
+    lookup_result_->headers_->addCopy(
+        Envoy::Http::Headers::get().ContentRange,
+        absl::StrCat("bytes */", lookup_result_->content_length_.value()));
     // We shouldn't serve any of the body, so the response content length
     // is 0.
     lookup_result_->setContentLength(0);
@@ -544,7 +550,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
   lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
                                     absl::StrCat("bytes ", ranges[0].begin(), "-",
                                                  ranges[0].end() - 1, "/",
-                                                 lookup_result_->content_length_));
+                                                 lookup_result_->content_length_.value()));
   // We serve only the desired range, so adjust the length
   // accordingly.
   lookup_result_->setContentLength(ranges[0].length());
@@ -691,11 +697,12 @@ void CacheFilter::encodeCachedResponse(bool end_stream_after_headers) {
   if (end_stream_after_headers || is_head_request_) {
     return;
   }
-  if (lookup_result_->content_length_ > 0) {
+  if (remaining_ranges_.empty() && lookup_result_->content_length_.value_or(1) > 0) {
     // No range has been added, so we add entire body to the response.
-    if (remaining_ranges_.empty()) {
-      remaining_ranges_.emplace_back(0, lookup_result_->content_length_);
-    }
+    remaining_ranges_.emplace_back(
+        0, lookup_result_->content_length_.value_or(std::numeric_limits<uint64_t>::max()));
+  }
+  if (!remaining_ranges_.empty()) {
     getBody();
   } else {
     getTrailers();

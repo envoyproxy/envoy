@@ -71,7 +71,16 @@ public:
     ASSERT(first < last, "Illegal byte range.");
   }
   uint64_t begin() const { return first_; }
+
   // Unlike RawByteRange, end() is one past the index of the last offset.
+  //
+  // std::numeric_limits<uint64_t>::max() is a special case that may (and most
+  // likely does) indicate that the range was filled in automatically and the
+  // content-length was unknown at that time. In this case it is allowable for
+  // a cache to pass a null body pointer to the LookupBodyCallback to indicate
+  // that no more body is available and the filter should request trailers.
+  // (If there is no trailer, end_stream should have already been passed with
+  // the final body chunk, meaning a null body pointer should not be necessary.)
   uint64_t end() const { return last_; }
   uint64_t length() const { return last_ - first_; }
   void trimFront(uint64_t n) {

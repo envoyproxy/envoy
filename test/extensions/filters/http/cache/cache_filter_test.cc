@@ -22,6 +22,7 @@ namespace Cache {
 namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::testing::Gt;
 using ::testing::IsNull;
 using ::testing::NotNull;
 
@@ -492,6 +493,57 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
 MATCHER_P2(RangeMatcher, begin, end, "") {
   return testing::ExplainMatchResult(begin, arg.begin(), result_listener) &&
          testing::ExplainMatchResult(end, arg.end(), result_listener);
+}
+
+TEST_F(CacheFilterTest, CacheEntryStreamedWithTrailersAndNoContentLengthCanDeliverTrailers) {
+  request_headers_.setHost("CacheEntryStreamedWithTrailers");
+  const std::string body = "abcde";
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  // response_headers_ intentionally has no content length, LookupResult also has no content length.
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    cb(LookupResult{CacheEntryStatus::Ok,
+                    std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                    absl::nullopt, absl::nullopt},
+       /* end_stream = */ false);
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, Gt(5)), _))
+      .WillOnce([&](AdjustedByteRange, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>(body), false);
+      });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(5, Gt(5)), _))
+      .WillOnce([&](AdjustedByteRange, LookupBodyCallback&& cb) { cb(nullptr, false); });
+  EXPECT_CALL(*mock_lookup_context, getTrailers(_)).WillOnce([&](LookupTrailersCallback&& cb) {
+    cb(std::make_unique<Http::TestResponseTrailerMapImpl>());
+  });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq("abcde")), false));
+    EXPECT_CALL(decoder_callbacks_, encodeTrailers_(_));
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    // The posted lookup callback will cause another callback to be posted (when getBody() is
+    // called) which should also be invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertCacheHit));
+  }
 }
 
 TEST_F(CacheFilterTest, OnDestroyBeforeOnHeadersAbortsAction) {

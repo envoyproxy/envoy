@@ -174,7 +174,7 @@ public:
 
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
                               const Http::TestResponseHeaderMapImpl& response_headers,
-                              uint64_t content_length = 0) {
+                              absl::optional<uint64_t> content_length = absl::nullopt) {
   // For the purpose of the test, set the response_time to the date header value.
   ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(
@@ -194,7 +194,7 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
        {"date", formatter_.fromTime(response_date)}});
-  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers, 0);
 
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
@@ -202,6 +202,24 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   EXPECT_THAT(*lookup_response.headers_,
               HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
+}
+
+TEST_P(LookupRequestTest, ResultWithUnknownContentLengthMatchesExpectation) {
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                   GetParam().request_cache_control);
+  const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
+  const LookupRequest lookup_request(request_headers_, request_time, vary_allow_list_);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", GetParam().response_cache_control},
+       {"date", formatter_.fromTime(response_date)}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(*lookup_response.headers_,
+              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
+  EXPECT_FALSE(lookup_response.content_length_.has_value());
 }
 
 TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
