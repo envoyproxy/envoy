@@ -6,6 +6,10 @@ behavior_changes:
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
     <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
+- area: golang
+  change: |
+    Change ``OnLogDownstreamStart``, ``OnLogDownstreamPeriodic`` and ``OnLog`` methods so that user can get the request/response's
+    headers and trailers when producing access log.
 - area: http
   change: |
     Added HTTP1-safe option for :ref:`max_connection_duration
