@@ -79,6 +79,8 @@ ActiveQuicListener::ActiveQuicListener(
       if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
         listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
         if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
+          // TODO(martinduke): Check if this line returns an error for Apple
+          // platforms.
           listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
         }
       } else {
