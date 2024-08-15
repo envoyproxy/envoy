@@ -1,8 +1,13 @@
 #include "envoy/common/execution_context.h"
+#include "envoy/http/filter_factory.h"
+
+#include "source/common/tracing/null_span_impl.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+thread_local const Http::FilterContext* current_filter_context = nullptr;
 
 class TestExecutionContext : public ExecutionContext {
 public:
@@ -20,6 +25,14 @@ private:
   void deactivate() override {
     EXPECT_GE(activation_depth_, 0);
     activation_depth_--;
+  }
+
+  ExecutionScope scopeForSpan(Envoy::Tracing::Span&) override { return ExecutionScope(); }
+
+  ExecutionScope scopeForFilter(const Http::FilterContext& filter_context) override {
+    const Http::FilterContext* old_filter_context = current_filter_context;
+    current_filter_context = &filter_context;
+    return ExecutionScope([old_filter_context]() { current_filter_context = old_filter_context; });
   }
 
   int activation_depth_ = 0;
@@ -66,6 +79,39 @@ TEST(ExecutionContextTest, DisjointScopes) {
   }
 
   EXPECT_EQ(context.activationDepth(), 0);
+}
+
+TEST(ExecutionContextTest, NoopScope) {
+  Http::FilterContext filter_context;
+  ExecutionScope scope1 = ExecutionContext::makeScopeForFilter(nullptr, filter_context);
+  EXPECT_FALSE(scope1.hasExitCallback());
+
+  ExecutionScope scope2 = ExecutionContext::makeScopeForSpan(nullptr, nullptr);
+  EXPECT_FALSE(scope2.hasExitCallback());
+
+  TestExecutionContext context;
+  ExecutionScope scope3 =
+      ExecutionContext::makeScopeForSpan(&context, &Tracing::NullSpan::instance());
+  EXPECT_FALSE(scope3.hasExitCallback());
+}
+
+TEST(ExecutionContextTest, FilterScope) {
+  TestExecutionContext context;
+
+  Http::FilterContext outer_filter_context{"outer_filter", "outer_filter"};
+  ExecutionScope outer_scope = ExecutionContext::makeScopeForFilter(&context, outer_filter_context);
+  EXPECT_TRUE(outer_scope.hasExitCallback());
+  EXPECT_EQ(current_filter_context, &outer_filter_context);
+
+  {
+    Http::FilterContext inner_filter_context{"inner_filter", "inner_filter"};
+    ExecutionScope inner_scope =
+        ExecutionContext::makeScopeForFilter(&context, inner_filter_context);
+    EXPECT_TRUE(inner_scope.hasExitCallback());
+    EXPECT_EQ(current_filter_context, &inner_filter_context);
+  }
+
+  EXPECT_EQ(current_filter_context, &outer_filter_context);
 }
 
 } // namespace Envoy

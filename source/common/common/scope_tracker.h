@@ -5,7 +5,6 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 
@@ -18,8 +17,7 @@ namespace Envoy {
 class ScopeTrackerScopeState {
 public:
   ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
-      : registered_object_(object),
-        scoped_execution_context_(executionContextEnabled() ? object->executionContext() : nullptr),
+      : registered_object_(object), scoped_execution_context_(object->executionContext()),
         tracker_(tracker) {
     tracker_.pushTrackedObject(registered_object_);
   }
@@ -36,11 +34,6 @@ public:
 
 private:
   friend class ScopeTrackerScopeStateTest;
-  static bool& executionContextEnabled() {
-    static bool enabled =
-        Runtime::runtimeFeatureEnabled("envoy.restart_features.enable_execution_context");
-    return enabled;
-  }
   const ScopeTrackedObject* registered_object_;
   ScopedExecutionContext scoped_execution_context_;
   Event::ScopeTracker& tracker_;

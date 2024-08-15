@@ -124,7 +124,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "execution_context",
     hdrs = ["execution_context.h"],
-    deps = [":pure_lib"],
+    deps = [
+        ":pure_lib",
+        "@com_google_absl//absl/functional:any_invocable",
+    ],
 )
 
 envoy_cc_library(

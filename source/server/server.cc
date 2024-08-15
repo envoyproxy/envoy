@@ -9,6 +9,7 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/execution_context.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
@@ -711,6 +712,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
     envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
         [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+  }
+
+  if (runtime().snapshot().getBoolean("envoy.enable_execution_context", false)) {
+    enableExecutionContext();
   }
 
   if (initial_config.admin().address()) {

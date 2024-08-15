@@ -4,6 +4,9 @@ namespace Envoy {
 namespace Network {
 
 ExecutionContext* getConnectionExecutionContext(const Network::Connection& connection) {
+  if (!isExecutionContextEnabled()) {
+    return nullptr;
+  }
   const ConnectionExecutionContextFilterState* filter_state =
       connection.streamInfo().filterState().getDataReadOnly<ConnectionExecutionContextFilterState>(
           kConnectionExecutionContextFilterStateName);

@@ -420,6 +420,7 @@ envoy_cc_library(
         ":regex_engine_lib",
         ":utils_lib",
         ":worker_lib",
+        "//envoy/common:execution_context",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:signal_interface",
         "//envoy/event:timer_interface",

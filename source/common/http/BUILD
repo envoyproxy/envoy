@@ -316,6 +316,7 @@ envoy_cc_library(
         "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
+        "//source/common/network:common_connection_filter_states_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

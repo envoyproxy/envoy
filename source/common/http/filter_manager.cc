@@ -528,6 +528,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
@@ -627,6 +629,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame types, return now.
     if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
       return;
@@ -766,6 +770,8 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -806,6 +812,8 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
   ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeMetadata));
 
   for (; entry != decoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
     // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
@@ -1129,6 +1137,8 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, false, FilterIterationStartState::AlwaysStartFromNext);
   for (; entry != encoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode1xxHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode1xxHeaders;
     const Filter1xxHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
@@ -1178,6 +1188,8 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == encoder_filters_.end());
@@ -1262,6 +1274,8 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
       commonEncodePrefix(filter, false, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != encoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
     // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
     // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
@@ -1350,6 +1364,8 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame type, return now.
     if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
       return;
@@ -1420,6 +1436,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
+    auto filter_scope =
+        ExecutionContext::makeScopeForFilter(executionContext(), (*entry)->filter_context_);
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
