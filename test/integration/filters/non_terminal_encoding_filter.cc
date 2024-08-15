@@ -31,7 +31,7 @@ public:
   const test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_trailers_;
 };
 
-// A test filter that adds body data to a request/response without body payload.
+// A test filter that encodes a response in a decodeXXX handler.
 class NonTerminalEncodingFilter : public Http::PassThroughFilter {
 public:
   NonTerminalEncodingFilter(std::shared_ptr<NonTerminalEncodingFilterConfig> config)
