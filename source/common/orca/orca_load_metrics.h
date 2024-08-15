@@ -10,7 +10,7 @@ namespace Orca {
 // List of metric names to report to the LRS.
 typedef std::vector<std::string> LrsReportMetricNames;
 
-void addOrcaLoadReportToLoadMetricStats(const OptRef<const LrsReportMetricNames>& metric_names,
+void addOrcaLoadReportToLoadMetricStats(const LrsReportMetricNames& metric_names,
                                         const xds::data::orca::v3::OrcaLoadReport& report,
                                         Upstream::LoadMetricStats& stats);
 

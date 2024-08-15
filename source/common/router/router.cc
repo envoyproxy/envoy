@@ -2131,7 +2131,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
                    orca_load_report->DebugString());
   Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
-      cluster_->lrsReportMetricNames(), orca_load_report.value(), host->loadMetricStats());
+      cluster_->lrsReportMetricNames().value(), orca_load_report.value(), host->loadMetricStats());
 }
 
 RetryStatePtr
