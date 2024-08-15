@@ -466,35 +466,33 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
   }
 }
 
-void ActiveStreamDecoderFilter::maybeMarkDecoderFilterTerminal(bool encoded_end_stream) {
-  // If this filter encoded end_stream and the decoder filter chain has not yet been finished
-  // then make this filter terminal. Decoding will not go past this filter.
-  filter_encoded_end_stream_ = encoded_end_stream;
-
-  // If the filter that encoded end_stream has also already observed request (downstream)
-  // end_stream, but the decoder filter chain has not been completed, then decoding is aborted as
-  // there is no need to iterate over remaining decoder filters any more.
-  if (encoded_end_stream && end_stream_ && !parent_.state_.decoder_filter_chain_complete_) {
+void ActiveStreamDecoderFilter::stopDecodingIfNonTerminalFilterEncodedEndStream(
+    bool encoded_end_stream) {
+  // Encoding end_stream by a non-terminal filters (i.e. cache filter) always causes the decoding to
+  // be stopped even if independent half-close is enabled. For simplicity, independent half-close is
+  // allowed only when the terminal (router) filter is encoding the response.
+  if (encoded_end_stream && !parent_.isTerminalDecoderFilter(*this) &&
+      !parent_.state_.decoder_filter_chain_complete_) {
     parent_.state_.decoder_filter_chain_aborted_ = true;
   }
 }
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
-  maybeMarkDecoderFilterTerminal(end_stream);
+  stopDecodingIfNonTerminalFilterEncodedEndStream(end_stream);
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  maybeMarkDecoderFilterTerminal(end_stream);
+  stopDecodingIfNonTerminalFilterEncodedEndStream(end_stream);
   parent_.encodeData(nullptr, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
-  maybeMarkDecoderFilterTerminal(true);
+  stopDecodingIfNonTerminalFilterEncodedEndStream(true);
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
 }
@@ -542,7 +540,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
-  // Terminal filter is either the last one or filter that encoded end_stream.
   bool terminal_filter_decoded_end_stream = false;
 
   for (; entry != decoder_filters_.end(); entry++) {
@@ -617,9 +614,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
+    // The decoder filter chain is finished here if the following is true:
+    // 1. the last filter has observed the end_stream AND
+    // 2. no filter, including the last filter, has injected body during header iteration.
+    // If body was injected the end_stream will be processed in the `decodeData()` method below.
+    const bool no_body_was_injected = continue_data_entry == decoder_filters_.end();
     terminal_filter_decoded_end_stream =
-        (end_stream && continue_data_entry == decoder_filters_.end()) &&
-        (std::next(entry) == decoder_filters_.end() || (*entry)->filter_encoded_end_stream_);
+        (std::next(entry) == decoder_filters_.end() && (*entry)->end_stream_) &&
+        no_body_was_injected;
   }
 
   maybeContinueDecoding(continue_data_entry);
@@ -725,9 +727,13 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       trailers_added_entry = entry;
     }
 
-    terminal_filter_decoded_end_stream =
-        end_stream &&
-        (std::next(entry) == decoder_filters_.end() || (*entry)->filter_encoded_end_stream_);
+    // The decoder filter chain is finished here if the following is true:
+    // 1. the last filter has observed the end_stream AND
+    // 2. no filter, including the last filter, has injected trailers during header iteration.
+    //    NOTE: end_stream is set to false above if a filter injected trailers.
+    // If trailers were injected the end_stream will be processed in the `decodeTrailers()` method
+    // below.
+    terminal_filter_decoded_end_stream = end_stream && std::next(entry) == decoder_filters_.end();
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
         std::next(entry) != decoder_filters_.end()) {
@@ -792,7 +798,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
-  bool terminal_filter_decoded_end_stream = false;
+  bool terminal_filter_reached = false;
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
@@ -816,10 +822,10 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     }
 
     processNewlyAddedMetadata();
-    terminal_filter_decoded_end_stream =
-        std::next(entry) == decoder_filters_.end() || (*entry)->filter_encoded_end_stream_;
+    // Check if the last filter has processed trailers
+    terminal_filter_reached = std::next(entry) == decoder_filters_.end();
 
-    if (terminal_filter_decoded_end_stream) {
+    if (terminal_filter_reached) {
       break;
     }
 
@@ -829,7 +835,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     }
   }
   disarmRequestTimeout();
-  maybeEndDecode(terminal_filter_decoded_end_stream);
+  maybeEndDecode(terminal_filter_reached);
 }
 
 void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map) {
@@ -959,10 +965,14 @@ void DownstreamFilterManager::sendLocalReply(
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
-  // Local reply always stops decoder filter chain.
-  state_.decoder_filter_chain_aborted_ = true;
-  if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    state_.decoder_filter_chain_aborted_ = true;
+  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
     state_.encoder_filter_chain_aborted_ = true;
+  }
+  // When independent half-close is enabled local reply always stops decoder filter chain.
+  if (filter_manager_callbacks_.isHalfCloseEnabled()) {
+    state_.decoder_filter_chain_aborted_ = true;
   }
 
   streamInfo().setResponseCodeDetails(details);
@@ -1510,10 +1520,7 @@ void FilterManager::maybeEndDecode(bool terminal_filter_decoded_end_stream) {
 }
 
 void FilterManager::checkAndCloseStreamIfFullyClosed() {
-  // This function is only used when half close semantics are enabled.
-  if (!filter_manager_callbacks_.isHalfCloseEnabled()) {
-    return;
-  }
+  ASSERT(filter_manager_callbacks_.isHalfCloseEnabled());
   // When the independent half close is enabled the stream is always closed on error responses
   // from the server.
   if (filter_manager_callbacks_.responseHeaders().has_value()) {
@@ -1525,6 +1532,21 @@ void FilterManager::checkAndCloseStreamIfFullyClosed() {
     if (error_response && !state_.decoder_filter_chain_complete_) {
       state_.decoder_filter_chain_aborted_ = true;
     }
+  }
+
+  // Handle the case where the end_stream was received from both downstream client and upstream
+  // server but a decoder filter added either request body or trailers AND paused decoder filter
+  // chain iteration. This case is currently handled the same way as if independent half-close is
+  // disabled, i.e. proxying is stopped as soon as encoding has finished.
+  // TODO(yanavlasov): to support this case the codec needs to notify HCM that it has closed its low
+  // level stream
+  //                   to avoid use-after-free when HCM cleans-up its ActiveStream
+  const bool downstream_client_sent_end_stream = decoderObservedEndStream();
+  const bool decoder_filter_chain_paused =
+      !state_.decoder_filter_chain_complete_ && !state_.decoder_filter_chain_aborted_;
+  if (state_.encoder_filter_chain_complete_ && downstream_client_sent_end_stream &&
+      decoder_filter_chain_paused) {
+    state_.decoder_filter_chain_aborted_ = true;
   }
 
   // If independent half close is enabled then close the stream when
@@ -1849,6 +1871,10 @@ void FilterManager::resetStream(StreamResetReason reason,
   }
 
   filter_manager_callbacks_.resetStream(reason, transport_failure_reason);
+}
+
+bool FilterManager::isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const {
+  return !decoder_filters_.empty() && decoder_filters_.back().get() == &filter;
 }
 
 void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,
