@@ -19,6 +19,15 @@ behavior_changes:
     HttpConnectionManager to close the connection itself.  Defaults to off ("unsafe" -- check
     \#34356) and is configurable via :ref:`http1_safe_max_connection_duration
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http1_safe_max_connection_duration>`.
+- area: eds
+  change: |
+    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
+    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
+    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
+    Following this change, after a cluster update, Envoy waits for an EDS assignment until
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
+    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
+    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 - area: stats scoped_rds
   change: |
     Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
