@@ -168,7 +168,7 @@ Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       bool prefer_gro = false, bool connect = false);
+                       bool prefer_gro = false);
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.

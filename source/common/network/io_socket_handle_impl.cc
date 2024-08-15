@@ -313,6 +313,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
   if (result.return_value_ < 0) {
+    ENVOY_LOG_MISC(error, "==> AAB recvmsg sys call resulted in errno: {}", result.errno_);
     return sysCallResultToIoCallResult(result);
   }
   if ((hdr.msg_flags & MSG_TRUNC) != 0) {
