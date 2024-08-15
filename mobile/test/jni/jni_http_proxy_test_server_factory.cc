@@ -9,9 +9,17 @@
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
-  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
-  Envoy::JNI::JniHelper::addClassToCache(
-      "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer");
+  Envoy::JNI::JniHelper::addToCache(
+      "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer",
+      /* methods= */
+      {
+          {"<init>", "(JI)V"},
+      },
+      /* static_methods= */ {}, /* fields= */
+      {
+          {"handle", "J"},
+      },
+      /* static_fields= */ {});
   return Envoy::JNI::JniHelper::getVersion();
 }
 
@@ -24,10 +32,10 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpProxyTestServerFactory_start(J
   Envoy::TestServer* test_server = new Envoy::TestServer();
   test_server->start(static_cast<Envoy::TestServerType>(type), 0);
 
-  jclass java_http_proxy_server_factory_class = jni_helper.findClass(
+  jclass java_http_proxy_server_factory_class = jni_helper.findClassFromCache(
       "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer");
   auto java_init_method_id =
-      jni_helper.getMethodId(java_http_proxy_server_factory_class, "<init>", "(JI)V");
+      jni_helper.getMethodIdFromCache(java_http_proxy_server_factory_class, "<init>", "(JI)V");
   int port = test_server->getPort();
   return jni_helper
       .newObject(java_http_proxy_server_factory_class, java_init_method_id,
@@ -39,8 +47,9 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_testing_HttpProxyTestServerFactory_00024HttpProxyTestServer_shutdown(
     JNIEnv* env, jobject instance) {
   Envoy::JNI::JniHelper jni_helper(env);
-  auto java_class = jni_helper.getObjectClass(instance);
-  auto java_handle_field_id = jni_helper.getFieldId(java_class.get(), "handle", "J");
+  auto java_class = jni_helper.findClassFromCache(
+      "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer");
+  auto java_handle_field_id = jni_helper.getFieldIdFromCache(java_class, "handle", "J");
   jlong java_handle = jni_helper.getLongField(instance, java_handle_field_id);
   Envoy::TestServer* test_server = reinterpret_cast<Envoy::TestServer*>(java_handle);
   test_server->shutdown();
