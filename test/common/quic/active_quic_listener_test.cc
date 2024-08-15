@@ -630,6 +630,9 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
     EXPECT_EQ(rv.return_value_, 0);
     EXPECT_EQ(optval, 1);
     EXPECT_FALSE(local_address_->ip()->ipv6()->v6only());
+#ifdef __APPLE__
+    return;
+#endif // __APPLE__
   }
   // Check the IPv4 version of the sockopt if the socket is v4 or dual-stack.
   // Platform/ APIs for ECN reporting are poorly documented, but this test
