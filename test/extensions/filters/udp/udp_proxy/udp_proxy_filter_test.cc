@@ -1618,6 +1618,10 @@ session_filters:
   EXPECT_THAT(output_.front(), testing::HasSubstr("session_complete"));
 }
 
+using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;
+using MockUpstreamTunnelCallbacks = SessionFilters::MockUpstreamTunnelCallbacks;
+using MockTunnelCreationCallbacks = SessionFilters::MockTunnelCreationCallbacks;
+
 class HttpUpstreamImplTest : public testing::Test {
 public:
   struct HeaderToAdd {
@@ -1941,6 +1945,8 @@ TEST_F(HttpUpstreamImplTest, TargetHostPercentEncoding) {
 
   setAndExpectRequestEncoder(expected_headers, is_ssl);
 }
+
+using MockHttpStreamCallbacks = SessionFilters::MockHttpStreamCallbacks;
 
 class TunnelingConnectionPoolImplTest : public testing::Test {
 public:
