@@ -34,7 +34,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@eb055d739abdc2e8de2e5f4ba1a8b246daa779aa  # codeql-bundle-v3.26.0
+      uses: github/codeql-action/init@429e1977040da7a23b6822b13c129cd1ba93dbb2  # codeql-bundle-v3.26.2
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -68,4 +68,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@eb055d739abdc2e8de2e5f4ba1a8b246daa779aa  # codeql-bundle-v3.26.0
+      uses: github/codeql-action/analyze@429e1977040da7a23b6822b13c129cd1ba93dbb2  # codeql-bundle-v3.26.2
