@@ -27,6 +27,7 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+CCL
 ECN
 ECS
 EKS
@@ -38,6 +39,8 @@ BPF
 Bdecoded
 Bencoded
 CIO
+cbegin
+cend
 deadcode
 DFP
 Dynatrace
@@ -326,6 +329,9 @@ middlewildcard
 monostate
 mpd
 mutators
+mybucket
+myobject
+myproject
 na
 oghttp
 OID
@@ -1235,6 +1241,7 @@ rollout
 roundtrip
 rpcs
 rq
+rtest
 rtrim
 rtt
 ruleset
@@ -1469,6 +1476,7 @@ virtualize
 virtualized
 vptr
 vtable
+vtest
 vtt
 wakeup
 wakeups

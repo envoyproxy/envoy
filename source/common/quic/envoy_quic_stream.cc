@@ -123,8 +123,8 @@ std::unique_ptr<char[]> dataFromString(const std::string& str) {
 void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId id,
                        absl::InlinedVector<quiche::QuicheMemSlice, 2>& slices) {
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
-  quic::QpackEncoder qpack_encoder(&decoder_stream_error_delegate,
-                                   quic::HuffmanEncoding::kDisabled);
+  quic::QpackEncoder qpack_encoder(&decoder_stream_error_delegate, quic::HuffmanEncoding::kDisabled,
+                                   quic::CookieCrumbling::kDisabled);
 
   spdy::Http2HeaderBlock header_block;
   for (const auto& [key, value] : *metadata) {

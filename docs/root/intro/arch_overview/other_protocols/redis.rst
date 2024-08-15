@@ -200,6 +200,7 @@ For details on each command's usage see the official
   RPOP, List
   RPUSH, List
   RPUSHX, List
+  PUBLISH, Pubsub
   EVAL, Scripting
   EVALSHA, Scripting
   SADD, Set
