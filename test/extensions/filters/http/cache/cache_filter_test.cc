@@ -1381,6 +1381,42 @@ TEST_F(CacheFilterTest, LocalReplyDuringLookup) {
 // https://google.github.io/googletest/advanced.html#death-test-naming
 using CacheFilterDeathTest = CacheFilterTest;
 
+TEST_F(CacheFilterDeathTest, BadRangeRequestLookup) {
+  request_headers_.setHost("BadRangeRequestLookup");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    // LookupResult with unknown length and an unsatisfiable RangeDetails is invalid.
+    cb(LookupResult{CacheEntryStatus::Ok,
+                    std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                    absl::nullopt,
+                    RangeDetails{/*satisfiable_ = */ false, {AdjustedByteRange{0, 5}}}},
+       false);
+  });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
+    // encodeHeaders can be called when ENVOY_BUG doesn't exit.
+    response_headers_ = {{":status", "416"}};
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), true))
+        .Times(testing::AnyNumber());
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=-5");
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    EXPECT_ENVOY_BUG(
+        dispatcher_->run(Event::Dispatcher::RunType::Block),
+        "handleCacheHitWithRangeRequest() should not be called with satisfiable_=false");
+  }
+}
+
 TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
   request_headers_.setHost("StreamTimeoutDuringLookup");
   {

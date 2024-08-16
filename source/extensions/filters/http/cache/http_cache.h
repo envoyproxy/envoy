@@ -191,6 +191,14 @@ class LookupContext {
 public:
   // Get the headers from the cache. It is a programming error to call this
   // twice.
+  // In the case that a cache supports shared streaming (serving content from
+  // the cache entry while it is still being populated), and a range request is made
+  // for a streaming entry that didn't have a content-length header from upstream, range
+  // requests may be unable to receive a response until the content-length is
+  // known to exceed the end of the requested range. In this case a cache
+  // implementation should wait until that is known before calling the callback,
+  // and must pass headers with a 416 Range Not Satisfiable response if the request
+  // is invalid.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next fragment from the cache, calling cb when the fragment is ready.
@@ -249,10 +257,8 @@ public:
   // miss, the returned LookupContext will be given to the insert call (if any).
   //
   // It is possible for a cache to make a "shared stream" of responses allowing
-  // read access to a cache entry before its write is complete. In the case that
-  // a cache is supporting this and a range request is made for an entry that
-  // didn't have a content-length header from upstream, range requests may be
-  // required to block until the content-length is known.
+  // read access to a cache entry before its write is complete. In this case the
+  // content-length value may be unset.
   virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
                                              Http::StreamDecoderFilterCallbacks& callbacks) PURE;
 

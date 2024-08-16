@@ -509,19 +509,22 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
                      "range_details_ being populated in lookup_result_");
     return;
   }
-  ENVOY_BUG(lookup_result_->content_length_.has_value(),
-            "handleCacheHitWithRangeRequest() should not be called without "
-            "content_length_ being populated in lookup_result_. cache implementation should "
-            "be blocking until content_length_ is known, declaring a miss, or stripping "
-            "range_details_ from the lookup result.");
   if (!lookup_result_->range_details_->satisfiable_) {
     filter_state_ = FilterState::DecodeServingFromCache;
     insert_status_ = InsertStatus::NoInsertCacheHit;
     lookup_result_->headers_->setStatus(
         static_cast<uint64_t>(Envoy::Http::Code::RangeNotSatisfiable));
-    lookup_result_->headers_->addCopy(
-        Envoy::Http::Headers::get().ContentRange,
-        absl::StrCat("bytes */", lookup_result_->content_length_.value()));
+    if (lookup_result_->content_length_.has_value()) {
+      lookup_result_->headers_->addCopy(
+          Envoy::Http::Headers::get().ContentRange,
+          absl::StrCat("bytes */", lookup_result_->content_length_.value()));
+    } else {
+      IS_ENVOY_BUG(
+          "handleCacheHitWithRangeRequest() should not be called with satisfiable_=false "
+          "without content_length_ being populated in lookup_result_. Cache implementation "
+          "should wait to respond to getHeaders in this case until content_length_ is known, "
+          "declaring a miss, or should strip range_details_ from the lookup result.");
+    }
     // We shouldn't serve any of the body, so the response content length
     // is 0.
     lookup_result_->setContentLength(0);
