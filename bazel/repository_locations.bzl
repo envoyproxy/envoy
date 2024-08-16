@@ -163,11 +163,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md",
         # When this is updated to a revision newer than 2022-08-12,
         # CertValidatorUtil::setIgnoreCertificateExpiration can be simplified.
-        version = "fips-20210429",
-        sha256 = "a4d069ccef6f3c7bc0c68de82b91414f05cb817494cd1ab483dcf3368883c7c2",
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-853ca1ea1168dff08011e5d42d94609cc0ca2e27.tar.xz"],
+        #
+        # !!! NOTE !!!
+        # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
+        # specified in the associated accredidation certificate, which can be found linked from
+        # https://boringssl.googlesource.com/boringssl/+/refs/heads/master/crypto/fipsmodule/FIPS.md, for example
+        # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
+        version = "fips-20220613",
+        sha256 = "62f733289f2d677c2723f556aa58034c438f3a7bbca6c12b156538a88e38da8a",
+        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-0c6f40132b828e92ba365c6b7680e32820c63fa7.tar.xz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-04-29",
+        release_date = "2022-06-13",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     aspect_bazel_lib = dict(
