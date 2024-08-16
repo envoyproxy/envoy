@@ -2469,20 +2469,11 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
   useAccessLog(fmt::format("%FILTER_STATE({}:PLAIN)%", TestFirstPacketReceivedFilterState::key()));
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_udp_listener_config()
-        ->mutable_quic_options()
-        ->mutable_save_cmsg_config()
-        ->mutable_level()
-        ->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
-    listener->mutable_udp_listener_config()
-        ->mutable_quic_options()
-        ->mutable_save_cmsg_config()
-        ->mutable_type()
-        ->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
-    listener->mutable_udp_listener_config()
-        ->mutable_quic_options()
-        ->mutable_save_cmsg_config()
-        ->set_expected_size(128);
+    envoy::config::core::v3::SocketCmsgHeaders* cmsg =
+        listener->mutable_udp_listener_config()->mutable_quic_options()->add_save_cmsg_config();
+    cmsg->mutable_level()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
+    cmsg->mutable_type()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    cmsg->set_expected_size(128);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
     auto configuration = test::integration::filters::TestQuicListenerFilterConfig();

@@ -110,15 +110,19 @@ ActiveQuicListener::ActiveQuicListener(
   }
 
   if (listener_config.udpListenerConfig()) {
-    const envoy::config::core::v3::SocketCmsgHeaders& save_cmsg_config =
+    const auto& save_cmsg_configs =
         listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config();
-    if (save_cmsg_config.has_level()) {
-      udp_save_cmsg_config_.level = save_cmsg_config.level().value();
+    if (save_cmsg_configs.size() > 0) {
+      // QUIC only supports a single cmsg config.
+      const envoy::config::core::v3::SocketCmsgHeaders save_cmsg_config = save_cmsg_configs.at(0);
+      if (save_cmsg_config.has_level()) {
+        udp_save_cmsg_config_.level = save_cmsg_config.level().value();
+      }
+      if (save_cmsg_config.has_type()) {
+        udp_save_cmsg_config_.type = save_cmsg_config.type().value();
+      }
+      udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
     }
-    if (save_cmsg_config.has_type()) {
-      udp_save_cmsg_config_.type = save_cmsg_config.type().value();
-    }
-    udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
   }
 }
 

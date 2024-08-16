@@ -92,5 +92,6 @@ message QuicProtocolOptions {
   // Both level and type must be specified for cmsg to be saved.
   // Cmsg may be truncated or omitted if expected size is not set.
   // If not specified, no cmsg will be saved to QuicReceivedPacket.
-  core.v3.SocketCmsgHeaders save_cmsg_config = 12;
+  repeated core.v3.SocketCmsgHeaders save_cmsg_config = 12
+      [(validate.rules).repeated = {max_items: 1}];
 }

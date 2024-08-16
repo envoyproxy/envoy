@@ -165,8 +165,8 @@ public:
 
   // Struct representation of QuicProtocolOptions::SaveCmsgConfig config proto.
   struct UdpSaveCmsgConfig {
-    absl::optional<int32_t> level;
-    absl::optional<int32_t> type;
+    absl::optional<uint32_t> level;
+    absl::optional<uint32_t> type;
     uint32_t expected_size = 0;
 
     bool hasConfig() const { return (level.has_value() && type.has_value()); }

@@ -18,10 +18,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // More info about `:ref:CMSG <https://man7.org/linux/man-pages/man3/cmsg.3.html>`_.
 message SocketCmsgHeaders {
   // cmsg level. Default is unset.
-  google.protobuf.Int32Value level = 1;
+  google.protobuf.UInt32Value level = 1;
 
   // cmsg type. Default is unset.
-  google.protobuf.Int32Value type = 2;
+  google.protobuf.UInt32Value type = 2;
 
   // Expected size of cmsg value. Default is zero.
   uint32 expected_size = 3;
