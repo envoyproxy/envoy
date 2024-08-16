@@ -13,20 +13,7 @@
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
-  Envoy::JNI::JniHelper::addClassToCache("java/lang/Object");
-  Envoy::JNI::JniHelper::addClassToCache("java/lang/Integer");
-  Envoy::JNI::JniHelper::addClassToCache("java/lang/ClassLoader");
-  Envoy::JNI::JniHelper::addClassToCache("java/nio/ByteBuffer");
-  Envoy::JNI::JniHelper::addClassToCache("java/lang/Throwable");
-  Envoy::JNI::JniHelper::addClassToCache("[B");
-  Envoy::JNI::JniHelper::addClassToCache("java/util/Map$Entry");
-  Envoy::JNI::JniHelper::addClassToCache("java/util/LinkedHashMap");
-  Envoy::JNI::JniHelper::addClassToCache("java/util/HashMap");
-  Envoy::JNI::JniHelper::addClassToCache("java/util/List");
-  Envoy::JNI::JniHelper::addClassToCache("java/util/ArrayList");
-  Envoy::JNI::JniHelper::addClassToCache("io/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel");
-  Envoy::JNI::JniHelper::addClassToCache(
-      "io/envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel");
+  Envoy::JNI::JniUtility::initCache();
   return Envoy::JNI::JniHelper::getVersion();
 }
 

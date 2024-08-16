@@ -213,6 +213,10 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     }
   }
 
+  if (soft_drain_http1_) {
+    stats_.named_.downstream_cx_http1_soft_drain_.dec();
+  }
+
   conn_length_->complete();
   user_agent_.completeConnectionLength(*conn_length_);
 }
@@ -243,7 +247,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
-  if (stream.response_encoder_ != nullptr && (!stream.filter_manager_.remoteDecodeComplete() ||
+  if (stream.response_encoder_ != nullptr && (!stream.filter_manager_.decoderObservedEndStream() ||
                                               !stream.state_.codec_saw_local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
@@ -280,17 +284,18 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
     drain_state_ = DrainState::Closing;
   }
 
-  // If HTTP/1.0 has no content length, it is framed by close and won't consider
-  // the request complete until the FIN is read. Don't delay close in this case.
-  bool http_10_sans_cl = (codec_->protocol() == Protocol::Http10) &&
-                         (!stream.response_headers_ || !stream.response_headers_->ContentLength());
-  // We also don't delay-close in the case of HTTP/1.1 where the request is
-  // fully read, as there's no race condition to avoid.
-  const bool connection_close =
-      stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
-  bool request_complete = stream.filter_manager_.remoteDecodeComplete();
-
   if (check_for_deferred_close) {
+    // If HTTP/1.0 has no content length, it is framed by close and won't consider
+    // the request complete until the FIN is read. Don't delay close in this case.
+    const bool http_10_sans_cl =
+        (codec_->protocol() == Protocol::Http10) &&
+        (!stream.response_headers_ || !stream.response_headers_->ContentLength());
+    // We also don't delay-close in the case of HTTP/1.1 where the request is
+    // fully read, as there's no race condition to avoid.
+    const bool connection_close =
+        stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
+    const bool request_complete = stream.filter_manager_.decoderObservedEndStream();
+
     // Don't do delay close for HTTP/1.0 or if the request is complete.
     checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
   }
@@ -410,6 +415,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     }
     ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
     stats_.named_.downstream_cx_max_requests_reached_.inc();
+  }
+
+  if (soft_drain_http1_) {
+    new_stream->filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+    // Prevent erroneous debug log of closing due to incoming connection close header.
+    drain_state_ = DrainState::Closing;
   }
 
   new_stream->state_.is_internally_created_ = is_internally_created;
@@ -723,7 +734,15 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
                       StreamInfo::CoreResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
-    startDrainSequence();
+    if (config_->http1SafeMaxConnectionDuration() && codec_->protocol() < Protocol::Http2) {
+      ENVOY_CONN_LOG(debug,
+                     "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
+                     read_callbacks_->connection());
+      stats_.named_.downstream_cx_http1_soft_drain_.inc();
+      soft_drain_http1_ = true;
+    } else {
+      startDrainSequence();
+    }
   }
 }
 
@@ -924,21 +943,21 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
   filter_manager_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
                  "stream timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
                  "request timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
                  "request header timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
@@ -946,7 +965,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
                  "downstream duration timeout", nullptr,
                  Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                  StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
@@ -1112,7 +1131,7 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
 
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
-  if (end_stream && !filter_manager_.remoteDecodeComplete()) {
+  if (end_stream && !filter_manager_.decoderObservedEndStream()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
@@ -1135,7 +1154,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
                    *headers);
   // We only want to record this when reading the headers the first time, not when recreating
   // a stream.
-  if (!filter_manager_.remoteDecodeComplete()) {
+  if (!filter_manager_.decoderObservedEndStream()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
   }
@@ -1151,17 +1170,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Both shouldDrainConnectionUponCompletion() and is_head_request_ affect local replies: set them
   // as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
-    if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
-      // Only mark the connection to be closed if the request indicates so. The connection might
-      // already be marked so before this step, in which case if shouldCloseConnection() returns
-      // false, the stream info value shouldn't be overridden.
-      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
-    }
-  } else {
-    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(
-        HeaderUtility::shouldCloseConnection(protocol, *request_headers_));
+  if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
+    // Only mark the connection to be closed if the request indicates so. The connection might
+    // already be marked so before this step, in which case if shouldCloseConnection() returns
+    // false, the stream info value shouldn't be overridden.
+    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
   }
 
   filter_manager_.streamInfo().protocol(protocol);
@@ -1763,7 +1776,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
-  if (!filter_manager_.remoteDecodeComplete()) {
+  if (!filter_manager_.decoderObservedEndStream()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }
