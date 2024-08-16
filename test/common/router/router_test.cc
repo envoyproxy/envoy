@@ -12,6 +12,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
@@ -6673,6 +6674,75 @@ TEST_F(RouterTest, OverwriteSchemeWithUpstreamTransportProtocol) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
             callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+}
+
+TEST_F(RouterTest, OrcaLoadReport) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Create LRS endpoint metric reporting config with three metrics.
+  Envoy::Orca::LrsReportMetricNames metric_names;
+  metric_names.push_back("cpu_utilization");
+  metric_names.push_back("named_metrics.good");
+  metric_names.push_back("named_metrics.not-in-report");
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, lrsReportMetricNames())
+      .WillByDefault(Return(makeOptRef<const Envoy::Orca::LrsReportMetricNames>(metric_names)));
+  // Send three metrics, one of which is not in the config.
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"not-in-config", 0.1});
+  orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  auto load_metric_stats_map =
+      cm_.thread_local_cluster_.conn_pool_.host_->loadMetricStats().latch();
+  ASSERT_NE(load_metric_stats_map, nullptr);
+  EXPECT_EQ(load_metric_stats_map->size(), 2);
+  EXPECT_EQ(load_metric_stats_map->at("cpu_utilization").total_metric_value, 0.5);
+  EXPECT_EQ(load_metric_stats_map->at("cpu_utilization").num_requests_with_metric, 1);
+  EXPECT_EQ(load_metric_stats_map->at("named_metrics.good").total_metric_value, 0.7);
+  EXPECT_EQ(load_metric_stats_map->at("named_metrics.good").num_requests_with_metric, 1);
+}
+
+TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Verify that no load metric stats are added when there are no configured metric names.
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  auto load_metric_stats_map =
+      cm_.thread_local_cluster_.conn_pool_.host_->loadMetricStats().latch();
+  ASSERT_EQ(load_metric_stats_map, nullptr);
 }
 
 } // namespace Router

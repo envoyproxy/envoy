@@ -35,6 +35,8 @@
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/orca/orca_load_metrics.h"
+#include "source/common/orca/orca_parser.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
@@ -1568,6 +1570,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     }
   }
 
+  maybeProcessOrcaLoadReport(*headers, upstream_request);
+
   if (grpc_status.has_value()) {
     upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
@@ -1736,6 +1740,8 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
   }
+
+  maybeProcessOrcaLoadReport(*trailers, upstream_request);
 
   onUpstreamComplete(upstream_request);
 
@@ -2098,6 +2104,38 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
     }
   }
   return false;
+}
+
+void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
+                                        UpstreamRequest& upstream_request) {
+  // Process the load report only once, so if response has report in headers,
+  // then don't process it in trailers.
+  if (orca_load_report_received_) {
+    return;
+  }
+  // Check whether we need to send the load report to the LRS or invoke the ORCA
+  // callbacks.
+  auto host = upstream_request.upstreamHost();
+  const bool need_to_send_load_report =
+      (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
+  if (!need_to_send_load_report) {
+    return;
+  }
+
+  absl::StatusOr<xds::data::orca::v3::OrcaLoadReport> orca_load_report =
+      Envoy::Orca::parseOrcaLoadReportHeaders(headers_or_trailers);
+  if (!orca_load_report.ok()) {
+    ENVOY_STREAM_LOG(trace, "Headers don't have orca load report: {}", *callbacks_,
+                     orca_load_report.status().message());
+    return;
+  }
+
+  orca_load_report_received_ = true;
+
+  ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
+                   orca_load_report->DebugString());
+  Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
+      cluster_->lrsReportMetricNames().value(), orca_load_report.value(), host->loadMetricStats());
 }
 
 RetryStatePtr
