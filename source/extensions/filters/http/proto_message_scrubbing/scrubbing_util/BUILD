@@ -29,6 +29,7 @@ envoy_cc_library(
     hdrs = [
         "scrubbing_util.h",
     ],
+    external_deps = ["grpc_transcoding"],
     deps = [
         ":proto_scrubber_interface",
         "//source/common/common:regex_lib",
@@ -48,7 +49,6 @@ envoy_cc_library(
     hdrs = [
         "proto_scrubber.h",
     ],
-    external_deps = ["grpc_transcoding"],
     deps = [
         ":proto_scrubber_interface",
         ":scrubbing_util",

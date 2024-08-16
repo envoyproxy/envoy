@@ -33,11 +33,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoMessageScrubbing {
-namespace {
 
 using ::Envoy::Protobuf::FieldMask;
-using ::Envoy::Protobuf::io::CodedOutputStream;
-using ::Envoy::Protobuf::io::CordOutputStream;
 using ::Envoy::Protobuf::util::JsonParseOptions;
 using ::Envoy::ProtobufUtil::FieldMaskUtil;
 using ::Envoy::ProtobufWkt::Struct;
@@ -50,71 +47,6 @@ using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::FieldCheckerInterface;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::proto_processing_lib::proto_scrubber::UnknownFieldChecker;
-
-absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
-                             const Envoy::ProtobufWkt::Type& type, const TypeHelper& type_helper,
-                             Struct* message_struct) {
-  // Convert from message data to JSON using absl::Cord.
-  auto in_stream = message.CreateCodedInputStreamWrapper();
-  ProtoStreamObjectSource os(&in_stream->Get(), type_helper.Resolver(), type);
-  os.set_max_recursion_depth(kProtoTranslationMaxRecursionDepth);
-
-  CordOutputStream cord_out_stream;
-  CodedOutputStream out_stream(&cord_out_stream);
-  JsonObjectWriter json_object_writer("", &out_stream);
-
-  if (!os.WriteTo(&json_object_writer).ok()) {
-    return absl::InternalError("Failed to write to JSON object writer.");
-  }
-  out_stream.Trim();
-
-  // Convert from JSON (in absl::Cord) to Struct.
-  JsonParseOptions options;
-  auto status = Protobuf::util::JsonStringToMessage(cord_out_stream.Consume().Flatten(),
-                                                    message_struct, options);
-  if (!status.ok()) {
-    return absl::InternalError(
-        absl::StrCat("Failed to parse Struct from formatted JSON of '", type.name(), "' message."));
-  }
-
-  (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
-      google::protobuf::util::converter::GetFullTypeWithUrl(type.name()));
-  return absl::OkStatus();
-}
-
-bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
-                   const Envoy::ProtobufWkt::Type& type, const TypeHelper& type_helper,
-                   Protobuf::field_extraction::MessageData* message,
-                   Envoy::ProtobufWkt::Struct* message_struct) {
-  message_struct->Clear();
-
-  // When scrubber or message is nullptr, it indicates that there's nothing to
-  // scrub and the whole message should be filtered.
-  if (scrubber == nullptr || message == nullptr) {
-    return false;
-  }
-
-  // Scrub the message.
-  absl::Status status = scrubber->Scrub(message);
-  if (!status.ok()) {
-    LOG(WARNING) << "Failed to scrub " << type.name()
-                 << "proto for cloud audit logging: " << status.ToString();
-    return false;
-  }
-
-  // Convert the scrubbed message to proto.
-  status = ConvertToStruct(*message, type, type_helper, message_struct);
-  if (!status.ok()) {
-    LOG(WARNING) << "Failed to convert " << type.name()
-                 << " proto to google.protobuf.Struct for cloud "
-                    "audit logging: "
-                 << status.ToString();
-    return false;
-  }
-
-  return !IsEmptyStruct(*message_struct);
-}
-} // namespace
 
 const google::protobuf::FieldMask&
 ProtoScrubber::FindWithDefault(ScrubbedMessageDirective directive) {

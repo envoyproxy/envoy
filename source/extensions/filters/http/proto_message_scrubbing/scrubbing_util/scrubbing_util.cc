@@ -22,6 +22,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
+#include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/field_extractor/field_extractor.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
@@ -49,6 +50,7 @@ using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::FieldExtractor;
 using ::Envoy::Protobuf::internal::WireFormatLite;
 using ::Envoy::Protobuf::io::CodedInputStream;
+using ::Envoy::Protobuf::io::CodedOutputStream;
 using ::Envoy::Protobuf::io::CordOutputStream;
 using ::Envoy::Protobuf::util::JsonParseOptions;
 using ::Envoy::Protobuf::util::TypeResolver;
@@ -57,6 +59,7 @@ using ::Envoy::Protobuf::util::converter::JsonObjectWriter;
 using ::Envoy::Protobuf::util::converter::ProtoStreamObjectSource;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::ProtobufWkt::Value;
+using ::google::grpc::transcoding::TypeHelper;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 
 std::string kLocationRegionExtractorPattern = R"((?:^|/)(?:locations|regions)/([^/]+))";
@@ -269,7 +272,6 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
     for (int i = 0; i < repeated_values->size(); ++i) {
       Value* value = repeated_values->Mutable(i);
       if (!value->has_struct_value()) {
-        LOG(ERROR) << "Cannot redact non-message-type field: " << field;
         return;
       }
       RedactPath(path_begin, path_end, value->mutable_struct_value());
@@ -290,8 +292,6 @@ void RedactPaths(absl::Span<const std::string> paths_to_redact, Struct* proto_st
   for (const std::string& path : paths_to_redact) {
     std::vector<std::string> path_pieces = absl::StrSplit(path, '.', absl::SkipEmpty());
     if (path_pieces.size() >= kMaxRedactedPathDepth) {
-      LOG(ERROR) << "Attempting to redact path with depth >= " << kMaxRedactedPathDepth << ": "
-                 << path;
       return;
     }
     RedactPath(path_pieces.begin(), path_pieces.end(), proto_struct);
@@ -308,7 +308,7 @@ absl::StatusOr<std::string> FindSingularLastValue(const Field* field,
   while (FieldExtractor::SearchField(*field, input_stream)) {
     if (input_stream->CurrentPosition() == position) {
       return absl::InvalidArgumentError(
-          "The request message is malformed with endless values for a single field.");
+          "Malformed request with endless values for a single field.");
     }
     position = input_stream->CurrentPosition();
     if (field->kind() == Field::TYPE_STRING) {
@@ -425,6 +425,67 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
   return field_extractor.ExtractFieldInfo<int64_t>(path, msg.CreateCodedInputStreamWrapper()->Get(),
                                                    extract_func);
 }
+
+absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
+                             const Envoy::ProtobufWkt::Type& type,
+                             const ::google::grpc::transcoding::TypeHelper& type_helper,
+                             Struct* message_struct) {
+  // Convert from message data to JSON using absl::Cord.
+  auto in_stream = message.CreateCodedInputStreamWrapper();
+  ProtoStreamObjectSource os(&in_stream->Get(), type_helper.Resolver(), type);
+  os.set_max_recursion_depth(kProtoTranslationMaxRecursionDepth);
+
+  CordOutputStream cord_out_stream;
+  CodedOutputStream out_stream(&cord_out_stream);
+  JsonObjectWriter json_object_writer("", &out_stream);
+
+  if (!os.WriteTo(&json_object_writer).ok()) {
+    return absl::InternalError("Failed to write to JSON object writer.");
+  }
+  out_stream.Trim();
+
+  // Convert from JSON (in absl::Cord) to Struct.
+  JsonParseOptions options;
+  auto status = Protobuf::util::JsonStringToMessage(cord_out_stream.Consume().Flatten(),
+                                                    message_struct, options);
+  if (!status.ok()) {
+    return absl::InternalError(
+        absl::StrCat("Failed to parse Struct from formatted JSON of '", type.name(), "' message."));
+  }
+
+  (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
+      google::protobuf::util::converter::GetFullTypeWithUrl(type.name()));
+  return absl::OkStatus();
+}
+
+bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
+                   const Envoy::ProtobufWkt::Type& type,
+                   const ::google::grpc::transcoding::TypeHelper& type_helper,
+                   Protobuf::field_extraction::MessageData* message,
+                   Envoy::ProtobufWkt::Struct* message_struct) {
+  message_struct->Clear();
+
+  // When scrubber or message is nullptr, it indicates that there's nothing to
+  // scrub and the whole message should be filtered.
+  if (scrubber == nullptr || message == nullptr) {
+    return false;
+  }
+
+  // Scrub the message.
+  absl::Status status = scrubber->Scrub(message);
+  if (!status.ok()) {
+    return false;
+  }
+
+  // Convert the scrubbed message to proto.
+  status = ConvertToStruct(*message, type, type_helper, message_struct);
+  if (!status.ok()) {
+    return false;
+  }
+
+  return !IsEmptyStruct(*message_struct);
+}
+
 } // namespace ProtoMessageScrubbing
 } // namespace HttpFilters
 } // namespace Extensions

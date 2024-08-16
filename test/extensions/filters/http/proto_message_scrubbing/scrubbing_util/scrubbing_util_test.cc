@@ -698,7 +698,7 @@ TEST_F(ScrubbingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST(StructUtilTest, RedactPaths_Basic) {
+TEST(ScrubUtilTest, RedactPaths_Basic) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"nested\""
                                     "  value {"
@@ -743,7 +743,7 @@ TEST(StructUtilTest, RedactPaths_Basic) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
 
-TEST(StructUtilTest, RedactPaths_HandlesOneOfFields) {
+TEST(ScrubUtilTest, RedactPaths_HandlesOneOfFields) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"nested_value\""
                                     "  value {"
@@ -774,7 +774,7 @@ TEST(StructUtilTest, RedactPaths_HandlesOneOfFields) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
 
-TEST(StructUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
+TEST(ScrubUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"repeated_message_field\""
                                     "  value {"
@@ -826,7 +826,7 @@ TEST(StructUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
 
-TEST(StructUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
+TEST(ScrubUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"repeated_message_field\""
                                     "  value {"

@@ -18,6 +18,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "google/api/monitored_resource.pb.h"
+#include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/field_extractor/field_extractor.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
@@ -124,6 +125,17 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
                           std::function<const Protobuf::Type*(const std::string&)> type_finder,
                           const std::string& path,
                           const Protobuf::field_extraction::MessageData& message);
+
+absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
+                             const Envoy::ProtobufWkt::Type& type,
+                             const ::google::grpc::transcoding::TypeHelper& type_helper,
+                             ::Envoy::ProtobufWkt::Struct* message_struct);
+
+bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
+                   const Envoy::ProtobufWkt::Type& type,
+                   const ::google::grpc::transcoding::TypeHelper& type_helper,
+                   Protobuf::field_extraction::MessageData* message,
+                   Envoy::ProtobufWkt::Struct* message_struct);
 
 } // namespace ProtoMessageScrubbing
 } // namespace HttpFilters

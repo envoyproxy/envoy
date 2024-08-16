@@ -1622,7 +1622,7 @@ scrubbing_by_method: {
 
 using FilterTestPassThrough = FilterTestBase;
 
-TEST_F(FilterTestPassThrough, NotGrpc) {
+TEST_F(FilterTestPassThrough, RequestNotGrpc) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1631,6 +1631,15 @@ TEST_F(FilterTestPassThrough, NotGrpc) {
 
   // Pass through headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+}
+
+TEST_F(FilterTestPassThrough, ResponseNotGrpc) {
+  setUp();
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers =
+      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
+
+  // Pass through headers directly.
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(resp_headers, true));
 }
 
 TEST_F(FilterTestPassThrough, PathNotExist) {
