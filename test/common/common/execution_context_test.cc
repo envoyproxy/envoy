@@ -98,13 +98,13 @@ TEST(ExecutionContextTest, NoopScope) {
 TEST(ExecutionContextTest, FilterScope) {
   TestExecutionContext context;
 
-  Http::FilterContext outer_filter_context{"outer_filter", "outer_filter"};
+  Http::FilterContext outer_filter_context{"outer_filter"};
   ExecutionScope outer_scope = ExecutionContext::makeScopeForFilter(&context, outer_filter_context);
   EXPECT_TRUE(outer_scope.hasExitCallback());
   EXPECT_EQ(current_filter_context, &outer_filter_context);
 
   {
-    Http::FilterContext inner_filter_context{"inner_filter", "inner_filter"};
+    Http::FilterContext inner_filter_context{"inner_filter"};
     ExecutionScope inner_scope =
         ExecutionContext::makeScopeForFilter(&context, inner_filter_context);
     EXPECT_TRUE(inner_scope.hasExitCallback());
