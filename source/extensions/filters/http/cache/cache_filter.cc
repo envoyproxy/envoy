@@ -550,10 +550,12 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
   insert_status_ = InsertStatus::NoInsertCacheHit;
 
   lookup_result_->headers_->setStatus(static_cast<uint64_t>(Envoy::Http::Code::PartialContent));
-  lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
-                                    absl::StrCat("bytes ", ranges[0].begin(), "-",
-                                                 ranges[0].end() - 1, "/",
-                                                 lookup_result_->content_length_.value()));
+  lookup_result_->headers_->addCopy(
+      Envoy::Http::Headers::get().ContentRange,
+      absl::StrCat("bytes ", ranges[0].begin(), "-", ranges[0].end() - 1, "/",
+                   lookup_result_->content_length_.has_value()
+                       ? absl::StrCat(lookup_result_->content_length_.value())
+                       : "*"));
   // We serve only the desired range, so adjust the length
   // accordingly.
   lookup_result_->setContentLength(ranges[0].length());
