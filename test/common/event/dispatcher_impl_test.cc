@@ -604,6 +604,7 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
       // the alarm interval, and if the scope is tracked correctly this will
       // result in a dumpState call.
       EXPECT_CALL(scope, dumpState(_, _));
+      EXPECT_CALL(scope, executionContext());
       Thread::LockGuard lock(mu_);
       timer = dispatcher_->createTimer([this]() {
         {

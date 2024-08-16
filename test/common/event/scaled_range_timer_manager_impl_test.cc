@@ -20,6 +20,7 @@ namespace {
 using testing::ElementsAre;
 using testing::InSequence;
 using testing::MockFunction;
+using testing::Return;
 
 class ScopeTrackingDispatcher : public WrappedDispatcher {
 public:
@@ -299,6 +300,9 @@ TEST_F(ScaledRangeTimerManagerTest, DisableLaterScalingMaxTimer) {
 class ScaledRangeTimerManagerTestWithScope : public ScaledRangeTimerManagerTest,
                                              public testing::WithParamInterface<bool> {
 public:
+  ScaledRangeTimerManagerTestWithScope() {
+    EXPECT_CALL(scope_, executionContext()).WillRepeatedly(Return(nullptr));
+  }
   ScopeTrackedObject* getScope() { return GetParam() ? &scope_ : nullptr; }
   MockScopeTrackedObject scope_;
 };
