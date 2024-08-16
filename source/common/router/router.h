@@ -310,7 +310,7 @@ public:
                                                "envoy.reloadable_features.streaming_shadow")),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
-        upstream_request_started_(false) {}
+        upstream_request_started_(false), orca_load_report_received_(false) {}
 
   ~Filter() override;
 
@@ -561,6 +561,9 @@ private:
   Http::Context& httpContext() { return config_->http_context_; }
   bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                          std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
+  // Process Orca Load Report if necessary (e.g. cluster has lrsReportMetricNames).
+  void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
+                                  UpstreamRequest& upstream_request);
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
@@ -614,6 +617,9 @@ private:
   const bool streaming_shadows_ : 1;
   const bool allow_multiplexed_upstream_half_close_ : 1;
   bool upstream_request_started_ : 1;
+  // Indicate that ORCA report is received to process it only once in either response headers or
+  // trailers.
+  bool orca_load_report_received_ : 1;
 };
 
 class ProdFilter : public Filter {
