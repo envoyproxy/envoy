@@ -36,12 +36,11 @@ message ProcessingMode {
 
   // Control how the request and response bodies are handled
   // When body mutation by external processor is enabled, ext_proc filter will always remove
-  // the content length header in four cases below because content length can not be guaranteed
+  // the content length header in three cases below because content length can not be guaranteed
   // to be set correctly:
   // 1) STREAMED BodySendMode: header processing completes before body mutation comes back.
   // 2) BUFFERED_PARTIAL BodySendMode: body is buffered and could be injected in different phases.
   // 3) BUFFERED BodySendMode + SKIP HeaderSendMode: header processing (e.g., update content-length) is skipped.
-  // 4) STREAMED_NO_HEADER_WAIT BodySendMode: header processing completes before body processing.
   //
   // In Envoy's http1 codec implementation, removing content length will enable chunked transfer
   // encoding whenever feasible. The recipient (either client or server) must be able
@@ -56,8 +55,8 @@ message ProcessingMode {
     // Do not send the body at all. This is the default.
     NONE = 0;
 
-    // Stream the body to the server in pieces as they arrive at the proxy
-    // after Envoy has received header response from the ext_proc server.
+    // Stream the body to the server in pieces as they arrive at the
+    // proxy.
     STREAMED = 1;
 
     // Buffer the message body in memory and send the entire body at once.
@@ -69,11 +68,6 @@ message ProcessingMode {
     // chunk. If the body exceeds the configured buffer limit, then the body contents
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
-
-    // [#not-implemented-hide:]
-    // Stream the body to the server in pieces as they arrive at the proxy
-    // without waiting for header response from the ext_proc server.
-    STREAMED_NO_HEADER_WAIT = 4;
   }
 
   // How to handle the request header. Default is "SEND".
