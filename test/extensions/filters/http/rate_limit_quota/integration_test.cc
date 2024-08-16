@@ -1031,9 +1031,10 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
         ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
         rlqs_stream_->startGrpcStream();
       } else {
-        // 3rd request won't start gRPC stream again since it is kept open.
+        // 3rd request won't start gRPC stream again since it is kept open and the usage will be
+        // aggregated instead of spawning an immediate report.
         envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+        ASSERT_FALSE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       }
 
       // Build the response.

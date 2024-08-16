@@ -41,13 +41,16 @@ struct Bucket {
   // RLQS server.
   BucketId bucket_id;
   // Cached action from the response that was received from the RLQS server.
-  BucketAction bucket_action;
+  absl::optional<BucketAction> cached_action = absl::nullopt;
+  BucketAction default_action;
   // Cache quota usage.
   QuotaUsage quota_usage;
   // Rate limiter based on token bucket algorithm.
   TokenBucketPtr token_bucket_limiter;
   // First assignment time.
-  Envoy::MonotonicTime first_assignment_time = {};
+  Envoy::MonotonicTime first_assignment_time;
+  // Most recent assignment time.
+  Envoy::MonotonicTime current_assignment_time;
 };
 
 using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;
