@@ -78,9 +78,13 @@ ActiveQuicListener::ActiveQuicListener(
       socklen_t optlen = sizeof(optval);
       if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
         listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
+#ifndef __APPLE__
+        // Linux dual-stack sockets require setting IP_RECVTOS separately. Apple
+        // sockets will return an error.
         if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
           listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
         }
+#endif // __APPLE__
       } else {
         listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
       }
