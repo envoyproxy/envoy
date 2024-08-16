@@ -36,7 +36,6 @@ TEST_F(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
 }
 
 TEST_F(ScopeTrackerScopeStateTest, ExecutionContextEnabled) {
-  enableExecutionContext();
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopeTrackedObject tracked_object;

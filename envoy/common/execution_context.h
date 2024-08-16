@@ -98,8 +98,9 @@ protected:
   // Called when the current thread stops running code on behalf of the owner of this object.
   // protected because it should only be called by ScopedExecutionContext.
   virtual void deactivate() PURE;
-
+  // Creates a scope in which |span| is active.
   virtual ExecutionScope scopeForSpan(Envoy::Tracing::Span& span) PURE;
+  // Creates a scope in which a filter with |filter_context| is active.
   virtual ExecutionScope scopeForFilter(const Http::FilterContext& filter_context) PURE;
 
   friend class ScopedExecutionContext;

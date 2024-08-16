@@ -76,6 +76,10 @@ public:
 protected:
   void activate() override {}
   void deactivate() override {}
+  ExecutionScope scopeForSpan(Envoy::Tracing::Span&) override { return ExecutionScope(); }
+  ExecutionScope scopeForFilter(const Envoy::Http::FilterContext&) override {
+    return ExecutionScope();
+  }
 };
 
 TEST(RawBufferSocket, TestBasics) {
@@ -352,6 +356,7 @@ TEST_P(ConnectionImplTest, SetGetExecutionContextFilterState) {
   setUpBasicConnection();
   connect();
 
+  enableExecutionContext();
   EXPECT_EQ(getConnectionExecutionContext(*client_connection_), nullptr);
 
   const StreamInfo::FilterStateSharedPtr& filter_state =
