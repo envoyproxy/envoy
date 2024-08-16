@@ -103,7 +103,7 @@ private:
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
   }
 
-  // Get the statuscode to return when a selected bucket has an expired
+  // Get the FilterHeadersStatus to return when a selected bucket has an expired
   // assignment. Note: this does not actually remove the expired entity from the
   // cache.
   Http::FilterHeadersStatus processExpiredBucket(size_t bucket_id,
