@@ -4,6 +4,8 @@
 
 #include <memory>
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace JNI {
 
@@ -119,6 +121,16 @@ class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
 
+  struct Method {
+    absl::string_view name_;
+    absl::string_view signature_;
+  };
+
+  struct Field {
+    absl::string_view name_;
+    absl::string_view signature_;
+  };
+
   /** Gets the JNI version supported. */
   static jint getVersion();
 
@@ -129,7 +141,8 @@ public:
   static void finalize();
 
   /**
-   * Adds the `jclass` object into a cache. This function is typically called inside `JNI_OnLoad`.
+   * Adds the `jclass`, `jmethodID`, and `jfieldID` objects into a cache. This function is typically
+   * called inside `JNI_OnLoad`.
    *
    * Caching the `jclass` can be useful for performance.
    * See https://developer.android.com/training/articles/perf-jni#jclass,-jmethodid,-and-jfieldid
@@ -144,7 +157,9 @@ public:
    * See
    * https://developer.android.com/training/articles/perf-jni#faq:-why-didnt-findclass-find-my-class
    */
-  static void addClassToCache(const char* class_name);
+  static void addToCache(absl::string_view class_name, const std::vector<Method>& methods,
+                         const std::vector<Method>& static_methods,
+                         const std::vector<Field>& fields, const std::vector<Field>& static_fields);
 
   /** Gets the `JavaVM`. The `initialize(JavaVM*) must be called first. */
   static JavaVM* getJavaVm();
@@ -175,11 +190,25 @@ public:
   jfieldID getFieldId(jclass clazz, const char* name, const char* signature);
 
   /**
+   * Gets the field ID for an instance field of a class from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getfieldid
+   */
+  jfieldID getFieldIdFromCache(jclass clazz, const char* name, const char* signature);
+
+  /**
    * Gets the field ID for a static field of a class.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticfieldid
    */
   jfieldID getStaticFieldId(jclass clazz, const char* name, const char* signature);
+
+  /**
+   * Gets the field ID for a static field of a class from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticfieldid
+   */
+  jfieldID getStaticFieldIdFromCache(jclass clazz, const char* name, const char* signature);
 
   /** A macro to create `Call<Type>Method` helper function. */
 #define DECLARE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                     \
@@ -214,6 +243,13 @@ public:
   jmethodID getMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
+   * Gets the object method with the given signature from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getmethodid
+   */
+  jmethodID getMethodIdFromCache(jclass clazz, const char* name, const char* signature);
+
+  /**
    * Gets the static method with the given signature.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticmethodid
@@ -221,11 +257,18 @@ public:
   jmethodID getStaticMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
+   * Gets the static method with the given signature from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticmethodid
+   */
+  jmethodID getStaticMethodIdFromCache(jclass clazz, const char* name, const char* signature);
+
+  /**
    * Finds the given `class_name` using from the cache.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
    */
-  [[nodiscard]] jclass findClass(const char* class_name);
+  [[nodiscard]] jclass findClassFromCache(const char* class_name);
 
   /**
    * Returns the class of a given `object`.
