@@ -208,5 +208,10 @@ new_features:
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: filter state
+  change: |
+    Added a special generic string object factory with hashing interface in filter state with key ``envoy.hashable_string``
+    which is to be used when unique upstream connection needs to be picked based on the hash of the value of filter state being shared.
+    See :ref:`the well-known filter state keys <well_known_filter_state>` for more detail.
 
 deprecated:
