@@ -1,3 +1,5 @@
+#include <openssl/x509.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -207,6 +209,25 @@ TEST(UtilityTest, TestGetX509ErrorInfo) {
   EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
             "X509_verify_cert: certificate verification error at depth 0: unknown certificate "
             "verification error");
+}
+
+TEST(UtilityTest, TestMapX509Stack) {
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_chain.pem"));
+
+  std::vector<std::string> expected_subject{
+      "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San "
+      "Francisco,ST=California,C=US",
+      "CN=Test Intermediate CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,"
+      "ST=California,C=US"};
+  auto func = [](X509& cert) -> std::string { return Utility::getSubjectFromCertificate(cert); };
+  EXPECT_EQ(expected_subject, Utility::mapX509Stack(*cert_chain, func));
+
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*sk_X509_new_null(), func), "x509 stack is empty or NULL");
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "field_extractor is nullptr");
+  bssl::UniquePtr<STACK_OF(X509)> fakeCertChain(sk_X509_new_null());
+  sk_X509_push(fakeCertChain.get(), nullptr);
+  EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fakeCertChain, func));
 }
 
 } // namespace
