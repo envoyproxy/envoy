@@ -203,7 +203,6 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
 
   if (local_addr != nullptr) {
-    ENVOY_LOG_MISC(error, "==> AAB local_addr={}", local_addr->asString());
     connection_socket->bind(local_addr);
     ASSERT(local_addr->ip());
   }
@@ -213,7 +212,6 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
                    errorDetails(result.errno_));
     return connection_socket;
   }
-  ENVOY_LOG_MISC(error, "==> AAB connect success to {}", peer_addr->asString());
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,

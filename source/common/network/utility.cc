@@ -97,10 +97,6 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
   auto reservation = buffer->reserveSingleSlice(max_rx_datagram_size);
   Buffer::RawSlice slice = reservation.slice();
   Api::IoCallUint64Result result = handle.recvmsg(&slice, 1, local_address.ip()->port(), output);
-  if (result.err_ != nullptr)
-    ENVOY_LOG_MISC(error, "==> AAB recvmsg ERROR");
-  else
-    ENVOY_LOG_MISC(error, "==> AAB recvmsg NO ERROR");
 
   if (result.ok()) {
     reservation.commit(std::min(max_rx_datagram_size, result.return_value_));
@@ -786,8 +782,6 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
         &packets_dropped, apply_read_limit_differently ? &num_packets_processed : nullptr);
 
     if (!result.ok()) {
-      ENVOY_LOG_MISC(error, "==> AAB readFromSocket() not ok: {}, {}",
-                     static_cast<int>(result.err_->getErrorCode()), result.err_->getErrorDetails());
       // No more to read or encountered a system error.
       return std::move(result.err_);
     }

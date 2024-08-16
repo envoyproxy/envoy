@@ -24,8 +24,6 @@ namespace Api {
 
 SysCallIntResult OsSysCallsImpl::bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
   const int rc = ::bind(sockfd, addr, addrlen);
-  std::cerr << "==========>>> AAB real bind() called on OS, rc = " << rc << ", errno=" << errno
-            << std::endl;
   return {rc, rc != -1 ? 0 : errno};
 }
 
@@ -79,8 +77,6 @@ SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t leng
 
 SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) {
   const ssize_t rc = ::recvmsg(sockfd, msg, flags);
-  std::cerr << "==========>>> AAB real recvmsg() called on OS, rc = " << rc << ", errno=" << errno
-            << std::endl;
   return {rc, rc != -1 ? 0 : errno};
 }
 
@@ -88,8 +84,6 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
                                           int flags, struct timespec* timeout) {
 #if ENVOY_MMSG_MORE
   const int rc = ::recvmmsg(sockfd, msgvec, vlen, flags, timeout);
-  std::cerr << "==========>>> AAB real recvmmsg() called on OS, rc = " << rc << ", errno=" << errno
-            << std::endl;
   return {rc, errno};
 #else
   UNREFERENCED_PARAMETER(sockfd);
@@ -270,8 +264,6 @@ SysCallIntResult OsSysCallsImpl::setsocketblocking(os_fd_t sockfd, bool blocking
 
 SysCallIntResult OsSysCallsImpl::connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
   const int rc = ::connect(sockfd, addr, addrlen);
-  std::cerr << "==========>>> AAB real connect() called on OS, rc = " << rc << ", errno=" << errno
-            << std::endl;
   return {rc, rc != -1 ? 0 : errno};
 }
 

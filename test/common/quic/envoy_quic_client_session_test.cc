@@ -99,7 +99,7 @@ public:
         self_addr_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
             54321)),
-        peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
+        peer_socket_(createUnconnectedSocket(self_addr_, peer_addr_)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
@@ -157,6 +157,19 @@ public:
       envoy_quic_session_->close(Network::ConnectionCloseType::NoFlush);
     }
     peer_socket_->close();
+  }
+
+  Network::ConnectionSocketPtr
+  createUnconnectedSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
+                          Network::Address::InstanceConstSharedPtr& local_addr) {
+    auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+        Network::Socket::Type::Datagram, local_addr, peer_addr,
+        Network::SocketCreationOptions{false, 0});
+    connection_socket->setDetectedTransportProtocol("quic");
+    ASSERT(connection_socket->isOpen());
+    connection_socket->bind(local_addr);
+    local_addr = connection_socket->connectionInfoProvider().localAddress();
+    return connection_socket;
   }
 
   EnvoyQuicClientStream& sendGetRequest(Http::ResponseDecoder& response_decoder,
