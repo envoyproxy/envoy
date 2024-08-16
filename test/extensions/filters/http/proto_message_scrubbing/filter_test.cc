@@ -1581,6 +1581,46 @@ TEST_F(FilterTestExtractRejected, RequestMisformedGrpcPath) {
             filter_->decodeHeaders(req_headers, false));
 }
 
+TEST_F(FilterTestExtractRejected, NothingToExtract) {
+  setUp(R"pb(
+mode: FIRST_AND_LAST
+scrubbing_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKeyInStream"
+  value: {}
+}
+    )pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest("");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse("");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+
+  // No data modification.
+  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
+}
+
 using FilterTestPassThrough = FilterTestBase;
 
 TEST_F(FilterTestPassThrough, NotGrpc) {

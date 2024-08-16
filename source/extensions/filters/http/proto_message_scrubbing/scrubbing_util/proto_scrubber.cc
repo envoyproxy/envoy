@@ -142,9 +142,7 @@ ProtoScrubber::ProtoScrubber(ScrubberContext scrubber_context, const TypeHelper*
   type_finder_ = [&](const std::string& type_url) {
     const Type* result = nullptr;
     absl::StatusOr<const Type*> type = type_helper_->Info()->GetTypeByTypeUrl(type_url);
-    if (!type.ok()) {
-      LOG(WARNING) << "Failed to find Type for type url: " << type_url;
-    } else {
+    if (type.ok()) {
       result = *type;
     }
     return result;
@@ -265,32 +263,6 @@ void ProtoScrubber::GetTargetResourceOrTargetResourceCallback(
     scrubbed_message_metadata->target_resource_callback.emplace(*status_or_target_resource);
   } else {
     scrubbed_message_metadata->target_resource.emplace(*status_or_target_resource);
-  }
-
-  MaybePopulateResourceLocation(field_mask.paths(0), message, scrubbed_message_metadata);
-}
-
-void ProtoScrubber::MaybePopulateResourceLocation(
-    absl::string_view resource_selector, const Protobuf::field_extraction::MessageData& raw_message,
-    ScrubbedMessageMetadata* result) const {
-  if (target_resource_location_selector_.empty()) {
-    return;
-  }
-
-  absl::StatusOr<std::string> extracted_resource_location = ExtractStringFieldValue(
-      *message_type_, type_finder_, target_resource_location_selector_, raw_message);
-
-  if (!extracted_resource_location.ok()) {
-    LOG(ERROR) << "Unable to extract resource location: " << extracted_resource_location.status();
-  } else if (target_resource_location_selector_ == resource_selector) {
-    // Resource location is in the same field as the resource name - need to
-    // extract it.
-    absl::string_view location_id = ExtractLocationIdFromResourceName(*extracted_resource_location);
-    if (!location_id.empty()) {
-      result->resource_location = location_id;
-    }
-  } else {
-    result->resource_location = *extracted_resource_location;
   }
 }
 

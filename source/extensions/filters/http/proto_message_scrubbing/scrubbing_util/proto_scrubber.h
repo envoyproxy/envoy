@@ -47,12 +47,6 @@ private:
       const Protobuf::FieldMask& field_mask, const Protobuf::field_extraction::MessageData& message,
       bool callback, ScrubbedMessageMetadata* scrubbed_message_metadata) const;
 
-  // Maybe populates the provided `result.resource_location` field with
-  // extracted target resource location value.
-  void MaybePopulateResourceLocation(absl::string_view resource_selector,
-                                     const Protobuf::field_extraction::MessageData& raw_message,
-                                     ScrubbedMessageMetadata* result) const;
-
   // Function to get the value associated with a key
   const ProtobufWkt::FieldMask& FindWithDefault(ScrubbedMessageDirective directive);
 

@@ -56,9 +56,6 @@ const char kRcDetailFilterProtoMessageScrubbing[] = "proto_message_scrubbing";
 
 const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
 
-const char kRcDetailErrorRequestProtoMessageScrubbingFailed[] =
-    "REQUEST_PROTO_MESSAGE_SCRUBBING_FAILED";
-
 const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
 
 const char kRcDetailErrorResponseOutOfData[] = "RESPONSE_OUT_OF_DATA";
@@ -221,12 +218,6 @@ Filter::HandleDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
       ScrubbedMessageResult result = extractor_->GetResult();
 
       if (result.request_data.empty()) {
-        rejectRequest(
-            Status::WellKnownGrpcStatus::InvalidArgument,
-            "did not receive enough data for request scrubbing.",
-            generateRcDetails(kRcDetailFilterProtoMessageScrubbing,
-                              absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
-                              kRcDetailErrorRequestProtoMessageScrubbingFailed));
         return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }
       handleRequestScrubbingResult(result.request_data);
@@ -342,12 +333,6 @@ Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
       ScrubbedMessageResult result = extractor_->GetResult();
 
       if (result.response_data.empty()) {
-        rejectResponse(
-            Status::WellKnownGrpcStatus::InvalidArgument,
-            "did not receive enough data for response scrubbing.",
-            generateRcDetails(kRcDetailFilterProtoMessageScrubbing,
-                              absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
-                              kRcDetailErrorRequestProtoMessageScrubbingFailed));
         return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
       }
       handleResponseScrubbingResult(result.response_data);
