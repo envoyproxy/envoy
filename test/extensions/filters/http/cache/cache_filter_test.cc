@@ -1417,6 +1417,44 @@ TEST_F(CacheFilterDeathTest, BadRangeRequestLookup) {
   }
 }
 
+TEST_F(CacheFilterTest, RangeRequestSatisfiedBeforeLengthKnown) {
+  request_headers_.setHost("RangeRequestSatisfiedBeforeLengthKnown");
+  std::string body = "abcde";
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    // LookupResult with unknown length and an unsatisfiable RangeDetails is invalid.
+    cb(LookupResult{CacheEntryStatus::Ok,
+                    std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                    absl::nullopt,
+                    RangeDetails{/*satisfiable_ = */ true, {AdjustedByteRange{0, 5}}}},
+       false);
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](AdjustedByteRange, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>(body), false);
+      });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
+    response_headers_ = {{":status", "206"}, {"content-range", "bytes 0-4/*"}};
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false))
+        .Times(testing::AnyNumber());
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=-5");
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+}
+
 TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
   request_headers_.setHost("StreamTimeoutDuringLookup");
   {

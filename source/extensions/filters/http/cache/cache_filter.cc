@@ -464,12 +464,19 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body, bool end_stream) {
       ? decoder_callbacks_->encodeData(*body, end_stream)
       : encoder_callbacks_->addEncodedData(*body, true);
 
-  if (!remaining_ranges_.empty()) {
-    getBody();
-  } else if (!end_stream) {
-    getTrailers();
-  } else {
+  if (end_stream) {
     finalizeEncodingCachedResponse();
+  } else if (!remaining_ranges_.empty()) {
+    getBody();
+  } else if (lookup_result_->range_details_.has_value()) {
+    // If a range was requested we don't send trailers.
+    // (It is unclear from the spec whether we should, but pragmatically we
+    // don't have any indication of whether trailers are present or not, and
+    // range requests in general are for filling in missing chunks so including
+    // trailers with every chunk would be wasteful.)
+    finalizeEncodingCachedResponse();
+  } else {
+    getTrailers();
   }
 }
 
