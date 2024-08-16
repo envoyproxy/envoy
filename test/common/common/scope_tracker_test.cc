@@ -14,19 +14,14 @@ namespace Envoy {
 
 using testing::_;
 
-class ScopeTrackerScopeStateTest : public testing::Test {
-protected:
-  void setExecutionContextEnabled(bool enabled) {
-    ScopeTrackerScopeState::executionContextEnabled() = enabled;
-  }
-};
+class ScopeTrackerScopeStateTest : public testing::Test {};
 
 TEST_F(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
-  setExecutionContextEnabled(false);
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopeTrackedObject tracked_object;
   {
+    EXPECT_CALL(tracked_object, executionContext());
     ScopeTrackerScopeState scope(&tracked_object, *dispatcher);
     // Check that the tracked_object is on the tracked object stack
     dispatcher->popTrackedObject(&tracked_object);
@@ -41,7 +36,7 @@ TEST_F(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
 }
 
 TEST_F(ScopeTrackerScopeStateTest, ExecutionContextEnabled) {
-  setExecutionContextEnabled(true);
+  enableExecutionContext();
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopeTrackedObject tracked_object;
