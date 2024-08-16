@@ -12,9 +12,7 @@ envoy_cc_library(
     name = "client_base_interface",
     hdrs = ["client_base.h"],
     tags = ["skip_on_windows"],
-    deps = [
-        "//envoy/common:pure_lib",
-    ],
+    deps = [],
 )
 
 envoy_cc_library(

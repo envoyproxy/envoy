@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include "envoy/common/pure.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
