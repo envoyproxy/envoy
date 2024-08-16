@@ -1593,8 +1593,7 @@ scrubbing_by_method: {
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKey"},
                                {"content-type", "application/grpc"}};
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
-            filter_->decodeHeaders(req_headers, true));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 
   CreateApiKeyRequest request = makeCreateApiKeyRequest("");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
