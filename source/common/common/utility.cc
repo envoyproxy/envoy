@@ -92,7 +92,8 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // A map is used to keep different formatted format strings at a given second.
     absl::node_hash_map<std::string, const Formatted> formatted;
   };
-  static thread_local CachedTime cached_time;
+  static thread_local CachedTime cached_time_utc;
+  static thread_local CachedTime cached_time_local;
 
   const std::chrono::nanoseconds epoch_time_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch());
@@ -100,6 +101,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
 
+  CachedTime& cached_time = local_time_ ? cached_time_local : cached_time_utc;
   const auto& item = cached_time.formatted.find(raw_format_string_);
   if (item == cached_time.formatted.end() ||
       item->second.epoch_time_seconds != epoch_time_seconds) {
@@ -203,7 +205,8 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   specifier_offsets.reserve(specifiers_.size());
   for (const auto& specifier : specifiers_) {
     std::string current_format =
-        absl::FormatTime(specifier.segment_, absl::FromTimeT(time), absl::UTCTimeZone());
+        absl::FormatTime(specifier.segment_, absl::FromTimeT(time),
+                         local_time_ ? absl::LocalTimeZone() : absl::UTCTimeZone());
     absl::StrAppend(&formatted_time, current_format,
                     specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 
@@ -501,16 +504,22 @@ void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
   }
 }
 
-const std::string& getDefaultDateFormat() {
+const std::string& getDefaultDateFormat(bool local_time) {
+  if (local_time) {
+    CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3S%z");
+  }
   CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time, bool local_time) {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
     std::string formatted_time;
   };
-  static thread_local CachedTime cached_time;
+  static thread_local CachedTime cached_time_utc;
+  static thread_local CachedTime cached_time_local;
+
+  CachedTime& cached_time = local_time ? cached_time_local : cached_time_utc;
 
   const std::chrono::milliseconds epoch_time_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch());
@@ -519,14 +528,15 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) 
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
   if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
-    cached_time.formatted_time = absl::FormatTime(
-        getDefaultDateFormat(), absl::FromChrono(system_time), absl::UTCTimeZone());
+    cached_time.formatted_time =
+        absl::FormatTime(getDefaultDateFormat(local_time), absl::FromChrono(system_time),
+                         local_time ? absl::LocalTimeZone() : absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
   } else {
-    // Overwrite the digits in the ".000Z" at the end of the string with the
+    // Overwrite the digits in the ".000Z" or ".000%z" at the end of the string with the
     // millisecond count from the input time.
-    ASSERT(cached_time.formatted_time.length() == 24);
-    size_t offset = cached_time.formatted_time.length() - 4;
+    ASSERT(cached_time.formatted_time.length() >= 23);
+    size_t offset = 20;
     uint32_t msec = epoch_time_ms.count() % 1000;
     cached_time.formatted_time[offset++] = ('0' + (msec / 100));
     msec %= 100;

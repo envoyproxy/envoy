@@ -111,6 +111,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: access_log
+  change: |
+    Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
+    similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
 - area: quic
   change: |
     Added QUIC protocol option :ref:`save_cmsg_config
