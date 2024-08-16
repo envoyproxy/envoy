@@ -3,7 +3,13 @@
 // NOLINT(namespace-envoy)
 
 #ifdef __cplusplus
+#include <atomic>
+
+#define _Atomic(X) std::atomic<X>
+
 extern "C" {
+#else
+#include <stdatomic.h> // NOLINT(modernize-deprecated-headers)
 #endif
 
 #include <stdint.h> // NOLINT(modernize-deprecated-headers)
@@ -27,6 +33,8 @@ typedef struct httpRequest { // NOLINT(modernize-use-using)
   // The ID of the worker that is processing this request, this enables the go filter to dedicate
   // memory to each worker and not require locks
   uint32_t worker_id;
+  // This flag will be read & written by different threads, so it need to be atomic
+  _Atomic(int) is_golang_processing_log;
 } httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)

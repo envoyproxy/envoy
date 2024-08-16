@@ -682,6 +682,7 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
   const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
@@ -851,6 +852,9 @@ public:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override {
+      return parent_->getRequestHostValue(headers);
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
     }
