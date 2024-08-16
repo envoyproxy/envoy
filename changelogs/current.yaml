@@ -19,6 +19,15 @@ behavior_changes:
     HttpConnectionManager to close the connection itself.  Defaults to off ("unsafe" -- check
     \#34356) and is configurable via :ref:`http1_safe_max_connection_duration
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http1_safe_max_connection_duration>`.
+- area: eds
+  change: |
+    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
+    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
+    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
+    Following this change, after a cluster update, Envoy waits for an EDS assignment until
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
+    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
+    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 - area: stats scoped_rds
   change: |
     Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
@@ -70,6 +79,10 @@ bug_fixes:
   change: |
     Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
     ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
+- area: rbac
+  change: |
+    RBAC will now allow stat prefixes configured in per-route config to override the base config's
+    stat prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -168,6 +181,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: access log
+  change: |
+    Added support for :ref:`%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1% <config_access_log_format_response_flags>`,
+    ``%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256``, and ``%DOWNSTREAM_PEER_CHAIN_SERIALS%``, as access log formatters.
 - area: matching
   change: |
     Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
