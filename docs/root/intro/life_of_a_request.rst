@@ -217,7 +217,7 @@ A brief outline of the life cycle of a request and response using the example co
     (2xx) status code. Otherwise the stream is destroyed when the response is complete, even if the
     request has not yet completed. Post-request processing will update stats, write to the access log
     and finalize trace spans.
-    
+
 We elaborate on each of these steps in the sections below.
 
 1. Listener TCP accept

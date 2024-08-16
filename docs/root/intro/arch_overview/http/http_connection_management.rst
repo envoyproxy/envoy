@@ -38,9 +38,10 @@ understand whether a stream originated on an HTTP/1.1, HTTP/2, or HTTP/3 connect
 
 HTTP lifecycle
 --------------
+
 Proxying of the request begins when the downstream HTTP codec has successfully decoded request header map.
 
-The point at which the proxying completes and the stream is destroyed depends on the upstream protocol and 
+The point at which the proxying completes and the stream is destroyed depends on the upstream protocol and
 whether the independent half close is enabled.
 
 If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3 protocols the stream
