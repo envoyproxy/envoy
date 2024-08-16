@@ -211,7 +211,14 @@ public:
   // A request may have a range that exceeds the size of the content, in support
   // of a "shared stream" cache entry, where the request may not know the size of
   // the content in advance. In this case the cache should call cb with
-  // end_stream=true when the end of the body is reached.
+  // end_stream=true when the end of the body is reached, if there are no trailers.
+  //
+  // If there are trailers *and* the size of the content was not known when the
+  // LookupContext was created, the cache should pass a null buffer pointer to the
+  // LookupBodyCallback (when getBody is called with a range starting beyond the
+  // end of the actual content-length) to indicate that no more body is available
+  // and the filter should request trailers. It is invalid to pass a null buffer
+  // pointer other than in this case.
   //
   // If a cache happens to load data in fragments of a set size, it may be
   // efficient to respond with fewer than the requested number of bytes. For
