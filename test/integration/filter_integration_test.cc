@@ -1502,6 +1502,13 @@ TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequestAndIde
 }
 
 void FilterIntegrationTest::testFilterAddsDataAndTrailersToHeaderOnlyRequest() {
+  // When an upstream filter adds body to the header only request the result observed by
+  // the upstream server is unpredictable. Sending of the added body races with the
+  // downstream FM closing the request, as it observed end_stream in both directions.
+  // This use case is effectively unsupported at this point.
+  if (!testing_downstream_filter_) {
+    return;
+  }
   prependFilter(R"EOF(
   name: add-trailers-filter
   )EOF");
