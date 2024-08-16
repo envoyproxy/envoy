@@ -110,7 +110,7 @@ ActiveQuicListener::ActiveQuicListener(
   }
 
   if (listener_config.udpListenerConfig()) {
-    const envoy::config::listener::v3::QuicProtocolOptions::SaveCmsgConfig& save_cmsg_config =
+    const envoy::config::core::v3::SocketCmsgHeaders& save_cmsg_config =
         listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config();
     if (save_cmsg_config.has_level()) {
       udp_save_cmsg_config_.level = save_cmsg_config.level().value();

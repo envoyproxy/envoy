@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
+import "envoy/config/core/v3/socket_cmsg_headers.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -28,20 +29,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
-
-  // Configuration for UDP cmsg to pass to listener filters via QuicReceivedPacket.
-  // Both level and type must be specified for cmsg to be saved.
-  // More info about CMSG: https://man7.org/linux/man-pages/man3/cmsg.3.html
-  message SaveCmsgConfig {
-    // cmsg level to save if matched. Default is unset and no cmsg will be saved.
-    google.protobuf.Int32Value level = 1;
-
-    // cmsg type to save if matched. Default is unset and no cmsg will be saved.
-    google.protobuf.Int32Value type = 2;
-
-    // expected size of cmsg value; if not set, cmsg may be truncated or omitted. Default is zero.
-    int32 expected_size = 3;
-  }
 
   core.v3.QuicProtocolOptions quic_protocol_options = 1;
 
@@ -102,6 +89,8 @@ message QuicProtocolOptions {
   core.v3.TypedExtensionConfig connection_debug_visitor_config = 11;
 
   // Configure a type of UDP cmsg to pass to listener filters via QuicReceivedPacket.
+  // Both level and type must be specified for cmsg to be saved.
+  // Cmsg may be truncated or omitted if expected size is not set.
   // If not specified, no cmsg will be saved to QuicReceivedPacket.
-  SaveCmsgConfig save_cmsg_config = 12;
+  core.v3.SocketCmsgHeaders save_cmsg_config = 12;
 }
