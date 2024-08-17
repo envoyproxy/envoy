@@ -279,6 +279,15 @@ message ExternalProcessor {
   // [#not-implemented-hide:]
   // Enables sending body to the side stream server before receives the header response from that server.
   // It only works for STREAMED body processing mode. For any other body processing modes, it is ignored.
+  //
+  // The server has two options upon receiving a header request:
+  // 1. Instant Response: Send the header response as soon as the header request is received.
+  // 2. Delayed Response: Wait for the body before sending any response.
+  // If the server chooses the second option, it has two further choices:
+  // 3. Separate Responses: Send the header response first, followed by separate body responses.
+  // 4. Combined Response: Include both the header response and the first chunk of the body response
+  //    in a single body response message, followed by the remaining body responses.
+  // In all scenarios, the header-body ordering must always be maintained.
   bool streaming_no_header_resp = 21;
 }
 
