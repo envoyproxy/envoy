@@ -16,8 +16,8 @@ TestFormatter::formatValueWithContext(const HttpFormatterContext& context,
   return ValueUtil::stringValue(formatWithContext(context, stream_info).value());
 }
 
-FormatterProviderPtr TestCommandParser::parse(const std::string& command, const std::string&,
-                                              absl::optional<size_t>&) const {
+FormatterProviderPtr TestCommandParser::parse(absl::string_view command, absl::string_view,
+                                              absl::optional<size_t>) const {
   if (command == "COMMAND_EXTENSION") {
     return std::make_unique<TestFormatter>();
   }
@@ -54,8 +54,8 @@ AdditionalFormatter::formatValueWithContext(const HttpFormatterContext& context,
   return ValueUtil::stringValue(formatWithContext(context, stream_info).value());
 }
 
-FormatterProviderPtr AdditionalCommandParser::parse(const std::string& command, const std::string&,
-                                                    absl::optional<size_t>&) const {
+FormatterProviderPtr AdditionalCommandParser::parse(absl::string_view command, absl::string_view,
+                                                    absl::optional<size_t>) const {
   if (command == "ADDITIONAL_EXTENSION") {
     return std::make_unique<AdditionalFormatter>();
   }

@@ -1,13 +1,18 @@
 #pragma once
 
+#include "envoy/server/filter_config.h"
+
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 namespace SessionFilters {
+
+using FilterFactoryCb = Network::UdpSessionFilterFactoryCb;
+using NamedUdpSessionFilterConfigFactory =
+    Server::Configuration::NamedUdpSessionFilterConfigFactory;
 
 template <class ConfigProto> class FactoryBase : public NamedUdpSessionFilterConfigFactory {
 public:
