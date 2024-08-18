@@ -166,6 +166,8 @@ RouterCheckTool RouterCheckTool::createFromBootstrap(const Options& options) {
       RouterCheckTool::extractRouteConfigFromListener(bootstrap_config, options.listener_name);
   if (extracted_route_config.has_value()) {
     route_config = extracted_route_config.value();
+  } else {
+    throw EnvoyException("No route configuration found in listener");
   }
 
   if (bootstrap_config.has_layered_runtime()) {
