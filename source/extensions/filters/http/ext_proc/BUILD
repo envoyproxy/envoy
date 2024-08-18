@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_proc/http_client:client_base_interface",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/strings:string_view",
@@ -52,6 +53,7 @@ envoy_cc_extension(
         ":client_lib",
         ":ext_proc",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -123,6 +125,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/extensions/filters/http/ext_proc/http_client:client_base_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],

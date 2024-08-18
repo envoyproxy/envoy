@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 
 #include "gmock/gmock.h"
 
@@ -9,10 +10,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class MockClient : public ExternalProcessorClient {
+class MockClient : public ExternalProcessorClient,
+                   public ClientBase {
 public:
   MockClient();
   ~MockClient() override;
+  void cancel() override {}
+  void sendRequest() override {}
+
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
               (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
                const Envoy::Http::AsyncClient::StreamOptions&,

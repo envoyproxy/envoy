@@ -244,6 +244,7 @@ envoy_extension_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc:client_interface",
+        "//source/extensions/filters/http/ext_proc/http_client:client_base_interface",
     ],
 )
 

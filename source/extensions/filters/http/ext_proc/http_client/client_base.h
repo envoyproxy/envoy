@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include "envoy/common/pure.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -28,6 +26,8 @@ public:
   virtual void sendRequest() PURE;
   virtual void cancel() PURE;
 };
+
+using ClientBasePtr = std::unique_ptr<ClientBase>;
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

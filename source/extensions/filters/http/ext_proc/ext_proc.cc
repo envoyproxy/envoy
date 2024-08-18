@@ -19,6 +19,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
+using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
@@ -47,6 +48,20 @@ absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config)
   }
   return absl::nullopt;
 }
+
+absl::optional<envoy::config::core::v3::GrpcService>
+getFilterGrpcService(const ExternalProcessor& config) {
+  if (config.has_grpc_service() != config.has_http_service()) {
+    if (config.has_grpc_service()) {
+      return config.grpc_service();
+    }
+  } else {
+    throw EnvoyException("One and only one of grpc_service or http_service must be configured");
+  }
+
+  return absl::nullopt;
+}
+
 
 absl::optional<envoy::config::core::v3::GrpcService>
 initGrpcService(const ExtProcPerRoute& config) {
@@ -177,7 +192,7 @@ ProcessingMode allDisabledMode() {
 } // namespace
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+    const ExternalProcessor& config,
     const std::chrono::milliseconds message_timeout, const uint32_t max_message_timeout_ms,
     Stats::Scope& scope, const std::string& stats_prefix, bool is_upstream,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
@@ -188,6 +203,7 @@ FilterConfig::FilterConfig(
       deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
                                                          DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
       message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+      grpc_service_(getFilterGrpcService(config)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -211,13 +227,12 @@ FilterConfig::FilterConfig(
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
   if (config.disable_clear_route_cache() &&
-      (route_cache_action_ !=
-       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+      (route_cache_action_ != ExternalProcessor::DEFAULT)) {
     throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
                          "be set to none-default at the same time.");
   }
   if (config.disable_clear_route_cache()) {
-    route_cache_action_ = envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
+    route_cache_action_ = ExternalProcessor::RETAIN;
   }
   thread_local_stream_manager_slot_->set(
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
@@ -336,6 +351,11 @@ Filter::StreamOpenState Filter::openStream() {
     ENVOY_LOG(debug, "External processing is completed when trying to open the gRPC stream");
     return StreamOpenState::IgnoreError;
   }
+
+  if (!config().grpcService().has_value()) {
+    return StreamOpenState::Ok;
+  }
+
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
 
@@ -347,7 +367,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(true);
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+        (dynamic_cast<ExternalProcessorClient&>(*client_)).start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called

@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "envoy/http/async_client.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 
 namespace Envoy {
