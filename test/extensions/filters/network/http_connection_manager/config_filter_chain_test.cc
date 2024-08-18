@@ -186,7 +186,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
-  Http::EmptyFilterChainOptions options;
+  const Http::EmptyFilterChainOptions options;
 
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should create an upgrade filter chain for
@@ -237,7 +237,7 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   ASSERT_TRUE(creation_status_.ok());
 
   NiceMock<Http::MockFilterChainManager> manager;
-  Http::EmptyFilterChainOptions options;
+  const Http::EmptyFilterChainOptions options;
 
   // Check the case where WebSockets are off in the HCM, and no router config is present.
   { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, options)); }
@@ -294,7 +294,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  Http::EmptyFilterChainOptions options;
+  const Http::EmptyFilterChainOptions options;
 
   {
     NiceMock<Http::MockFilterChainManager> manager;
