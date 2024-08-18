@@ -54,53 +54,123 @@ private:
 };
 
 /**
+ * Options for Router Check Tool.
+ */
+struct Options {
+  Options();
+  Options(int argc, char** argv);
+
+  Options& setConfigPath(std::string path) {
+    config_path = path;
+    return *this;
+  }
+  Options& setBootstrapConfig(std::string path) {
+    bootstrap_config = path;
+    return *this;
+  }
+  Options& setTestPath(std::string path) {
+    test_path = path;
+    return *this;
+  }
+  Options& setFailUnder(double value) {
+    fail_under = value;
+    return *this;
+  }
+  Options& setComprehensiveCoverage(bool value) {
+    comprehensive_coverage = value;
+    return *this;
+  }
+  Options& setDetailed(bool value) {
+    is_detailed = value;
+    return *this;
+  }
+  Options& setOnlyShowFailures(bool value) {
+    only_show_failures = value;
+    return *this;
+  }
+  Options& setDisableDeprecationCheck(bool value) {
+    disable_deprecation_check = value;
+    return *this;
+  }
+  Options& setDetailedCoverageReport(bool value) {
+    detailed_coverage_report = value;
+    return *this;
+  }
+  Options& setOutputPath(std::string path) {
+    output_path = path;
+    return *this;
+  }
+  Options& setListenerName(std::string listener) {
+    listener_name = listener;
+    return *this;
+  }
+
+  absl::Status validate() const {
+    if (test_path.empty()) {
+      return absl::InvalidArgumentError("test path is required");
+    }
+    if (config_path.empty() && bootstrap_config.empty()) {
+      return absl::InvalidArgumentError("route or bootstrap config are required");
+    }
+    if (!config_path.empty() && !bootstrap_config.empty()) {
+      return absl::InvalidArgumentError("only one of route or bootstrap config is allowed");
+    }
+    if (!bootstrap_config.empty() && listener_name.empty()) {
+      return absl::InvalidArgumentError("listener name is required when using bootstrap config");
+    }
+    return absl::OkStatus();
+  }
+
+  std::string test_path;
+  std::string config_path;
+  std::string bootstrap_config;
+  float fail_under;
+  bool comprehensive_coverage;
+  bool is_detailed;
+  bool only_show_failures;
+  bool disable_deprecation_check;
+  bool detailed_coverage_report;
+  std::string output_path;
+  std::string listener_name;
+};
+
+/**
  * A route table check tool that check whether route parameters returned by a router match
  * what is expected.
  */
 class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
-   * @param router_config_file v2 router config file.
-   * @param disable_deprecation_check flag to disable the RouteConfig deprecated field check
-   * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
-   * config file.
-   * */
-  static RouterCheckTool create(const std::string& router_config_file,
-                                const bool disable_deprecation_check,
-                                const std::string& listener_name);
-
+   * @param options RouterCheckTool options.
+   * @return RouterCheckTool a RouterCheckTool instance
+   */
+  static RouterCheckTool create(const Options& options);
   /**
    * @param expected_route_json tool config json file.
    * @return bool if all routes match what is expected.
    */
-  std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
-  compareEntries(const std::string& expected_routes);
+  std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> compareEntries();
 
-  /**
-   * Set whether to print out match case details.
-   */
-  void setShowDetails() { details_ = true; }
-
-  /**
-   * Set whether to only print failing match cases.
-   */
-  void setOnlyShowFailures() { only_show_failures_ = true; }
-
-  /**
-   * Set whether to print out detailed coverage report.
-   */
-  void setDetailedCoverageReport() { detailed_coverage_report_ = true; }
-
-  float coverage(bool comprehensive_coverage) {
-    return comprehensive_coverage ? coverage_.comprehensiveReport()
-                                  : coverage_.report(detailed_coverage_report_);
+  float coverage() {
+    return options_.detailed_coverage_report ? coverage_.comprehensiveReport()
+                                             : coverage_.report(options_.detailed_coverage_report);
   }
 
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
       std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-      Api::ApiPtr api, Coverage coverage);
+      Api::ApiPtr api, Coverage coverage, Options options);
+
+  /**
+   * Create route check tool from a route typed configuration.
+   */
+  static RouterCheckTool createFromRoute(const Options& options);
+
+  /**
+   * Create route check tool from a bootstrap typed configuration.
+   */
+  static RouterCheckTool createFromBootstrap(const Options& options);
 
   /**
    * Extracts the route configuration from the listener with the given name.
@@ -186,12 +256,6 @@ private:
 
   bool headers_finalized_{false};
 
-  bool details_{false};
-
-  bool only_show_failures_{false};
-
-  bool detailed_coverage_report_{false};
-
   // The first member of each pair is the name of the test.
   // The second member is a list of any failing results for that test as strings.
   std::vector<std::pair<std::string, std::vector<std::string>>> tests_;
@@ -203,75 +267,6 @@ private:
   Api::ApiPtr api_;
   std::string active_runtime_;
   Coverage coverage_;
-};
-
-/**
- * Parses command line arguments for Router Check Tool.
- */
-class Options {
-public:
-  Options(int argc, char** argv);
-
-  /**
-   * @return the path to configuration file.
-   */
-  const std::string& configPath() const { return config_path_; }
-
-  /**
-   * @return the path to test file.
-   */
-  const std::string& testPath() const { return test_path_; }
-
-  /**
-   * @return the minimum required percentage of routes coverage.
-   */
-  double failUnder() const { return fail_under_; }
-
-  /**
-   * @return true if test coverage should be comprehensive.
-   */
-  bool comprehensiveCoverage() const { return comprehensive_coverage_; }
-
-  /**
-   * @return true if detailed test execution results are displayed.
-   */
-  bool isDetailed() const { return is_detailed_; }
-
-  /**
-   * @return true if only test failures are displayed.
-   */
-  bool onlyShowFailures() const { return only_show_failures_; }
-
-  /**
-   * @return true if the deprecated field check for RouteConfiguration is disabled.
-   */
-  bool disableDeprecationCheck() const { return disable_deprecation_check_; }
-
-  /**
-   * @return true if detailed coverage report is displayed.
-   */
-  bool detailedCoverageReport() const { return detailed_coverage_report_; }
-
-  /**
-   * @return the path to save tests results.
-   */
-  const std::string& outputPath() const { return output_path_; }
-
-  /**
-   * @return the name of the listener to use.
-   */
-  const std::string& listenerName() const { return listener_name_; }
-
-private:
-  std::string test_path_;
-  std::string config_path_;
-  float fail_under_;
-  bool comprehensive_coverage_;
-  bool is_detailed_;
-  bool only_show_failures_;
-  bool disable_deprecation_check_;
-  bool detailed_coverage_report_;
-  std::string output_path_;
-  std::string listener_name_;
+  Options options_;
 };
 } // namespace Envoy

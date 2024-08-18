@@ -8,12 +8,19 @@ PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
 # Config json path
 PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
 
-TESTS=("ClusterHeaderBootstrap" "ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
+TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
 
 # Testing expected matches
 for t in "${TESTS[@]}"
 do
-  "${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details" "-l" "main"
+  "${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details"
+done
+
+# Testing bootstrap config
+TESTS=("ClusterHeaderBootstrap")
+for t in "${TESTS[@]}"
+do
+  "${PATH_BIN}" "--bootstrap-config" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details" "-l" "main"
 done
 
 # Testing coverage flag passes
@@ -57,7 +64,7 @@ fi
 echo "testing bad config output"
 BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml" 2>&1) ||
   echo "${BAD_CONFIG_OUTPUT:-no-output}"
-if ! [[ "${BAD_CONFIG_OUTPUT}" =~ .*INVALID_ARGUMENT.*envoy.config.bootstrap.v3.Bootstrap.*tests.* ]]; then
+if ! [[ "${BAD_CONFIG_OUTPUT}" =~ .*INVALID_ARGUMENT.*envoy.config.route.v3.RouteConfiguration.*tests.* ]]; then
   exit 1
 fi
 

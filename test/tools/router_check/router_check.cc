@@ -24,46 +24,32 @@ bool hasFailures(
 int main(int argc, char* argv[]) {
   Envoy::Options options(argc, argv);
 
-  const bool enforce_coverage = options.failUnder() != 0.0;
+  const bool enforce_coverage = options.fail_under != 0.0;
   // We need this to ensure WSAStartup is called on Windows
   Envoy::PlatformImpl platform_impl_;
   // Until we remove v2 API, the tool will warn but not fail.
   Envoy::TestDeprecatedV2Api _deprecated_v2_api;
 
   try {
-    Envoy::RouterCheckTool checktool = Envoy::RouterCheckTool::create(
-        options.configPath(), options.disableDeprecationCheck(), options.listenerName());
-
-    if (options.isDetailed()) {
-      checktool.setShowDetails();
-    }
-
-    if (options.onlyShowFailures()) {
-      checktool.setOnlyShowFailures();
-    }
-
-    if (options.detailedCoverageReport()) {
-      checktool.setDetailedCoverageReport();
-    }
-
+    Envoy::RouterCheckTool checktool = Envoy::RouterCheckTool::create(options);
     const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-        checktool.compareEntries(options.testPath());
-    if (!options.outputPath().empty()) {
+        checktool.compareEntries();
+    if (!options.output_path.empty()) {
       envoy::RouterCheckToolSchema::ValidationResult result;
       *result.mutable_test_results() = {test_results.begin(), test_results.end()};
       Envoy::TestEnvironment::writeStringToFileForTest(
-          options.outputPath(), result.SerializeAsString(), /*fully_qualified_path=*/true);
+          options.output_path, result.SerializeAsString(), /*fully_qualified_path=*/true);
     }
     // Test fails if routes do not match what is expected
     if (hasFailures(test_results)) {
       return EXIT_FAILURE;
     }
 
-    const double current_coverage = checktool.coverage(options.comprehensiveCoverage());
+    const double current_coverage = checktool.coverage();
     std::cout << "Current route coverage: " << current_coverage << "%" << std::endl;
     if (enforce_coverage) {
-      if (current_coverage < options.failUnder()) {
-        std::cerr << "Failed to meet coverage requirement: " << options.failUnder() << "%"
+      if (current_coverage < options.fail_under) {
+        std::cerr << "Failed to meet coverage requirement: " << options.fail_under << "%"
                   << std::endl;
         return EXIT_FAILURE;
       }

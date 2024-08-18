@@ -127,25 +127,43 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_h
       random_value_(random_value) {}
 
 // static
-RouterCheckTool RouterCheckTool::create(const std::string& config_file,
-                                        const bool disable_deprecation_check,
-                                        const std::string& listener_name) {
+RouterCheckTool RouterCheckTool::createFromRoute(const Options& options) {
+  envoy::config::route::v3::RouteConfiguration route_config;
+  auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
+  auto api = Api::createApiForTest(*stats);
+  TestUtility::loadFromFile(options.config_path, route_config, *api);
+  assignUniqueRouteNames(route_config);
+  assignRuntimeFraction(route_config);
+  auto factory_context =
+      std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
+  auto config = *Router::ConfigImpl::create(route_config, *factory_context,
+                                            ProtobufMessage::getNullValidationVisitor(), false);
+  if (!options.disable_deprecation_check) {
+    ProtobufMessage::StrictValidationVisitorImpl visitor;
+    visitor.setRuntime(factory_context->runtime_loader_);
+    MessageUtil::checkForUnexpectedFields(route_config, visitor);
+  }
+
+  return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
+          Coverage(route_config),     std::move(options)};
+}
+
+RouterCheckTool RouterCheckTool::createFromBootstrap(const Options& options) {
+
+  if (options.listener_name.empty()) {
+    throw EnvoyException("No listener name provided");
+  }
   envoy::config::route::v3::RouteConfiguration route_config;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
 
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  try {
-    TestUtility::loadFromFile(config_file, route_config, *api);
-  } catch (const EnvoyException& _) {
-    TestUtility::loadFromFile(config_file, bootstrap_config, *api);
-  }
-
+  TestUtility::loadFromFile(options.bootstrap_config, bootstrap_config, *api);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
 
   auto extracted_route_config =
-      RouterCheckTool::extractRouteConfigFromListener(bootstrap_config, listener_name);
+      RouterCheckTool::extractRouteConfigFromListener(bootstrap_config, options.listener_name);
   if (extracted_route_config.has_value()) {
     route_config = extracted_route_config.value();
   }
@@ -167,14 +185,14 @@ RouterCheckTool RouterCheckTool::create(const std::string& config_file,
   assignRuntimeFraction(route_config);
   auto config = *Router::ConfigImpl::create(route_config, *factory_context,
                                             ProtobufMessage::getNullValidationVisitor(), false);
-  if (!disable_deprecation_check) {
+  if (!options.disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
     MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
   return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
-          Coverage(route_config)};
+          Coverage(route_config),     std::move(options)};
 }
 
 absl::optional<envoy::config::route::v3::RouteConfiguration>
@@ -224,6 +242,19 @@ RouterCheckTool::extractRouteConfigFromListener(
   }
   std::cerr << "No route configuration found in listener" << std::endl;
   return absl::nullopt;
+}
+
+RouterCheckTool RouterCheckTool::create(const Options& options) {
+  absl::Status options_status = options.validate();
+  if (!options_status.ok()) {
+    throw EnvoyException(options_status.ToString());
+  }
+  if (!options.config_path.empty()) {
+    return RouterCheckTool::createFromRoute(options);
+  } else if (!options.bootstrap_config.empty()) {
+    return RouterCheckTool::createFromBootstrap(options);
+  }
+  throw EnvoyException("Must provide either route or bootstrap path");
 }
 
 void RouterCheckTool::assignUniqueRouteNames(
@@ -294,9 +325,10 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
     std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-    Api::ApiPtr api, Coverage coverage)
+    Api::ApiPtr api, Coverage coverage, Options options)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
-      stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
+      stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)),
+      options_(options) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
           featureEnabled(_, testing::An<const envoy::type::v3::FractionalPercent&>(),
                          testing::An<uint64_t>()))
@@ -311,13 +343,12 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
   return Json::Factory::loadFromString(contents);
 }
 
-std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
-RouterCheckTool::compareEntries(const std::string& expected_routes) {
+std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> RouterCheckTool::compareEntries() {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes).value();
-  TestUtility::loadFromFile(expected_routes, validation_config, *api);
+  const std::string contents = api->fileSystem().fileReadToEnd(options_.test_path).value();
+  TestUtility::loadFromFile(options_.test_path, validation_config, *api);
   TestUtility::validate(validation_config);
 
   std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results;
@@ -368,7 +399,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
     if (test_failed) {
       *test_result.mutable_failure() = validation_failure;
     }
-    if (test_failed || !only_show_failures_) {
+    if (test_failed || !options_.only_show_failures) {
       test_results.push_back(test_result);
     }
   }
@@ -672,8 +703,8 @@ void RouterCheckTool::printResults() {
   for (const auto& test_result : tests_) {
     // All test names are printed if the details_ flag is true unless only_show_failures_ is
     // also true.
-    if ((details_ && !only_show_failures_) ||
-        (only_show_failures_ && !test_result.second.empty())) {
+    if ((options_.is_detailed && !options_.only_show_failures) ||
+        (options_.only_show_failures && !test_result.second.empty())) {
       if (test_result.second.empty()) {
         std::cout << test_result.first << std::endl;
       } else {
@@ -695,34 +726,38 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
+Options::Options() = default;
+
 Options::Options(int argc, char** argv) {
   // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
-  TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
-  TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
-                                      false);
-  TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
-                                             "Disable deprecated fields check", cmd, false);
-  TCLAP::ValueArg<double> fail_under("f", "fail-under",
-                                     "Fail if test coverage is under a specified amount", false,
-                                     0.0, "float", cmd);
-  TCLAP::SwitchArg comprehensive_coverage(
+  TCLAP::SwitchArg is_detailed_flag("d", "details", "Show detailed test execution results", cmd,
+                                    false);
+  TCLAP::SwitchArg only_show_failures_flag("", "only-show-failures", "Only display failing tests",
+                                           cmd, false);
+  TCLAP::SwitchArg disable_deprecation_check_flag("", "disable-deprecation-check",
+                                                  "Disable deprecated fields check", cmd, false);
+  TCLAP::ValueArg<double> fail_under_flag("f", "fail-under",
+                                          "Fail if test coverage is under a specified amount",
+                                          false, 0.0, "float", cmd);
+  TCLAP::SwitchArg comprehensive_coverage_flag(
       "", "covall", "Measure coverage by checking all route fields", cmd, false);
-  TCLAP::ValueArg<std::string> config_path("c", "config-path",
-                                           "Path to bootstrap or route configuration file.", false,
-                                           "", "string", cmd);
-  TCLAP::ValueArg<std::string> listener_name(
+  TCLAP::ValueArg<std::string> config_path_flag(
+      "c", "config-path", "Path to route configuration file.", false, "", "string", cmd);
+  TCLAP::ValueArg<std::string> bootstrap_config_flag(
+      "", "bootstrap-config", "Path to bootstrap configuration file.", false, "", "string", cmd);
+  TCLAP::ValueArg<std::string> listener_name_flag(
       "l", "listener-name",
       "Name of the listener to use the route configuration. This is only used if config-path is a "
       "bootstrap configuration.",
       false, "", "string", cmd);
-  TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
-                                         "string", cmd);
-  TCLAP::ValueArg<std::string> output_path(
+  TCLAP::ValueArg<std::string> test_path_flag("t", "test-path", "Path to test file.", false, "",
+                                              "string", cmd);
+  TCLAP::ValueArg<std::string> output_path_flag(
       "o", "output-path", "Path to output file to write test results", false, "", "string", cmd);
-  TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
+  TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs_flag(
       "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
-  TCLAP::SwitchArg detailed_coverage(
+  TCLAP::SwitchArg detailed_coverage_flag(
       "", "detailed-coverage", "Show detailed coverage with routes without tests", cmd, false);
   try {
     cmd.parse(argc, argv);
@@ -731,21 +766,17 @@ Options::Options(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  is_detailed_ = is_detailed.getValue();
-  only_show_failures_ = only_show_failures.getValue();
-  fail_under_ = fail_under.getValue();
-  comprehensive_coverage_ = comprehensive_coverage.getValue();
-  disable_deprecation_check_ = disable_deprecation_check.getValue();
-  detailed_coverage_report_ = detailed_coverage.getValue();
+  is_detailed = is_detailed_flag.getValue();
+  only_show_failures = only_show_failures_flag.getValue();
+  fail_under = fail_under_flag.getValue();
+  comprehensive_coverage = comprehensive_coverage_flag.getValue();
+  disable_deprecation_check = disable_deprecation_check_flag.getValue();
+  detailed_coverage_report = detailed_coverage_flag.getValue();
 
-  config_path_ = config_path.getValue();
-  listener_name_ = listener_name.getValue();
-  test_path_ = test_path.getValue();
-  output_path_ = output_path.getValue();
-  if (config_path_.empty() || test_path_.empty()) {
-    std::cerr << "error: "
-              << "Both --config-path/c and --test-path/t are mandatory" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  config_path = config_path_flag.getValue();
+  bootstrap_config = bootstrap_config_flag.getValue();
+  listener_name = listener_name_flag.getValue();
+  test_path = test_path_flag.getValue();
+  output_path = output_path_flag.getValue();
 }
 } // namespace Envoy

@@ -19,12 +19,11 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
 
-  const std::string listener_name = "";
-  const bool disable_deprecation_check = false;
+  Envoy::Options options;
   RouterCheckTool checktool =
-      RouterCheckTool::create(config_filename_, disable_deprecation_check, listener_name);
+      RouterCheckTool::create(options.setConfigPath(config_filename_).setTestPath(tests_filename_));
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-      checktool.compareEntries(tests_filename_);
+      checktool.compareEntries();
   EXPECT_EQ(test_results.size(), 33);
   for (const auto& test_result : test_results) {
     EXPECT_TRUE(test_result.test_passed());
@@ -38,13 +37,13 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
 
-  const std::string listener_name = "";
-  const bool disable_deprecation_check = false;
-  RouterCheckTool checktool =
-      RouterCheckTool::create(config_filename_, disable_deprecation_check, listener_name);
-  checktool.setOnlyShowFailures();
+  Envoy::Options options;
+  RouterCheckTool checktool = RouterCheckTool::create(options.setConfigPath(config_filename_)
+                                                          .setOnlyShowFailures(true)
+                                                          .setTestPath(tests_filename_));
+
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-      checktool.compareEntries(tests_filename_);
+      checktool.compareEntries();
   EXPECT_EQ(test_results.size(), 0);
 }
 
@@ -54,13 +53,12 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutesFailures.golden.proto.json"));
 
-  const std::string listener_name = "";
-  const bool disable_deprecation_check = false;
-  RouterCheckTool checktool =
-      RouterCheckTool::create(config_filename_, disable_deprecation_check, listener_name);
-  checktool.setOnlyShowFailures();
+  Envoy::Options options;
+  RouterCheckTool checktool = RouterCheckTool::create(options.setConfigPath(config_filename_)
+                                                          .setTestPath(tests_filename_)
+                                                          .setOnlyShowFailures(true));
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-      checktool.compareEntries(tests_filename_);
+      checktool.compareEntries();
   EXPECT_EQ(test_results.size(), 1);
   const envoy::RouterCheckToolSchema::ValidationItemResult& test_result = test_results[0];
   std::string expected_result_str = R"pb(
