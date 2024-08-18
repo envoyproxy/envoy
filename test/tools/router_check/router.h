@@ -152,8 +152,8 @@ public:
   std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> compareEntries();
 
   float coverage() {
-    return options_.detailed_coverage_report ? coverage_.comprehensiveReport()
-                                             : coverage_.report(options_.detailed_coverage_report);
+    return options_.comprehensive_coverage ? coverage_.comprehensiveReport()
+                                           : coverage_.report(options_.detailed_coverage_report);
   }
 
 private:
