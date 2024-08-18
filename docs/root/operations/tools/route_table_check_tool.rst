@@ -18,11 +18,15 @@ Usage
       Schema: All internal schemas in the tool are based on :repo:`proto3 <test/tools/router_check/validation.proto>`.
 
     -c <string>,  --config-path <string>
-      Path to the :ref:`router <envoy_v3_api_file_envoy/config/route/v3/route.proto>` or
-      :ref:`bootstrap <envoy_v3_api_file_envoy/config/bootstrap/v3/bootstrap.proto>` config file (YAML or JSON).
+       Path to a router config file (YAML or JSON). The router config file schema is found in
+       :ref:`config <envoy_v3_api_file_envoy/config/route/v3/route.proto>` and the config file extension
+       must reflect its file type (for instance, .json for JSON and .yaml for YAML).
 
-    -l <string>, --listener
-      The name of the listener to extract the route configuration from. Only required if --config-path is a bootstrap config.
+    --bootstrap-config <string>
+      Indicates that the config file is a :ref:`bootstrap <envoy_v3_api_file_envoy/config/bootstrap/v3/bootstrap.proto>` config file. The listener name must be provided.
+
+    -l <string>, --listener-name <string>
+      The name of the listener to extract the route configuration from. Only required if using --bootstrap-config.
 
     -o <string>,  --output-path <string>
       Path to a file where to write test results as binary proto. If the file already exists,

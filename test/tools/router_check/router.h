@@ -121,7 +121,7 @@ struct Options {
     return absl::OkStatus();
   }
 
-  float fail_under = 0.0f;
+  float fail_under = 0.0;
   bool comprehensive_coverage = false;
   bool is_detailed = false;
   bool only_show_failures = false;
