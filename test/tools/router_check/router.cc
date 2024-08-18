@@ -726,8 +726,6 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
-Options::Options() = default;
-
 Options::Options(int argc, char** argv) {
   // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);

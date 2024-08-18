@@ -57,7 +57,7 @@ private:
  * Options for Router Check Tool.
  */
 struct Options {
-  Options();
+  Options() = default;
   Options(int argc, char** argv);
 
   Options& setConfigPath(std::string path) {
@@ -121,15 +121,15 @@ struct Options {
     return absl::OkStatus();
   }
 
+  float fail_under = 0.0f;
+  bool comprehensive_coverage = false;
+  bool is_detailed = false;
+  bool only_show_failures = false;
+  bool disable_deprecation_check = false;
+  bool detailed_coverage_report = false;
+  std::string bootstrap_config;
   std::string test_path;
   std::string config_path;
-  std::string bootstrap_config;
-  float fail_under;
-  bool comprehensive_coverage;
-  bool is_detailed;
-  bool only_show_failures;
-  bool disable_deprecation_check;
-  bool detailed_coverage_report;
   std::string output_path;
   std::string listener_name;
 };
