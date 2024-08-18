@@ -83,6 +83,7 @@ jobs:
       cacheName: $(CI_TARGET)
       envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
       cacheTestResults: ${{ parameters.cacheTestResults }}
+      diskspaceHack: true
       managedAgent: false
       repoFetchDepth: $(REPO_FETCH_DEPTH)
       repoFetchTags: $(REPO_FETCH_TAGS)

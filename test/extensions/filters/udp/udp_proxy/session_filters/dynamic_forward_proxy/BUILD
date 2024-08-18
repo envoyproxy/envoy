@@ -26,8 +26,6 @@ envoy_cc_test_library(
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/test_common:utility_lib",
     ],
     alwayslink = 1,

@@ -171,12 +171,25 @@ public:
 
   const std::string& expectedSha256Digest() const { return expected_sha256_digest_; }
 
+  TestUtilOptions& setExpectedSha256Digests(std::vector<std::string>& expected_sha256_digests) {
+    expected_sha256_digests_ = expected_sha256_digests;
+    return *this;
+  }
+  const std::vector<std::string> expectedSha256Digests() const { return expected_sha256_digests_; }
+
   TestUtilOptions& setExpectedSha1Digest(const std::string& expected_sha1_digest) {
     expected_sha1_digest_ = expected_sha1_digest;
     return *this;
   }
 
   const std::string& expectedSha1Digest() const { return expected_sha1_digest_; }
+
+  TestUtilOptions& setExpectedSha1Digests(std::vector<std::string>& expected_sha1_digests) {
+    expected_sha1_digests_ = expected_sha1_digests;
+    return *this;
+  }
+
+  const std::vector<std::string> expectedSha1Digests() const { return expected_sha1_digests_; }
 
   TestUtilOptions& setExpectedLocalUri(const std::string& expected_local_uri) {
     expected_local_uri_ = {expected_local_uri};
@@ -191,6 +204,13 @@ public:
   }
 
   const std::string& expectedSerialNumber() const { return expected_serial_number_; }
+
+  TestUtilOptions& setExpectedSerialNumbers(std::vector<std::string>& expected_serial_numbers) {
+    expected_serial_numbers_ = expected_serial_numbers;
+    return *this;
+  }
+
+  const std::vector<std::string> expectedSerialNumbers() const { return expected_serial_numbers_; }
 
   TestUtilOptions& setExpectedPeerIssuer(const std::string& expected_peer_issuer) {
     expected_peer_issuer_ = expected_peer_issuer;
@@ -313,9 +333,12 @@ private:
   NiceMock<Runtime::MockLoader> runtime_;
   Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
+  std::vector<std::string> expected_sha256_digests_;
   std::string expected_sha1_digest_;
+  std::vector<std::string> expected_sha1_digests_;
   std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
+  std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
   std::string expected_peer_subject_;
   std::string expected_local_subject_;
@@ -442,12 +465,26 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedSha256Digest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
+      if (!options.expectedSha256Digests().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha256Digests(),
+                  server_connection->ssl()->sha256PeerCertificateChainDigests());
+        EXPECT_EQ(options.expectedSha256Digests(),
+                  server_connection->ssl()->sha256PeerCertificateChainDigests());
+      }
       if (!options.expectedSha1Digest().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(options.expectedSha1Digest(),
                   server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(options.expectedSha1Digest(),
                   server_connection->ssl()->sha1PeerCertificateDigest());
+      }
+      if (!options.expectedSha1Digests().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha1Digests(),
+                  server_connection->ssl()->sha1PeerCertificateChainDigests());
+        EXPECT_EQ(options.expectedSha1Digests(),
+                  server_connection->ssl()->sha1PeerCertificateChainDigests());
       }
       // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
@@ -458,16 +495,32 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
+
       EXPECT_EQ(options.expectedSerialNumber(),
                 server_connection->ssl()->serialNumberPeerCertificate());
+      EXPECT_EQ(options.expectedSerialNumber(),
+                server_connection->ssl()->serialNumberPeerCertificate());
+      if (!options.expectedSerialNumbers().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSerialNumbers(),
+                  server_connection->ssl()->serialNumbersPeerCertificates());
+        EXPECT_EQ(options.expectedSerialNumbers(),
+                  server_connection->ssl()->serialNumbersPeerCertificates());
+      }
       if (!options.expectedPeerIssuer().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
       }
       if (!options.expectedPeerSubject().empty()) {
         EXPECT_EQ(options.expectedPeerSubject(),
                   server_connection->ssl()->subjectPeerCertificate());
+        EXPECT_EQ(options.expectedPeerSubject(),
+                  server_connection->ssl()->subjectPeerCertificate());
       }
       if (!options.expectedLocalSubject().empty()) {
+        EXPECT_EQ(options.expectedLocalSubject(),
+                  server_connection->ssl()->subjectLocalCertificate());
         EXPECT_EQ(options.expectedLocalSubject(),
                   server_connection->ssl()->subjectLocalCertificate());
       }
@@ -817,6 +870,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       if (!options.expectedALPNProtocol().empty()) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
+      // Assert twice to ensure a cached value is returned and still valid.
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertIpSans(),
                 server_connection->ssl()->ipSansPeerCertificate());
@@ -1096,6 +1151,63 @@ TEST_P(SslSocketTest, GetCertDigestInvalidFiles) {
   testUtil(
       test_options.setExpectedSha256Digest("").setExpectedSha1Digest("").setExpectedSerialNumber(
           ""));
+}
+
+TEST_P(SslSocketTest, GetCertDigests) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  std::vector<std::string> sha256Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_256_HASHES, ',');
+  std::vector<std::string> sha1Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_1_HASHES, ',');
+  std::vector<std::string> serialNumbers = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_SERIALS, ',');
+  testUtil(test_options.setExpectedSha256Digests(sha256Digests)
+               .setExpectedSha1Digests(sha1Digests)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #
+               .setExpectedSerialNumbers(serialNumbers));
+}
+
+TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  std::vector<std::string> emptyStringVec;
+  testUtil(test_options.setExpectedSha256Digests(emptyStringVec)
+               .setExpectedSha1Digests(emptyStringVec)
+               .setExpectedSerialNumbers(emptyStringVec));
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {

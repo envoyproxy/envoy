@@ -19,6 +19,7 @@ TEST(RoundRobinConfigTest, ValidateFail) {
   NiceMock<Upstream::MockClusterInfo> cluster_info;
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
+  NiceMock<Upstream::MockLoadBalancerFactoryContext> lb_factory_context;
 
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.round_robin");
@@ -28,8 +29,8 @@ TEST(RoundRobinConfigTest, ValidateFail) {
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.round_robin", factory.name());
 
-  auto lb_config =
-      factory.loadConfig(*factory.createEmptyConfigProto(), context.messageValidationVisitor());
+  auto lb_config = factory.loadConfig(lb_factory_context, *factory.createEmptyConfigProto(),
+                                      context.messageValidationVisitor());
 
   auto thread_aware_lb =
       factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
