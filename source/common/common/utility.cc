@@ -500,6 +500,23 @@ void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
   }
 }
 
+std::string StringUtil::sanitizeInvalidHostname(const absl::string_view source) {
+  std::string ret_str = std::string(source);
+  bool sanitized = false;
+  for (size_t i = 0; i < ret_str.size(); ++i) {
+    if (absl::ascii_isalnum(ret_str[i]) || ret_str[i] == '.' || ret_str[i] == '-') {
+      continue;
+    }
+    sanitized = true;
+    ret_str[i] = '_';
+  }
+
+  if (sanitized) {
+    ret_str = absl::StrCat("invalid:", ret_str);
+  }
+  return ret_str;
+}
+
 const std::string& getDefaultDateFormat() {
   CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
 }
