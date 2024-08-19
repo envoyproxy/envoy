@@ -277,7 +277,7 @@ message ExternalProcessor {
   google.protobuf.Duration deferred_close_timeout = 19;
 
   // [#not-implemented-hide:]
-  // Send body to the side stream server without waiting for the header response from that server.
+  // Send body to the side stream server once it arrives without waiting for the header response from that server.
   // It only works for STREAMED body processing mode. For any other body processing modes, it is ignored.
   //
   // The server has two options upon receiving a header request:
