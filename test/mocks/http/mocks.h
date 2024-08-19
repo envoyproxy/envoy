@@ -578,6 +578,7 @@ public:
               (override));
   MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
 
 private:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;

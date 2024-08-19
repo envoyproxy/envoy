@@ -2195,6 +2195,18 @@ TEST_F(AsyncClientImplTest, DumpState) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
+TEST_F(AsyncClientImplTest, ParentStreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
+  auto options = AsyncClient::StreamOptions();
+  options.parent_context.stream_info = &parent_stream_info;
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+  EXPECT_TRUE(stream->streamInfo().parentStreamInfo().has_value());
+  EXPECT_EQ(stream->streamInfo().parentStreamInfo().ptr(),
+            dynamic_cast<const StreamInfo::StreamInfo*>(&parent_stream_info));
+  stream->streamInfo().clearParentStreamInfo();
+  EXPECT_FALSE(stream->streamInfo().parentStreamInfo().has_value());
+}
+
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.
