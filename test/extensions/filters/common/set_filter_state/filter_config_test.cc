@@ -15,7 +15,7 @@ namespace Filters {
 namespace Common {
 namespace SetFilterState {
 namespace {
-
+using Protobuf::util::MessageDifferencer;
 class ObjectBarFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
   std::string name() const override { return "bar"; }
@@ -90,6 +90,27 @@ TEST_F(ConfigTest, SetValueWithFactory) {
   const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("my_key");
   ASSERT_NE(nullptr, foo);
   EXPECT_EQ(foo->serializeAsString(), "XXX");
+  EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
+}
+
+TEST_F(ConfigTest, SetHashableStringValueWithFactory) {
+  initialize({R"YAML(
+    object_key: foo
+    factory_key: envoy.hashable_string
+    format_string:
+      text_format_source:
+        inline_string: "BAR"
+  )YAML"});
+  update();
+  EXPECT_FALSE(info_.filterState()->hasDataAtOrAboveLifeSpan(LifeSpan::Request));
+  const auto* foo = info_.filterState()->getDataReadOnly<HashableStringObject>("foo");
+  ASSERT_NE(nullptr, foo);
+  EXPECT_EQ(foo->asString(), "BAR");
+  EXPECT_EQ(foo->serializeAsString(), "BAR");
+  auto expected = std::make_unique<ProtobufWkt::StringValue>();
+  expected->set_value("BAR");
+  EXPECT_TRUE(MessageDifferencer::Equals(*(foo->serializeAsProto()), *expected));
+  EXPECT_EQ(foo->hash(), 16886375300707051836UL);
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
 }
 

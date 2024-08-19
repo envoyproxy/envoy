@@ -22,6 +22,17 @@ public:
 
 REGISTER_FACTORY(GenericStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+class HashableStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.hashable_string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<HashableStringObject>(data);
+  }
+};
+
+REGISTER_FACTORY(HashableStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
               Server::Configuration::GenericFactoryContext& context) const {

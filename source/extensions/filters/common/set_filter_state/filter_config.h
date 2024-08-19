@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/hashable.h"
 #include "envoy/extensions/filters/common/set_filter_state/v3/value.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/filter_state.h"
@@ -26,6 +27,29 @@ struct Value {
   StreamSharing stream_sharing_{StreamSharing::None};
   bool skip_if_empty_;
   Formatter::FormatterConstSharedPtr value_;
+};
+
+class HashableStringObject : public StreamInfo::FilterState::Object, public Hashable {
+public:
+  HashableStringObject(absl::string_view value) : value_(value) {}
+
+  // StringAccessor
+  absl::string_view asString() const { return value_; }
+
+  // FilterState::Object
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(value_);
+    return message;
+  }
+  absl::optional<std::string> serializeAsString() const override { return value_; }
+
+  // Implements hashing interface because the value is applied once per upstream connection.
+  // Multiple streams sharing the upstream connection must have the same object.
+  absl::optional<uint64_t> hash() const override { return HashUtil::xxHash64(value_); }
+
+private:
+  std::string value_;
 };
 
 class Config : public Logger::Loggable<Logger::Id::config> {
