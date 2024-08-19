@@ -62,4 +62,4 @@ The following statistics are generated for all subscriptions.
  update_time, Gauge, Timestamp of the last successful API fetch attempt as milliseconds since the epoch. Refreshed even after a trivial configuration reload that contained no configuration changes.
  version, Gauge, Hash of the contents from the last successful API fetch
  version_text, TextReadout, The version text from the last successful API fetch
- control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
+ control_plane.connected_state, Gauge, Indicates which management server Envoy is currently connected to. 0 - disconnected, 1 - the primary (first) server, 2 - the failover (second) server (if configured).

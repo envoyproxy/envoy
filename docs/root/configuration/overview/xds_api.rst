@@ -292,6 +292,64 @@ to
 with the effect that the LDS stream will be directed to *some_ads_cluster* over
 the shared ADS channel.
 
+.. _config_overview_xds_failover:
+
+xDS-Failover support
+^^^^^^^^^^^^^^^^^^^^
+
+The ADS cluster can be configured with multiple endpoints to improve scalability and
+availability. However, if the primary xDS source becomes unavailable due to a server-side
+issue, Envoy clients might not receive any configuration. To prevent a single point of
+failure, Envoy supports a failover gRPC endpoint. This endpoint is used if the primary
+endpoint is unavailable and no configuration has been received.
+
+The Failover endpoint can be configured by adding another entry to the **grpc_services** list in the
+:ref:`DynamicResources.ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>`
+field, for example:
+
+.. code-block:: yaml
+
+    ads_config:
+      api_type: GRPC
+      grpc_services:
+        - envoy_grpc:
+            cluster_name: ads_cluster
+        - envoy_grpc:
+            cluster_name: failover_ads_cluster
+
+When Envoy starts up it attempts to connect to the primary ADS endpoint (the first entry in the list).
+If the gRPC connection attempt fails, or the underlying connection is established, but no
+:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` is received before
+the stream is terminated, then that endpoint is deemed as unavailable. If this happens twice,
+Envoy will alternate between attempting to connect to the failover and the primary sources,
+until one of them successfully provides a config response.
+
+Once Envoy detects that the primary source is available, it will only attempt connections to that source,
+and retry in case of a failure. If, on the other hand, Envoy detecs that the failover source is available, it
+will use it as the config source until it is disconnected from it. After it is disconnected, Envoy will attempt
+connecting to the primary source before retrying the failover source.
+
+Note on using failover in :ref:`Delta-xDS <config_overview_delta>` mode::
+
+After successfully receiving a config from the failover source, while attempting to connect to the
+primary source, Envoy will *omit* the contents of
+:ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`.
+This will support xDS-servers that use a
+:ref:`resource version <envoy_v3_api_field_service.discovery.v3.resource.version>` which may be the same
+from the primary and failover sources, while the resource contents may be different.
+
+.. note::
+
+   The primary and failover endpoints are considered as different config sources, and the primary
+   is always preferred over the failover. For this reason, if Envoy receives any config response
+   from the primary it will prefer using that config and avoid connecting to the failover source.
+
+.. note::
+
+   The failover support feature is currently under active testing and requires setting the
+   ``envoy.restart_features.xds_failover_support`` runtime flag to ``true`` in order to use it.
+
+
 .. _config_overview_delta:
 
 Delta endpoints

@@ -130,6 +130,9 @@ different types reach Envoy, there is aggregated xDS, a single gRPC service that
 resource types in a single gRPC stream. (ADS is only supported by gRPC).
 :ref:`More details about ADS <config_overview_ads>`.
 
+Envoy also supports a failover ADS config source. See
+:ref:`xDS-Failover support <config_overview_xds_failover>` for more details.
+
 .. _arch_overview_dynamic_config_delta:
 
 Delta gRPC xDS
