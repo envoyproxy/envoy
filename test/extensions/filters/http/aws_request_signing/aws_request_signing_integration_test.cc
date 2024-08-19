@@ -66,6 +66,7 @@ class AwsRequestSigningIntegrationTest : public testing::TestWithParam<Network::
 public:
   AwsRequestSigningIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+
     skipPortUsageValidation();
     // set some environment credentials so the test cases perform signing correctly
     TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
