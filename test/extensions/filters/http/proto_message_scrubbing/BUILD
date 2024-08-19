@@ -36,6 +36,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     deps = [
+        "//source/extensions/filters/http/proto_message_scrubbing:config",
         "//source/extensions/filters/http/proto_message_scrubbing:extractor",
         "//source/extensions/filters/http/proto_message_scrubbing:extractor_impl",
         "//source/extensions/filters/http/proto_message_scrubbing:filter_config",

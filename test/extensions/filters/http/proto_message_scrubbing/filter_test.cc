@@ -1725,14 +1725,13 @@ TEST_F(FilterTestWithScrubModeUnspecified, ModeUnspecified) {
 
 using FilterTestWithScrubRedacted = FilterTestBase;
 
-// TODO: Add test case for non-repeated numerical/string or timestamp field.
 TEST_F(FilterTestWithScrubRedacted, StringField) {
   setUp(R"pb(
       mode: FIRST_AND_LAST
       scrubbing_by_method: {
         key: "apikeys.ApiKeys.CreateApiKey"
         value: {
-          request_scrubbing_by_field: { key: "parent" value: SCRUB_REDACT }
+          request_scrubbing_by_field: { key: "key.current_key" value: SCRUB_REDACT }
           response_scrubbing_by_field: { key: "name" value: SCRUB_REDACT }
         }
       }
@@ -1748,14 +1747,7 @@ TEST_F(FilterTestWithScrubRedacted, StringField) {
   CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
 
-  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
-            EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
-          }));
-
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+  EXPECT_DEATH(filter_->decodeData(*request_data, true), ".*");
 
   // No data modification.
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
@@ -1771,14 +1763,7 @@ TEST_F(FilterTestWithScrubRedacted, StringField) {
   apikeys::ApiKey response = makeCreateApiKeyResponse();
   Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
 
-  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
-            EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
-          }));
-
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+  EXPECT_DEATH(filter_->encodeData(*response_data, true), ".*");
 
   // No data modification.
   checkSerializedData<apikeys::ApiKey>(*response_data, {response});

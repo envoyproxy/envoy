@@ -78,6 +78,9 @@ ScrubbedMessageDirective TypeMapping(const MethodScrubbing::ScrubDirective& type
 } // namespace
 
 absl::Status ExtractorImpl::init() {
+  // TODO: The FieldValueExtractorFactory fails to create an extractor in case of a non-leaf field.
+  // In `SCRUB_REDACT` directive, we allow redacting repeated leaf and non-leaf
+  // message type fields. This check needs to be modified in the proto field extraction lib.
   FieldValueExtractorFactory extractor_factory(type_finder_);
   for (const auto& it : method_scrubbing_.request_scrubbing_by_field()) {
     auto extractor = extractor_factory.Create(request_type_url_, it.first);

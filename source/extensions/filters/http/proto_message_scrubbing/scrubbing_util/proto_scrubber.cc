@@ -101,8 +101,7 @@ ProtoScrubber::ProtoScrubber(ScrubberContext scrubber_context, const TypeHelper*
       absl::Status status = field_checker_->AddOrIntersectFieldPaths(std::vector<std::string>(
           scrubbed_message_field_mask.paths().begin(), scrubbed_message_field_mask.paths().end()));
       if (!status.ok()) {
-        LOG(WARNING) << "Failed to create proto scrubber for message '" << message_type_->name()
-                     << "' for audit logging: " << status;
+        LOG(WARNING) << "Failed to create proto scrubber. Status: '" << status;
       }
     }
     scrubber_ = std::make_unique<proto_processing_lib::proto_scrubber::ProtoScrubber>(

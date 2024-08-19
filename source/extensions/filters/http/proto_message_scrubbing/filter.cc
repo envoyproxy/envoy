@@ -363,11 +363,6 @@ Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
 void Filter::handleRequestScrubbingResult(const std::vector<ScrubbedMessageMetadata>& result) {
   RELEASE_ASSERT(extractor_, "`extractor_` should be initialized when extracting fields");
 
-  if (result.empty()) {
-    ENVOY_STREAM_LOG(debug, "No scrubbed fields extracted from request.", *decoder_callbacks_);
-    return;
-  }
-
   Envoy::ProtobufWkt::Struct dest_metadata;
 
   auto addResultToMetadata = [&](const std::string& category, const std::string& key,
@@ -401,11 +396,6 @@ void Filter::handleRequestScrubbingResult(const std::vector<ScrubbedMessageMetad
 
 void Filter::handleResponseScrubbingResult(const std::vector<ScrubbedMessageMetadata>& result) {
   RELEASE_ASSERT(extractor_, "`extractor_` should be initialized when extracting fields");
-
-  if (result.empty()) {
-    ENVOY_STREAM_LOG(debug, "No scrubbed fields extracted from response.", *decoder_callbacks_);
-    return;
-  }
 
   Envoy::ProtobufWkt::Struct dest_metadata;
 

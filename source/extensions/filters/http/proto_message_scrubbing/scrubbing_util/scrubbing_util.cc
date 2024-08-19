@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "source/common/http/status.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -271,19 +272,14 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
     auto* repeated_values = field_value.mutable_list_value()->mutable_values();
     for (int i = 0; i < repeated_values->size(); ++i) {
       Value* value = repeated_values->Mutable(i);
-      if (!value->has_struct_value()) {
-        return;
-      }
+      CHECK(value->has_struct_value()) << "Cannot redact non-message-type field " << field;
       RedactPath(path_begin, path_end, value->mutable_struct_value());
     }
     return;
   }
 
   // Fail if trying to redact non-message-type field.
-  if (!field_value.has_struct_value()) {
-    LOG(ERROR) << "Cannot redact non-message-type field: " << field;
-    return;
-  }
+  CHECK(field_value.has_struct_value()) << "Cannot redact non-message-type field" << field;
 
   RedactPath(path_begin, path_end, field_value.mutable_struct_value());
 }
@@ -291,9 +287,8 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
 void RedactPaths(absl::Span<const std::string> paths_to_redact, Struct* proto_struct) {
   for (const std::string& path : paths_to_redact) {
     std::vector<std::string> path_pieces = absl::StrSplit(path, '.', absl::SkipEmpty());
-    if (path_pieces.size() >= kMaxRedactedPathDepth) {
-      return;
-    }
+    CHECK(path_pieces.size() < kMaxRedactedPathDepth)
+        << "Attempting to redact path with depth >= " << kMaxRedactedPathDepth << ": " << path;
     RedactPath(path_pieces.begin(), path_pieces.end(), proto_struct);
   }
 }
@@ -428,20 +423,18 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
 
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
                              const Envoy::ProtobufWkt::Type& type,
-                             const ::google::grpc::transcoding::TypeHelper& type_helper,
+                             ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              Struct* message_struct) {
   // Convert from message data to JSON using absl::Cord.
   auto in_stream = message.CreateCodedInputStreamWrapper();
-  ProtoStreamObjectSource os(&in_stream->Get(), type_helper.Resolver(), type);
+  ProtoStreamObjectSource os(&in_stream->Get(), type_resolver, type);
   os.set_max_recursion_depth(kProtoTranslationMaxRecursionDepth);
 
   CordOutputStream cord_out_stream;
   CodedOutputStream out_stream(&cord_out_stream);
   JsonObjectWriter json_object_writer("", &out_stream);
 
-  if (!os.WriteTo(&json_object_writer).ok()) {
-    return absl::InternalError("Failed to write to JSON object writer.");
-  }
+  RETURN_IF_ERROR(os.WriteTo(&json_object_writer));
   out_stream.Trim();
 
   // Convert from JSON (in absl::Cord) to Struct.
@@ -478,7 +471,7 @@ bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* sc
   }
 
   // Convert the scrubbed message to proto.
-  status = ConvertToStruct(*message, type, type_helper, message_struct);
+  status = ConvertToStruct(*message, type, type_helper.Resolver(), message_struct);
   if (!status.ok()) {
     return false;
   }

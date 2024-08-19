@@ -1,3 +1,4 @@
+#include "source/extensions/filters/http/proto_message_scrubbing/config.h"
 #include "source/extensions/filters/http/proto_message_scrubbing/extractor.h"
 #include "source/extensions/filters/http/proto_message_scrubbing/extractor_impl.h"
 #include "source/extensions/filters/http/proto_message_scrubbing/filter_config.h"
@@ -365,6 +366,11 @@ TEST_F(FilterConfigTestException, UnsupportedTypeMessage) {
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'message' must be numerical/string)"));
+}
+
+TEST(FilterFactoryCreatorTest, Constructor) {
+  FilterFactoryCreator factory;
+  EXPECT_EQ(factory.name(), "envoy.filters.http.proto_message_scrubbing");
 }
 
 } // namespace

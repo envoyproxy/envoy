@@ -128,7 +128,7 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
 
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
                              const Envoy::ProtobufWkt::Type& type,
-                             const ::google::grpc::transcoding::TypeHelper& type_helper,
+                             ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              ::Envoy::ProtobufWkt::Struct* message_struct);
 
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,

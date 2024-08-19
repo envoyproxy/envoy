@@ -18,6 +18,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "ocpdiag/core/compat/status_macros.h"
+#include "ocpdiag/core/testing/parse_text_proto.h"
 #include "ocpdiag/core/testing/status_matchers.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/test_utils/utils.h"
@@ -386,7 +387,6 @@ TEST_F(ScrubbingUtilTest, FindSingularLastValue_SingleStringField) {
   field.set_number(1);
   field.set_kind(Field::TYPE_INT64);
 
-  std::string data = "123445";
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
   ASSERT_TRUE(result.ok());
@@ -400,7 +400,6 @@ TEST_F(ScrubbingUtilTest, FindSingularLastValue_RepeatedStringField) {
   field.set_kind(Field::TYPE_STRING);
   field.set_cardinality(Field::CARDINALITY_REPEATED);
 
-  std::string data = "repeated-string-0";
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
   EXPECT_TRUE(result.ok());
@@ -413,7 +412,6 @@ TEST_F(ScrubbingUtilTest, FindSingularLastValue_RepeatedMessageField) {
   field.set_number(2);
   field.set_kind(Field::TYPE_STRING);
 
-  std::string data = "test-bucket";
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
   ASSERT_TRUE(result.ok());
@@ -696,6 +694,50 @@ TEST_F(ScrubbingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, invalid_type_finder, "bucket.ratio",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrScrubber) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_FALSE(ScrubToStruct(nullptr /*scrubber*/, *request_type_, nullptr /*type_helper*/,
+                             &raw_proto, &actual_struct));
+}
+
+TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrTypeHelper) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  std::vector<std::string> paths = {"bucket.ratio", "bucket.objects", "id"};
+
+  CloudAuditLogFieldChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+  ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_DEATH(ScrubToStruct(&proto_scrubber, *request_type_, nullptr /*type_helper*/, &raw_proto,
+                             &actual_struct),
+               ".*");
 }
 
 TEST(ScrubUtilTest, RedactPaths_Basic) {
