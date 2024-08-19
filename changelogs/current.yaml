@@ -98,6 +98,10 @@ minor_behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
+- area: access_log
+  change: |
+    Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime
+    flag ``envoy.reloadable_features.sanitize_sni_in_access_log`` is set to ``false``, the sanitize behavior is disabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
