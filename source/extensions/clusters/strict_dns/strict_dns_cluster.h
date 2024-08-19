@@ -68,10 +68,10 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
-  const std::chrono::milliseconds dns_refresh_rate_ms_;
-  const std::chrono::milliseconds dns_jitter_ms_;
+  std::chrono::milliseconds dns_refresh_rate_ms_;
+  std::chrono::milliseconds dns_jitter_ms_;
   BackOffStrategyPtr failure_backoff_strategy_;
-  const bool respect_dns_ttl_;
+  bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;

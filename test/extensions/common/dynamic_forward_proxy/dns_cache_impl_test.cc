@@ -43,7 +43,7 @@ public:
       std::vector<std::pair<std::string /*host*/, uint32_t /*port*/>> preresolve_hostnames = {},
       uint32_t max_hosts = 1024) {
     config_.set_name("foo");
-    config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+    config_.set_dns_lookup_family(envoy::extensions::clusters::dns::v3::DnsConfig::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
     if (!preresolve_hostnames.empty()) {
       for (const auto& [host, port] : preresolve_hostnames) {
@@ -1516,7 +1516,7 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config4;
   config4.set_name("foo");
-  config4.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
+  config4.set_dns_lookup_family(envoy::extensions::clusters::dns::v3::DnsConfig::V4_ONLY);
   EXPECT_EQ(cache_manager.getCache(config4).status().message(),
             "config specified DNS cache 'foo' with different settings");
 }

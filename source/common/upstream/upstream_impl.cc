@@ -2518,6 +2518,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
 Network::DnsLookupFamily
 getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster) {
+  // if (cluster.has_dns_config() && cluster.dns_config().dns_lookup_family() !=
+  //                                     envoy::extensions::clusters::dns::v3::DnsConfig::AUTO) {
+  //   return DnsUtils::getDnsLookupFamilyFromEnum(cluster.dns_config().dns_lookup_family());
+  // }
   return DnsUtils::getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
 }
 

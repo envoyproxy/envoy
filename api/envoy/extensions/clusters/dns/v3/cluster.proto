@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.dns.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/security.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.dns.v3";
+option java_outer_classname = "ClusterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dns/v3;dnsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: DNS cluster configuration]
+
+// Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
+// <arch_overview_http_dynamic_forward_proxy>` for more information.
+// [#extension: envoy.clusters.dns]
+
+// [#next-free-field: 7]
+message DnsConfig {
+  // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
+  // addresses in the IPv4 family. If V6_ONLY is selected, the DNS resolver will
+  // only perform a lookup for addresses in the IPv6 family. If AUTO is
+  // specified, the DNS resolver will first perform a lookup for addresses in
+  // the IPv6 family and fallback to a lookup for addresses in the IPv4 family.
+  // This is semantically equivalent to a non-existent V6_PREFERRED option.
+  // AUTO is a legacy name that is more opaque than
+  // necessary and will be deprecated in favor of V6_PREFERRED in a future major version of the API.
+  // If V4_PREFERRED is specified, the DNS resolver will first perform a lookup for addresses in the
+  // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
+  // target will only get v6 addresses if there were NO v4 addresses to return.
+  // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
+  // and return all resolved addresses. When this is used, Happy Eyeballs will be enabled for
+  // upstream connections. Refer to :ref:`Happy Eyeballs Support <arch_overview_happy_eyeballs>`
+  // for more information.
+  // For cluster types other than
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
+  // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // this setting is
+  // ignored.
+  // [#next-major-version: deprecate AUTO in favor of a V6_PREFERRED option.]
+  enum DnsLookupFamily {
+    AUTO = 0;
+    V4_ONLY = 1;
+    V6_ONLY = 2;
+    V4_PREFERRED = 3;
+    ALL = 4;
+  }
+
+  message RefreshRate {
+    option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster.RefreshRate";
+
+    // Specifies the base interval between refreshes. This parameter is required and must be greater
+    // than zero and less than
+    // :ref:`max_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsConfig.RefreshRate.max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
+    // greater than or equal to the
+    // :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsConfig.RefreshRate.max_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsConfig.RefreshRate.max_interval>`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
+  // This value is the cluster’s DNS refresh rate. The value configured must be at least 1ms.
+  // If this setting is not specified, the
+  // value defaults to 5000ms.
+  google.protobuf.Duration dns_refresh_rate = 1 [(validate.rules).duration = {gt {nanos: 1000000}}];
+
+  // this is the cluster’s DNS refresh rate when requests are failing. If this setting is
+  // not specified, the failure refresh rate defaults to the DNS refresh rate.
+  RefreshRate dns_failure_refresh_rate = 2;
+
+  // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
+  // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
+  // resolution.
+  bool respect_dns_ttl = 3;
+
+  // The DNS IP address resolution policy. If this setting is not specified, the
+  // value defaults to
+  // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsConfig.DnsLookupFamily.AUTO>`.
+  DnsLookupFamily dns_lookup_family = 4 [(validate.rules).enum = {defined_only: true}];
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // configuration.
+  // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
+  // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
+  // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
+  // [#extension-category: envoy.network.dns_resolver]
+  // Fixme docs
+  config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 5;
+
+  // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
+  // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
+  // There will be no jitter if this value is omitted.
+  google.protobuf.Duration dns_jitter = 6;
+}

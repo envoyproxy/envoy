@@ -85,7 +85,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
-    cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+    cluster.set_dns_lookup_family(envoy::extensions::clusters::dns::v3::DnsConfig::ALL);
     // Make the refresh rate fast to hit the R/W race.
     cluster.mutable_dns_refresh_rate()->set_nanos(1000001);
   });

@@ -46,11 +46,25 @@ bool tryUseAppleApiForDnsLookups(
   return false;
 }
 
+bool checkDnsResolutionConfigExist(
+    [[maybe_unused]] const envoy::extensions::clusters::dns::v3::DnsConfig& config,
+    [[maybe_unused]] envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  return false;
+}
+
 // Overloading the template function for DnsFilterConfig type, which doesn't need to copy anything.
 void handleLegacyDnsResolverData(
     const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ClientContextConfig&,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   makeDefaultCaresDnsResolverConfig(typed_dns_resolver_config);
+}
+
+void handleLegacyDnsResolverData(
+    [[maybe_unused]] const envoy::extensions::clusters::dns::v3::DnsConfig config,
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
 // Overloading the template function for Cluster config type, which need to copy

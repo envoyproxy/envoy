@@ -159,7 +159,7 @@ public:
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       if (version_ == Network::Address::IpVersion::v4) {
-        cluster_0->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+        cluster_0->set_dns_lookup_family(envoy::extensions::clusters::dns::v3::DnsConfig::V4_ONLY);
       }
       for (int j = 0; j < cluster_0->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster_0->mutable_load_assignment()->mutable_endpoints(j);

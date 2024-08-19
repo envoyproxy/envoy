@@ -61,6 +61,11 @@ bool checkDnsResolutionConfigExist(
   return false;
 }
 
+// Overloading the template funciton for DnsConfig because DnsConfig has no dns_resolution_config.
+bool checkDnsResolutionConfigExist(
+    const envoy::extensions::clusters::dns::v3::DnsConfig& config,
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
 // For backward compatibility, copy over use_tcp_for_dns_lookups from config, and create
 // a CaresDnsResolverConfig typed config. This logic fit for bootstrap, and dns_cache config types.
 template <class ConfigType>
@@ -83,6 +88,11 @@ void handleLegacyDnsResolverData(
 // both use_tcp_for_dns_lookups and dns_resolvers.
 void handleLegacyDnsResolverData(
     const envoy::config::cluster::v3::Cluster& config,
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
+// Overloading the template function for Dns cluster config type, which doesn't copy anything
+void handleLegacyDnsResolverData(
+    const envoy::extensions::clusters::dns::v3::DnsConfig config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // Make typed_dns_resolver_config from the passed @param config.

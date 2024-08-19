@@ -93,10 +93,9 @@ name: stream-info-to-headers-filter
         Protobuf::util::TimeUtil::MillisecondsToDuration(5000));
     cluster_.set_name("cluster_0");
     cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-    cluster_.set_dns_lookup_family(
-        GetParam() == Network::Address::IpVersion::v4
-            ? envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY
-            : envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V6_ONLY);
+    cluster_.set_dns_lookup_family(GetParam() == Network::Address::IpVersion::v4
+                                       ? envoy::extensions::clusters::dns::v3::DnsConfig::V4_ONLY
+                                       : envoy::extensions::clusters::dns::v3::DnsConfig::V6_ONLY);
 
     protocol_options_.mutable_upstream_http_protocol_options()->set_auto_sni(true);
     if (!override_auto_sni_header.empty()) {

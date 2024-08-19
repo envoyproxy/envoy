@@ -7,6 +7,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "source/common/common/dns_utils.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -28,16 +30,55 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
                                            absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, context, creation_status),
       load_assignment_(cluster.load_assignment()),
-      local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
-      dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0)),
-      respect_dns_ttl_(cluster.respect_dns_ttl()) {
-  failure_backoff_strategy_ =
-      Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(),
-          context.serverFactoryContext().api().randomGenerator());
+      local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver) {
+  if (cluster.has_dns_config()) {
+    if (cluster.has_dns_refresh_rate() /* deprecated */) {
+      throw EnvoyException("Only one of dns_refresh_rate or dns_config can be specified.");
+    }
+    if (cluster.has_dns_jitter() /* deprecated */) {
+      throw EnvoyException("Only one of dns_jitter or dns_config can be specified.");
+    }
+    if (cluster.has_typed_dns_resolver_config() /* deprecated */) {
+      throw EnvoyException(
+          "Only one of typed_dns_resolution_config or dns_config can be specified.");
+    }
+    if (cluster.dns_lookup_family() != envoy::extensions::clusters::dns::v3::DnsConfig::AUTO &&
+        cluster.dns_config().dns_lookup_family() !=
+            envoy::extensions::clusters::dns::v3::DnsConfig::AUTO /* deprecated */) {
+      throw EnvoyException("Only one of dns_lookup_family or dns_config can be specified.");
+    }
+    if (cluster.has_dns_refresh_rate() /* deprecated */) {
+      throw EnvoyException("Only one of dns_refresh_rate or dns_config can be specified.");
+    }
+    if (cluster.has_dns_failure_refresh_rate() /* deprecated */) {
+      throw EnvoyException("Only one of dns_failure_refresh_rate or dns_config can be specified.");
+    }
 
+    if (cluster.has_wait_for_warm_on_init() /* deprecated */) {
+      throw EnvoyException("Only one of wait_for_warm_on_init or dns_config can be specified.");
+    }
+    dns_refresh_rate_ms_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_OR_DEFAULT(cluster.dns_config(), dns_refresh_rate, 5000));
+    dns_jitter_ms_ =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster.dns_config(), dns_jitter, 0));
+    dns_lookup_family_ =
+        DnsUtils::getDnsLookupFamilyFromEnum(cluster.dns_config().dns_lookup_family());
+    respect_dns_ttl_ = cluster.dns_config().respect_dns_ttl();
+    failure_backoff_strategy_ =
+        Config::Utility::prepareDnsRefreshStrategy<envoy::extensions::clusters::dns::v3::DnsConfig>(
+            cluster.dns_config(), dns_refresh_rate_ms_.count(),
+            context.serverFactoryContext().api().randomGenerator());
+  } else {
+    dns_refresh_rate_ms_ =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000));
+    dns_jitter_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0));
+    dns_lookup_family_ = DnsUtils::getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
+    respect_dns_ttl_ = cluster.respect_dns_ttl();
+    failure_backoff_strategy_ =
+        Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
+            cluster, dns_refresh_rate_ms_.count(),
+            context.serverFactoryContext().api().randomGenerator());
+  }
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
@@ -55,7 +96,6 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
     }
   }
   resolve_targets_ = std::move(resolve_targets);
-  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);

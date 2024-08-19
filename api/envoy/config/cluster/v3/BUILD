@@ -9,6 +9,7 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/config/endpoint/v3:pkg",
+        "//envoy/extensions/clusters/dns/v3:pkg",
         "//envoy/type/metadata/v3:pkg",
         "//envoy/type/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
