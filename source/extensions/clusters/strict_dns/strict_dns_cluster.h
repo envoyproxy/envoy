@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -31,7 +32,8 @@ private:
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
                   const std::string& dns_address, const uint32_t dns_port,
                   const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-                  const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
+                  const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+                  Random::RandomGeneratorImpl& random_generator);
     ~ResolveTarget();
     void startResolve();
 
@@ -44,6 +46,7 @@ private:
     const uint32_t port_;
     const Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+    Random::RandomGeneratorImpl& random_generator_;
 
     // Host map for current resolve target. When we have multiple resolve targets, multiple targets
     // may contain two different hosts with the same address. This has two effects:
@@ -74,6 +77,7 @@ private:
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
+  Random::RandomGeneratorImpl random_generator_;
 };
 
 /**

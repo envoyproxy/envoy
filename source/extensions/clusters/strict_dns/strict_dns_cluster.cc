@@ -1,9 +1,13 @@
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 
+#include <chrono>
+
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+
+#include "source/common/common/random_generator.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -29,7 +33,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      respect_dns_ttl_(cluster.respect_dns_ttl()) {
+      respect_dns_ttl_(cluster.respect_dns_ttl()), random_generator_() {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(),
@@ -48,7 +52,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
 
       resolve_targets.emplace_back(new ResolveTarget(
           *this, context.serverFactoryContext().mainThreadDispatcher(), socket_address.address(),
-          socket_address.port_value(), locality_lb_endpoint, lb_endpoint));
+          socket_address.port_value(), locality_lb_endpoint, lb_endpoint, random_generator_));
     }
   }
   resolve_targets_ = std::move(resolve_targets);
@@ -100,13 +104,14 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
     StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& dns_address,
     const uint32_t dns_port,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint)
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+    Random::RandomGeneratorImpl& random_generator)
     : parent_(parent), locality_lb_endpoints_(locality_lb_endpoint), lb_endpoint_(lb_endpoint),
       dns_address_(dns_address),
       hostname_(lb_endpoint_.endpoint().hostname().empty() ? dns_address_
                                                            : lb_endpoint_.endpoint().hostname()),
-      port_(dns_port),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {}
+      port_(dns_port), resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
+      random_generator_(random_generator) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -185,7 +190,12 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
               ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = ttl_refresh_rate;
+            std::chrono::milliseconds jitter =
+                std::chrono::milliseconds(random_generator_.random() % 512); // FIXME
+            if (jitter >= ttl_refresh_rate) {
+              jitter = std::chrono::milliseconds(0);
+            }
+            final_refresh_rate = ttl_refresh_rate - jitter;
             ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }
