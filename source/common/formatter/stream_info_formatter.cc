@@ -1350,8 +1350,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     absl::optional<std::string> result;
                     if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
-                      result = std::string(
-                          stream_info.downstreamAddressProvider().requestedServerName());
+                      if (Runtime::runtimeFeatureEnabled(
+                              "envoy.reloadable_features.sanitize_sni_in_access_log")) {
+                        result = StringUtil::sanitizeInvalidHostname(
+                            stream_info.downstreamAddressProvider().requestedServerName());
+                      } else {
+                        result = std::string(
+                            stream_info.downstreamAddressProvider().requestedServerName());
+                      }
                     }
                     return result;
                   });

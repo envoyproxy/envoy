@@ -17,6 +17,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: access_log
+  change: |
+    Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime
+    flag ``envoy.reloadable_features.sanitize_sni_in_access_log`` is set to ``false``, the sanitize behavior is disabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
