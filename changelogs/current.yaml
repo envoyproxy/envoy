@@ -201,6 +201,10 @@ new_features:
   change: |
     Prefer using IPv6 address when addresses from both families are available.
     Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
+- area: config
+  change: |
+    Introducing :ref:`xDS-Failover supporti <config_overview_xds_failover>`. This is under testing
+    at the moment, and can be enable by setting ``envoy.restart_features.xds_failover_support`` to true.
 - area: grpc_field_extraction
   change: |
     Added ``map<string, string>`` support: Target fields of type ``map<string, string>`` can be extracted and added to dynamic metadata.
