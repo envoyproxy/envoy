@@ -430,6 +430,15 @@ public:
   static void escapeToOstream(std::ostream& os, absl::string_view view);
 
   /**
+   * Sanitize host name strings for logging purposes. Replace invalid hostname characters (anything
+   * that's not alphanumeric, hyphen, or period) with underscore. The sanitized string is not a
+   * valid host name.
+   * @param source supplies the string to sanitize.
+   * @return sanitized string.
+   */
+  static std::string sanitizeInvalidHostname(const absl::string_view source);
+
+  /**
    * Provide a default value for a string if empty.
    * @param s string.
    * @param default_value replacement for s if empty.
