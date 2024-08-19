@@ -893,16 +893,19 @@ TEST_P(GolangIntegrationTest, AccessLog) {
   auto path = "/test";
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", path},
-      {":scheme", "http"},
-      {":authority", "test.com"},
+      {":method", "POST"},        {":path", path},  {":scheme", "http"},
+      {":authority", "test.com"}, {"Referer", "r"},
   };
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::RequestEncoder& request_encoder = encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(request_encoder, "helloworld", true);
+  codec_client_->sendData(request_encoder, "helloworld", false);
+
+  Http::TestRequestTrailerMapImpl request_trailers{
+      {"x-trailer", "foo"},
+  };
+  codec_client_->sendTrailers(request_encoder, request_trailers);
 
   waitForNextUpstreamRequest();
 
@@ -913,7 +916,10 @@ TEST_P(GolangIntegrationTest, AccessLog) {
   Buffer::OwnedImpl response_data1("good");
   upstream_request_->encodeData(response_data1, false);
   Buffer::OwnedImpl response_data2("bye");
-  upstream_request_->encodeData(response_data2, true);
+  upstream_request_->encodeData(response_data2, false);
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-trailer", "bar"}};
+  upstream_request_->encodeTrailers(response_trailers);
 
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
@@ -927,6 +933,8 @@ TEST_P(GolangIntegrationTest, AccessLog) {
   EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
   EXPECT_EQ("7", getHeader(upstream_request_->headers(), "respSize"));
   EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
+  EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-req-trailer"));
+  EXPECT_EQ("bar", getHeader(upstream_request_->headers(), "x-resp-trailer"));
 
   cleanup();
 }
