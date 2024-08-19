@@ -7,8 +7,8 @@ Proto Message Scrubbing
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.proto_message_scrubbing.v3.ProtoMessageScrubbingConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.proto_message_scrubbing.v3.ProtoMessageScrubbingConfig>`.
 
-ProtoMessageScrubbing filter supports scrubbing scrubbed gRPC
-requests/responses (proto messages) as google.protobuf.Struct and storing
+ProtoMessageScrubbing filter supports scrubbing gRPC
+requests/responses (proto messages) into google.protobuf.Struct and storing
 results in the dynamic metadata `envoy.filters.http.proto_message_scrubbing`
 for later access.
 
