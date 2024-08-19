@@ -24,9 +24,9 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
-#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -266,7 +266,9 @@ public:
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
   }
 
-  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const { return grpc_service_; }
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
+    return grpc_service_;
+  }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -373,7 +375,8 @@ class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
 public:
   Filter(const FilterConfigSharedPtr& config, ClientBasePtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(config->grpcService().has_value()? config->grpcService().value() : envoy::config::core::v3::GrpcService()),
+        grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
+                                                        : envoy::config::core::v3::GrpcService()),
         config_with_hash_key_(grpc_service_),
         decoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),

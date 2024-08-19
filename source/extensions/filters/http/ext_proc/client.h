@@ -10,6 +10,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/sidestream_watermark.h"
+#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +40,7 @@ public:
   virtual void logGrpcStreamInfo() PURE;
 };
 
-class ExternalProcessorClient {
+class ExternalProcessorClient : public ClientBase {
 public:
   virtual ~ExternalProcessorClient() = default;
   virtual ExternalProcessorStreamPtr

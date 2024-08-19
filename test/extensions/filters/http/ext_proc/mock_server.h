@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/extensions/filters/http/ext_proc/client.h"
-#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 
 #include "gmock/gmock.h"
 
@@ -10,8 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class MockClient : public ExternalProcessorClient,
-                   public ClientBase {
+class MockClient : public ExternalProcessorClient {
 public:
   MockClient();
   ~MockClient() override;

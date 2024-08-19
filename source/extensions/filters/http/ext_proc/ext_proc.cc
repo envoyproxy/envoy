@@ -19,8 +19,8 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
+using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::type::v3::StatusCode;
@@ -61,7 +61,6 @@ getFilterGrpcService(const ExternalProcessor& config) {
 
   return absl::nullopt;
 }
-
 
 absl::optional<envoy::config::core::v3::GrpcService>
 initGrpcService(const ExtProcPerRoute& config) {
@@ -191,12 +190,12 @@ ProcessingMode allDisabledMode() {
 
 } // namespace
 
-FilterConfig::FilterConfig(
-    const ExternalProcessor& config,
-    const std::chrono::milliseconds message_timeout, const uint32_t max_message_timeout_ms,
-    Stats::Scope& scope, const std::string& stats_prefix, bool is_upstream,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
-    Server::Configuration::CommonFactoryContext& context)
+FilterConfig::FilterConfig(const ExternalProcessor& config,
+                           const std::chrono::milliseconds message_timeout,
+                           const uint32_t max_message_timeout_ms, Stats::Scope& scope,
+                           const std::string& stats_prefix, bool is_upstream,
+                           Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+                           Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
       route_cache_action_(config.route_cache_action()),
@@ -226,8 +225,7 @@ FilterConfig::FilterConfig(
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-  if (config.disable_clear_route_cache() &&
-      (route_cache_action_ != ExternalProcessor::DEFAULT)) {
+  if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
     throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
                          "be set to none-default at the same time.");
   }
@@ -367,7 +365,8 @@ Filter::StreamOpenState Filter::openStream() {
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
     ExternalProcessorStreamPtr stream_object =
-        (dynamic_cast<ExternalProcessorClient&>(*client_)).start(*this, config_with_hash_key_, options, watermark_callbacks_);
+        (dynamic_cast<ExternalProcessorClient&>(*client_))
+            .start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called

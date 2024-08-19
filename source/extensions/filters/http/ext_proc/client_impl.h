@@ -12,7 +12,6 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
-#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
@@ -24,8 +23,7 @@ namespace ExternalProcessing {
 
 using ProcessingResponsePtr = std::unique_ptr<ProcessingResponse>;
 
-class ExternalProcessorClientImpl : public ExternalProcessorClient,
-                                    public ClientBase {
+class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
