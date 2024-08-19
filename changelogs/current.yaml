@@ -94,6 +94,10 @@ minor_behavior_changes:
   change: |
     Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
     but may return StopIteration in onAccept to wait for asynchronous callback.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
+    requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

@@ -56,7 +56,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_ex
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year.
-RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_visitor_for_data);
 RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
@@ -123,6 +122,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
+// TODO(birenroy) flip after the security issue is addressed.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Flip this to true and/or remove completely once verified by Envoy Mobile.
