@@ -10,6 +10,10 @@ behavior_changes:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
     See the config examples from the above ``internal_address_config`` link. This default no trust internal address can be turned on by
     setting runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` to ``true``.
+- area: http2
+  change: |
+    Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
+    requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
