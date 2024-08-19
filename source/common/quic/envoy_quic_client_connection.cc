@@ -127,8 +127,10 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
       ENVOY_CONN_LOG(error, "Fail to apply listening options", *this);
       connection_socket.close();
     }
-  }
-  if (!connection_socket.isOpen()) {
+  } else if (connectionSocket().get() == &connection_socket) {
+    // Only close the connection if the connection socket is the current one. If it is a probing
+    // socket that isn't the current socket, do not close the connection upon failure, as the
+    // current socket is still valid.
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
