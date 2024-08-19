@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.ext_proc.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/core/v3/http_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/matcher/v3/string.proto";
 
@@ -98,7 +99,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -125,7 +126,18 @@ message ExternalProcessor {
 
   // Configuration for the gRPC service that the filter will communicate with.
   // The filter supports both the "Envoy" and "Google" gRPC clients.
-  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+  // Only one of ``grpc_service`` or ``http_service`` can be set.
+  // It is required that one of them must be set.
+  config.core.v3.GrpcService grpc_service = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
+
+  // [#not-implemented-hide:]
+  // Configuration for the HTTP service that the filter will communicate with.
+  // Only one of ``http_service`` or
+  // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
+  // can be set. It is required that one of them must be set.
+  ExtProcHttpService http_service = 20
+      [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
 
   // By default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the
@@ -263,6 +275,12 @@ message ExternalProcessor {
   // backend stream lifetime. In this case, Envoy will eventually timeout the external processor stream according to this time limit.
   // The default value is 5000 milliseconds (5 seconds) if not specified.
   google.protobuf.Duration deferred_close_timeout = 19;
+}
+
+// ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
+message ExtProcHttpService {
+  // Sets the HTTP service which the external processing requests must be sent to.
+  config.core.v3.HttpService http_service = 1;
 }
 
 // The MetadataOptions structure defines options for the sending and receiving of

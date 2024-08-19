@@ -95,7 +95,7 @@ public:
   bool isProcessingInGo() {
     return filterState() == FilterState::ProcessingHeader ||
            filterState() == FilterState::ProcessingData ||
-           filterState() == FilterState::ProcessingTrailer;
+           filterState() == FilterState::ProcessingTrailer || req->is_golang_processing_log;
   }
   bool isProcessingHeader() { return filterState() == FilterState::ProcessingHeader; }
 

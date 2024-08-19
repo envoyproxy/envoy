@@ -901,6 +901,23 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
+   * Returns the final host value for the request, taking into account route-level mutations.
+   *
+   * The value returned is computed with the following logic in order:
+   *
+   * 1. If a host rewrite is configured for the route, it returns that value.
+   * 2. If a host rewrite header is specified, it attempts to use the value from that header.
+   * 3. If a host rewrite path regex is configured, it applies the regex to the request path and
+   *    returns the result.
+   * 4. If none of the above apply, it returns the original host value from the request headers.
+   *
+   * @param headers The constant reference to the request headers.
+   * @note This function will not attempt to restore the port in the host value. If port information
+   *       is required, it should be handled separately.
+   */
+  virtual const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const PURE;
+
+  /**
    * Returns the HTTP status code to use when configured cluster is not found.
    * @return Http::Code to use when configured cluster is not found.
    */
@@ -1544,15 +1561,13 @@ public:
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
 
   // TODO(vikaschoudhary16): Remove this api.
-  // This api is only used to enable half-close semantics on the upstream connection.
-  // This ideally should be done via calling connection.enableHalfClose() but since TcpProxy
-  // does not have access to the upstream connection, it is done via this api for now.
+  // This api is only used to enable TCP tunneling semantics in the upstream codec.
+  // TCP proxy extension uses this API when proxyingn TCP tunnel via HTTP CONNECT or POST.
   /**
-   * Enable half-close semantics on the upstream connection. Reading a remote half-close
+   * Enable TCP tunneling semantics on the upstream codec. Reading a remote half-close
    * will not fully close the connection. This is off by default.
-   * @param enabled Whether to set half-close semantics as enabled or disabled.
    */
-  virtual void enableHalfClose() PURE;
+  virtual void enableTcpTunneling() PURE;
   /**
    * Enable/disable further data from this stream.
    */

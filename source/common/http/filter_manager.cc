@@ -91,7 +91,7 @@ void ActiveStreamFilterBase::commonContinue() {
   // future.
   if (!headers_continued_) {
     headers_continued_ = true;
-    doHeaders(complete() && !bufferedData() && !hasTrailers());
+    doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
   }
 
   doMetadata();
@@ -102,7 +102,7 @@ void ActiveStreamFilterBase::commonContinue() {
   // on doData() to do so.
   const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
-    doData(complete() && !had_trailers_before_data);
+    doData(observedEndStream() && !had_trailers_before_data);
   }
 
   if (had_trailers_before_data) {
@@ -197,7 +197,7 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (complete() && !hasTrailers() && !bufferedData() &&
+    } else if (observedEndStream() && !hasTrailers() && !bufferedData() &&
                // If the stream is destroyed, no need to handle the data buffer or trailers.
                // This can occur if the filter calls sendLocalReply.
                !parent_.state_.destroyed_) {
@@ -347,13 +347,13 @@ bool ActiveStreamDecoderFilter::canContinue() {
   // continue to further filters. A concrete example of this is a filter buffering data, the
   // last data frame comes in and the filter continues, but the final buffering takes the stream
   // over the high watermark such that a 413 is returned.
-  return !parent_.state_.local_complete_;
+  return !parent_.stopDecoderFilterChain();
 }
 
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent.
-  return !parent_.state_.remote_encode_complete_;
+  return !parent_.state_.encoder_filter_chain_complete_;
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -369,7 +369,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::complete() { return parent_.remoteDecodeComplete(); }
+bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -557,7 +557,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
-    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
+    ENVOY_BUG(!continue_iteration || !stopDecoderFilterChain(),
               fmt::format(
                   "filter={} did not return StopAll or StopIteration after sending a local reply.",
                   (*entry)->filter_context_.config_name));
@@ -568,7 +568,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     }
 
     // Skip processing metadata after sending local reply
-    if (state_.local_complete_ && std::next(entry) != decoder_filters_.end()) {
+    if (stopDecoderFilterChain() && std::next(entry) != decoder_filters_.end()) {
       maybeContinueDecoding(continue_data_entry);
       return;
     }
@@ -616,7 +616,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
-  if (state_.local_complete_) {
+  if (stopDecoderFilterChain()) {
     return;
   }
 
@@ -755,8 +755,9 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
 MetadataMapVector& FilterManager::addDecodedMetadata() { return *getRequestMetadataMapVector(); }
 
 void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers) {
-  // See decodeData() above for why we check local_complete_ here.
-  if (state_.local_complete_) {
+  // If a response is complete or a reset has been sent, filters do not care about further body
+  // data. Just drop it.
+  if (stopDecoderFilterChain()) {
     return;
   }
 
@@ -858,13 +859,19 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
   ENVOY_STREAM_LOG(trace, "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}", *this,
                    end_stream, filter_manager_callbacks_.isHalfCloseEnabled());
   if (filter == nullptr) {
-    // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
-    // should not set the local_complete_ flag to true when end_stream is true.
-    // setting local_complete_ to true will cause any data sent in the upstream direction to be
-    // dropped.
-    if (end_stream && !filter_manager_callbacks_.isHalfCloseEnabled()) {
-      ASSERT(!state_.local_complete_);
-      state_.local_complete_ = true;
+    if (end_stream) {
+      ASSERT(!state_.observed_encode_end_stream_);
+      state_.observed_encode_end_stream_ = true;
+
+      // When half close semantics are disabled, receiving end stream from the upstream causes
+      // decoder filter to stop, as neither filters nor upstream is interested in downstream data.
+      // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
+      // should not stop decoder filter chain when end_stream is true, as it will cause any data
+      // sent in the upstream direction to be
+      // dropped.
+      if (!filter_manager_callbacks_.isHalfCloseEnabled()) {
+        state_.decoder_filter_chain_aborted_ = true;
+      }
     }
     return encoder_filters_.begin();
   }
@@ -1439,8 +1446,8 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
-    ASSERT(!state_.remote_encode_complete_);
-    state_.remote_encode_complete_ = true;
+    ASSERT(!state_.encoder_filter_chain_complete_);
+    state_.encoder_filter_chain_complete_ = true;
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1579,7 +1586,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete()) {
+  if (!observedEndStream()) {
     return false;
   }
 
@@ -1624,7 +1631,9 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
-bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
+bool ActiveStreamEncoderFilter::observedEndStream() {
+  return parent_.state_.observed_encode_end_stream_;
+}
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }

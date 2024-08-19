@@ -67,13 +67,8 @@ Http::FilterHeadersStatus FileSystemBufferFilter::decodeHeaders(Http::RequestHea
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
   request_callbacks_->setDecoderBufferLimit(request_state_.config_->memoryBufferBytesLimit());
-  // If we're going to buffer everything, don't even start sending the data until we're ready.
-  if (request_state_.injecting_content_length_header_ ||
-      request_state_.config_->behavior().alwaysFullyBuffer()) {
-    request_headers_ = &headers;
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-  return Http::FilterHeadersStatus::Continue;
+  request_headers_ = &headers;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterHeadersStatus FileSystemBufferFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -100,13 +95,8 @@ Http::FilterHeadersStatus FileSystemBufferFilter::encodeHeaders(Http::ResponseHe
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
   response_callbacks_->setEncoderBufferLimit(response_state_.config_->memoryBufferBytesLimit());
-  // If we're going to buffer everything, don't even start sending the data until we're ready.
-  if (response_state_.injecting_content_length_header_ ||
-      response_state_.config_->behavior().alwaysFullyBuffer()) {
-    response_headers_ = &headers;
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-  return Http::FilterHeadersStatus::Continue;
+  response_headers_ = &headers;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void FileSystemBufferFilter::onAboveWriteBufferHighWatermark() {

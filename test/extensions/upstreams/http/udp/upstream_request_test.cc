@@ -46,7 +46,7 @@ public:
     udp_upstream_ =
         std::make_unique<UdpUpstream>(&mock_upstream_to_downstream_, std::move(mock_socket),
                                       std::move(mock_host), mock_dispatcher_);
-    EXPECT_NO_THROW(udp_upstream_->enableHalfClose());
+    EXPECT_NO_THROW(udp_upstream_->enableTcpTunneling());
   }
 
 protected:

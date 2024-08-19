@@ -546,7 +546,7 @@ func (f *filter) EncodeTrailers(trailers api.ResponseTrailerMap) api.StatusType 
 	}
 }
 
-func (f *filter) OnLog() {
+func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
 	api.LogError("call log in OnLog")
 }
 
