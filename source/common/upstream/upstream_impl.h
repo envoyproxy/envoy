@@ -794,7 +794,8 @@ public:
   HostMapConstSharedPtr crossPriorityHostMap() const override;
 
 protected:
-  void updateCrossPriorityHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+  void updateCrossPriorityHostMap(uint32_t priority, const HostVector& hosts_added,
+                                  const HostVector& hosts_removed);
 
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
