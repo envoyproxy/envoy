@@ -216,7 +216,8 @@ new_features:
     the configured duration.
 - area: cluster
   change: |
-    Customizing the happy eyeballs algorithm for an upstream cluster by configuring :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
+    Customizing the happy eyeballs algorithm for an upstream cluster by configuring 
+    :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
     A default configuration will be used if not provided. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` to false.
 
