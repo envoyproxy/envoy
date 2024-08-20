@@ -58,27 +58,6 @@ TEST_F(FilterConfigTestOk, DescriptorInline) {
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
-TEST_F(FilterConfigTestOk, ScrubRedact) {
-  parseConfigProto(R"pb(
-    mode: FIRST_AND_LAST
-    scrubbing_by_method: {
-      key: "apikeys.ApiKeys.CreateApiKey"
-      value: {
-        request_scrubbing_by_field: { key: "parent" value: SCRUB_REDACT }
-        request_scrubbing_by_field: { key: "key.name" value: SCRUB_REDACT }
-        response_scrubbing_by_field: { key: "name" value: SCRUB_REDACT }
-      }
-    })pb");
-  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
-      api_->fileSystem()
-          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
-          .value();
-  filter_config_ = std::make_unique<FilterConfig>(proto_config_,
-                                                  std::make_unique<ExtractorFactoryImpl>(), *api_);
-  EXPECT_EQ(filter_config_->findExtractor("undefined"), nullptr);
-  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
-}
-
 TEST_F(FilterConfigTestOk, ScrubDirectiveUnspecified) {
   parseConfigProto(R"pb(
     mode: FIRST_AND_LAST
@@ -366,6 +345,28 @@ TEST_F(FilterConfigTestException, UnsupportedTypeMessage) {
       EnvoyException,
       testing::HasSubstr(
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'message' must be numerical/string)"));
+}
+
+TEST_F(FilterConfigTestException, RedactLeafField) {
+  parseConfigProto(R"pb(
+    mode: FIRST_AND_LAST
+    scrubbing_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_scrubbing_by_field: { key: "parent" value: SCRUB_REDACT }
+      }
+    })pb");
+  *proto_config_.mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+          .value();
+
+  EXPECT_THAT_THROWS_MESSAGE(
+      std::make_unique<FilterConfig>(proto_config_, std::make_unique<ExtractorFactoryImpl>(),
+                                     *api_),
+      EnvoyException,
+      testing::HasSubstr(
+          R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: SCRUB_REDACT tag cannot be used with leaf fields)"));
 }
 
 TEST(FilterFactoryCreatorTest, Constructor) {

@@ -36,7 +36,7 @@ using ::testing::Eq;
 
 constexpr absl::string_view kFilterName = "envoy.filters.http.proto_message_scrubbing";
 
-constexpr absl::string_view kExpectedRequestMetadata = R"pb(
+constexpr absl::string_view kExpectedRequestScrubbedResult = R"pb(
 fields {
   key: "requests"
   value {
@@ -65,7 +65,7 @@ fields {
 }
 )pb";
 
-constexpr absl::string_view kExpectedResponseMetadata = R"pb(
+constexpr absl::string_view kExpectedResponseScrubbedResult = R"pb(
 fields {
   key: "responses"
   value {
@@ -210,7 +210,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedRequestScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
@@ -233,7 +233,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
@@ -630,7 +630,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([](const std::string& ns, const Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, kFilterName);
-        checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+        checkProtoStruct(new_dynamic_metadata, kExpectedRequestScrubbedResult);
       }));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(end_request_data, true));
 
@@ -672,7 +672,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(end_response_data, true));
@@ -1581,45 +1581,6 @@ TEST_F(FilterTestExtractRejected, RequestMisformedGrpcPath) {
             filter_->decodeHeaders(req_headers, false));
 }
 
-TEST_F(FilterTestExtractRejected, NothingToExtract) {
-  setUp(R"pb(
-mode: FIRST_AND_LAST
-scrubbing_by_method: {
-  key: "apikeys.ApiKeys.CreateApiKeyInStream"
-  value: {}
-}
-    )pb");
-  TestRequestHeaderMapImpl req_headers =
-      TestRequestHeaderMapImpl{{":method", "POST"},
-                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
-                               {"content-type", "application/grpc"}};
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
-
-  CreateApiKeyRequest request = makeCreateApiKeyRequest("");
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
-
-  // No data modification.
-  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
-
-  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
-      {":status", "200"},
-      {"grpc-status", "1"},
-      {"content-type", "application/grpc"},
-  };
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
-            filter_->encodeHeaders(resp_headers, false));
-
-  apikeys::ApiKey response = makeCreateApiKeyResponse("");
-  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
-
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
-
-  // No data modification.
-  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
-}
-
 using FilterTestPassThrough = FilterTestBase;
 
 TEST_F(FilterTestPassThrough, RequestNotGrpc) {
@@ -1662,6 +1623,45 @@ TEST_F(FilterTestPassThrough, UnconfiguredRequest) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 
+TEST_F(FilterTestPassThrough, NothingToExtract) {
+  setUp(R"pb(
+mode: FIRST_AND_LAST
+scrubbing_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKeyInStream"
+  value: {}
+}
+    )pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest("");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse("");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+
+  // No data modification.
+  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
+}
+
 using FilterTestWithScrubModeUnspecified = FilterTestBase;
 
 TEST_F(FilterTestWithScrubModeUnspecified, ModeUnspecified) {
@@ -1691,7 +1691,7 @@ TEST_F(FilterTestWithScrubModeUnspecified, ModeUnspecified) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedRequestScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
@@ -1714,56 +1714,10 @@ TEST_F(FilterTestWithScrubModeUnspecified, ModeUnspecified) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
-
-  // No data modification.
-  checkSerializedData<apikeys::ApiKey>(*response_data, {response});
-}
-
-using FilterTestWithScrubRedacted = FilterTestBase;
-
-TEST_F(FilterTestWithScrubRedacted, StringField) {
-  setUp(R"pb(
-      mode: FIRST_AND_LAST
-      scrubbing_by_method: {
-        key: "apikeys.ApiKeys.CreateApiKey"
-        value: {
-          request_scrubbing_by_field: { key: "key.current_key" value: SCRUB_REDACT }
-          response_scrubbing_by_field: { key: "name" value: SCRUB_REDACT }
-        }
-      }
-    )pb");
-
-  Envoy::Http::TestRequestHeaderMapImpl req_headers =
-      TestRequestHeaderMapImpl{{":method", "POST"},
-                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
-                               {"content-type", "application/grpc"}};
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(req_headers, true));
-
-  CreateApiKeyRequest request = makeCreateApiKeyRequest();
-  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
-
-  EXPECT_DEATH(filter_->decodeData(*request_data, true), ".*");
-
-  // No data modification.
-  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
-
-  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
-      {":status", "200"},
-      {"grpc-status", "1"},
-      {"content-type", "application/grpc"},
-  };
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
-            filter_->encodeHeaders(resp_headers, false));
-
-  apikeys::ApiKey response = makeCreateApiKeyResponse();
-  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
-
-  EXPECT_DEATH(filter_->encodeData(*response_data, true), ".*");
 
   // No data modification.
   checkSerializedData<apikeys::ApiKey>(*response_data, {response});
@@ -1798,7 +1752,7 @@ TEST_F(FilterTestWithScrubDirectiveUnspecified, HappyPath) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedRequestMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedRequestScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
@@ -1821,7 +1775,7 @@ TEST_F(FilterTestWithScrubDirectiveUnspecified, HappyPath) {
       .WillOnce(
           Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
-            checkProtoStruct(new_dynamic_metadata, kExpectedResponseMetadata);
+            checkProtoStruct(new_dynamic_metadata, kExpectedResponseScrubbedResult);
           }));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));

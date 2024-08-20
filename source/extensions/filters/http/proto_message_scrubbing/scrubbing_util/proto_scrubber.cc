@@ -9,6 +9,7 @@
 
 #include "source/extensions/filters/http/proto_message_scrubbing/scrubbing_util/proto_scrubber_interface.h"
 #include "source/extensions/filters/http/proto_message_scrubbing/scrubbing_util/scrubbing_util.h"
+#include "source/common/common/logger.h"
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
@@ -81,8 +82,8 @@ ProtoScrubber::ProtoScrubber(ScrubberContext scrubber_context, const TypeHelper*
   };
 
   for (const auto& directive : directives_mapping_) {
-    LOG(INFO) << "Scrubbing Directive: " << std::to_string(static_cast<int>(directive.first))
-              << ": " << directive.second.DebugString();
+    ENVOY_LOG_MISC(debug, "Scrubbing Directive: {}: {}", static_cast<int>(directive.first),
+                     directive.second.DebugString());
   }
 
   // Initialize proto scrubber that retains fields annotated with SCRUB and
@@ -101,7 +102,7 @@ ProtoScrubber::ProtoScrubber(ScrubberContext scrubber_context, const TypeHelper*
       absl::Status status = field_checker_->AddOrIntersectFieldPaths(std::vector<std::string>(
           scrubbed_message_field_mask.paths().begin(), scrubbed_message_field_mask.paths().end()));
       if (!status.ok()) {
-        LOG(WARNING) << "Failed to create proto scrubber. Status: '" << status;
+        ENVOY_LOG_MISC(debug, "Failed to create proto scrubber. Status: {}", status);
       }
     }
     scrubber_ = std::make_unique<proto_processing_lib::proto_scrubber::ProtoScrubber>(
@@ -154,7 +155,7 @@ ProtoScrubber::ScrubMessage(const Protobuf::field_extraction::MessageData& raw_m
                                &scrubbed_message_metadata.scrubbed_message);
 
   if (!success) {
-    LOG(ERROR) << "Failed to scrub message.";
+    ENVOY_LOG_MISC(error, "Failed to scrub message.");
   }
 
   // Handle redacted fields.
@@ -184,7 +185,7 @@ void ProtoScrubber::GetTargetResourceOrTargetResourceCallback(
   absl::StatusOr<std::string> status_or_target_resource =
       ExtractStringFieldValue(*message_type_, type_finder_, field_mask.paths(0), message);
   if (!status_or_target_resource.ok()) {
-    LOG(ERROR) << "Unable to extract target resource: " << status_or_target_resource.status();
+    ENVOY_LOG_MISC(error, "Unable to extract target resource: {}", status_or_target_resource.status());
     return;
   }
 

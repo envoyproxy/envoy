@@ -20,6 +20,7 @@
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +43,7 @@ ABSL_CONST_INIT const char* const kTypeServiceBaseUrl = "type.googleapis.com";
 void Extract(ProtoScrubberInterface& scrubber, Protobuf::field_extraction::MessageData& message,
              std::vector<ScrubbedMessageMetadata>& vect) {
   ScrubbedMessageMetadata data = scrubber.ScrubMessage(message);
-  LOG(INFO) << "Extracted scrubbed fields: " << data.scrubbed_message;
+  ENVOY_LOG_MISC(debug, "Extracted scrubbed fields: {}", data.scrubbed_message.DebugString());
 
   // Only need to keep the result from the first and the last.
   // Always overwrite the 2nd result as the last one.
@@ -86,6 +87,11 @@ absl::Status ExtractorImpl::init() {
     auto extractor = extractor_factory.Create(request_type_url_, it.first);
     if (!extractor.ok()) {
       return extractor.status();
+    }
+
+    // TODO: Remove this check once proto field extraction lib validation is completed.
+    if (TypeMapping(it.second) == ScrubbedMessageDirective::SCRUB_REDACT){
+      return absl::InvalidArgumentError("SCRUB_REDACT tag cannot be used with leaf fields");
     }
 
     request_field_path_to_scrub_type_[it.first].push_back(TypeMapping(it.second));
