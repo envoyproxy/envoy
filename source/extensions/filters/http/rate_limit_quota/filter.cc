@@ -225,16 +225,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
                           ->default_action.quota_assignment_action()
                           .rate_limit_strategy()
                           .blanket_rule();
-  switch (blanket_rule) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case RateLimitStrategy::ALLOW_ALL:
-    ENVOY_LOG(trace,
-              "For first matched request with hashed bucket_id {}, it is "
-              "allowed by the configured default ALLOW_ALL strategy.",
-              bucket_id);
-    ENVOY_LOG(debug, "Hit configured default ALLOW_ALL for bucket_id {}", bucket_id);
-    return Http::FilterHeadersStatus::Continue;
-  case RateLimitStrategy::DENY_ALL:
+  if (blanket_rule == RateLimitStrategy::DENY_ALL) {
     // For the request that is rejected due to DENY_ALL
     // no_assignment_behavior, immediate report is still sent to RLQS server
     // above, and here the local reply with deny response is sent.
@@ -242,15 +233,19 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
               "For first matched request with hashed bucket_id {}, it is "
               "throttled by DENY_ALL strategy.",
               bucket_id);
-    ENVOY_LOG(debug, "Hit configured default DENY_ALL for bucket_id {}", bucket_id);
+    ENVOY_LOG(debug, "Hit configured default DENY_ALL for bucket_id {}",
+              bucket_id);
     sendDenyResponse();
     return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
-  ENVOY_LOG(error,
-            "Failing open as default action for bucket_id {} contains an "
-            "unsupported blanket rule: {}",
-            bucket_id, RateLimitStrategy::BlanketRule_Name(blanket_rule));
-  return Envoy::Http::FilterHeadersStatus::Continue;
+
+  ENVOY_LOG(trace,
+            "For first matched request with hashed bucket_id {}, it is "
+            "allowed by the configured default ALLOW_ALL strategy.",
+            bucket_id);
+  ENVOY_LOG(debug, "Hit configured default ALLOW_ALL for bucket_id {}",
+            bucket_id);
+  return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::getStatusFromAction(const BucketAction& action,
@@ -368,16 +363,8 @@ RateLimitQuotaFilter::processExpiredBucket(size_t bucket_id,
 
   const RateLimitStrategy& fallback_rate_limit =
       match_action.bucketSettings().expired_assignment_behavior().fallback_rate_limit();
-  if (!fallback_rate_limit.has_blanket_rule()) {
-    ENVOY_LOG(error,
-              "Bucket default action selected for expiration fallback as "
-              "the configured fallback contains an unsupported action {} for "
-              "bucket_id {}.",
-              fallback_rate_limit.DebugString(), bucket_id);
-    return getStatusFromAction(cached_bucket->default_action, bucket_id);
-  }
-
-  if (fallback_rate_limit.blanket_rule() == RateLimitStrategy::DENY_ALL) {
+  if (fallback_rate_limit.has_blanket_rule() &&
+      fallback_rate_limit.blanket_rule() == RateLimitStrategy::DENY_ALL) {
     ENVOY_LOG(debug,
               "Exipred action falling back to configured DENY_ALL for "
               "bucket_id {}",
