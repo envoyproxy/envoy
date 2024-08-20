@@ -31,12 +31,12 @@ jobs:
         - data-plane-api
         - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.34
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.35
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.34
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.35
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
