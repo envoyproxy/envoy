@@ -60,8 +60,12 @@ public:
 
     // Unregister the watermark callbacks(if any) to prevent access of filter callbacks after
     // the filter object is destroyed.
-    if (grpc_side_stream_flow_control_ && !stream_closed_) {
-      stream_.removeWatermarkCallbacks();
+    if (!stream_closed_) {
+      // Remove the parent stream info to avoid a dangling reference.
+      stream_.streamInfo().clearParentStreamInfo();
+      if (grpc_side_stream_flow_control_) {
+        stream_.removeWatermarkCallbacks();
+      }
     }
   }
 
@@ -74,6 +78,7 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_.streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_.streamInfo(); }
 
   bool grpcSidestreamFlowControl() { return grpc_side_stream_flow_control_; }
 

@@ -1532,6 +1532,30 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return connection_info.serialNumberPeerCertificate();
                   });
             }}},
+          {"DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.sha256PeerCertificateChainDigests(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.sha1PeerCertificateChainDigests(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_PEER_CHAIN_SERIALS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](const absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.serialNumbersPeerCertificates(), ",");
+                  });
+            }}},
           {"DOWNSTREAM_PEER_ISSUER",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {

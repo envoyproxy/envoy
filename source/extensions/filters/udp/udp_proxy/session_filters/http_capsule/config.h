@@ -14,6 +14,7 @@ namespace HttpCapsule {
 
 using FilterConfig =
     envoy::extensions::filters::udp::udp_proxy::session::http_capsule::v3::FilterConfig;
+using FilterFactoryCb = Network::UdpSessionFilterFactoryCb;
 
 /**
  * Config registration for the http_capsule filter. @see

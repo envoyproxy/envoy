@@ -209,7 +209,7 @@ public:
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager, const Http::FilterChainOptions&),
+               FilterChainManager& manager, const FilterChainOptions&),
               (const));
 };
 
@@ -577,6 +577,7 @@ public:
               (override));
   MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
 
 private:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
