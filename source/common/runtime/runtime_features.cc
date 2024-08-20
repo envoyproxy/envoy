@@ -62,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply)
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_route_connect_proxy_by_default);
+RUNTIME_GUARD(envoy_reloadable_features_internal_authority_header_validator);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
 RUNTIME_GUARD(envoy_reloadable_features_lua_flow_control_while_http_call);
@@ -89,6 +90,7 @@ RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_remote_address_use_connection);
+RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_use_http3_header_normalisation);
 RUNTIME_GUARD(envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san);
 RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
@@ -135,8 +137,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_http_client_to_fetch_aws_crede
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(pksohn): enable after canarying fix for https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
-// TODO(panting): flip this to true after some test time.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 // TODO(#33474) removed it once GRO packet dropping is fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
