@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/proto_message_scrubbing/v3/config.pb.h"
 #include "envoy/extensions/filters/http/proto_message_scrubbing/v3/config.pb.validate.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/filters/http/proto_message_scrubbing/extractor.h"
 #include "source/extensions/filters/http/proto_message_scrubbing/scrubbing_util/proto_scrubber_interface.h"
 
@@ -20,7 +21,6 @@
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
-#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,7 +90,7 @@ absl::Status ExtractorImpl::init() {
     }
 
     // TODO: Remove this check once proto field extraction lib validation is completed.
-    if (TypeMapping(it.second) == ScrubbedMessageDirective::SCRUB_REDACT){
+    if (TypeMapping(it.second) == ScrubbedMessageDirective::SCRUB_REDACT) {
       return absl::InvalidArgumentError("SCRUB_REDACT tag cannot be used with leaf fields");
     }
 

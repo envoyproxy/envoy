@@ -9,9 +9,9 @@
 #include <utility>
 #include <vector>
 
+#include "source/common/common/logger.h"
 #include "source/common/http/status.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
@@ -235,7 +235,7 @@ int64_t ExtractRepeatedFieldSize(const Type& type,
       ExtractRepeatedFieldSizeHelper(field_extractor, field_mask->paths(0), message);
   if (!status_or_size.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to extract repeated field size of '{}' from proto '{}': {}",
-                     field_mask->paths(0), type.name(), status_or_size.status());
+                   field_mask->paths(0), type.name(), status_or_size.status());
   } else {
     num_response_items = *status_or_size;
   }
