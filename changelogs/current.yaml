@@ -72,11 +72,6 @@ bug_fixes:
     ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
 
 removed_config_or_runtime:
-- area: http
-  change: |
-    Removed runtime guard envoy_reloadable_features_use_http3_header_normalisation
-
-removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: upstream
   change: |
@@ -133,6 +128,9 @@ removed_config_or_runtime:
 - area: dynamic forward proxy
   change: |
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.use_http3_header_normalisation`` runtime flag and legacy code paths.
 
 new_features:
 - area: redis
