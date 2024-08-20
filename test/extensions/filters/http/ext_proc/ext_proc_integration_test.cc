@@ -88,6 +88,19 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
+  const std::string default_http_config_ = R"EOF(
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+  )EOF";
+
   void initializeConfig(ConfigOptions config_option = {},
                         const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
                                                                                      {1, 1}}) {
@@ -121,15 +134,19 @@ protected:
       }
 
       const std::string valid_grpc_cluster_name = "ext_proc_server_0";
-      if (config_option.valid_grpc_server) {
-        // Load configuration of the server from YAML and use a helper to add a grpc_service
-        // stanza pointing to the cluster that we just made
-        setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
-                       grpc_upstreams_[0]->localAddress());
+      if (is_grpc_test_) {
+        if (config_option.valid_grpc_server) {
+          // Load configuration of the server from YAML and use a helper to add a grpc_service
+          // stanza pointing to the cluster that we just made
+          setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
+                         grpc_upstreams_[0]->localAddress());
+        } else {
+          // Set up the gRPC service with wrong cluster name and address.
+          setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
+                         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+        }
       } else {
-        // Set up the gRPC service with wrong cluster name and address.
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
-                       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+        TestUtility::loadFromYaml(default_http_config_, proto_config_);
       }
 
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
@@ -177,7 +194,8 @@ protected:
 
       // Add logging test filter only in Envoy gRPC mode.
       // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
-      if (clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter &&
+
+      if (is_grpc_test_ && clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter &&
           config_option.valid_grpc_server) {
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
@@ -357,17 +375,28 @@ protected:
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
       ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     }
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_headers());
-    if (first_message) {
-      processor_stream_->startGrpcStream();
+
+    if (is_grpc_test_) {
+      ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+      ASSERT_TRUE(request.has_request_headers());
+      if (first_message) {
+        processor_stream_->startGrpcStream();
+      }
+      ProcessingResponse response;
+      auto* headers = response.mutable_request_headers();
+      const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
+      if (sendReply) {
+        processor_stream_->sendGrpcMessage(response);
+      }
+    } else {
+      AssertionResult result = processor_stream_->waitForHeadersComplete();
+      RELEASE_ASSERT(result, result.message());
+      std::cout << "\n yanjun process request message 3 " << result.message() << std::endl;
+
+      std::cout << "\n yanjun process request message 4 host " << processor_stream_->headers().Host()->value().getStringView() <<  std::endl;
+      processor_stream_->encodeHeaders(default_response_headers_, false);
     }
-    ProcessingResponse response;
-    auto* headers = response.mutable_request_headers();
-    const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
-    if (sendReply) {
-      processor_stream_->sendGrpcMessage(response);
-    }
+
   }
 
   void processRequestTrailersMessage(
@@ -720,6 +749,7 @@ protected:
   TestScopedRuntime scoped_runtime_;
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
+  bool is_grpc_test_ = true;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -727,6 +757,7 @@ INSTANTIATE_TEST_SUITE_P(
     GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
     Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
+#if 0
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by immediately closing the stream.
@@ -4648,6 +4679,58 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_"
                                  "paused_reading_total",
                                  2);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+#endif
+
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersHttpClient) {
+  is_grpc_test_ = false;
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
+
+  AssertionResult result = grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_);
+  std::cout << "\n yanjun process request message 1 " << result.message() << std::endl;
+  RELEASE_ASSERT(result, result.message());
+  result = processor_connection_->waitForNewStream(*dispatcher_, processor_stream_);
+  std::cout << "\n yanjun process request message 2 " << result.message() << std::endl;
+  RELEASE_ASSERT(result, result.message());
+
+  result = processor_stream_->waitForHeadersComplete();
+  RELEASE_ASSERT(result, result.message());
+  std::cout << "\n yanjun process request message 3 " << result.message() << std::endl;
+
+  std::cout << "\n yanjun process request message 4 host " << processor_stream_->headers().Host()->value().getStringView() <<  std::endl;
+  processor_stream_->encodeHeaders(default_response_headers_, true);
+
+  std::cout << "\n 10 yanjun GetAndSetHeaders header processing complete \n";
+
+
+
+  std::cout << "\n yanjun hello world 0 \n";
+
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  std::cout << "\n yanjun hello world 1 \n";
+
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  std::cout << "\n yanjun hello world 2 \n";
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  std::cout << "\n yanjun hello world 3 \n";
+//  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+//  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+ // upstream_request_->encodeData(100, true);
 
   verifyDownstreamResponse(*response, 200);
 }

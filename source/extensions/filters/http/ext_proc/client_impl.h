@@ -27,9 +27,6 @@ class ExternalProcessorClientImpl : public ExternalProcessorClient {
 public:
   ExternalProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
 
-  void cancel() override {}
-  void sendRequest() override {}
-
   ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,

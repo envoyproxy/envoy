@@ -30,7 +30,7 @@ public:
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
 
-class ExternalProcessorCallbacks {
+class ExternalProcessorCallbacks : public RequestCallbacks {
 public:
   virtual ~ExternalProcessorCallbacks() = default;
   virtual void onReceiveMessage(

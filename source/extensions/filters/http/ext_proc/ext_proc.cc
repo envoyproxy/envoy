@@ -9,6 +9,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -341,6 +342,16 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
   watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
+void Filter::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream) {
+  if (config_->grpcService().has_value()) {
+    stream_->send(std::move(req), end_stream);
+  } else {
+    ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
+    http_client->setCallbacks(this);
+    http_client->sendRequest(std::move(req), end_stream);
+  }
+}
+
 Filter::StreamOpenState Filter::openStream() {
   // External processing is completed. This means there is no need to send any further
   // message to the server for processing. Just return IgnoreError so the filter
@@ -452,7 +463,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
-  stream_->send(std::move(req), false);
+  sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
@@ -677,7 +688,7 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
   ENVOY_LOG(debug, "Sending headers message in observability mode");
-  stream_->send(std::move(req), false);
+  sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
   return FilterHeadersStatus::Continue;
@@ -702,7 +713,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
     // Set up the the body chunk and send.
     auto req = setupBodyChunk(state, data, end_stream);
     req.set_observability_mode(true);
-    stream_->send(std::move(req), false);
+    sendRequest(std::move(req), false);
     stats_.stream_msgs_sent_.inc();
     ENVOY_LOG(debug, "Sending body message in ObservabilityMode");
   } else if (state.bodyMode() != ProcessingMode::NONE) {
@@ -894,7 +905,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
-  stream_->send(std::move(req), false);
+  sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -910,7 +921,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
-  stream_->send(std::move(req), false);
+  sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 

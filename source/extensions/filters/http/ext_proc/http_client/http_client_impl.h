@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/http/async_client.h"
 
 #include "source/common/common/logger.h"
@@ -23,8 +24,8 @@ public:
 
   ~ExtProcHttpClient() { cancel(); }
 
-  void sendRequest() override {}
-  void cancel() override {}
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
+  void cancel() {}
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   // Http::AsyncClient::Callbacks implemented by this class.
@@ -35,10 +36,13 @@ public:
 
   Server::Configuration::ServerFactoryContext& context() const { return context_; }
 
+  void setCallbacks(RequestCallbacks* callbacks) { callbacks_ = callbacks; }
+
 private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
+  RequestCallbacks* callbacks_{};
 };
 
 } // namespace ExternalProcessing

@@ -34,6 +34,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/ext_proc/http_client:client_base_interface",
+        "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/strings:string_view",

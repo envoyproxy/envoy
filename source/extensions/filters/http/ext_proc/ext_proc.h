@@ -440,6 +440,12 @@ public:
   const ProcessorState& encodingState() { return encoding_state_; }
   const ProcessorState& decodingState() { return decoding_state_; }
 
+  void onComplete() override {
+    std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse> my_resp = std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>();
+    my_resp->mutable_request_headers()->mutable_response()->set_clear_route_cache(true);
+    onReceiveMessage(std::move(my_resp));
+  }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -474,6 +480,8 @@ private:
   envoy::service::ext_proc::v3::ProcessingRequest
   buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                      bool end_stream, bool observability_mode);
+
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;

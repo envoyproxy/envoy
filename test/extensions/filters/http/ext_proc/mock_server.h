@@ -13,8 +13,6 @@ class MockClient : public ExternalProcessorClient {
 public:
   MockClient();
   ~MockClient() override;
-  void cancel() override {}
-  void sendRequest() override {}
 
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
               (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
