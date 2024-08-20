@@ -159,11 +159,6 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
-//
-// If `connect` is set to true, the socket is connected (connect() is called on the socket). If
-// `connect` is set to false, the socket is not connected, but instead bind() is called. The bind()
-// call is not made when `connect` is set to true. Set `connect` to true when creating a client
-// outbound QUIC connection.
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,

@@ -176,7 +176,8 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
           : 0u;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram,
-      // The local address is used to retrieve the IoHandle, so it is required to not be null here.
+      // Use an arbitrary local address if `local_addr` is null, to pass in the socket interface
+      // used to create IoHandle.
       local_addr ? local_addr : Network::Utility::getLocalAddress(peer_addr->ip()->version()),
       peer_addr, Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");

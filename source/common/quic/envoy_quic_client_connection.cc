@@ -131,7 +131,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
   if (!connection_socket.isOpen() && connectionSocket().get() == &connection_socket) {
     // Only close the connection if the connection socket is the current one. If it is a probing
     // socket that isn't the current socket, do not close the connection upon failure, as the
-    // current socket is still valid.
+    // current socket is still usable.
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
