@@ -91,7 +91,7 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   }
   ENVOY_BUG(event != Network::ConnectionEvent::ConnectedZeroRtt,
             "Unexpected 0-RTT event from the underlying TCP connection.");
-  parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
+  parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event, true);
 
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {

@@ -94,6 +94,8 @@ public:
   }
 
   MOCK_METHOD(Config::EdsResourcesCacheOptRef, edsResourcesCache, ());
+  MOCK_METHOD(void, createNetworkObserverRegistries,
+              (Quic::EnvoyQuicNetworkObserverRegistryFactory&));
 
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 

@@ -9,12 +9,26 @@
 namespace Envoy {
 namespace Quic {
 
+// A registry of network connectivity observers.
 class EnvoyQuicNetworkObserverRegistry {
 public:
   virtual ~EnvoyQuicNetworkObserverRegistry() = default;
 
-  virtual void registerObserver(QuicNetworkConnectivityObserver& observer) PURE;
-  virtual void unregisterObserver(QuicNetworkConnectivityObserver& observer) PURE;
+  void registerObserver(QuicNetworkConnectivityObserver& observer) {
+    quic_observers_.insert(&observer);
+  }
+
+  void unregisterObserver(QuicNetworkConnectivityObserver& observer) {
+    quic_observers_.erase(&observer);
+  }
+
+protected:
+  const absl::flat_hash_set<QuicNetworkConnectivityObserver*>& registeredQuicObservers() const {
+    return quic_observers_;
+  }
+
+private:
+  absl::flat_hash_set<QuicNetworkConnectivityObserver*> quic_observers_;
 };
 
 using EnvoyQuicNetworkObserverRegistryPtr = std::unique_ptr<EnvoyQuicNetworkObserverRegistry>;
@@ -24,7 +38,9 @@ public:
   virtual ~EnvoyQuicNetworkObserverRegistryFactory() = default;
 
   virtual EnvoyQuicNetworkObserverRegistryPtr
-  createQuicNetworkObserverRegistry(Event::Dispatcher& dispatcher) PURE;
+  createQuicNetworkObserverRegistry(Event::Dispatcher& /*dispatcher*/) {
+    return std::make_unique<EnvoyQuicNetworkObserverRegistry>();
+  }
 };
 
 using EnvoyQuicNetworkObserverRegistryFactoryPtr =

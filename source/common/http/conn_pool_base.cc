@@ -102,6 +102,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
   if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
+      close_after_goaway_ = true;
       codec_client_->close();
     } else {
       parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);

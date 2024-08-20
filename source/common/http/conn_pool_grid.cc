@@ -20,8 +20,10 @@ bool hasBothAddressFamilies(Upstream::HostConstSharedPtr host) {
 }
 
 namespace {
-absl::string_view describePool(const ConnectionPool::Instance& pool) {
-  return pool.protocolDescription();
+std::string describePool(const ConnectionPool::Instance& pool) {
+  std::ostringstream oss;
+  oss << pool.protocolDescription() << " @" << static_cast<void const*>(&pool);
+  return oss.str();
 }
 
 static constexpr uint32_t kDefaultTimeoutMs = 300;
@@ -406,6 +408,7 @@ bool ConnectivityGrid::hasActiveConnections() const {
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks,
                                                          const Instance::StreamOptions& options) {
+  std::cerr << "ConnectivityGrid::newStream @" << static_cast<const void*>(this) << "\n";
   ASSERT(!deferred_deleting_);
 
   // New streams should not be created during draining.

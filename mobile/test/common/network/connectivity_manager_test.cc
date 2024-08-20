@@ -1,6 +1,7 @@
 #include <net/if.h>
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
 #include "gtest/gtest.h"
@@ -47,6 +48,24 @@ TEST_F(ConnectivityManagerTest,
   EXPECT_NE(original_key, stale_key);
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST_F(ConnectivityManagerTest, OnNetworkMadeDefault) {
+  Quic::EnvoyMobileQuicNetworkObserverRegistryPtr registry;
+  Event::MockDispatcher dispatcher;
+  EXPECT_CALL(cm_, createNetworkObserverRegistries(_))
+      .WillOnce(Invoke([&](Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) {
+        registry.reset(static_cast<Quic::EnvoyMobileQuicNetworkObserverRegistry*>(
+            factory.createQuicNetworkObserverRegistry(dispatcher).release()));
+      }));
+  connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
+  EXPECT_NE(nullptr, registry);
+  envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
+  EXPECT_CALL(dispatcher, post(_));
+  envoy_netconf_t new_key = connectivity_manager_->onNetworkMadeDefault(NetworkType::WWAN);
+  EXPECT_NE(original_key, new_key);
+}
+#endif
 
 TEST_F(ConnectivityManagerTest, RefreshDnsForCurrentConfigurationTriggersDnsRefresh) {
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());

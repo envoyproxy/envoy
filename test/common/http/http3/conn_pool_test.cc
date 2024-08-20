@@ -36,6 +36,20 @@ public:
   MOCK_METHOD(void, onZeroRttHandshakeFailed, ());
 };
 
+class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
+public:
+  void onNetworkChanged() {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkChanged();
+    }
+  }
+  using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
+};
+
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
@@ -69,7 +83,7 @@ public:
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         quic_info_, happy_eyeballs_);
+                         quic_info_, {observers_}, happy_eyeballs_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -93,6 +107,8 @@ public:
   Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
+  // Needs to out-live pool_;
+  TestNetworkObserverRegistry observers_;
   std::unique_ptr<Http3ConnPoolImpl> pool_;
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
@@ -127,10 +143,10 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   new Event::MockSchedulableCallback(&dispatcher_);
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::TransportSocketOptionsConstSharedPtr transport_options;
-  ConnectionPool::InstancePtr pool =
-      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
+  ConnectionPool::InstancePtr pool = allocateConnPool(
+      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options, transport_options,
+      state_, quic_stat_names_, {}, *store_.rootScope(),
+      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_, {observers_});
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
 }
@@ -154,10 +170,10 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   new Event::MockSchedulableCallback(&dispatcher_);
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::TransportSocketOptionsConstSharedPtr transport_options;
-  ConnectionPool::InstancePtr pool =
-      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
+  ConnectionPool::InstancePtr pool = allocateConnPool(
+      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options, transport_options,
+      state_, quic_stat_names_, {}, *store_.rootScope(),
+      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_, {observers_});
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
@@ -208,7 +224,7 @@ void Http3ConnPoolImplTest::createNewStream() {
   EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
-  pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
+  pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected, true);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) { createNewStream(); }
@@ -271,6 +287,69 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   // Triggering the async connect callback after the client starts draining shouldn't cause crash.
   async_connect_callback->invokeCallback();
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
+// Tests that network change happens when the pool is establishing a new connection for pending
+// streams, the connection should be closed without triggering a pool failure. And a new connectio
+// on the new network should be established to handle the pending streams.
+TEST_F(Http3ConnPoolImplTest, PendingNewStreamWithNetworkChange) {
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+  initialize();
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  mockHost().cluster_.cluster_socket_options_ = std::make_shared<Network::Socket::Options>();
+  std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
+  mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
+  EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
+      .Times(2u)
+      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
+                                 -> Upstream::UpstreamLocalAddress {
+        if (happy_eyeballs_ && address_list_->size() == 2) {
+          EXPECT_EQ(address, (*address_list_)[1]);
+        } else {
+          EXPECT_EQ(address, test_address_);
+        }
+        Network::ConnectionSocket::OptionsSharedPtr options =
+            std::make_shared<Network::ConnectionSocket::Options>();
+        Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
+        return Upstream::UpstreamLocalAddress({nullptr, options});
+      }));
+  EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(6u);
+  EXPECT_CALL(*socket_option_, setOption(_, _)).Times(6u);
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
+  EXPECT_NE(nullptr, cancellable);
+  async_connect_callback->invokeCallback();
+
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  EXPECT_EQ(1u, clients.size());
+  EXPECT_EQ(observers_.registeredQuicObservers().size(), 1);
+  Envoy::ConnectionPool::ActiveClient* client = clients.front().get();
+
+  // Network change should close the connection but shouldn't cause pool failure. Instead a new
+  // connection should be attempted.
+  EXPECT_CALL(callbacks.pool_failure_, ready()).Times(0);
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+  async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  observers_.onNetworkChanged();
+  async_connect_callback->invokeCallback();
+
+  EXPECT_NE(client, clients.front().get());
+  // The closed connection hasn't been destroyed yet, its observer is still
+  // registered.
+  EXPECT_EQ(observers_.registeredQuicObservers().size(), 2);
+
+  EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
+    // Cancel the request to avoid actually creating a QUIC stream on the QUIC connection.
+    cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  }));
+  clients.front()->onEvent(Network::ConnectionEvent::Connected);
 }
 
 } // namespace Http3

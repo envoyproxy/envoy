@@ -4,28 +4,24 @@
 namespace Envoy {
 namespace Quic {
 
-void EnvoyQuicNetworkObserverRegistryImpl::registerObserver(
-    QuicNetworkConnectivityObserver& observer) {
-  quic_observers_.insert(&observer);
-}
-
-void EnvoyQuicNetworkObserverRegistryImpl::unregisterObserver(
-    QuicNetworkConnectivityObserver& observer) {
-  quic_observers_.erase(&observer);
-}
-
-void EnvoyQuicNetworkObserverRegistryImpl::onNetworkMadeDefault() {
+void EnvoyMobileQuicNetworkObserverRegistry::onNetworkMadeDefault() {
+  ENVOY_LOG_MISC(trace, "Default network changed.");
   dispatcher_.post([this]() {
-    for (QuicNetworkConnectivityObserver* observer : quic_observers_) {
+    // Retain the existing observers in a list and iterate on the list.
+    std::list<quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
       observer->onNetworkChanged();
     }
   });
 }
 
 EnvoyQuicNetworkObserverRegistryPtr
-EnvoyQuicNetworkObserverRegistryFactoryImpl::createQuicNetworkObserverRegistry(
+EnvoyMobileQuicNetworkObserverRegistryFactory::createQuicNetworkObserverRegistry(
     Event::Dispatcher& dispatcher) {
-  auto result = std::make_unique<EnvoyQuicNetworkObserverRegistryImpl>(dispatcher);
+  auto result = std::make_unique<EnvoyMobileQuicNetworkObserverRegistry>(dispatcher);
   thread_local_observer_registries_.emplace_back(*result);
   return result;
 }

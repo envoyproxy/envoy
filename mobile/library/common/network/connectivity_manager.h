@@ -216,7 +216,7 @@ public:
       : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {
 #ifdef ENVOY_ENABLE_QUIC
     quic_observer_registry_factory_ =
-        std::make_unique<Quic::EnvoyQuicNetworkObserverRegistryFactoryImpl>();
+        std::make_unique<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>();
     cluster_manager_.createNetworkObserverRegistries(*quic_observer_registry_factory_);
 #endif
   }
@@ -271,7 +271,8 @@ private:
       dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
 #ifdef ENVOY_ENABLE_QUIC
-  Quic::EnvoyQuicNetworkObserverRegistryFactoryImplPtr quic_observer_registry_factory_;
+  std::unique_ptr<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>
+      quic_observer_registry_factory_;
 #endif
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;

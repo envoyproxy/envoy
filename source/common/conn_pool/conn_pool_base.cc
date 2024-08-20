@@ -6,6 +6,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/server/backtrace.h"
 
 namespace Envoy {
 namespace ConnectionPool {
@@ -478,7 +479,8 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 }
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
-                                         Network::ConnectionEvent event) {
+                                         Network::ConnectionEvent event,
+                                         bool purge_pending_streams) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
   case Network::ConnectionEvent::LocalClose: {
@@ -492,7 +494,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.
-    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", client, failure_reason);
+    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}. {}purge pending streams",
+                   client, failure_reason, (purge_pending_streams ? "" : "Not "));
 
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     const bool incomplete_stream = client.closingWithIncompleteStream();
@@ -518,13 +521,15 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
         reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
 
-      // Raw connect failures should never happen under normal circumstances. If we have an
-      // upstream that is behaving badly, streams can get stuck here in the pending state. If we
-      // see a connect failure, we purge all pending streams so that calling code can determine
-      // what to do with the stream.
-      // NOTE: We move the existing pending streams to a temporary list. This is done so that
-      //       if retry logic submits a new stream to the pool, we don't fail it inline.
-      purgePendingStreams(client.real_host_description_, failure_reason, reason);
+      if (purge_pending_streams) {
+        // Raw connect failures should never happen under normal circumstances. If we have an
+        // upstream that is behaving badly, streams can get stuck here in the pending state. If we
+        // see a connect failure, we purge all pending streams so that calling code can determine
+        // what to do with the stream.
+        // NOTE: We move the existing pending streams to a temporary list. This is done so that
+        //       if retry logic submits a new stream to the pool, we don't fail it inline.
+        purgePendingStreams(client.real_host_description_, failure_reason, reason);
+      }
       // See if we should preconnect based on active connections.
       if (!is_draining_for_deletion_) {
         tryCreateNewConnections();

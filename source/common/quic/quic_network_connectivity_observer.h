@@ -2,13 +2,15 @@
 
 #include <memory>
 
+#include "source/common/common/logger.h"
+
 namespace Envoy {
 namespace Quic {
 
 class EnvoyQuicClientSession;
 
 // TODO(danzh) deprecate this class once QUICHE has its own more detailed network observer.
-class QuicNetworkConnectivityObserver {
+class QuicNetworkConnectivityObserver : protected Logger::Loggable<Logger::Id::connection> {
 public:
   // session must outlive this object.
   explicit QuicNetworkConnectivityObserver(EnvoyQuicClientSession& session);

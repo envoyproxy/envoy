@@ -104,8 +104,9 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network
 }
 
 envoy_netconf_t ConnectivityManagerImpl::onNetworkMadeDefault(NetworkType network) {
+  ENVOY_LOG_MISC(trace, "Default network changed to {}", static_cast<int>(network));
   envoy_netconf_t configuration_key = setPreferredNetwork(network);
-  for (std::reference_wrapper<Quic::EnvoyQuicNetworkObserverRegistryImpl> registry :
+  for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
        quic_observer_registry_factory_->getCreatedObserverRegistries()) {
     registry.get().onNetworkMadeDefault();
   }
@@ -316,16 +317,7 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(Netwo
     return getAlternateInterfaceSocketOptions(network);
   }
 
-  // Envoy uses the hash signature of overridden socket options to choose a connection pool.
-  // Setting a dummy socket option is a hack that allows us to select a different
-  // connection pool without materially changing the socket configuration.
-  ASSERT(static_cast<int>(network) >= 0 && static_cast<int>(network) < 3);
-  int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
-  auto options = std::make_shared<Socket::Options>();
-  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
-      ENVOY_SOCKET_IPV6_UNICAST_HOPS, ttl_value));
-  return options;
+  return std::make_shared<Socket::Options>();
 }
 
 Socket::OptionsSharedPtr

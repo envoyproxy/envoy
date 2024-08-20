@@ -10,7 +10,24 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
+
 namespace Envoy {
+#else
+
+namespace Envoy {
+
+// Dumb definitions of QUIC classes if QUICHE is compiled out.
+namespace Quic {
+
+class EnvoyQuicNetworkObserverRegistryFactory {};
+class EnvoyQuicNetworkObserverRegistry {};
+
+} // namespace Quic
+
+#endif
+
 namespace Upstream {
 using ::testing::NiceMock;
 class MockClusterManagerFactory : public ClusterManagerFactory {
@@ -32,7 +49,8 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                TimeSource& source, ClusterConnectivityState& state,
-               Http::PersistentQuicInfoPtr& quic_info));
+               Http::PersistentQuicInfoPtr& quic_info,
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
