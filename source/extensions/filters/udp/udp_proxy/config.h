@@ -163,8 +163,6 @@ public:
       if (config.has_value()) {
         Network::UdpSessionFilterFactoryCb& factory = config.value();
         factory(callbacks);
-      } else {
-        ENVOY_LOG(warn, "missing filter configuration: {}", filter_config_provider->name());
       }
     }
   };
