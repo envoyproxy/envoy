@@ -58,9 +58,8 @@ message HttpConnectionManager {
     // Prior knowledge is allowed).
     HTTP2 = 2;
 
-    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
-    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
-    // to distinguish HTTP1 and HTTP2 traffic.
+    // The connection manager will assume that the client is speaking HTTP/3.
+    // This needs to be consistent with listener and transport socket config.
     HTTP3 = 3;
   }
 
