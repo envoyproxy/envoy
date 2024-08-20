@@ -476,6 +476,10 @@ public:
    */
   virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
 
+  /**
+   * Create a QUIC network observer registry for each worker thread using the given factory.
+   * @param factory used to create a registry object.
+   */
   virtual void createNetworkObserverRegistries(
       Envoy::Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) PURE;
 };
@@ -526,6 +530,8 @@ public:
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
    * 'protocol', and 'options->hashKey()', if any.
+   * @param network_observer_registry if not null all the QUIC connections created by this pool
+   * should register to it for network events.
    */
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,

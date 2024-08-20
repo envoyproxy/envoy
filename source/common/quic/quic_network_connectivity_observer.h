@@ -17,6 +17,7 @@ public:
   QuicNetworkConnectivityObserver(const QuicNetworkConnectivityObserver&) = delete;
   QuicNetworkConnectivityObserver& operator=(const QuicNetworkConnectivityObserver&) = delete;
 
+  // Called when the device switches to a different network.
   void onNetworkChanged();
 
 private:

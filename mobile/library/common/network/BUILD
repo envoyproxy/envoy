@@ -5,9 +5,9 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
-    name = "envoy_quic_network_observer_registry_factory_impl_lib",
-    srcs = ["envoy_quic_network_observer_registry_factory_impl.cc"],
-    hdrs = ["envoy_quic_network_observer_registry_factory_impl.h"],
+    name = "envoy_mobile_quic_network_observer_registry_factory_lib",
+    srcs = ["envoy_mobile_quic_network_observer_registry_factory.cc"],
+    hdrs = ["envoy_mobile_quic_network_observer_registry_factory.h"],
     repository = "@envoy",
     deps = [
         "@envoy//source/common/quic:envoy_quic_client_session_lib",
@@ -37,7 +37,7 @@ envoy_cc_library(
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
     ] + envoy_select_enable_http3(
         [
-            ":envoy_quic_network_observer_registry_factory_impl_lib",
+            ":envoy_mobile_quic_network_observer_registry_factory_lib",
         ],
         "@envoy",
     ),

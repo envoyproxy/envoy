@@ -408,7 +408,6 @@ bool ConnectivityGrid::hasActiveConnections() const {
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks,
                                                          const Instance::StreamOptions& options) {
-  std::cerr << "ConnectivityGrid::newStream @" << static_cast<const void*>(this) << "\n";
   ASSERT(!deferred_deleting_);
 
   // New streams should not be created during draining.

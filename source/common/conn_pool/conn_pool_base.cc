@@ -6,7 +6,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/backtrace.h"
 
 namespace Envoy {
 namespace ConnectionPool {

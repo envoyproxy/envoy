@@ -1,4 +1,3 @@
-#include "connectivity_manager.h"
 #include "library/common/network/connectivity_manager.h"
 
 #include <net/if.h>
@@ -77,6 +76,16 @@ constexpr unsigned int InitialFaultThreshold = 1;
 // The number of faults allowed on a previously-successful connection (i.e. able to send and receive
 // L7 bytes) before switching socket mode.
 constexpr unsigned int MaxFaultThreshold = 3;
+
+ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
+                                                 DnsCacheManagerSharedPtr dns_cache_manager)
+    : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {
+#ifdef ENVOY_ENABLE_QUIC
+  quic_observer_registry_factory_ =
+      std::make_unique<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>();
+  cluster_manager_.createNetworkObserverRegistries(*quic_observer_registry_factory_);
+#endif
+}
 
 ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
     1, NetworkType::Generic, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode,

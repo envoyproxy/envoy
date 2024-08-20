@@ -290,7 +290,7 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
 }
 
 // Tests that network change happens when the pool is establishing a new connection for pending
-// streams, the connection should be closed without triggering a pool failure. And a new connectio
+// streams, the connection should be closed without triggering a pool failure. And a new connection
 // on the new network should be established to handle the pending streams.
 TEST_F(Http3ConnPoolImplTest, PendingNewStreamWithNetworkChange) {
   EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));

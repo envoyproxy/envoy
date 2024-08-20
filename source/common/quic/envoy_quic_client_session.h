@@ -91,9 +91,10 @@ public:
   void OnServerPreferredAddressAvailable(
       const quic::QuicSocketAddress& server_preferred_address) override;
 
-  // Called when device switches to a different network.
+  // Called when the device switches to a different network.
   void notifyServerGoAway();
 
+  // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;

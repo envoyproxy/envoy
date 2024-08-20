@@ -15,7 +15,7 @@
 #include "library/common/types/c_types.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "library/common/network/envoy_quic_network_observer_registry_factory_impl.h"
+#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
 #endif
 
 /**
@@ -212,14 +212,7 @@ public:
   static envoy_netconf_t setPreferredNetwork(NetworkType network);
 
   ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
-                          DnsCacheManagerSharedPtr dns_cache_manager)
-      : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {
-#ifdef ENVOY_ENABLE_QUIC
-    quic_observer_registry_factory_ =
-        std::make_unique<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>();
-    cluster_manager_.createNetworkObserverRegistries(*quic_observer_registry_factory_);
-#endif
-  }
+                          DnsCacheManagerSharedPtr dns_cache_manager);
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
   void onDnsHostAddOrUpdate(

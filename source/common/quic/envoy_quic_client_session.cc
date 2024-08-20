@@ -1,4 +1,3 @@
-#include "envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 
 #include <openssl/ssl.h>

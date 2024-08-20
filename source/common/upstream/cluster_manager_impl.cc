@@ -2004,7 +2004,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   for (auto protocol : upstream_protocols) {
     hash_key.push_back(uint8_t(protocol));
   }
-  ENVOY_LOG(trace, "======== hash_key by upstream_protocols {}", absl::StrJoin(hash_key, "-"));
 
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_options = host->cluster().alternateProtocolsCacheOptions();
@@ -2022,24 +2021,18 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   // different options are not pooled together.
   for (const auto& option : *upstream_options) {
     option->hashKey(hash_key);
-    ENVOY_LOG(trace, "======== hash_key by upstream option {} from LB context @{}",
-              absl::StrJoin(hash_key, "-"), static_cast<const void*>(context),
-              static_cast<const void*>(option.get()));
   }
 
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
     have_transport_socket_options = true;
-    ENVOY_LOG(trace, "======== hash_key by upstream transport socket options {}",
-              absl::StrJoin(hash_key, "-"));
   }
 
   // If configured, use the downstream connection id in pool hash key
   if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
       context->downstreamConnection()) {
     context->downstreamConnection()->hashKey(hash_key);
-    ENVOY_LOG(trace, "======== hash_key by downstream connection {}", absl::StrJoin(hash_key, "-"));
   }
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
@@ -2048,8 +2041,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   // function. Otherwise, we'd need to capture a few of these variables by value.
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
-        ENVOY_LOG(trace, "======== create a new pool for priority {}, hash_key {}",
-                  static_cast<uint8_t>(priority), absl::StrJoin(hash_key, "-"));
         auto pool = parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
@@ -2065,11 +2056,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
       });
 
   if (pool.has_value()) {
-    ENVOY_LOG(trace,
-              "======= ClusterEntry(@{})::httpConnPoolImpl: pool container @{}, host @{}, pool @{}",
-              static_cast<const void*>(this), static_cast<const void*>(&container),
-              static_cast<const void*>(host.get()),
-              static_cast<const void*>(&(pool.value().get())));
     return &(pool.value().get());
   } else {
     return nullptr;
