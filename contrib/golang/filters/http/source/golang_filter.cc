@@ -131,6 +131,14 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
 }
 
+void Filter::onStreamComplete() {
+  // We reuse the same flag for both onStreamComplete & log to save the space,
+  // since they are exclusive and serve for the access log purpose.
+  req_->is_golang_processing_log = 1;
+  dynamic_lib_->envoyGoFilterOnHttpStreamComplete(req_);
+  req_->is_golang_processing_log = 0;
+}
+
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
