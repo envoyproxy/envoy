@@ -68,7 +68,6 @@ build:mobile-dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
 build:ios --test_timeout=390,750,1500,5700
-build:ios --define=envoy_full_protos=enabled
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
@@ -231,7 +230,6 @@ build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:mobile-remote-ci-macos --remote_download_toplevel
 build:mobile-remote-ci-macos --config=ci
 build:mobile-remote-ci-macos --config=remote
-build:mobile-remote-ci-macos --define=envoy_full_protos=disabled
 
 build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci --config=remote-ci
