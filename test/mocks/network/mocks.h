@@ -724,6 +724,7 @@ public:
   MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
   MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+  MOCK_METHOD(const IoHandle::UdpSaveCmsgConfig&, saveCmsgConfig, (), (const));
 };
 
 class MockSocketInterface : public SocketInterfaceImpl {
