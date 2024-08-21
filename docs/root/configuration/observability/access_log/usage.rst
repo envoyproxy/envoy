@@ -1111,6 +1111,24 @@ UDP
   UDP
     Not implemented ("-").
 
+%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%
+  HTTP/TCP/THRIFT
+    The comma-separated hex-encoded SHA256 fingerprints of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1%
+  HTTP/TCP/THRIFT
+    The comma-separated hex-encoded SHA1 fingerprints of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_SERIALS%
+  HTTP/TCP/THRIFT
+    The comma-separated wserial numbers of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
 %DOWNSTREAM_PEER_CERT%
   HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.

@@ -14,6 +14,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
@@ -34,6 +35,8 @@ class ConfigHelper {
 public:
   using HttpConnectionManager =
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+  using UdpProxyConfig = envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig;
+
   struct ServerSslOptions {
     ServerSslOptions& setAllowExpiredCertificate(bool allow) {
       allow_expired_certificate_ = allow;
@@ -185,6 +188,7 @@ public:
       const ServerSslOptions& options);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
+  using UdpProxyModifierFunction = std::function<void(UdpProxyConfig&)>;
 
   // A basic configuration (admin port, cluster_0, no listeners) with no network filters.
   static std::string baseConfigNoListeners();
@@ -377,6 +381,10 @@ public:
   // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
 
+  // Allows callers to easily modify the UDP Proxy configuration.
+  // Modifiers will be applied just before ports are modified in finalize
+  void addConfigModifier(UdpProxyModifierFunction function);
+
   // Allows callers to easily modify the filter named 'name' from the first filter chain from the
   // first listener. Modifiers will be applied just before ports are modified in finalize
   template <class FilterType>
@@ -462,6 +470,11 @@ public:
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(const HttpConnectionManager& hcm);
+  // Load the first UDP Proxy from the first listener into a parsed proto.
+  bool loadUdpProxyFilter(UdpProxyConfig& udp_proxy);
+  // Take the contents of the provided UDP Proxy and stuff them into the first HCM
+  // struct of the first listener.
+  void storeUdpProxyFilter(const UdpProxyConfig& udp_proxy);
 
 private:
   // Load the first FilterType struct from the first listener into a parsed proto.
@@ -484,8 +497,34 @@ private:
     filter_config_any->PackFrom(filter);
   }
 
+  // Load the first FilterType struct from the first listener filters into a parsed proto.
+  template <class FilterType> bool loadListenerFilter(const std::string& name, FilterType& filter) {
+    RELEASE_ASSERT(!finalized_, "");
+    auto* filter_config = getListenerFilterFromListener(name);
+    if (filter_config) {
+      auto* config = filter_config->mutable_typed_config();
+      filter = MessageUtil::anyConvert<FilterType>(*config);
+      return true;
+    }
+    return false;
+  }
+
+  // Take the contents of the provided FilterType proto and stuff them into the first FilterType
+  // struct of the first listener.
+  template <class FilterType>
+  void storeListenerFilter(const std::string& name, const FilterType& filter) {
+    RELEASE_ASSERT(!finalized_, "");
+    auto* filter_config_any = getListenerFilterFromListener(name)->mutable_typed_config();
+
+    filter_config_any->PackFrom(filter);
+  }
+
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);
+
+  // Finds the filter named 'name' from the first listener filter from the first listener.
+  envoy::config::listener::v3::ListenerFilter*
+  getListenerFilterFromListener(const std::string& name);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;

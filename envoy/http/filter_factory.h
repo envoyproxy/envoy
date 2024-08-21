@@ -113,7 +113,7 @@ public:
   virtual bool createUpgradeFilterChain(
       absl::string_view upgrade, const UpgradeMap* per_route_upgrade_map,
       FilterChainManager& manager,
-      const Http::FilterChainOptions& option = EmptyFilterChainOptions{}) const PURE;
+      const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 };
 
 } // namespace Http
