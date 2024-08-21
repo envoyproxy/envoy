@@ -396,8 +396,8 @@ struct GetLastAddressFromXffInfo {
  * @param trusted_cidrs the list of CIDRs which are considered trusted proxies
  * @return whether the remote address is a trusted proxy
  */
-bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::InstanceConstSharedPtr& remote,
-                                 const std::vector<Network::Address::CidrRange> trusted_cidrs);
+bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::InstanceConstSharedPtr remote,
+                                 absl::Span<const Network::Address::CidrRange> trusted_cidrs);
 
 /**
  * Retrieves the last address in the x-forwarded-header after removing all trusted proxy addresses.
@@ -408,7 +408,7 @@ bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::InstanceConstSha
  */
 GetLastAddressFromXffInfo
 getLastNonTrustedAddressFromXFF(const Http::RequestHeaderMap& request_headers,
-                                const std::vector<Network::Address::CidrRange> trusted_cidrs);
+                                absl::Span<const Network::Address::CidrRange> trusted_cidrs);
 
 /**
  * Retrieves the last IPv4/IPv6 address in the x-forwarded-for header.

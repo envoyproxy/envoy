@@ -758,8 +758,8 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
 }
 
 bool Utility::remoteAddressIsTrustedProxy(
-    const Envoy::Network::Address::InstanceConstSharedPtr& remote,
-    const std::vector<Network::Address::CidrRange> trusted_cidrs) {
+    const Envoy::Network::Address::InstanceConstSharedPtr remote,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
   for (const auto& cidr : trusted_cidrs) {
     if (cidr.isInRange(*remote.get())) {
       return true;
@@ -770,12 +770,13 @@ bool Utility::remoteAddressIsTrustedProxy(
 
 Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
     const Http::RequestHeaderMap& request_headers,
-    const std::vector<Network::Address::CidrRange> trusted_cidrs) {
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
   const auto xff_header = request_headers.getForwardedForValue();
   static constexpr absl::string_view separator(",");
   static constexpr size_t MAX_ALLOWED_XFF_ENTRIES = 20;
 
-  const auto xff_entries = StringUtil::splitToken(xff_header, separator, false, true);
+  const std::vector<absl::string_view> xff_entries =
+      StringUtil::splitToken(xff_header, separator, false, true);
   // If there are more than 20 entries in the XFF header, refuse to parse.
   // There are very few valid use cases for this many entries and parsing too many has
   // a performance impact.
