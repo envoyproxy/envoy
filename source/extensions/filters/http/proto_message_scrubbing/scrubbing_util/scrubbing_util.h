@@ -126,11 +126,20 @@ IsMessageFieldPathPresent(const Protobuf::Type& type,
                           const std::string& path,
                           const Protobuf::field_extraction::MessageData& message);
 
+// Converts given proto message to Struct. It also adds
+// a "@type" property with proto type url to the generated Struct. Expects the
+// TypeResolver to handle types prefixed with "type.googleapis.com/".
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
                              const Envoy::ProtobufWkt::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              ::Envoy::ProtobufWkt::Struct* message_struct);
 
+// Scrubs given proto message and convert the scrubbed proto to Struct.
+//
+// Returns true if succeeds, otherwise, returns false in case of
+//  (1) `scrubber` is nullptr;
+//  (2) error during scrubbing/converting;
+//  (3) the message is empty after scrubbing;
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
                    const Envoy::ProtobufWkt::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,

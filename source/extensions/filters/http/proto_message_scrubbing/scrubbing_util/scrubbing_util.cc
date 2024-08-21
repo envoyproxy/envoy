@@ -443,8 +443,8 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
   auto status = Protobuf::util::JsonStringToMessage(cord_out_stream.Consume().Flatten(),
                                                     message_struct, options);
   if (!status.ok()) {
-    return absl::InternalError(
-        absl::StrCat("Failed to parse Struct from formatted JSON of '", type.name(), "' message."));
+    return absl::InternalError(absl::StrCat("Failed to parse Struct from formatted JSON of '",
+                                            type.name(), "' message. Status: ", status.ToString()));
   }
 
   (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
@@ -468,12 +468,16 @@ bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* sc
   // Scrub the message.
   absl::Status status = scrubber->Scrub(message);
   if (!status.ok()) {
+    ENVOY_LOG_MISC(debug, absl::StrCat("Failed to scrub ", type.name(),
+                                       " proto. Status: ", status.ToString()));
     return false;
   }
 
   // Convert the scrubbed message to proto.
   status = ConvertToStruct(*message, type, type_helper.Resolver(), message_struct);
   if (!status.ok()) {
+    ENVOY_LOG_MISC(debug, absl::StrCat("Failed to convert ", type.name(),
+                                       " proto to google.protobuf.Struct: ", status.ToString()));
     return false;
   }
 

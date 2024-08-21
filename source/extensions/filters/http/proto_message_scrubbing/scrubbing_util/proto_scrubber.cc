@@ -185,7 +185,7 @@ void ProtoScrubber::GetTargetResourceOrTargetResourceCallback(
   absl::StatusOr<std::string> status_or_target_resource =
       ExtractStringFieldValue(*message_type_, type_finder_, field_mask.paths(0), message);
   if (!status_or_target_resource.ok()) {
-    ENVOY_LOG_MISC(error, "Unable to extract target resource: {}",
+    ENVOY_LOG_MISC(debug, "Unable to extract target resource: {}",
                    status_or_target_resource.status());
     return;
   }
