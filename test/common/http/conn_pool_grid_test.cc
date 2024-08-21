@@ -188,7 +188,7 @@ public:
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
         transport_socket_options_, state_, simTime(), alternate_protocols_, options_,
-        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_);
+        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_);
     grid_->cancel_ = &cancel_;
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
@@ -234,10 +234,11 @@ public:
 
   StreamInfo::MockStreamInfo info_;
   NiceMock<MockRequestEncoder> encoder_;
-
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+
+  Quic::EnvoyQuicNetworkObserverRegistry registry_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
   std::string host_impl_hostname_ = "hostname";
 };
@@ -1366,7 +1367,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_);
+      *quic_connection_persistent_info_, {});
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -1406,7 +1407,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_);
+      *quic_connection_persistent_info_, {});
 
   // Create the HTTP/3 pool.
   auto pool = ConnectivityGridForTest::forceGetOrCreateHttp3Pool(grid);

@@ -20,10 +20,8 @@ bool hasBothAddressFamilies(Upstream::HostConstSharedPtr host) {
 }
 
 namespace {
-std::string describePool(const ConnectionPool::Instance& pool) {
-  std::ostringstream oss;
-  oss << pool.protocolDescription() << " @" << static_cast<void const*>(&pool);
-  return oss.str();
+absl::string_view describePool(const ConnectionPool::Instance& pool) {
+  return pool.protocolDescription();
 }
 
 static constexpr uint32_t kDefaultTimeoutMs = 300;
