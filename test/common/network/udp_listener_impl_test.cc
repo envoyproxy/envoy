@@ -60,6 +60,9 @@ public:
         .WillByDefault(Return(os_calls.latched().supportsMmsg()));
     ON_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
         .WillByDefault(Return(MAX_NUM_PACKETS_PER_EVENT_LOOP));
+    const IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config;
+    ON_CALL(listener_callbacks_, udpSaveCmsgConfig())
+        .WillByDefault(ReturnRef(udp_save_cmsg_config));
 
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
