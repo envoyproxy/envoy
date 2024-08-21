@@ -30,7 +30,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   // succeeds.
   const RateLimitOnMatchAction& match_action =
       match_result.value()->getTyped<RateLimitOnMatchAction>();
-  absl::StatusOr ret = match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
+  absl::StatusOr<BucketId> ret =
+      match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
     // default (i.e., fail-open).
