@@ -44,11 +44,7 @@
 namespace Envoy {
 namespace Platform {
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {
-#ifndef ENVOY_ENABLE_QUIC
-  enable_http3_ = false;
-#endif
-}
+EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {}
 
 EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   network_thread_priority_ = thread_priority;
@@ -61,7 +57,6 @@ EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
   return *this;
 }
 #endif
-
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -192,7 +187,6 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
-#ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
@@ -222,8 +216,6 @@ EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
   enable_port_migration_ = enable_port_migration;
   return *this;
 }
-
-#endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
@@ -382,14 +374,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up the optional filters
   if (enable_http3_) {
-#ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
-#else
-    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
-#endif
   }
 
   if (gzip_decompression_filter_) {

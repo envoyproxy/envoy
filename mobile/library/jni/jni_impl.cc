@@ -1229,7 +1229,6 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enableGzipDecompression(enable_gzip_decompression == JNI_TRUE);
   builder.enableBrotliDecompression(enable_brotli_decompression == JNI_TRUE);
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
-#ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(enable_http3 == JNI_TRUE);
   builder.setHttp3ConnectionOptions(
       Envoy::JNI::javaStringToCppString(jni_helper, http3_connection_options));
@@ -1245,8 +1244,6 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
     builder.addQuicCanonicalSuffix(suffix);
   }
   builder.enablePortMigration(enable_port_migration);
-
-#endif
   builder.setUseCares(use_cares == JNI_TRUE);
   builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
