@@ -42,7 +42,7 @@ HTTP lifecycle
 Proxying of the request begins when the downstream HTTP codec has successfully decoded request header map.
 
 The point at which the proxying completes and the stream is destroyed depends on the upstream protocol and
-whether the independent half close is enabled.
+whether independent half close is enabled.
 
 If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3 protocols the stream
 is destroyed after both request and response are complete i.e. reach their respective end-of-stream,
@@ -51,7 +51,7 @@ success (2xx) status code.
 
 For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed when the response
 is complete and reaches its end-of-stream, i.e. when trailers or the response header/body with
-end-stream set are received, even if the request has not yet completed. If request was incomplete at response
+end-stream set are received, even if the request has not yet completed. If the request was incomplete at response
 completion, the stream is reset.
 
 Note that proxying can stop early when an error or timeout occurred or when a peer reset HTTP/2 or HTTP/3 stream.

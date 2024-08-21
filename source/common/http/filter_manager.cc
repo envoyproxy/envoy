@@ -825,12 +825,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     // Check if the last filter has processed trailers
     terminal_filter_reached = std::next(entry) == decoder_filters_.end();
 
-    if (terminal_filter_reached) {
-      break;
-    }
-
-    if (!(*entry)->commonHandleAfterTrailersCallback(status) &&
-        std::next(entry) != decoder_filters_.end()) {
+    if (!(*entry)->commonHandleAfterTrailersCallback(status) && !terminal_filter_reached) {
       return;
     }
   }
@@ -1526,7 +1521,7 @@ void FilterManager::checkAndCloseStreamIfFullyClosed() {
   if (filter_manager_callbacks_.responseHeaders().has_value()) {
     const uint64_t response_status =
         Http::Utility::getResponseStatus(filter_manager_callbacks_.responseHeaders().ref());
-    bool error_response =
+    const bool error_response =
         !(Http::CodeUtility::is2xx(response_status) || Http::CodeUtility::is1xx(response_status));
     // Abort the decoder filter if it has not yet been completed.
     if (error_response && !state_.decoder_filter_chain_complete_) {

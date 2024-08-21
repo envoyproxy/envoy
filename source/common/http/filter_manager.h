@@ -282,7 +282,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void requestDataDrained();
   // Encoding end_stream by a non-terminal filters (i.e. cache filter) always causes the decoding to
   // be stopped even if independent half-close is enabled. For simplicity, independent half-close is
-  // enabled only when the terminal (router) filter is encoding the response.
+  // enabled only when the terminal filter is encoding the response.
   void stopDecodingIfNonTerminalFilterEncodedEndStream(bool encoded_end_stream);
 
   StreamDecoderFilterSharedPtr handle_;
