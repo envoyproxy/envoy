@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/empty_string.h"
+#include "source/common/common/random_generator.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"
@@ -69,12 +70,14 @@ private:
 
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const std::chrono::milliseconds dns_jitter_max_ms_;
   BackOffStrategyPtr failure_backoff_strategy_;
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   Event::TimerPtr resolve_timer_;
   std::string dns_address_;
   uint32_t dns_port_;
+  Random::RandomGeneratorImpl random_generator_;
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
