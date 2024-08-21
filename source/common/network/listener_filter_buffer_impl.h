@@ -47,6 +47,7 @@ public:
   void activateFileEvent(uint32_t events);
   uint64_t capacity() const { return buffer_size_; }
   void resetCapacity(uint64_t size);
+  void setZeroBufferSize(bool zero_buffer_size) { zero_buffer_size_ = zero_buffer_size; }
 
 private:
   absl::Status onFileEvent(uint32_t events);

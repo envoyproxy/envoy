@@ -85,7 +85,6 @@ void ListenerFilterBufferImpl::resetCapacity(uint64_t size) {
   base_ = buffer_.get();
   buffer_size_ = size;
   data_size_ = 0;
-  zero_buffer_size_ = false;
 }
 
 void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) {
