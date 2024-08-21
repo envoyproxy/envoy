@@ -197,8 +197,8 @@ public:
   // requests may be unable to receive a response until the content-length is
   // known to exceed the end of the requested range. In this case a cache
   // implementation should wait until that is known before calling the callback,
-  // and must pass headers with a 416 Range Not Satisfiable response if the request
-  // is invalid.
+  // and must pass a LookupResult with range_details_->satisfiable_ = false
+  // if the request is invalid.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next fragment from the cache, calling cb when the fragment is ready.
