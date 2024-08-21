@@ -187,6 +187,10 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: oauth
+  change: |
+    Added :ref:`cookie_domain <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_domain>`
+    field to OAuth2 filter to allow setting the domain of cookies.
 - area: access log
   change: |
     Added support for :ref:`%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1% <config_access_log_format_response_flags>`,
@@ -218,6 +222,9 @@ new_features:
   change: |
     Added :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>`
     which when set to true enables filter state stats for access logging.
+- area: http3
+  change: |
+    ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.
 - area: cluster
   change: |
     Customizing the happy eyeballs algorithm for an upstream cluster by configuring
