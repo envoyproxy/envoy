@@ -28,6 +28,7 @@
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/test_data/ca_cert_info.h"
 #include "test/common/tls/test_data/extensions_cert_info.h"
+#include "test/common/tls/test_data/intermediate_ca_cert_info.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/password_protected_cert_info.h"
 #include "test/common/tls/test_data/san_dns2_cert_info.h"
