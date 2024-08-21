@@ -1075,11 +1075,11 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamData(Buffer::Instance& da
   cluster_.cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
   resetIdleTimer();
 
-  Network::UdpRecvData recv_data{.addresses_ = {addresses_.local_, addresses_.peer_},
-                                 .buffer_ = std::make_unique<Buffer::OwnedImpl>(data),
-                                 .receive_time_ =
-                                     cluster_.filter_.config_->timeSource().monotonicTime(),
-                                 .saved_cmsg_ = {}};
+  Network::UdpRecvData recv_data{{addresses_.local_, addresses_.peer_},
+                                 std::make_unique<Buffer::OwnedImpl>(data),
+                                 cluster_.filter_.config_->timeSource().monotonicTime(),
+                                 0,
+                                 {}};
   processUpstreamDatagram(recv_data);
 }
 
