@@ -266,7 +266,13 @@ func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64
 }
 
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
+	decodingStateWrapper *C.processState, encodingStateWrapper *C.processState,
+	reqHeaderNum, reqHeaderBytes, reqTrailerNum, reqTrailerBytes,
+	respHeaderNum, respHeaderBytes, respTrailerNum, respTrailerBytes uint64) {
+
+	decodingState := getOrCreateState(decodingStateWrapper)
+	encodingState := getOrCreateState(encodingStateWrapper)
 	req := getRequest(r)
 	if req == nil {
 		req = createRequest(r)
@@ -276,17 +282,79 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
 
 	v := api.AccessLogType(logType)
 
+	// Request headers must exist because the HTTP filter won't be run if the headers are
+	// not sent yet.
+	// TODO: make the headers/trailers read-only
+	reqHeader := &requestHeaderMapImpl{
+		requestOrResponseHeaderMapImpl{
+			headerMapImpl{
+				state:       decodingState,
+				headerNum:   reqHeaderNum,
+				headerBytes: reqHeaderBytes,
+			},
+		},
+	}
+
+	var reqTrailer api.RequestTrailerMap
+	if reqTrailerNum != 0 {
+		reqTrailer = &requestTrailerMapImpl{
+			requestOrResponseTrailerMapImpl{
+				headerMapImpl{
+					state:       decodingState,
+					headerNum:   reqTrailerNum,
+					headerBytes: reqTrailerBytes,
+				},
+			},
+		}
+	}
+
+	var respHeader api.ResponseHeaderMap
+	if respHeaderNum != 0 {
+		respHeader = &responseHeaderMapImpl{
+			requestOrResponseHeaderMapImpl{
+				headerMapImpl{
+					state:       encodingState,
+					headerNum:   respHeaderNum,
+					headerBytes: respHeaderBytes,
+				},
+			},
+		}
+	}
+
+	var respTrailer api.ResponseTrailerMap
+	if respTrailerNum != 0 {
+		respTrailer = &responseTrailerMapImpl{
+			requestOrResponseTrailerMapImpl{
+				headerMapImpl{
+					state:       encodingState,
+					headerNum:   respTrailerNum,
+					headerBytes: respTrailerBytes,
+				},
+			},
+		}
+	}
+
 	f := req.httpFilter
+
 	switch v {
-	case api.AccessLogDownstreamStart:
-		f.OnLogDownstreamStart()
-	case api.AccessLogDownstreamPeriodic:
-		f.OnLogDownstreamPeriodic()
 	case api.AccessLogDownstreamEnd:
-		f.OnLog()
+		f.OnLog(reqHeader, reqTrailer, respHeader, respTrailer)
+	case api.AccessLogDownstreamPeriodic:
+		f.OnLogDownstreamPeriodic(reqHeader, reqTrailer, respHeader, respTrailer)
+	case api.AccessLogDownstreamStart:
+		f.OnLogDownstreamStart(reqHeader)
 	default:
 		api.LogErrorf("access log type %d is not supported yet", logType)
 	}
+}
+
+//export envoyGoFilterOnHttpStreamComplete
+func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
+	req := getRequest(r)
+	defer req.recoverPanic()
+
+	f := req.httpFilter
+	f.OnStreamComplete()
 }
 
 //export envoyGoFilterOnHttpDestroy
