@@ -15,7 +15,6 @@ envoy_cc_extension(
     # prevously considered core code.
     visibility = ["//visibility:public"],
     deps = [
-        "//source/common/common:random_generator_lib",
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

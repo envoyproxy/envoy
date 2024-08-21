@@ -11,7 +11,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/empty_string.h"
-#include "source/common/common/random_generator.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"

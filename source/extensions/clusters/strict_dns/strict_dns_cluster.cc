@@ -7,8 +7,6 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
-#include "source/common/common/random_generator.h"
-
 namespace Envoy {
 namespace Upstream {
 
