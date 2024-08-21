@@ -51,6 +51,8 @@ TEST_F(ConnectivityManagerTest,
 
 #ifdef ENVOY_ENABLE_QUIC
 TEST_F(ConnectivityManagerTest, OnNetworkMadeDefault) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.quic_upstream_connection_handle_network_change", true);
   Quic::EnvoyMobileQuicNetworkObserverRegistryPtr registry;
   Event::MockDispatcher dispatcher;
   EXPECT_CALL(cm_, createNetworkObserverRegistries(_))

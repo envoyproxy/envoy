@@ -57,6 +57,7 @@ public:
                const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
                Network::DnsResolver::ResolutionStatus));
   MOCK_METHOD(Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr, dnsCache, ());
+  MOCK_METHOD(envoy_netconf_t, onNetworkMadeDefault, (NetworkType network));
 };
 
 class NetworkConfigurationFilterTest : public testing::Test {
