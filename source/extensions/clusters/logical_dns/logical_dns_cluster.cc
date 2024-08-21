@@ -56,7 +56,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& 
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
-      random_generator_(), local_info_(context.serverFactoryContext().localInfo()),
+      local_info_(context.serverFactoryContext().localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(

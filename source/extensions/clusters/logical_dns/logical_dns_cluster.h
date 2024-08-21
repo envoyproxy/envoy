@@ -76,7 +76,6 @@ private:
   Event::TimerPtr resolve_timer_;
   std::string dns_address_;
   uint32_t dns_port_;
-  Random::RandomGeneratorImpl random_generator_;
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
