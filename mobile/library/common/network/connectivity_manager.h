@@ -270,6 +270,7 @@ private:
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
   static NetworkState network_state_;
+  const bool quic_upstream_connection_handle_network_change_;
 };
 
 using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;

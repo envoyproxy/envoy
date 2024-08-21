@@ -15,7 +15,7 @@ void QuicNetworkConnectivityObserver::onNetworkChanged() {
 
   if (!session_.HasActiveRequestStreams() && session_.connection()->IsHandshakeComplete()) {
     // Close the connection if it's idle and has finished handshake. Connections
-    // which are still doing handshake will be drained instead to avoid propergation of upstream
+    // which are still doing handshake will be drained instead to avoid propagation of upstream
     // pool failure to downstream.
     session_.CloseConnectionWithDetails(quic::QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS,
                                         "net_error");
@@ -27,7 +27,8 @@ void QuicNetworkConnectivityObserver::onNetworkChanged() {
       trace,
       "The default network changed. Drain the connection with in-flight requests or handshake.",
       session_);
-  session_.notifyServerGoAway();
+  // Use an error code other than NoError to distinguish from receiving GOAWAY for real.
+  session_.notifyServerGoAway(Http::GoAwayErrorCode::Other);
 }
 
 } // namespace Quic

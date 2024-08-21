@@ -96,6 +96,8 @@ public class CronetHttp3Test {
     NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
         new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
     nativeCronetEngineBuilder.addRuntimeGuard("reset_brokenness_on_nework_change", true);
+    nativeCronetEngineBuilder.addRuntimeGuard("quic_upstream_connection_handle_network_change",
+                                              true);
     if (setUpLogging) {
       nativeCronetEngineBuilder.setLogger(logger);
       nativeCronetEngineBuilder.setLogLevel(EnvoyEngine.LogLevel.TRACE);
@@ -380,9 +382,9 @@ public class CronetHttp3Test {
     // Another HTTP/3 connection should have been attempted in any case.
     assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
     // The 1st connection should have been closed with QUIC_NO_ERROR if network change was
-    // propergated to the Envoy thread when the 2nd POST request or the following GET request was
+    // propagated to the Envoy thread when the 2nd POST request or the following GET request was
     // in-flight, with QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS if the network change was
-    // propergated to the Envoy thread after the POST request finished and before the follow GET was
+    // propagated to the Envoy thread after the POST request finished and before the follow GET was
     // processed when the connection was idle.
     assertThat(
         postStats,
