@@ -15,7 +15,8 @@ class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   EnvoyTlsServerHandshaker(quic::QuicSession* session,
                            const quic::QuicCryptoServerConfig* crypto_config,
-                           Envoy::Event::Dispatcher& dispatcher);
+                           Envoy::Event::Dispatcher& dispatcher,
+                           const Network::DownstreamTransportSocketFactory& transport_socket_factory);
 
   Envoy::Event::Dispatcher& dispatcher() { return dispatcher_; }
 
@@ -28,8 +29,8 @@ private:
                                         protected Logger::Loggable<Logger::Id::quic_stream> {
   public:
     EnvoyDefaultProofSourceHandle(EnvoyTlsServerHandshaker* handshaker,
-                                  quic::ProofSource* proof_source,
-                                  std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle);
+                                  std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle,
+                                  const QuicServerTransportSocketFactory& transport_socket_factory);
     ~EnvoyDefaultProofSourceHandle();
     void CloseHandle() override;
     quic::QuicAsyncStatus SelectCertificate(
@@ -54,16 +55,16 @@ private:
     void onPrivateKeyMethodComplete() override;
 
     EnvoyTlsServerHandshaker* handshaker_{nullptr};
-    EnvoyQuicProofSource* proof_source_;
     std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle_{nullptr};
     size_t max_sig_size_{0};
     std::string signature_;
     Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{nullptr};
-    OptRef<const Network::FilterChain> filter_chain_;
+    const QuicServerTransportSocketFactory& transport_socket_factory_;
   };
 
   Envoy::Event::Dispatcher& dispatcher_;
   quic::ProofSource* proof_source_;
+  const QuicServerTransportSocketFactory& transport_socket_factory_;
 };
 
 } // namespace Quic
