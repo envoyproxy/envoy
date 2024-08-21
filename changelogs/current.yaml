@@ -6,6 +6,10 @@ behavior_changes:
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
     <https://github.com/envoyproxy/envoy/issues/27401>`_ for details.
+- area: golang
+  change: |
+    Change ``OnLogDownstreamStart``, ``OnLogDownstreamPeriodic`` and ``OnLog`` methods so that user can get the request/response's
+    headers and trailers when producing access log.
 - area: http
   change: |
     Added HTTP1-safe option for :ref:`max_connection_duration
@@ -15,6 +19,15 @@ behavior_changes:
     HttpConnectionManager to close the connection itself.  Defaults to off ("unsafe" -- check
     \#34356) and is configurable via :ref:`http1_safe_max_connection_duration
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http1_safe_max_connection_duration>`.
+- area: eds
+  change: |
+    Enabling caching caching of EDS assignments when used with ADS by default (introduced in Envoy v1.28).
+    Prior to this change, Envoy required that EDS assignments were sent after an EDS cluster was updated.
+    If no EDS assignment was received for the cluster, it ended up with an empty assignment.
+    Following this change, after a cluster update, Envoy waits for an EDS assignment until
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>` times out, and will then apply
+    the cached assignment and finish updating the warmed cluster. This change temporarily disabled by setting
+    the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 - area: stats scoped_rds
   change: |
     Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
@@ -42,6 +55,17 @@ minor_behavior_changes:
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+- area: http
+  change: |
+    Modified the authority header value validator to allow the same characters as oghttp2
+    plus the "@" character. This is compliant with nghttp2, and supports the HTTP/1 use-cases
+    that allow user-info@ as part of the authority. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` to false.
+- area: sni
+  change: |
+    When computing SNI and SAN value for the auto-sni and auto-san verification feature,
+    route host manipulations are now taken into account. This behavior can be reverted
+    by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -61,6 +85,10 @@ bug_fixes:
   change: |
     Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
     ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
+- area: rbac
+  change: |
+    RBAC will now allow stat prefixes configured in per-route config to override the base config's
+    stat prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -159,6 +187,14 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: oauth
+  change: |
+    Added :ref:`cookie_domain <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_domain>`
+    field to OAuth2 filter to allow setting the domain of cookies.
+- area: access log
+  change: |
+    Added support for :ref:`%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1% <config_access_log_format_response_flags>`,
+    ``%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256``, and ``%DOWNSTREAM_PEER_CHAIN_SERIALS%``, as access log formatters.
 - area: matching
   change: |
     Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
@@ -175,10 +211,22 @@ new_features:
   change: |
     Prefer using IPv6 address when addresses from both families are available.
     Can be reverted by setting ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` to false.
+- area: grpc_field_extraction
+  change: |
+    Added ``map<string, string>`` support: Target fields of type ``map<string, string>`` can be extracted and added to dynamic metadata.
 - area: rbac
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: http3
+  change: |
+    ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.
+- area: cluster
+  change: |
+    Customizing the happy eyeballs algorithm for an upstream cluster by configuring
+    :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
+    A default configuration will be used if not provided. This behavior can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` to false.
 - area: original_ip_detection extension
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`

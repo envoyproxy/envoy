@@ -1,9 +1,10 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 #include "quiche/common/capsule.h"
 #include "quiche/common/simple_buffer_allocator.h"
@@ -14,6 +15,12 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace SessionFilters {
 namespace HttpCapsule {
+
+using Filter = Network::UdpSessionFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using WriteFilterStatus = Network::UdpSessionWriteFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
+using WriteFilterCallbacks = Network::UdpSessionWriteFilterCallbacks;
 
 class HttpCapsuleFilter : public Filter,
                           public quiche::CapsuleParser::Visitor,
