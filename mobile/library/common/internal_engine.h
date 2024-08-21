@@ -115,6 +115,7 @@ public:
    *   `setIpVersionToRemove` in the DNS cache implementation to remove the IPv6 addresses from
    *   the DNS response in the subsequent DNS resolutions.
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
+   * - Optionally (if configured) clear HTTP/3 broken status.
    */
   envoy_status_t setPreferredNetwork(NetworkType network);
 

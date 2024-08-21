@@ -70,157 +70,6 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
-def _envoy_repo_impl(repository_ctx):
-    """This provides information about the Envoy repository
-
-    You can access the current project and api versions and the path to the repository in
-    .bzl/BUILD files as follows:
-
-    ```starlark
-    load("@envoy_repo//:version.bzl", "VERSION", "API_VERSION")
-    ```
-
-    `*VERSION` can be used to derive version-specific rules and can be passed
-    to the rules.
-
-    The `VERSION`s and also the local `PATH` to the repo can be accessed in
-    python libraries/binaries. By adding `@envoy_repo` to `deps` they become
-    importable through the `envoy_repo` namespace.
-
-    As the `PATH` is local to the machine, it is generally only useful for
-    jobs that will run locally.
-
-    This can be useful, for example, for bazel run jobs to run bazel queries that cannot be run
-    within the constraints of a `genquery`, or that otherwise need access to the repository
-    files.
-
-    Project and repo data can be accessed in JSON format using `@envoy_repo//:project`, eg:
-
-    ```starlark
-    load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-
-    jq(
-        name = "project_version",
-        srcs = ["@envoy_repo//:data"],
-        out = "version.txt",
-        args = ["-r"],
-        filter = ".version",
-    )
-
-    ```
-
-    """
-    repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
-    api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
-    version = repository_ctx.read(repo_version_path).strip()
-    api_version = repository_ctx.read(api_version_path).strip()
-    repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
-    repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
-    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
-    repository_ctx.file("WORKSPACE", "")
-    repository_ctx.file("BUILD", '''
-load("@rules_python//python:defs.bzl", "py_library")
-load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
-load("//:path.bzl", "PATH")
-
-py_library(
-    name = "envoy_repo",
-    srcs = ["__init__.py"],
-    visibility = ["//visibility:public"],
-)
-
-envoy_entry_point(
-    name = "get_project_json",
-    pkg = "envoy.base.utils",
-    script = "envoy.project_data",
-    init_data = [":__init__.py"],
-)
-
-genrule(
-    name = "project",
-    outs = ["project.json"],
-    cmd = """
-    $(location :get_project_json) $$(dirname $(location @envoy//:VERSION.txt)) > $@
-    """,
-    tools = [
-        ":get_project_json",
-        "@envoy//:VERSION.txt",
-        "@envoy//changelogs",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-envoy_entry_point(
-    name = "release",
-    args = [
-        "release",
-        PATH,
-        "--release-message-path=$(location @envoy//changelogs:summary)",
-    ],
-    data = ["@envoy//changelogs:summary"],
-    pkg = "envoy.base.utils",
-    script = "envoy.project",
-    init_data = [":__init__.py"],
-)
-
-envoy_entry_point(
-    name = "dev",
-    args = [
-        "dev",
-        PATH,
-    ],
-    pkg = "envoy.base.utils",
-    script = "envoy.project",
-    init_data = [":__init__.py"],
-)
-
-envoy_entry_point(
-    name = "sync",
-    args = [
-        "sync",
-        PATH,
-    ],
-    pkg = "envoy.base.utils",
-    script = "envoy.project",
-    init_data = [":__init__.py"],
-)
-
-envoy_entry_point(
-    name = "publish",
-    args = [
-        "publish",
-        PATH,
-    ],
-    pkg = "envoy.base.utils",
-    script = "envoy.project",
-    init_data = [":__init__.py"],
-)
-
-envoy_entry_point(
-    name = "trigger",
-    args = [
-        "trigger",
-        PATH,
-    ],
-    pkg = "envoy.base.utils",
-    script = "envoy.project",
-    init_data = [":__init__.py"],
-)
-
-''')
-
-_envoy_repo = repository_rule(
-    implementation = _envoy_repo_impl,
-    attrs = {
-        "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
-        "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
-    },
-)
-
-def envoy_repo():
-    if "envoy_repo" not in native.existing_rules().keys():
-        _envoy_repo(name = "envoy_repo")
-
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive("grpc_httpjson_transcoding")
@@ -230,6 +79,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
     )
     external_http_archive("com_google_protofieldextraction")
+    external_http_archive("com_google_protoprocessinglib")
     external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
@@ -254,9 +104,6 @@ def _rust_deps():
     )
 
 def envoy_dependencies(skip_targets = []):
-    # Add a binding for repository variables.
-    envoy_repo()
-
     # Setup Envoy developer tools.
     envoy_dev_binding()
 
@@ -302,7 +149,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
-    _com_github_rules_proto_grpc()
+    _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_intel_ipp_crypto_crypto_mb_fips()
@@ -361,6 +208,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    external_http_archive(name = "envoy_examples")
+
     _com_github_maxmind_libmaxminddb()
 
     external_http_archive("rules_pkg")
@@ -443,11 +292,6 @@ def _com_github_c_ares_c_ares():
     external_http_archive(
         name = "com_github_c_ares_c_ares",
         build_file_content = BUILD_ALL_CONTENT,
-        # Patch c-ares library aith commit
-        # https://github.com/c-ares/c-ares/commit/a070d7835d667b2fae5266fe1b790677dae47d25
-        # This commit fixes an issue when the gRPC library attempts to resolve a domain name.
-        patches = ["@envoy//bazel/foreign_cc:cares.patch"],
-        patch_args = ["-p1"],
     )
     native.bind(
         name = "ares",
@@ -1222,8 +1066,8 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _com_github_rules_proto_grpc():
-    external_http_archive("com_github_rules_proto_grpc")
+def _rules_proto_grpc():
+    external_http_archive("rules_proto_grpc")
 
 def _re2():
     external_http_archive("com_googlesource_code_re2")
