@@ -448,27 +448,6 @@ TEST_F(GeoipProviderTest, DbReloadError) {
 
 using GeoipProviderDeathTest = GeoipProviderTest;
 
-TEST_F(GeoipProviderDeathTest, GeoDbNotSetForConfiguredHeader) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        city: "x-geo-city"
-        asn: "x-geo-asn"
-    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-  )EOF";
-  initializeProvider(config_yaml);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  EXPECT_ENVOY_BUG(
-      provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
-      "envoy bug failure: false. Details: Maxmind asn database must be initialised for "
-      "performing lookups");
-}
-
 TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -478,6 +457,69 @@ TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
   )EOF";
   EXPECT_DEATH(initializeProvider(config_yaml), ".*Unable to open Maxmind database file.*");
 }
+
+struct GeoipProviderGeoDbNotSetTestCase {
+  GeoipProviderGeoDbNotSetTestCase() = default;
+  GeoipProviderGeoDbNotSetTestCase(const std::string& yaml_config, const std::string& db_type)
+      : yaml_config_(yaml_config), db_type_(db_type) {}
+  GeoipProviderGeoDbNotSetTestCase(const GeoipProviderGeoDbNotSetTestCase& rhs) = default;
+
+  std::string yaml_config_;
+  std::string db_type_;
+};
+
+class GeoipProviderGeoDbNotSetDeathTest
+    : public ::testing::TestWithParam<GeoipProviderGeoDbNotSetTestCase>,
+      public GeoipProviderTestBase {};
+
+TEST_P(GeoipProviderGeoDbNotSetDeathTest, GeoDbNotSetForConfiguredHeader) {
+  GeoipProviderGeoDbNotSetTestCase test_case = GetParam();
+  initializeProvider(test_case.yaml_config_);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  EXPECT_ENVOY_BUG(
+      provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
+      fmt::format("envoy bug failure: false. Details: Maxmind {} database must be initialised for "
+                  "performing lookups",
+                  test_case.db_type_));
+}
+
+struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
+    {
+        R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF",
+        "asn"},
+    {
+        R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF",
+        "city"},
+    {
+        R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        is_anon: "x-geo-anon"
+        asn: "x-geo-asn"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF",
+        "anon"},
+};
+
+INSTANTIATE_TEST_SUITE_P(TestName, GeoipProviderGeoDbNotSetDeathTest,
+                         ::testing::ValuesIn(geo_db_not_set_test_cases));
 
 struct MmdbReloadTestCase {
 
