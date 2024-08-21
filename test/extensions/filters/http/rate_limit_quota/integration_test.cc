@@ -112,13 +112,11 @@ protected:
               ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
         }
       } else if (config_option.unsupported_no_assignment_strategy) {
-        auto* requests_per_time_unit =
-            mutable_bucket_settings.mutable_no_assignment_behavior()
-                ->mutable_fallback_rate_limit()
-                ->mutable_requests_per_time_unit();
+        auto* requests_per_time_unit = mutable_bucket_settings.mutable_no_assignment_behavior()
+                                           ->mutable_fallback_rate_limit()
+                                           ->mutable_requests_per_time_unit();
         requests_per_time_unit->set_requests_per_time_unit(100);
-        requests_per_time_unit->set_time_unit(
-            envoy::type::v3::RateLimitUnit::SECOND);
+        requests_per_time_unit->set_time_unit(envoy::type::v3::RateLimitUnit::SECOND);
       }
 
       if (config_option.expired_assignment_blanket_rule != BlanketRule::NOT_SPECIFIED) {
@@ -946,8 +944,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucket) {
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsupportedStrategy) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {
-      {"environment", "staging"}, {"group", "envoy"}};
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
 
   for (int i = 0; i < 2; ++i) {
     // Send downstream client request to upstream.
@@ -955,13 +953,10 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsupportedStrategy) {
 
     // Handle the request received by upstream. All requests will be allowed
     // since the strategy is not supported.
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_,
-                                                            upstream_request_));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(100, true);
 
     // Verify the response to downstream.
@@ -973,33 +968,26 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsupportedStrategy) {
     // server as the subsequent requests will find the entry in the cache.
     if (i == 0) {
       // Start the gRPC stream to RLQS server.
-      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_,
-                                                            rlqs_connection_));
-      ASSERT_TRUE(
-          rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       rlqs_stream_->startGrpcStream();
 
       // Build the response.
-      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse
-          rlqs_response;
-      absl::flat_hash_map<std::string, std::string> custom_headers_cpy =
-          custom_headers;
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+      absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
       custom_headers_cpy.insert({"name", "prod"});
       auto* bucket_action = rlqs_response.add_bucket_action();
       for (const auto& [key, value] : custom_headers_cpy) {
-        (*bucket_action->mutable_bucket_id()->mutable_bucket())
-            .insert({key, value});
-        auto* quota_assignment =
-            bucket_action->mutable_quota_assignment_action();
+        (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
         quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
         auto* strategy = quota_assignment->mutable_rate_limit_strategy();
         auto* unsupported_strategy = strategy->mutable_requests_per_time_unit();
         unsupported_strategy->set_requests_per_time_unit(10);
-        unsupported_strategy->set_time_unit(
-            envoy::type::v3::RateLimitUnit::SECOND);
+        unsupported_strategy->set_time_unit(envoy::type::v3::RateLimitUnit::SECOND);
       }
 
       // Send the response from RLQS server.
@@ -1014,8 +1002,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsupportedStrategy) {
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsetStrategy) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {
-      {"environment", "staging"}, {"group", "envoy"}};
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
 
   for (int i = 0; i < 2; ++i) {
     // Send downstream client request to upstream.
@@ -1023,13 +1011,10 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsetStrategy) {
 
     // Handle the request received by upstream. All requests will be allowed
     // since the strategy is not set.
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_,
-                                                            upstream_request_));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(100, true);
 
     // Verify the response to downstream.
@@ -1041,27 +1026,21 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsetStrategy) {
     // server as the subsequent requests will find the entry in the cache.
     if (i == 0) {
       // Start the gRPC stream to RLQS server.
-      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_,
-                                                            rlqs_connection_));
-      ASSERT_TRUE(
-          rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
       envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
       ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       rlqs_stream_->startGrpcStream();
 
       // Build the response.
-      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse
-          rlqs_response;
-      absl::flat_hash_map<std::string, std::string> custom_headers_cpy =
-          custom_headers;
+      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+      absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
       custom_headers_cpy.insert({"name", "prod"});
       auto* bucket_action = rlqs_response.add_bucket_action();
       for (const auto& [key, value] : custom_headers_cpy) {
-        (*bucket_action->mutable_bucket_id()->mutable_bucket())
-            .insert({key, value});
-        auto* quota_assignment =
-            bucket_action->mutable_quota_assignment_action();
+        (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
         quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
       }
 
@@ -1074,27 +1053,23 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsetStrategy) {
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest,
-       MultiRequestWithUnsupportedDefaultAction) {
+TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsupportedDefaultAction) {
   ConfigOption option;
   option.unsupported_no_assignment_strategy = true;
   initializeConfig(option);
   HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {
-      {"environment", "staging"}, {"group", "envoy"}};
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
 
   // Send downstream client request to upstream.
   sendClientRequest(&custom_headers);
 
   // Handle the request received by upstream. All requests will be allowed
   // since the strategy is not set.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_,
-                                                          upstream_request_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
   // Verify the response to downstream.
@@ -1103,8 +1078,7 @@ TEST_P(RateLimitQuotaIntegrationTest,
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
   // Start the gRPC stream to RLQS server.
-  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_,
-                                                        rlqs_connection_));
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
   ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
@@ -1254,15 +1228,14 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest,
-       MultiSameRequestWithExpirationToDefaultDeny) {
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpirationToDefaultDeny) {
   ConfigOption option;
   option.expired_assignment_blanket_rule = BlanketRule::DENY_ALL;
   option.no_assignment_blanket_rule = BlanketRule::ALLOW_ALL;
   initializeConfig(option);
   HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {
-      {"environment", "staging"}, {"group", "envoy"}};
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
 
   for (int i = 0; i < 4; ++i) {
     // Advance the time to make cached assignment expired.
@@ -1276,13 +1249,11 @@ TEST_P(RateLimitQuotaIntegrationTest,
     // Query 3: DENY_ALL by assignment expiration. Query 4: ALLOW_ALL by default.
     if (i == 0 || i == 3) {
       // Handle the request received by upstream.
-      ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-          *dispatcher_, fake_upstream_connection_));
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(
-          *dispatcher_, upstream_request_));
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-      upstream_request_->encodeHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
       upstream_request_->encodeData(100, true);
 
       // Verify the response to downstream.
@@ -1292,33 +1263,25 @@ TEST_P(RateLimitQuotaIntegrationTest,
 
       if (i == 0) {
         // Start the gRPC stream to RLQS server & send the initial report.
-        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(
-            *dispatcher_, rlqs_connection_));
-        ASSERT_TRUE(
-            rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+        ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports
-            reports;
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
         ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
         rlqs_stream_->startGrpcStream();
 
         // Build the response.
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse
-            rlqs_response;
-        absl::flat_hash_map<std::string, std::string> custom_headers_cpy =
-            custom_headers;
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+        absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
         custom_headers_cpy.insert({"name", "prod"});
         auto* bucket_action = rlqs_response.add_bucket_action();
 
         for (const auto& [key, value] : custom_headers_cpy) {
-          (*bucket_action->mutable_bucket_id()->mutable_bucket())
-              .insert({key, value});
-          auto* quota_assignment =
-              bucket_action->mutable_quota_assignment_action();
+          (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+          auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
           quota_assignment->mutable_assignment_time_to_live()->set_seconds(15);
           auto* strategy = quota_assignment->mutable_rate_limit_strategy();
-          strategy->set_blanket_rule(
-              envoy::type::v3::RateLimitStrategy::DENY_ALL);
+          strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
         }
 
         // Send the response from RLQS server.
@@ -1335,14 +1298,13 @@ TEST_P(RateLimitQuotaIntegrationTest,
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest,
-       MultiSameRequestWithExpirationWithoutFallback) {
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpirationWithoutFallback) {
   ConfigOption option;
   option.no_assignment_blanket_rule = BlanketRule::ALLOW_ALL;
   initializeConfig(option);
   HttpIntegrationTest::initialize();
-  absl::flat_hash_map<std::string, std::string> custom_headers = {
-      {"environment", "staging"}, {"group", "envoy"}};
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
 
   for (int i = 0; i < 3; ++i) {
     // Advance the time to make cached assignment expired.
@@ -1356,13 +1318,11 @@ TEST_P(RateLimitQuotaIntegrationTest,
     // Query 3: DENY_ALL by assignment expiration. Query 4: ALLOW_ALL by default.
     if (i == 0 || i == 2) {
       // Handle the request received by upstream.
-      ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-          *dispatcher_, fake_upstream_connection_));
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(
-          *dispatcher_, upstream_request_));
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-      upstream_request_->encodeHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
       upstream_request_->encodeData(100, true);
 
       // Verify the response to downstream.
@@ -1372,33 +1332,25 @@ TEST_P(RateLimitQuotaIntegrationTest,
 
       if (i == 0) {
         // Start the gRPC stream to RLQS server & send the initial report.
-        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(
-            *dispatcher_, rlqs_connection_));
-        ASSERT_TRUE(
-            rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+        ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports
-            reports;
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
         ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
         rlqs_stream_->startGrpcStream();
 
         // Build the response.
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse
-            rlqs_response;
-        absl::flat_hash_map<std::string, std::string> custom_headers_cpy =
-            custom_headers;
+        envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+        absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
         custom_headers_cpy.insert({"name", "prod"});
         auto* bucket_action = rlqs_response.add_bucket_action();
 
         for (const auto& [key, value] : custom_headers_cpy) {
-          (*bucket_action->mutable_bucket_id()->mutable_bucket())
-              .insert({key, value});
-          auto* quota_assignment =
-              bucket_action->mutable_quota_assignment_action();
+          (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+          auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
           quota_assignment->mutable_assignment_time_to_live()->set_seconds(15);
           auto* strategy = quota_assignment->mutable_rate_limit_strategy();
-          strategy->set_blanket_rule(
-              envoy::type::v3::RateLimitStrategy::DENY_ALL);
+          strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
         }
 
         // Send the response from RLQS server.

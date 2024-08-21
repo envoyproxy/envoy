@@ -142,7 +142,6 @@ void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
   new_bucket->bucket_id = bucket_id;
   // Mark the assignment time.
   auto now = time_source_.monotonicTime();
-  new_bucket->first_assignment_time = now;
   new_bucket->current_assignment_time = now;
   // Set up the quota usage.
   QuotaUsage quota_usage;
@@ -233,8 +232,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
               "For first matched request with hashed bucket_id {}, it is "
               "throttled by DENY_ALL strategy.",
               bucket_id);
-    ENVOY_LOG(debug, "Hit configured default DENY_ALL for bucket_id {}",
-              bucket_id);
+    ENVOY_LOG(debug, "Hit configured default DENY_ALL for bucket_id {}", bucket_id);
     sendDenyResponse();
     return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
@@ -243,8 +241,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
             "For first matched request with hashed bucket_id {}, it is "
             "allowed by the configured default ALLOW_ALL strategy.",
             bucket_id);
-  ENVOY_LOG(debug, "Hit configured default ALLOW_ALL for bucket_id {}",
-            bucket_id);
+  ENVOY_LOG(debug, "Hit configured default ALLOW_ALL for bucket_id {}", bucket_id);
   return Http::FilterHeadersStatus::Continue;
 }
 
