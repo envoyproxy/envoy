@@ -26,6 +26,7 @@ statistics:
    ``downstream_cx_ssl_active``, Gauge, Total active TLS connections
    ``downstream_cx_http1_active``, Gauge, Total active HTTP/1.1 connections
    ``downstream_cx_upgrades_active``, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
+   ``downstream_cx_http1_soft_drain``, Gauge, Total active HTTP/1.x connections waiting for another downstream request to safely close the connection.
    ``downstream_cx_http2_active``, Gauge, Total active HTTP/2 connections
    ``downstream_cx_http3_active``, Gauge, Total active HTTP/3 connections
    ``downstream_cx_protocol_error``, Counter, Total protocol errors

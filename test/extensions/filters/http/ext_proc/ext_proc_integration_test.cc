@@ -182,6 +182,9 @@ protected:
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
+        // No need to check the bytes received for observability mode because it is a
+        // "send and go" mode.
+        logging_filter_config.set_check_received_bytes(!proto_config_.observability_mode());
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
@@ -2393,6 +2396,24 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 504);
+}
+
+TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutOldErrorCode) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_timeout_error", "false"}});
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
