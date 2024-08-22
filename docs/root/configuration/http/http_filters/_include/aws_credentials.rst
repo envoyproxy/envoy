@@ -38,9 +38,10 @@ secret access key (the session token is optional).
    containing the string required in the Authorization header sent to the EKS Pod Identity Agent. The fields ``AccessKeyId``, ``SecretAccessKey``,
    and ``Token`` are used, and credentials are cached for 1 hour or until they expire (according to the field ``Expiration``).
    Note that the latest update on AWS credentials provider utility provides an option to use http async client functionality instead of libcurl
-   to fetch the credentials. To fetch the credentials from either EC2 instance metadata or ECS task metadata a static cluster is required pointing
-   towards the credentials provider. The static cluster name has to be ``ec2_instance_metadata_server_internal`` for fetching from EC2 instance
+   to fetch the credentials. To fetch the credentials from either EC2 instance metadata or ECS task metadata a static cluster pointing
+   towards the credentials provider is required. The static cluster name has to be ``ec2_instance_metadata_server_internal`` for fetching from EC2 instance
    metadata or ``ecs_task_metadata_server_internal`` for fetching from ECS task metadata.
+
    If these clusters are not provided in the bootstrap configuration then either of these will be added by default.
    The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
    not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
