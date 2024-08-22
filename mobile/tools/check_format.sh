@@ -45,7 +45,7 @@ FORMAT_ARGS+=(
 
 export ENVOY_BAZEL_PREFIX="@envoy" && ./bazelw run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
 
-KTFMT="$(dirname "${BASH_SOURCE[0]}")"/ktfmt.sh
+KTFMT="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"/ktfmt.sh
 KOTLIN_DIRS=(
   "library/kotlin"
   "test/kotlin"
