@@ -352,13 +352,12 @@ void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
   }
 }
 
-void Filter:: onComplete(ProcessingResponse& response) {
-  std::unique_ptr<ProcessingResponse> resp_ptr =
-      std::make_unique<ProcessingResponse>(response);
+void Filter::onComplete(ProcessingResponse& response) {
+  std::unique_ptr<ProcessingResponse> resp_ptr = std::make_unique<ProcessingResponse>(response);
   onReceiveMessage(std::move(resp_ptr));
 }
 
-void Filter:: onError() {
+void Filter::onError() {
   ENVOY_LOG(debug, "Received Error response from server");
   stats_.http_not_ok_resp_received_.inc();
 

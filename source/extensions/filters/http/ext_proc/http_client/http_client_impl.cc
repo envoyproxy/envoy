@@ -30,11 +30,10 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   message->body().add(MessageUtil::getJsonStringFromMessageOrError(req, true, true));
-  auto options = Http::AsyncClient::RequestOptions()
-                     .setSampled(absl::nullopt)
-                     .setSendXff(false);
+  auto options = Http::AsyncClient::RequestOptions().setSampled(absl::nullopt).setSendXff(false);
 
-  active_request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
+  active_request_ =
+      thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
 }
 
 void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,

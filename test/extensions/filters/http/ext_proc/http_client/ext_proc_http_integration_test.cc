@@ -22,9 +22,9 @@ using envoy::service::ext_proc::v3::HeadersResponse;
 using envoy::service::ext_proc::v3::HttpHeaders;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
-using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
+using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
 using Http::LowerCaseString;
 
@@ -34,8 +34,9 @@ struct ConfigOptions {
   bool failure_mode_allow = false;
 };
 
-class ExtProcHttpClientIntegrationTest : public HttpIntegrationTest,
-                                         public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+class ExtProcHttpClientIntegrationTest
+    : public HttpIntegrationTest,
+      public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
 protected:
   ExtProcHttpClientIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
@@ -150,8 +151,7 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
 
     if (send_bad_resp) {
-      processor_stream_->encodeHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
+      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
       return;
     }
     // The ext_proc ProcessingRequest message is JSON encoded in the body of the HTTP message.
@@ -165,14 +165,14 @@ protected:
       const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
       if (sendReply) {
         // Sending 200 response with the ProcessingResponse JSON encoded in the body.
-        std::string response_str = MessageUtil::getJsonStringFromMessageOrError(response, true, true);
-        processor_stream_->encodeHeaders(
-            Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+        std::string response_str =
+            MessageUtil::getJsonStringFromMessageOrError(response, true, true);
+        processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                         false);
         processor_stream_->encodeData(response_str, true);
       }
     } else {
-      processor_stream_->encodeHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
+      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
     }
   }
 
@@ -209,7 +209,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("foo"), "yes"); });
 
   // The side stream get the request and sends back the response.
-  processRequestHeadersMessage(http_side_upstreams_[0], false,  absl::nullopt);
+  processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
@@ -227,10 +227,11 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(
-      http_side_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      http_side_upstreams_[0], false,
+      [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
         Http::TestRequestHeaderMapImpl expected_request_headers{
-          {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
-          {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
+            {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
+            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
@@ -256,12 +257,12 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseTimeout) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(
-      http_side_upstreams_[0], false, [this](const HttpHeaders&, HeadersResponse&) {
-        // Travel forward 400 ms
-        timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
-        return false;
-      });
+  processRequestHeadersMessage(http_side_upstreams_[0], false,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
+                                 return false;
+                               });
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 504);
@@ -273,10 +274,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailClose) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(
-      http_side_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse&) {
-        return true;
-      });
+  processRequestHeadersMessage(http_side_upstreams_[0], true,
+                               [](const HttpHeaders&, HeadersResponse&) { return true; });
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 504);
@@ -290,10 +289,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailOpen) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(
-      http_side_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse&) {
-        return true;
-      });
+  processRequestHeadersMessage(http_side_upstreams_[0], true,
+                               [](const HttpHeaders&, HeadersResponse&) { return true; });
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
