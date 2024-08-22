@@ -53,7 +53,7 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  std::string default_http_config_ = R"EOF(
+  const std::string default_http_config_ = R"EOF(
   http_service:
     http_service:
       http_uri:

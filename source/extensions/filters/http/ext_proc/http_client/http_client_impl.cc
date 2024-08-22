@@ -10,8 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req,
-                                    bool /* end_stream*/) {
+void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req) {
   // Cancel any active requests.
   cancel();
 
@@ -55,8 +54,12 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ENVOY_LOG(debug, "Response status is OK");
-      ASSERT(callbacks_ != nullptr);
       std::string msg_body = response->body().toString();
+      if (msg_body.empty()) {
+        ENVOY_LOG(error, "The HTTP response body should not be empty");
+        onError();
+        return;
+      }
       envoy::service::ext_proc::v3::ProcessingResponse response_msg;
       bool has_unknown_field;
       auto status = MessageUtil::loadFromJsonNoThrow(msg_body, response_msg, has_unknown_field);
@@ -92,7 +95,9 @@ void ExtProcHttpClient::onError() {
   // Cancel if the request is active.
   cancel();
   ENVOY_LOG(error, "ext_proc HTTP client error condition happens.");
-  callbacks_->onError();
+  if (callbacks_) {
+    callbacks_->onError();
+  }
   callbacks_ = nullptr;
 }
 

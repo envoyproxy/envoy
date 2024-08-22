@@ -348,7 +348,7 @@ void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
   } else {
     ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
     http_client->setCallbacks(this);
-    http_client->sendRequest(std::move(req), end_stream);
+    http_client->sendRequest(std::move(req));
   }
 }
 
