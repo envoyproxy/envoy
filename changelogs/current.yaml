@@ -66,6 +66,10 @@ minor_behavior_changes:
     When computing SNI and SAN value for the auto-sni and auto-san verification feature,
     route host manipulations are now taken into account. This behavior can be reverted
     by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to false.
+- area: aws
+  change: |
+    Aws request signing common code uses http async client by default, moving curl to deprecation path. This behavior change can be
+    reverted by setting the ``envoy_reloadable_features_use_http_client_to_fetch_aws_credentials`` runtime flag to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
