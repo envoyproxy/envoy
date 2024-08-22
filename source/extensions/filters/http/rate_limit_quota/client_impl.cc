@@ -64,10 +64,14 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 // This function covers both periodical report and immediate report case, with the difference that
 // bucked id in periodical report case is empty.
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
-  ASSERT(stream_ != nullptr);
-  // Build the report and then send the report to RLQS server.
-  // `end_stream` should always be set to false as we don't want to close the stream locally.
-  stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
+  if (stream_ != nullptr) {
+    // Build the report and then send the report to RLQS server.
+    // `end_stream` should always be set to false as we don't want to close the stream locally.
+    stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
+  } else {
+    // Don't send any reports if stream has already been closed.
+    ENVOY_LOG(debug, "The stream has already been closed; no reports will be sent.");
+  }
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
@@ -81,7 +85,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
     // Get the hash id value from BucketId in the response.
     const size_t bucket_id = MessageUtil::hash(action.bucket_id());
-    ENVOY_LOG(trace,
+    ENVOY_LOG(debug,
               "Received a response for bucket id proto :\n {}, and generated "
               "the associated hashed bucket id: {}",
               action.bucket_id().DebugString(), bucket_id);
@@ -93,10 +97,11 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       switch (action.bucket_action_case()) {
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kQuotaAssignmentAction: {
-        quota_buckets_[bucket_id]->bucket_action = action;
-        if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
+        quota_buckets_[bucket_id]->cached_action = action;
+        quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
+        if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
           auto rate_limit_strategy = quota_buckets_[bucket_id]
-                                         ->bucket_action.quota_assignment_action()
+                                         ->cached_action->quota_assignment_action()
                                          .rate_limit_strategy();
 
           if (rate_limit_strategy.has_token_bucket()) {
@@ -143,20 +148,18 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
-  if (stream_ != nullptr && !stream_closed_) {
+  if (stream_ != nullptr) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     stream_->closeStream();
-    stream_closed_ = true;
     stream_->resetStream();
+    stream_ = nullptr;
   }
 }
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                         const std::string& message) {
-  // TODO(tyxia) Revisit later, maybe add some logging.
-  stream_closed_ = true;
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  closeStream();
+  stream_ = nullptr;
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
