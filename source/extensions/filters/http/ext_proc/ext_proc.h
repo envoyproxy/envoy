@@ -48,7 +48,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(send_immediate_resp_upstream_ignored)
+  COUNTER(send_immediate_resp_upstream_ignored)                                                    \
+  COUNTER(http_not_ok_resp_received)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -439,12 +440,8 @@ public:
 
   const ProcessorState& encodingState() { return encoding_state_; }
   const ProcessorState& decodingState() { return decoding_state_; }
-
-  void onComplete() override {
-    std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse> my_resp = std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>();
-    my_resp->mutable_request_headers()->mutable_response()->set_clear_route_cache(true);
-    onReceiveMessage(std::move(my_resp));
-  }
+  void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
+  void onError() override;
 
 private:
   void mergePerRouteConfig();

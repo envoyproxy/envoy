@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -13,7 +15,8 @@ namespace ExternalProcessing {
 class RequestCallbacks {
 public:
   virtual ~RequestCallbacks() = default;
-  virtual void onComplete() PURE;
+  virtual void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) PURE;
+  virtual void onError() PURE;
 };
 
 /**

@@ -8,8 +8,8 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -342,13 +342,47 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
   watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
-void Filter::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream) {
+void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
   if (config_->grpcService().has_value()) {
     stream_->send(std::move(req), end_stream);
   } else {
     ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
     http_client->setCallbacks(this);
     http_client->sendRequest(std::move(req), end_stream);
+  }
+}
+
+void Filter:: onComplete(ProcessingResponse& response) {
+  std::unique_ptr<ProcessingResponse> resp_ptr =
+      std::make_unique<ProcessingResponse>(response);
+  onReceiveMessage(std::move(resp_ptr));
+}
+
+void Filter:: onError() {
+  ENVOY_LOG(debug, "Received Error response from server");
+  stats_.http_not_ok_resp_received_.inc();
+
+  if (processing_complete_) {
+    ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
+    return;
+  }
+
+  if (config_->failureModeAllow()) {
+    // The user would like a none-200-ok response to not cause message processing to fail.
+    // Close the external processing.
+    processing_complete_ = true;
+    stats_.failure_mode_allowed_.inc();
+    clearAsyncState();
+  } else {
+    // Return an error and stop processing the current stream.
+    processing_complete_ = true;
+    decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
+    encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
+    ImmediateResponse errorResponse;
+
+    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.set_details(absl::StrCat(ErrorPrefix, "_HTTP_ERROR"));
+    sendImmediateResponse(errorResponse);
   }
 }
 

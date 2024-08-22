@@ -12,7 +12,9 @@ envoy_cc_library(
     name = "client_base_interface",
     hdrs = ["client_base.h"],
     tags = ["skip_on_windows"],
-    deps = [],
+    deps = [
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -23,8 +25,8 @@ envoy_cc_library(
     deps = [
         "client_base_interface",
         "//source/common/common:enum_to_int",
-        "//source/common/http:utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
