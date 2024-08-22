@@ -5,6 +5,7 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 
 #include "test/common/http/common.h"
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -34,20 +35,6 @@ class MockPoolConnectResultCallback : public PoolConnectResultCallback {
 public:
   MOCK_METHOD(void, onHandshakeComplete, ());
   MOCK_METHOD(void, onZeroRttHandshakeFailed, ());
-};
-
-class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
-public:
-  void onNetworkChanged() {
-    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
-    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
-      existing_observers.push_back(observer);
-    }
-    for (auto* observer : existing_observers) {
-      observer->onNetworkChanged();
-    }
-  }
-  using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
 
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
@@ -108,7 +95,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
   // Needs to out-live pool_;
-  TestNetworkObserverRegistry observers_;
+  Quic::TestNetworkObserverRegistry observers_;
   std::unique_ptr<Http3ConnPoolImpl> pool_;
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};

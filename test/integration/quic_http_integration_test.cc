@@ -1,3 +1,4 @@
+#include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
 
@@ -247,6 +248,7 @@ public:
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
         persistent_info.crypto_stream_factory_, quic_stat_names_, cache, *stats_store_.rootScope(),
         nullptr, *transport_socket_factory_);
+    session->registerNetworkObserver(registry_);
     return session;
   }
 
@@ -475,6 +477,7 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   std::string client_alpn_;
+  TestNetworkObserverRegistry registry_;
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
@@ -2483,6 +2486,33 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacket) {
   EXPECT_EQ(std::stoi(metrics.at(0)), 1);
   // first packet has length greater than zero.
   EXPECT_GT(std::stoi(metrics.at(1)), 0);
+}
+
+TEST_P(QuicHttpIntegrationTest, NetworkChangeOnIdleClientConnection) {
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EXPECT_FALSE(registry_.registeredQuicObservers().empty());
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  registry_.onNetworkChanged();
+  EXPECT_TRUE(codec_client_->disconnected());
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
+                                  : "listener.[__1]_0.http3.downstream.rx.";
+  std::string error_code =
+      "quic_connection_close_error_code_QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
+
+  // The connection should not response to network change any more.
+  EXPECT_FALSE(registry_.registeredQuicObservers().empty());
+  registry_.onNetworkChanged();
+
+  // Unregister itself upon destruction.
+  codec_client_.reset();
+  EXPECT_TRUE(registry_.registeredQuicObservers().empty());
 }
 
 } // namespace Quic
