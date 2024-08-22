@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_root="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 certificate="$script_root/tmp/certs/engflow.crt"
 key="$script_root/tmp/certs/engflow.key"
 

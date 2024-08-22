@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BASE="$(dirname "$0")"
+BASE="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 declare -r BASE
 declare -r TARGET_PATH=$1
 declare -r EXTENSION=$2

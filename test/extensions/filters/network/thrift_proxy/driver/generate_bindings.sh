@@ -3,7 +3,7 @@
 # Generates the thrift bindings for example.thrift. Requires that
 # apache-thrift's thrift generator is installed and on the path.
 
-DIR=$(cd "$(dirname "$0")" && pwd)
+DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 cd "${DIR}" || exit 1
 
 thrift --gen py --out ./generated example.thrift
