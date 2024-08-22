@@ -286,7 +286,7 @@ message CommonResponse {
   // HttpBody request, header mutations will only take effect if
   // the current processing mode for the body is: 1) BUFFERED; 2) or STREAMED and
   // the below filter configuration is enabled:
-  // [#comment:TODO :ref:`streaming_no_header_resp <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.streaming_no_header_resp>`]
+  // [#comment:TODO :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`]
   HeaderMutation header_mutation = 2;
 
   // Replace the body of the last message sent to the remote server on this
