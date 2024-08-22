@@ -8,8 +8,10 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 # shellcheck source=ci/build_setup.sh
-. "$(dirname "$0")"/build_setup.sh
+. "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
 echo "building using ${NUM_CPUS} CPUs"
 echo "building for ${ENVOY_BUILD_ARCH}"
