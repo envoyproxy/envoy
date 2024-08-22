@@ -31,7 +31,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      dns_jitter_max_ms_(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter_max, 512)),
+      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0)),
       respect_dns_ttl_(cluster.respect_dns_ttl()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
@@ -129,14 +129,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds jitter(0);
-        if (parent_.dns_jitter_max_ms_.count() != 0) {
-          jitter = std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_max_ms_;
+        if (parent_.dns_jitter_ms_.count() > 0) {
+          jitter = std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_;
         }
-
-        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
-        if (jitter < final_refresh_rate) {
-          final_refresh_rate -= jitter;
-        }
+        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_ + jitter;
 
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           parent_.info_->configUpdateStats().update_success_.inc();
@@ -196,10 +192,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
               ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = ttl_refresh_rate;
-            if (jitter < final_refresh_rate) {
-              final_refresh_rate -= jitter;
-            }
+            final_refresh_rate = ttl_refresh_rate + jitter;
             ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }

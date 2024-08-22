@@ -51,8 +51,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& 
     : ClusterImplBase(cluster, context, creation_status), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      dns_jitter_max_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter_max, 512))),
+      dns_jitter_ms_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
@@ -104,13 +103,10 @@ void LogicalDnsCluster::startResolve() {
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds jitter(0);
-        if (dns_jitter_max_ms_.count() != 0) {
-          jitter = std::chrono::milliseconds(random_.random()) % dns_jitter_max_ms_;
+        if (dns_jitter_ms_.count() != 0) {
+          jitter = std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
         }
-        std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
-        if (jitter < final_refresh_rate) {
-          final_refresh_rate -= jitter;
-        }
+        std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_ + jitter;
 
         // If the DNS resolver successfully resolved with an empty response list, the logical DNS
         // cluster does not update. This ensures that a potentially previously resolved address does
@@ -156,10 +152,7 @@ void LogicalDnsCluster::startResolve() {
           failure_backoff_strategy_->reset();
 
           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
-            final_refresh_rate = addrinfo.ttl_;
-            if (jitter < final_refresh_rate) {
-              final_refresh_rate -= jitter;
-            }
+            final_refresh_rate = addrinfo.ttl_ + jitter;
           }
 
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,

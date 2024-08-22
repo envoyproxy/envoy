@@ -1391,7 +1391,6 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     dns_refresh_rate: 4s
-    dns_jitter_max: 0s
     dns_failure_refresh_rate:
       base_interval: 7s
       max_interval: 10s
@@ -1443,7 +1442,6 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
     lb_policy: ROUND_ROBIN
     dns_refresh_rate: 4s
     respect_dns_ttl: true
-    dns_jitter_max: 0s
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -1493,13 +1491,13 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
-  // jitter defaults to 512ms
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     dns_refresh_rate: 4s
+    dns_jitter: 1s
     respect_dns_ttl: true
     load_assignment:
         endpoints:
@@ -1521,12 +1519,12 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
 
   cluster->initialize([] {});
 
-  uint64_t random_return = 8000;
-  uint64_t jitter_ms = random_return % 512;
+  uint64_t random_return = 8500;
+  uint64_t jitter_ms = random_return % 1000;
   uint64_t ttl_s = 6;
 
   EXPECT_CALL(*resolver.timer_,
-              enableTimer(std::chrono::milliseconds(ttl_s * 1000 - jitter_ms), _));
+              enableTimer(std::chrono::milliseconds(ttl_s * 1000 + jitter_ms), _));
   ON_CALL(random_, random()).WillByDefault(Return(random_return));
   resolver.dns_callback_(
       Network::DnsResolver::ResolutionStatus::Success, "",
