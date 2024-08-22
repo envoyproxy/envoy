@@ -64,10 +64,18 @@ void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullpt
 
 void LibeventScheduler::registerOnPrepareCallback(OnPrepareCallback&& callback) {
   ASSERT(callback);
-  ASSERT(!callback_);
+  ASSERT(!prepare_callback_);
 
-  callback_ = std::move(callback);
+  prepare_callback_ = std::move(callback);
   evwatch_prepare_new(libevent_.get(), &onPrepareForCallback, this);
+}
+
+void LibeventScheduler::registerOnCheckCallback(OnCheckCallback&& callback) {
+  ASSERT(callback);
+  ASSERT(!check_callback_);
+
+  check_callback_ = std::move(callback);
+  evwatch_check_new(libevent_.get(), &onCheckForCallback, this);
 }
 
 void LibeventScheduler::initializeStats(DispatcherStats* stats) {
@@ -80,7 +88,13 @@ void LibeventScheduler::initializeStats(DispatcherStats* stats) {
 void LibeventScheduler::onPrepareForCallback(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
   // `self` is `this`, passed in from evwatch_prepare_new.
   auto self = static_cast<LibeventScheduler*>(arg);
-  self->callback_();
+  self->prepare_callback_();
+}
+
+void LibeventScheduler::onCheckForCallback(evwatch*, const evwatch_check_cb_info*, void* arg) {
+  // `self` is `this`, passed in from evwatch_prepare_new.
+  auto self = static_cast<LibeventScheduler*>(arg);
+  self->check_callback_();
 }
 
 void LibeventScheduler::onPrepareForStats(evwatch*, const evwatch_prepare_cb_info* info,

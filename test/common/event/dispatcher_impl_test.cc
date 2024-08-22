@@ -801,14 +801,22 @@ protected:
 };
 
 TEST_F(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
-  dispatcher_->post([this]() {
-    {
-      MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
-      dispatcher_->updateApproximateMonotonicTime();
-      MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
-      EXPECT_LT(time1, time2);
+  dispatcher_->updateApproximateMonotonicTime();
+  MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
+  Event::TimerPtr timer = dispatcher_->createTimer([&] {
+    // Approximate time should have been updated in this loop to 1s later.
+    MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
+    EXPECT_LT(time1, time2);
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.fix_dispatcher_approximate_now")) {
+      EXPECT_LT(std::chrono::seconds(1), (time2 - time1))
+          << std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count() << "us";
+    } else {
+      // Without the fix, time2 is updated very close to time1 and before the timer fires.
+      EXPECT_GT(std::chrono::seconds(1), (time2 - time1))
+          << std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count() << "us";
     }
   });
+  timer->enableTimer(std::chrono::seconds(1));
 
   dispatcher_->run(Dispatcher::RunType::Block);
 }
