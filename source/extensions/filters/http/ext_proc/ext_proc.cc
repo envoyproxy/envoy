@@ -433,6 +433,10 @@ Filter::StreamOpenState Filter::openStream() {
 }
 
 void Filter::closeStream() {
+  if (!config_->grpcService().has_value()) {
+    return;
+  }
+
   if (stream_) {
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
@@ -457,6 +461,12 @@ void Filter::onDestroy() {
   processing_complete_ = true;
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
+
+  if (!config_->grpcService().has_value()) {
+    ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
+    http_client->cancel();
+    return;
+  }
 
   if (config_->observabilityMode()) {
     // In observability mode where the main stream processing and side stream processing are

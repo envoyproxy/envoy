@@ -12,6 +12,9 @@ namespace ExternalProcessing {
 
 void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req,
                                     bool /* end_stream*/) {
+  // Cancel any active requests.
+  cancel();
+
   std::string cluster = config_.http_service().http_service().http_uri().cluster();
   std::string url = config_.http_service().http_service().http_uri().uri();
   absl::string_view host;
@@ -29,7 +32,15 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
            {Envoy::Http::Headers::get().Host, std::string(host)}});
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
-  message->body().add(MessageUtil::getJsonStringFromMessageOrError(req, true, true));
+  auto req_in_json = MessageUtil::getJsonStringFromMessage(req);
+  if (!req_in_json.ok()) {
+    ENVOY_LOG(error,
+              "The ProcessingRequest proto message can not be encoded into a JSON string: {}",
+              req_in_json.status().ToString());
+    onError();
+    return;
+  }
+  message->body().add(req_in_json.value());
   auto options = Http::AsyncClient::RequestOptions().setSampled(absl::nullopt).setSendXff(false);
 
   active_request_ =
@@ -50,6 +61,8 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
       bool has_unknown_field;
       auto status = MessageUtil::loadFromJsonNoThrow(msg_body, response_msg, has_unknown_field);
       if (!status.ok()) {
+        ENVOY_LOG(error,
+                  "The HTTP response body can not be decoded into a ProcessResponse proto message");
         onError();
         return;
       }

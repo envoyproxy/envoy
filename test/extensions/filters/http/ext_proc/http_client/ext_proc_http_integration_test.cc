@@ -9,7 +9,7 @@
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -29,17 +29,13 @@ using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 using Http::LowerCaseString;
 
 struct ConfigOptions {
-  bool http1_codec = false;
   bool downstream_filter = true;
   bool failure_mode_allow = false;
 };
 
-class ExtProcHttpClientIntegrationTest
-    : public HttpIntegrationTest,
-      public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
-protected:
-  ExtProcHttpClientIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+class ExtProcHttpClientIntegrationTest : public HttpProtocolIntegrationTest {
 
+protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
 
@@ -115,20 +111,10 @@ protected:
         ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
       }
-
-      // Parameterize with defer processing to prevent bit rot as filter made
-      // assumptions of data flow, prior relying on eager processing.
-      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                        deferredProcessing() ? "true" : "false");
     });
 
-    if (config_option.http1_codec) {
-      setUpstreamProtocol(Http::CodecType::HTTP1);
-      setDownstreamProtocol(Http::CodecType::HTTP1);
-    } else {
-      setUpstreamProtocol(Http::CodecType::HTTP2);
-      setDownstreamProtocol(Http::CodecType::HTTP2);
-    }
+    setUpstreamProtocol(GetParam().upstream_protocol);
+    setDownstreamProtocol(GetParam().downstream_protocol);
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
@@ -197,9 +183,11 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDeferredProcessing, ExtProcHttpClientIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+    Protocols, ExtProcHttpClientIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+        /*downstream_protocols=*/{Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
+        /*upstream_protocols=*/{Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Side stream server does not mutate the header request.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
