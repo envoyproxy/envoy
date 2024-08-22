@@ -1391,6 +1391,7 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     dns_refresh_rate: 4s
+    dns_jitter_max: 0s
     dns_failure_refresh_rate:
       base_interval: 7s
       max_interval: 10s

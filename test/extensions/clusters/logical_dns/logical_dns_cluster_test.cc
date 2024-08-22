@@ -319,6 +319,7 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   name: name
   type: LOGICAL_DNS
   dns_refresh_rate: 4s
+  dns_jitter_max: 0s
   dns_failure_refresh_rate:
     base_interval: 7s
     max_interval: 10s
@@ -646,11 +647,13 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
 
   // We don't set `respect_dns_ttl`, so we use `dns_refresh_rate` instead of the ttl.
   EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(config);
+
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000 - jitter_ms), _));
   ON_CALL(random_, random()).WillByDefault(Return(random_return));
-  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  setupFromV3Yaml(config);
+
   dns_callback_(
       Network::DnsResolver::ResolutionStatus::Success, "",
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
