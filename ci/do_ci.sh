@@ -285,10 +285,7 @@ case $CI_TARGET in
         echo "Building API..."
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               -c fastbuild @envoy_api//envoy/...
-        if [[ -n "$ENVOY_API_ONLY" ]]; then
-            exit 0
-        fi
-        ;&
+        ;;
 
     api.go)
         if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
