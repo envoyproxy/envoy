@@ -602,7 +602,6 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
   setupFromV3Yaml(config);
 
   EXPECT_CALL(membership_updated_, ready());
-
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
   dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));

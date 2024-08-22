@@ -945,6 +945,7 @@ message Cluster {
   map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
 
   // If the DNS refresh rate is specified and the cluster type is either
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
   // rate. The value configured must be at least 1ms. If this setting is not specified, the
@@ -959,7 +960,7 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
   // DNS jitter causes the cluster to refresh DNS entries later by a random amount to avoid a
-  // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount .
+  // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
   // There will be no jitter if this value is omitted. For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`

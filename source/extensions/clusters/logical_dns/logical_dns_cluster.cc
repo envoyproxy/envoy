@@ -154,7 +154,6 @@ void LogicalDnsCluster::startResolve() {
           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
             final_refresh_rate = addrinfo.ttl_ + jitter;
           }
-
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
         } else {

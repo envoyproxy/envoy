@@ -1534,6 +1534,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
 // Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
 TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
   const std::string yaml = R"EOF(
+    name: name
     connect_timeout: 0.25s
     type: strict_dns
     dns_refresh_rate: 4s
