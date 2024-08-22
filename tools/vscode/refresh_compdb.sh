@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-echo "$(dirname "${BASH_SOURCE[0]}")"
-
 [[ -z "${SKIP_PROTO_FORMAT}" ]] && tools/proto_format/proto_format.sh fix
 
 bazel_or_isk=bazelisk

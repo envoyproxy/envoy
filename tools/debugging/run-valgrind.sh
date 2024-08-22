@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
 #
 # Helper script to run tests under valgrind.  Usage:
 #    bazel test --run_under=`pwd`/tools/debugging/run-valgrind.sh ...
