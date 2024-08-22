@@ -42,6 +42,7 @@ cat > "${DOCKER_ENV}" <<EOF
   export NO_PROXY="${NO_PROXY}"
 EOF
 
+# shellcheck source=ci/envoy_build_sha.sh
 . "${SCRIPT_DIR}"/../ci/envoy_build_sha.sh
 IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
 
