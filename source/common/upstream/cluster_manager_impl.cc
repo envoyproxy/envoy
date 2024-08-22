@@ -2265,6 +2265,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry);
 #else
     (void)quic_info;
+    (void)network_observer_registry;
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
 #endif
