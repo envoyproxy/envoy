@@ -17,8 +17,11 @@ DECLARE_FACTORY(GetAddrInfoDnsResolverFactory);
 // desired.
 class GetAddrInfoDnsResolver : public DnsResolver, public Logger::Loggable<Logger::Id::dns> {
 public:
-  GetAddrInfoDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api)
-      : dispatcher_(dispatcher),
+  GetAddrInfoDnsResolver(
+      const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig&
+          config,
+      Event::Dispatcher& dispatcher, Api::Api& api)
+      : config_(config), dispatcher_(dispatcher),
         resolver_thread_(api.threadFactory().createThread([this] { resolveThreadRoutine(); })) {}
 
   ~GetAddrInfoDnsResolver() override;
@@ -51,6 +54,12 @@ protected:
   // Must be a shared_ptr for passing around via post.
   using PendingQuerySharedPtr = std::shared_ptr<PendingQuery>;
 
+  struct PendingQueryInfo {
+    PendingQuerySharedPtr pending_query_;
+    // Empty means it will retry indefinitely until it succeeds.
+    absl::optional<uint32_t> num_retries_;
+  };
+
   // Parse a getaddrinfo() response and determine the final address list. We could potentially avoid
   // adding v4 or v6 addresses if we know they will never be used. Right now the final filtering is
   // done below and this code is kept simple.
@@ -64,9 +73,10 @@ protected:
   // later if needed.
   static constexpr std::chrono::seconds DEFAULT_TTL = std::chrono::seconds(60);
 
+  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config_;
   Event::Dispatcher& dispatcher_;
   absl::Mutex mutex_;
-  std::list<PendingQuerySharedPtr> pending_queries_ ABSL_GUARDED_BY(mutex_);
+  std::list<PendingQueryInfo> pending_queries_ ABSL_GUARDED_BY(mutex_);
   bool shutting_down_ ABSL_GUARDED_BY(mutex_){};
   // The resolver thread must be initialized last so that the above members are already fully
   // initialized.
@@ -86,8 +96,11 @@ public:
 
   absl::StatusOr<DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<GetAddrInfoDnsResolver>(dispatcher, api);
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_getaddrinfo_config)
+      const override {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config;
+    RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_getaddrinfo_config.typed_config(), config));
+    return std::make_shared<GetAddrInfoDnsResolver>(config, dispatcher, api);
   }
 };
 

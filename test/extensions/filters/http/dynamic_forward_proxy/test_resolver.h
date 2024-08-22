@@ -65,8 +65,11 @@ public:
 
   absl::StatusOr<DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<TestResolver>(dispatcher, api);
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_getaddrinfo_config)
+      const override {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config;
+    RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_getaddrinfo_config.typed_config(), config));
+    return std::make_shared<TestResolver>(config, dispatcher, api);
   }
 };
 
@@ -74,8 +77,11 @@ class OverrideAddrInfoDnsResolverFactory : public Network::GetAddrInfoDnsResolve
 public:
   absl::StatusOr<Network::DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<Network::TestResolver>(dispatcher, api);
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_getaddrinfo_config)
+      const override {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config;
+    RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_getaddrinfo_config.typed_config(), config));
+    return std::make_shared<Network::TestResolver>(config, dispatcher, api);
   }
 };
 
