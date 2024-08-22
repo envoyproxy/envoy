@@ -11,6 +11,8 @@ if [[ -n "$NO_BUILD_SETUP" ]]; then
     return
 fi
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=$(grep -c ^processor /proc/cpuinfo)
@@ -111,7 +113,7 @@ export BAZEL_BUILD_OPTION_LIST
 export BAZEL_GLOBAL_OPTION_LIST
 
 if [[ -e "${LLVM_ROOT}" ]]; then
-    "$(dirname "$0")/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+    "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
 else
     echo "LLVM_ROOT not found, not setting up llvm."
 fi
@@ -148,7 +150,7 @@ mkdir -p "${ENVOY_BUILD_PROFILE}"
 
 if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
   # shellcheck source=ci/filter_example_setup.sh
-  . "$(dirname "$0")"/filter_example_setup.sh
+  . "${CURRENT_SCRIPT_DIR}"/filter_example_setup.sh
 else
   echo "Skip setting up Envoy Filter Example."
 fi
