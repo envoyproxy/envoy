@@ -96,8 +96,8 @@ public:
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override { handleEstablishedStream(); }
-  void onEstablishmentFailure(bool nextAttemptToTheSameSource) override {
-    handleStreamEstablishmentFailure(nextAttemptToTheSameSource);
+  void onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) override {
+    handleStreamEstablishmentFailure(next_attempt_may_send_initial_resource_version);
   }
   void onWriteable() override { trySendDiscoveryRequests(); }
   void onDiscoveryResponse(std::unique_ptr<RS>&& message,
@@ -154,7 +154,7 @@ protected:
   S& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
-  void handleStreamEstablishmentFailure(bool nextAttemptToTheSameSource);
+  void handleStreamEstablishmentFailure(bool next_attempt_may_send_initial_resource_version);
   void genericHandleResponse(const std::string& type_url, const RS& response_proto,
                              ControlPlaneStats& control_plane_stats);
   void trySendDiscoveryRequests();

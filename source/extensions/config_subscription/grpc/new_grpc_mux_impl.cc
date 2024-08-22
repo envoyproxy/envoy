@@ -181,7 +181,7 @@ void NewGrpcMuxImpl::onStreamEstablished() {
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::onEstablishmentFailure(bool nextAttemptToTheSameSource) {
+void NewGrpcMuxImpl::onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -199,7 +199,7 @@ void NewGrpcMuxImpl::onEstablishmentFailure(bool nextAttemptToTheSameSource) {
       }
     }
   } while (all_subscribed.size() != subscriptions_.size());
-  should_send_initial_resource_versions_ = nextAttemptToTheSameSource;
+  should_send_initial_resource_versions_ = next_attempt_may_send_initial_resource_version;
 }
 
 void NewGrpcMuxImpl::onWriteable() { trySendDiscoveryRequests(); }

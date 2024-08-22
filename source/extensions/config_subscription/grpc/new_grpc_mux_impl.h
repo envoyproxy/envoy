@@ -69,7 +69,7 @@ public:
 
   void onStreamEstablished() override;
 
-  void onEstablishmentFailure(bool nextAttemptToTheSameSource) override;
+  void onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) override;
 
   void onWriteable() override;
 
