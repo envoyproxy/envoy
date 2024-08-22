@@ -44,7 +44,7 @@ public:
       if (dns_override.has_value()) {
         *const_cast<std::string*>(&new_query->dns_name_) = dns_override.value();
       }
-      pending_queries_.emplace_back(std::unique_ptr<PendingQuery>{new_query});
+      pending_queries_.push_back({std::unique_ptr<PendingQuery>{new_query}, absl::nullopt});
     });
     return new_query;
   }

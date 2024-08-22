@@ -164,7 +164,8 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         response = processResponse(*next_query, addrinfo_wrapper.get());
       } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
         absl::MutexLock guard(&mutex_);
-        if (num_retries.has_value()) {
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
+            num_retries.has_value()) {
           (*num_retries)--;
         }
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
