@@ -13,7 +13,14 @@ fi
 
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
-[ -z "${NUM_CPUS}" ] && NUM_CPUS=$(grep -c ^processor /proc/cpuinfo)
+if [[ -z "${NUM_CPUS}" ]]; then
+    if [[ "${OSTYPE}" == darwin* ]]; then
+        NUM_CPUS=$(sysctl -n hw.ncpu)
+    else
+        NUM_CPUS=$(grep -c ^processor /proc/cpuinfo)
+    fi
+fi
+
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
 [ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
 [ -z "${ENVOY_BUILD_DEBUG_INFORMATION}" ] && export ENVOY_BUILD_DEBUG_INFORMATION=//source/exe:envoy-static.dwp
