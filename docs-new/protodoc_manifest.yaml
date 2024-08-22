@@ -1,0 +1,59 @@
+fields:
+  envoy.config.bootstrap.v3.Bootstrap.overload_manager:
+    edge_config:
+      example:
+        refresh_interval: 0.25s
+        resource_monitors:
+        - name: "envoy.resource_monitors.fixed_heap"
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
+            max_heap_size_bytes: 1073741824
+        actions:
+        - name: "envoy.overload_actions.shrink_heap"
+          triggers:
+          - name: "envoy.resource_monitors.fixed_heap"
+            threshold:
+              value: 0.90
+        - name: "envoy.overload_actions.stop_accepting_requests"
+          triggers:
+          - name: "envoy.resource_monitors.fixed_heap"
+            threshold:
+              value: 0.95
+  envoy.config.cluster.v3.Cluster.per_connection_buffer_limit_bytes:
+    edge_config: {example: 32768}
+  envoy.config.cluster.v3.Cluster.http2_protocol_options:
+    edge_config:
+      example:
+        initial_stream_window_size: 65536  # 64 KiB
+        initial_connection_window_size: 1048576  # 1 MiB
+  envoy.config.listener.v3.Listener.per_connection_buffer_limit_bytes:
+    edge_config: {example: 32768}
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options:
+    edge_config:
+      example:
+        idle_timeout: 900s  # 15 mins
+        headers_with_underscores_action: REJECT_REQUEST
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http2_protocol_options:
+    edge_config:
+      example:
+        max_concurrent_streams: 100
+        initial_stream_window_size: 65536  # 64 KiB
+        initial_connection_window_size: 1048576  # 1 MiB
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout:
+    edge_config:
+      example: 300s  # 5 mins
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_headers_timeout:
+    edge_config:
+      example: 10s  # 10 seconds
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_timeout:
+    edge_config:
+      note: >
+        This timeout is not compatible with streaming requests.
+      example: 300s  # 5 mins
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address:
+    edge_config: {example: true}
+  envoy.config.listener.v3.QuicProtocolOptions.quic_protocol_options:
+    edge_config:
+      example:
+        initial_stream_window_size: 65536  # 64 KiB
+        initial_connection_window_size: 65536  # 64 KiB

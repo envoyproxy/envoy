@@ -1,0 +1,29 @@
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+  name: listener_0
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 10000
+  filter_chains:
+  - filters:
+    - name: envoy.http_connection_manager
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: ingress_http
+        http_filters:
+        - name: envoy.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        route_config:
+          name: local_route
+          virtual_hosts:
+          - name: local_service
+            domains:
+            - "*"
+            routes:
+            - match:
+                prefix: "/"
+              route:
+                host_rewrite_literal: www.envoyproxy.io
+                cluster: example_proxy_cluster
