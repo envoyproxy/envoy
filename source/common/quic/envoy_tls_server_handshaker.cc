@@ -48,6 +48,8 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::S
     std::optional<std::string> alps, const std::vector<uint8_t>& quic_transport_params,
     const std::optional<std::vector<uint8_t>>& early_data_context,
     const quic::QuicSSLConfig& ssl_config) {
+  // TODO: Invoke transport socket factory to get the cert directly after the runtime flag
+  // `envoy.restart_features.quic_handle_certs_with_shared_tls_code` removed.
   return default_proof_source_handle_->SelectCertificate(
     server_address, client_address, original_connection_id, ssl_capabilities,
     hostname, client_hello, alpn, alps, quic_transport_params, early_data_context, ssl_config);
