@@ -42,7 +42,7 @@ cat > "${DOCKER_ENV}" <<EOF
   export NO_PROXY="${NO_PROXY}"
 EOF
 
-. ./ci/envoy_build_sha.sh
+. "${SCRIPT_DIR}"/../ci/envoy_build_sha.sh
 IMAGE=envoyproxy/envoy-build:${ENVOY_BUILD_SHA}
 
 # Note docker_wrapper.sh is tightly coupled to the order of arguments here due to where the test
