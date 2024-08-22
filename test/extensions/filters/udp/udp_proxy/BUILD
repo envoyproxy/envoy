@@ -19,7 +19,6 @@ envoy_extension_cc_mock(
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -95,8 +94,6 @@ envoy_extension_cc_test(
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/udp/udp_proxy:config",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_config_interface",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_config_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_proto_cc_proto",
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
