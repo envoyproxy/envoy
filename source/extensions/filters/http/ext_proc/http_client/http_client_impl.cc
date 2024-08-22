@@ -14,23 +14,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
   // Cancel any active requests.
   cancel();
 
-  std::string cluster = config_.http_service().http_service().http_uri().cluster();
-  std::string url = config_.http_service().http_service().http_uri().uri();
-  absl::string_view host;
-  absl::string_view path;
-  Envoy::Http::Utility::extractHostPathFromUri(url, host, path);
-  ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, url {}, host {}, path {}",
-            cluster, url, host, path);
-
-  const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
-  Http::RequestHeaderMapPtr headers =
-      Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
-          {{Envoy::Http::Headers::get().Method, "POST"},
-           {Envoy::Http::Headers::get().Scheme, "http"},
-           {Envoy::Http::Headers::get().Path, std::string(path)},
-           {Envoy::Http::Headers::get().Host, std::string(host)}});
-  Http::RequestMessagePtr message =
-      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  // Transcode req message into JSON string.
   auto req_in_json = MessageUtil::getJsonStringFromMessage(req);
   if (!req_in_json.ok()) {
     ENVOY_LOG(error,
@@ -39,7 +23,27 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
     onError();
     return;
   }
+
+  const std::string cluster = config_.http_service().http_service().http_uri().cluster();
+  const std::string url = config_.http_service().http_service().http_uri().uri();
+  absl::string_view host, path;
+  Envoy::Http::Utility::extractHostPathFromUri(url, host, path);
+  ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, url {}, host {}, path {}",
+            cluster, url, host, path);
+
+  const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
+
+  // Construct a HTTP POST message and sends to the ext_proc server cluster.
+  Http::RequestHeaderMapPtr headers =
+      Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
+          {{Envoy::Http::Headers::get().Method, "POST"},
+           {Envoy::Http::Headers::get().Scheme, "http"},
+           {Envoy::Http::Headers::get().Path, std::string(path)},
+           {Envoy::Http::Headers::get().Host, std::string(host)}});
+  Http::RequestMessagePtr message =
+      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   message->body().add(req_in_json.value());
+
   auto options = Http::AsyncClient::RequestOptions().setSampled(absl::nullopt).setSendXff(false);
 
   active_request_ =
@@ -55,19 +59,17 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ENVOY_LOG(debug, "Response status is OK");
       std::string msg_body = response->body().toString();
-      if (msg_body.empty()) {
-        ENVOY_LOG(error, "The HTTP response body should not be empty");
-        onError();
-        return;
-      }
       envoy::service::ext_proc::v3::ProcessingResponse response_msg;
-      bool has_unknown_field;
-      auto status = MessageUtil::loadFromJsonNoThrow(msg_body, response_msg, has_unknown_field);
-      if (!status.ok()) {
-        ENVOY_LOG(error,
-                  "The HTTP response body can not be decoded into a ProcessResponse proto message");
-        onError();
-        return;
+      if (!msg_body.empty()) {
+        bool has_unknown_field;
+        auto status = MessageUtil::loadFromJsonNoThrow(msg_body, response_msg, has_unknown_field);
+        if (!status.ok()) {
+          ENVOY_LOG(
+              error,
+              "The HTTP response body can not be decoded into a ProcessResponse proto message");
+          onError();
+          return;
+        }
       }
       callbacks_->onComplete(response_msg);
       callbacks_ = nullptr;

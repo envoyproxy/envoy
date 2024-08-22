@@ -378,7 +378,6 @@ void Filter::onError() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     ImmediateResponse errorResponse;
-
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrCat(ErrorPrefix, "_HTTP_ERROR"));
     sendImmediateResponse(errorResponse);
@@ -408,9 +407,9 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
+    ExternalProcessorClient* http_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
-        (dynamic_cast<ExternalProcessorClient&>(*client_))
-            .start(*this, config_with_hash_key_, options, watermark_callbacks_);
+        http_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called

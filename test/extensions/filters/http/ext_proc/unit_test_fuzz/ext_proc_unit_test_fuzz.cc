@@ -90,7 +90,7 @@ DEFINE_PROTO_FUZZER(
 
   MockClient* client = new MockClient();
   std::unique_ptr<ExternalProcessing::Filter> filter = std::make_unique<ExternalProcessing::Filter>(
-      config, ExternalProcessing::ExternalProcessorClientPtr{client}, proto_config.grpc_service());
+      config, ExternalProcessing::ExternalProcessorClientPtr{client});
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
