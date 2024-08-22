@@ -14,7 +14,7 @@ if [[ -z "$1" ]]; then
   exit 1
 fi
 
-SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 [[ -z "${BAZEL}" ]] && BAZEL=bazel
 [[ -z "${DOCKER}" ]] && DOCKER=docker
 
