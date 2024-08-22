@@ -93,6 +93,8 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
+  Http::FilterHeadersStatus getStatusFromAction(const BucketAction& action, size_t bucket_id);
+
   Http::FilterHeadersStatus processCachedBucket(size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
   // TODO(tyxia) Build the customized response based on `DenyResponseSettings`.
@@ -100,6 +102,12 @@ private:
     callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt, "");
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
   }
+
+  // Get the FilterHeadersStatus to return when a selected bucket has an expired
+  // assignment. Note: this does not actually remove the expired entity from the
+  // cache.
+  Http::FilterHeadersStatus processExpiredBucket(size_t bucket_id,
+                                                 const RateLimitOnMatchAction& match_action);
 
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
