@@ -14,6 +14,18 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+
+Network::Address::InstanceConstSharedPtr
+getLoopbackAddress(const Network::Address::IpVersion version) {
+  if (version == Network::Address::IpVersion::v6) {
+    return std::make_shared<Network::Address::Ipv6Instance>("::1");
+  }
+  return std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+}
+
+} // namespace
+
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
 // the heap allocation is too expensive.
 Network::Address::InstanceConstSharedPtr
@@ -176,10 +188,10 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
           : 0u;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram,
-      // Use an arbitrary local address if `local_addr` is null, to pass in the socket interface
-      // used to create IoHandle.
-      local_addr ? local_addr : Network::Utility::getLocalAddress(peer_addr->ip()->version()),
-      peer_addr, Network::SocketCreationOptions{false, max_addresses_cache_size});
+      // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
+      // create the IoHandle, without having to make the more expensive `getifaddrs` call.
+      local_addr ? local_addr : getLoopbackAddress(peer_addr->ip()->version()), peer_addr,
+      Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");

@@ -27,8 +27,8 @@ public:
       Address::InstanceConstSharedPtr& peer_address_override_out);
   using WriteOverrideProc = std::function<WriteOverrideType>;
   using ReadOverrideProc = std::function<void(RecvMsgOutput& output)>;
-  using ConnectOverrideProc =
-      std::function<absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle)>;
+  using ConnectOverrideProc = std::function<absl::optional<Api::IoCallUint64Result>(
+      TestIoSocketHandle* io_handle, Address::InstanceConstSharedPtr& peer_address_override_out)>;
 
   TestIoSocketHandle(ConnectOverrideProc connect_override_proc,
                      WriteOverrideProc write_override_proc, ReadOverrideProc read_override_proc,
