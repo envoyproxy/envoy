@@ -93,6 +93,12 @@ bug_fixes:
   change: |
     RBAC will now allow stat prefixes configured in per-route config to override the base config's
     stat prefix.
+- area: http
+  change: |
+    Fixed a bug where an incomplete request (missing body or trailers) may be proxied to the upstream when the limit on
+    the number of requests per I/O cycle is configured and an HTTP decoder filter that pauses filter chain is present. This behavior
+    can be reverted by setting the runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream``
+    to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
