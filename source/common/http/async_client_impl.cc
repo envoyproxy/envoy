@@ -133,6 +133,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
   stream_info_.route_ = route_;
 
+  if (options.parent_context.stream_info != nullptr) {
+    stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
+  }
+
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
   }

@@ -28,6 +28,7 @@
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/test_data/ca_cert_info.h"
 #include "test/common/tls/test_data/extensions_cert_info.h"
+#include "test/common/tls/test_data/intermediate_ca_cert_info.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/password_protected_cert_info.h"
 #include "test/common/tls/test_data/san_dns2_cert_info.h"
@@ -1176,9 +1177,12 @@ TEST_P(SslSocketTest, GetCertDigests) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  std::vector<std::string> sha256Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_256_HASHES, ',');
-  std::vector<std::string> sha1Digests = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_1_HASHES, ',');
-  std::vector<std::string> serialNumbers = absl::StrSplit(TEST_NO_SAN_CERT_CHAIN_SERIALS, ',');
+  std::vector<std::string> sha256Digests = {TEST_NO_SAN_CERT_256_HASH,
+                                            TEST_INTERMEDIATE_CA_CERT_256_HASH};
+  std::vector<std::string> sha1Digests = {TEST_NO_SAN_CERT_1_HASH,
+                                          TEST_INTERMEDIATE_CA_CERT_1_HASH};
+  std::vector<std::string> serialNumbers = {TEST_NO_SAN_CERT_SERIAL,
+                                            TEST_INTERMEDIATE_CA_CERT_SERIAL};
   testUtil(test_options.setExpectedSha256Digests(sha256Digests)
                .setExpectedSha1Digests(sha1Digests)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #

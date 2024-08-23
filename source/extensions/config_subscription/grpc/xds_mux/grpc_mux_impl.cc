@@ -69,7 +69,8 @@ GrpcMuxImpl<S, F, RQ, RS>::createGrpcStreamObject(GrpcMuxContext& grpc_mux_conte
               callbacks, std::move(grpc_mux_context.async_client_),
               grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
               grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-              grpc_mux_context.rate_limit_settings_);
+              grpc_mux_context.rate_limit_settings_,
+              GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
         },
         /*failover_stream_creator=*/
         grpc_mux_context.failover_async_client_
@@ -83,7 +84,8 @@ GrpcMuxImpl<S, F, RQ, RS>::createGrpcStreamObject(GrpcMuxContext& grpc_mux_conte
                     // be the same as the primary source.
                     std::make_unique<FixedBackOffStrategy>(
                         GrpcMuxFailover<RQ, RS>::DefaultFailoverBackoffMilliseconds),
-                    grpc_mux_context.rate_limit_settings_);
+                    grpc_mux_context.rate_limit_settings_,
+                    GrpcStream<RQ, RS>::ConnectedStateValue::SECOND_ENTRY);
               })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
@@ -92,7 +94,8 @@ GrpcMuxImpl<S, F, RQ, RS>::createGrpcStreamObject(GrpcMuxContext& grpc_mux_conte
   return std::make_unique<GrpcStream<RQ, RS>>(
       this, std::move(grpc_mux_context.async_client_), grpc_mux_context.service_method_,
       grpc_mux_context.dispatcher_, grpc_mux_context.scope_,
-      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_);
+      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_,
+      GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
 }
 template <class S, class F, class RQ, class RS> GrpcMuxImpl<S, F, RQ, RS>::~GrpcMuxImpl() {
   AllMuxes::get().erase(this);
