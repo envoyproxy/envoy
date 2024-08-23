@@ -392,7 +392,7 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
-        "//tools:socket_passing",
+        "//tools/socket_passing",
     ],
     # Hot restart does not apply on Windows, skipping
     tags = ["skip_on_windows"],
