@@ -158,9 +158,9 @@ struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
       : stream_(std::move(stream)), parent(stream_manager), stats(stat),
         deferred_close_timeout(timeout) {}
 
-  void deferredClose(Envoy::Event::Dispatcher& dispatcher, uint64_t stream_id);
+  void deferredClose(Envoy::Event::Dispatcher& dispatcher);
+  void closeStreamOnTimer();
 
-  void closeStreamOnTimer(uint64_t stream_id);
   ExternalProcessorStreamPtr stream_;
   ThreadLocalStreamManager& parent;
   ExtProcFilterStats stats;
@@ -174,28 +174,28 @@ class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
-  ExternalProcessorStream* store(uint64_t stream_id, ExternalProcessorStreamPtr stream,
-                                 const ExtProcFilterStats& stat,
+  ExternalProcessorStream* store(ExternalProcessorStreamPtr stream, const ExtProcFilterStats& stat,
                                  const std::chrono::milliseconds& timeout) {
-    stream_manager_[stream_id] =
+    auto deferred_stream =
         std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat, timeout);
-    return stream_manager_[stream_id]->stream_.get();
+    ExternalProcessorStream* raw_stream = deferred_stream->stream_.get();
+    stream_manager_[raw_stream] = std::move(deferred_stream);
+    return stream_manager_[raw_stream]->stream_.get();
   }
 
-  void erase(uint64_t stream_id) { stream_manager_.erase(stream_id); }
-
-  void deferredErase(uint64_t stream_id, Envoy::Event::Dispatcher& dispatcher) {
-    auto it = stream_manager_.find(stream_id);
+  void erase(ExternalProcessorStream* stream) { stream_manager_.erase(stream); }
+  void deferredErase(ExternalProcessorStream* stream, Envoy::Event::Dispatcher& dispatcher) {
+    auto it = stream_manager_.find(stream);
     if (it == stream_manager_.end()) {
       return;
     }
 
-    it->second->deferredClose(dispatcher, stream_id);
+    it->second->deferredClose(dispatcher);
   }
 
 private:
-  // Map of DeferredDeletableStreamPtrs with stream id as key.
-  absl::flat_hash_map<uint64_t, DeferredDeletableStreamPtr> stream_manager_;
+  // Map of DeferredDeletableStreamPtrs with ExternalProcessorStream pointer as key.
+  absl::flat_hash_map<ExternalProcessorStream*, DeferredDeletableStreamPtr> stream_manager_;
 };
 
 class FilterConfig {
@@ -499,6 +499,7 @@ private:
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
   Http::StreamFilterCallbacks* filter_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 };
 
 extern std::string responseCaseToString(

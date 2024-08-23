@@ -170,6 +170,11 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+.. _config_access_log_format_start_time_local:
+
+%START_TIME_LOCAL%
+  Same as :ref:`START_TIME <config_access_log_format_start_time>`, but use local time zone.
+
 .. _config_access_log_format_emit_time:
 
 %EMIT_TIME%
@@ -177,6 +182,11 @@ The following command operators are supported:
 
   EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_emit_time_local:
+
+%EMIT_TIME_LOCAL%
+  Same as :ref:`EMIT_TIME <config_access_log_format_emit_time>`, but use local time zone.
 
 %REQUEST_HEADERS_BYTES%
   HTTP
@@ -575,6 +585,10 @@ UDP
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
+
+%UPSTREAM_CLUSTER_RAW%
+  Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
+  <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` does NOT modify this value.
 
 %UPSTREAM_LOCAL_ADDRESS%
   Local address of the upstream connection. If the address is an IP address it includes both
@@ -1094,6 +1108,24 @@ UDP
 %DOWNSTREAM_PEER_SERIAL%
   HTTP/TCP/THRIFT
     The serial number of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%
+  HTTP/TCP/THRIFT
+    The comma-separated hex-encoded SHA256 fingerprints of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1%
+  HTTP/TCP/THRIFT
+    The comma-separated hex-encoded SHA1 fingerprints of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_SERIALS%
+  HTTP/TCP/THRIFT
+    The comma-separated wserial numbers of all client certificates used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 

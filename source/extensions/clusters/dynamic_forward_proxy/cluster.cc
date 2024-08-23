@@ -499,7 +499,7 @@ ClusterFactory::createClusterWithConfig(
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
   auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
-  RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
+  RETURN_IF_NOT_OK_REF(dns_cache_or_error.status());
 
   absl::Status creation_status = absl::OkStatus();
   auto new_cluster = std::shared_ptr<Cluster>(

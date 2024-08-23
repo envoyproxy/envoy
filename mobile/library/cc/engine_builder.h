@@ -56,19 +56,18 @@ public:
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-#ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& setHttp3ConnectionOptions(std::string options);
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
   EngineBuilder& enablePortMigration(bool enable_port_migration);
-#endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
   EngineBuilder& setUseGroIfAvailable(bool use_gro_if_available);
-  EngineBuilder& setSocketReceiveBufferSize(int32_t size);
+  EngineBuilder& setUdpSocketReceiveBufferSize(int32_t size);
+  EngineBuilder& setUdpSocketSendBufferSize(int32_t size);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& setUpstreamTlsSni(std::string sni);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
@@ -82,6 +81,7 @@ public:
   // E.g. addDnsPreresolveHost(std::string host, uint32_t port);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
+  EngineBuilder& addNativeFilter(const std::string& name, const ProtobufWkt::Any& typed_config);
 
   EngineBuilder& addPlatformFilter(const std::string& name);
   // Adds a runtime guard for the `envoy.reloadable_features.<guard>`.
@@ -118,10 +118,14 @@ public:
 private:
   struct NativeFilterConfig {
     NativeFilterConfig(std::string name, std::string typed_config)
-        : name_(std::move(name)), typed_config_(std::move(typed_config)) {}
+        : name_(std::move(name)), textproto_typed_config_(std::move(typed_config)) {}
+
+    NativeFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config)
+        : name_(name), typed_config_(typed_config) {}
 
     std::string name_;
-    std::string typed_config_;
+    std::string textproto_typed_config_{};
+    ProtobufWkt::Any typed_config_{};
   };
 
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
@@ -182,7 +186,11 @@ private:
 
   // This is the same value Cronet uses for QUIC:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
-  int32_t socket_receive_buffer_size_ = 1024 * 1024; // 1MB
+  int32_t udp_socket_receive_buffer_size_ = 1024 * 1024; // 1MB
+  // This is the same value Cronet uses for QUIC:
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_session_pool.cc;l=790-793;drc=7f04a8e033c23dede6beae129cd212e6d4473d72
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/third_party/quiche/src/quiche/quic/core/quic_constants.h;l=43-47;drc=34ad7f3844f882baf3d31a6bc6e300acaa0e3fc8
+  int32_t udp_socket_send_buffer_size_ = 1452 * 20;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

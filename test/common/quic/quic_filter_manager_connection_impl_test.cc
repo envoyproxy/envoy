@@ -16,13 +16,15 @@ public:
   TestQuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                       const quic::QuicConnectionId& connection_id,
                                       Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                                      std::shared_ptr<QuicSslConnectionInfo>&& ssl_info)
+                                      std::shared_ptr<QuicSslConnectionInfo>&& ssl_info,
+                                      QuicStatNames& quic_stat_names, Stats::Scope& scope)
       : QuicFilterManagerConnectionImpl(
             connection, connection_id, dispatcher, send_buffer_limit, std::move(ssl_info),
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
                 connection.connectionSocket()->connectionInfoProviderSharedPtr(),
-                StreamInfo::FilterState::LifeSpan::Connection)) {}
+                StreamInfo::FilterState::LifeSpan::Connection),
+            quic_stat_names, scope) {}
 
   void dumpState(std::ostream& /*os*/, int /*indent_level = 0*/) const override {}
   absl::string_view requestedServerName() const override { return {}; }
@@ -42,11 +44,12 @@ class QuicFilterManagerConnectionImplTest : public ::testing::Test {
 public:
   QuicFilterManagerConnectionImplTest()
       : socket_(std::make_unique<NiceMock<Network::MockConnectionSocket>>()),
-        connection_(std::move(socket_)),
+        quic_stat_names_(store_.symbolTable()), connection_(std::move(socket_)),
         quic_session_(new quic::test::MockQuicConnection(&helper_, &alarm_factory_,
                                                          quic::Perspective::IS_SERVER)),
         ssl_info_(std::make_shared<QuicSslConnectionInfo>(quic_session_)),
-        impl_(connection_, connection_id_, dispatcher_, send_buffer_limit_, std::move(ssl_info_)) {}
+        impl_(connection_, connection_id_, dispatcher_, send_buffer_limit_, std::move(ssl_info_),
+              quic_stat_names_, *store_.rootScope()) {}
 
 protected:
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> socket_;
@@ -55,6 +58,8 @@ protected:
   uint32_t send_buffer_limit_ = 0;
   quic::test::MockQuicConnectionHelper helper_;
   quic::test::MockAlarmFactory alarm_factory_;
+  Stats::IsolatedStoreImpl store_;
+  QuicStatNames quic_stat_names_;
   QuicNetworkConnection connection_;
   quic::test::MockQuicSession quic_session_;
   std::shared_ptr<QuicSslConnectionInfo> ssl_info_;
@@ -127,6 +132,12 @@ TEST_F(QuicFilterManagerConnectionImplTest, EnableHalfClose) {
 
 TEST_F(QuicFilterManagerConnectionImplTest, IsHalfCloseEnabled) {
   EXPECT_FALSE(impl_.isHalfCloseEnabled());
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
+  const absl::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
+  EXPECT_TRUE(id.has_value());
+  EXPECT_NE(id.value_or(0), 0);
 }
 
 } // namespace Quic

@@ -45,6 +45,7 @@ envoy_cc_test(
     name = "ext_authz_http_impl_test",
     srcs = ["ext_authz_http_impl_test.cc"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/mocks/server:server_factory_context_mocks",

@@ -31,7 +31,7 @@ public:
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
-        Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks) override;
+        Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override;
 
 private:
   Grpc::AsyncClientManager& client_manager_;
@@ -46,7 +46,7 @@ public:
   static ExternalProcessorStreamPtr
   create(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
          ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
-         Http::DecoderFilterWatermarkCallbacks* decoder_watermark_callbacks);
+         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks);
 
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
@@ -57,6 +57,16 @@ public:
     // When the filter object is being destroyed,  `callbacks_` (which is a OptRef to filter object)
     // should be reset to avoid the dangling reference.
     callbacks_.reset();
+
+    // Unregister the watermark callbacks(if any) to prevent access of filter callbacks after
+    // the filter object is destroyed.
+    if (!stream_closed_) {
+      // Remove the parent stream info to avoid a dangling reference.
+      stream_.streamInfo().clearParentStreamInfo();
+      if (grpc_side_stream_flow_control_) {
+        stream_.removeWatermarkCallbacks();
+      }
+    }
   }
 
   // AsyncStreamCallbacks
@@ -68,6 +78,7 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_.streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_.streamInfo(); }
 
   bool grpcSidestreamFlowControl() { return grpc_side_stream_flow_control_; }
 
@@ -87,6 +98,7 @@ private:
   Grpc::AsyncStream<ProcessingRequest> stream_;
   Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
+  // Boolean flag initiated by runtime flag.
   const bool grpc_side_stream_flow_control_;
 };
 
