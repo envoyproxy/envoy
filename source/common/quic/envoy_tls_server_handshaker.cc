@@ -7,23 +7,25 @@ namespace Quic {
 
 EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
-    Envoy::Event::Dispatcher& dispatcher, const Network::DownstreamTransportSocketFactory& transport_socket_factory)
+    Envoy::Event::Dispatcher& dispatcher,
+    const Network::DownstreamTransportSocketFactory& transport_socket_factory)
     : quic::TlsServerHandshaker(session, crypto_config), dispatcher_(dispatcher),
       proof_source_(crypto_config->proof_source()),
-      transport_socket_factory_(dynamic_cast<const QuicServerTransportSocketFactory&>(transport_socket_factory)) {}
+      transport_socket_factory_(
+          dynamic_cast<const QuicServerTransportSocketFactory&>(transport_socket_factory)) {}
 
 std::unique_ptr<quic::ProofSourceHandle> EnvoyTlsServerHandshaker::MaybeCreateProofSourceHandle() {
   return std::make_unique<EnvoyDefaultProofSourceHandle>(
-    this, quic::TlsServerHandshaker::MaybeCreateProofSourceHandle(), transport_socket_factory_);
+      this, quic::TlsServerHandshaker::MaybeCreateProofSourceHandle(), transport_socket_factory_);
 }
 
 EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::EnvoyDefaultProofSourceHandle(
-  EnvoyTlsServerHandshaker* tls_server_handshaker,
-  std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle,
-  const QuicServerTransportSocketFactory& transport_socket_factory) :
-    handshaker_(tls_server_handshaker),
-    default_proof_source_handle_(std::move(default_proof_source_handle)),
-    transport_socket_factory_(transport_socket_factory) {
+    EnvoyTlsServerHandshaker* tls_server_handshaker,
+    std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle,
+    const QuicServerTransportSocketFactory& transport_socket_factory)
+    : handshaker_(tls_server_handshaker),
+      default_proof_source_handle_(std::move(default_proof_source_handle)),
+      transport_socket_factory_(transport_socket_factory) {
   ASSERT(handshaker_ != nullptr);
 }
 
@@ -41,8 +43,7 @@ void EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::CloseHandle() {
 // Delegates to proof_source_->GetCertChain.
 // Returns QUIC_SUCCESS or QUIC_FAILURE. Never returns QUIC_PENDING.
 quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::SelectCertificate(
-    const quic::QuicSocketAddress& server_address,
-    const quic::QuicSocketAddress& client_address,
+    const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const quic::QuicConnectionId& original_connection_id, absl::string_view ssl_capabilities,
     const std::string& hostname, absl::string_view client_hello, const std::string& alpn,
     std::optional<std::string> alps, const std::vector<uint8_t>& quic_transport_params,
@@ -51,20 +52,19 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::S
   // TODO: Invoke transport socket factory to get the cert directly after the runtime flag
   // `envoy.restart_features.quic_handle_certs_with_shared_tls_code` removed.
   return default_proof_source_handle_->SelectCertificate(
-    server_address, client_address, original_connection_id, ssl_capabilities,
-    hostname, client_hello, alpn, alps, quic_transport_params, early_data_context, ssl_config);
+      server_address, client_address, original_connection_id, ssl_capabilities, hostname,
+      client_hello, alpn, alps, quic_transport_params, early_data_context, ssl_config);
 }
 
 quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::ComputeSignature(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname, uint16_t signature_algorithm, absl::string_view in,
     size_t max_signature_size) {
-  private_key_method_provider_ =
-      transport_socket_factory_.getPrivateKeyMethodProvider(hostname);
-    
+  private_key_method_provider_ = transport_socket_factory_.getPrivateKeyMethodProvider(hostname);
+
   if (private_key_method_provider_ == nullptr) {
-    return default_proof_source_handle_->ComputeSignature(server_address,
-      client_address, hostname, signature_algorithm, in, max_signature_size);
+    return default_proof_source_handle_->ComputeSignature(
+        server_address, client_address, hostname, signature_algorithm, in, max_signature_size);
   } else {
     auto* ssl = handshaker_->GetSsl();
     private_key_method_provider_->registerPrivateKeyMethod(ssl, *this, handshaker_->dispatcher());
@@ -94,14 +94,13 @@ void EnvoyTlsServerHandshaker::EnvoyDefaultProofSourceHandle::onPrivateKeyMethod
   ASSERT(private_key_method_provider_ != nullptr);
   size_t sig_len = 0;
   auto ret = private_key_method_provider_->getBoringSslPrivateKeyMethod()->complete(
-      handshaker_->GetSsl(), const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(signature_.data())), &sig_len,
+      handshaker_->GetSsl(),
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(signature_.data())), &sig_len,
       max_sig_size_);
   if (ret == ssl_private_key_failure) {
-    handshaker_->OnComputeSignatureDone(
-      false, false, "", nullptr);
-  } else { 
-    handshaker_->OnComputeSignatureDone(
-                true, false, std::move(signature_), nullptr);
+    handshaker_->OnComputeSignatureDone(false, false, "", nullptr);
+  } else {
+    handshaker_->OnComputeSignatureDone(true, false, std::move(signature_), nullptr);
   }
   private_key_method_provider_->unregisterPrivateKeyMethod(handshaker_->GetSsl());
 }

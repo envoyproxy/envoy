@@ -13,10 +13,10 @@ namespace Quic {
 
 class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
-  EnvoyTlsServerHandshaker(quic::QuicSession* session,
-                           const quic::QuicCryptoServerConfig* crypto_config,
-                           Envoy::Event::Dispatcher& dispatcher,
-                           const Network::DownstreamTransportSocketFactory& transport_socket_factory);
+  EnvoyTlsServerHandshaker(
+      quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
+      Envoy::Event::Dispatcher& dispatcher,
+      const Network::DownstreamTransportSocketFactory& transport_socket_factory);
 
   Envoy::Event::Dispatcher& dispatcher() { return dispatcher_; }
 
@@ -28,9 +28,10 @@ private:
                                         public Envoy::Ssl::PrivateKeyConnectionCallbacks,
                                         protected Logger::Loggable<Logger::Id::quic_stream> {
   public:
-    EnvoyDefaultProofSourceHandle(EnvoyTlsServerHandshaker* handshaker,
-                                  std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle,
-                                  const QuicServerTransportSocketFactory& transport_socket_factory);
+    EnvoyDefaultProofSourceHandle(
+        EnvoyTlsServerHandshaker* handshaker,
+        std::unique_ptr<quic::ProofSourceHandle> default_proof_source_handle,
+        const QuicServerTransportSocketFactory& transport_socket_factory);
     ~EnvoyDefaultProofSourceHandle();
     void CloseHandle() override;
     quic::QuicAsyncStatus SelectCertificate(

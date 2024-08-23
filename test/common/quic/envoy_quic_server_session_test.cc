@@ -95,10 +95,10 @@ class TestEnvoyQuicTlsServerHandshaker : public EnvoyTlsServerHandshaker,
 public:
   ~TestEnvoyQuicTlsServerHandshaker() override = default;
 
-  TestEnvoyQuicTlsServerHandshaker(quic::QuicSession* session,
-                                   const quic::QuicCryptoServerConfig& crypto_config,
-                                   Envoy::Event::Dispatcher& dispatcher,
-                                   const Network::DownstreamTransportSocketFactory& transport_socket_factory)
+  TestEnvoyQuicTlsServerHandshaker(
+      quic::QuicSession* session, const quic::QuicCryptoServerConfig& crypto_config,
+      Envoy::Event::Dispatcher& dispatcher,
+      const Network::DownstreamTransportSocketFactory& transport_socket_factory)
       : EnvoyTlsServerHandshaker(session, &crypto_config, dispatcher, transport_socket_factory),
         params_(new quic::QuicCryptoNegotiatedParameters) {
     params_->cipher_suite = 1;
@@ -134,7 +134,8 @@ public:
       return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
                                                           session, helper);
     case quic::PROTOCOL_TLS1_3:
-      return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config, dispatcher, transport_socket_factory.value());
+      return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config, dispatcher,
+                                                                transport_socket_factory.value());
     case quic::PROTOCOL_UNSUPPORTED:
       ASSERT(false, "Unknown handshake protocol");
     }
@@ -169,18 +170,19 @@ public:
                 quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr(),
                 StreamInfo::FilterState::LifeSpan::Connection),
             connection_stats_, debug_visitor_factory_),
-        stats_({ALL_HTTP3_CODEC_STATS(
-            POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
-            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
+        stats_(
+            {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
+                                   POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
         transport_socket_factory_(listener_config_.listenerScope(), "") {
 
-    ON_CALL(filter_chain_, transportSocketFactory()).WillByDefault(ReturnRef(transport_socket_factory_));
+    ON_CALL(filter_chain_, transportSocketFactory())
+        .WillByDefault(ReturnRef(transport_socket_factory_));
     EXPECT_CALL(transport_socket_factory_, earlyDataEnabled()).WillOnce(Return(false));
     filter_chain_map_[&filter_chain_].push_front(
         std::reference_wrapper<Network::Connection>(envoy_quic_session_));
     envoy_quic_session_.storeConnectionMapPosition(filter_chain_map_, filter_chain_,
-                                             filter_chain_map_[&filter_chain_].begin());
-    
+                                                   filter_chain_map_[&filter_chain_].begin());
+
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
 

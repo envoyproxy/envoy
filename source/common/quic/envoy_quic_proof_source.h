@@ -35,6 +35,7 @@ public:
   getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
                                    const quic::QuicSocketAddress& client_address,
                                    const std::string& hostname);
+
 protected:
   // quic::ProofSource
   void signPayload(const quic::QuicSocketAddress& server_address,

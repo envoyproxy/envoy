@@ -13,15 +13,15 @@
 namespace Envoy {
 namespace Quic {
 
-class QuicServerTransportSocketFactory: public Network::DownstreamTransportSocketFactory,
-                                        public QuicTransportSocketFactoryBase {
+class QuicServerTransportSocketFactory : public Network::DownstreamTransportSocketFactory,
+                                         public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Stats::Scope& store, const std::string& perspective) :
-    QuicTransportSocketFactoryBase(store, perspective) {}
+  QuicServerTransportSocketFactory(Stats::Scope& store, const std::string& perspective)
+      : QuicTransportSocketFactoryBase(store, perspective) {}
   ~QuicServerTransportSocketFactory() = default;
 
   virtual std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
-            std::shared_ptr<quic::CertificatePrivateKey>>
+                    std::shared_ptr<quic::CertificatePrivateKey>>
   getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const PURE;
 
   virtual Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
@@ -37,7 +37,7 @@ public:
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
-class QuicServerTransportSocketFactoryImpl: public QuicServerTransportSocketFactory {
+class QuicServerTransportSocketFactoryImpl : public QuicServerTransportSocketFactory {
 public:
   ~QuicServerTransportSocketFactoryImpl() override;
 
@@ -76,10 +76,10 @@ public:
 
 protected:
   QuicServerTransportSocketFactoryImpl(bool enable_early_data, Stats::Scope& store,
-                                   Ssl::ServerContextConfigPtr config,
-                                   Envoy::Ssl::ContextManager& manager,
-                                   const std::vector<std::string>& server_names,
-                                   absl::Status& creation_status);
+                                       Ssl::ServerContextConfigPtr config,
+                                       Envoy::Ssl::ContextManager& manager,
+                                       const std::vector<std::string>& server_names,
+                                       absl::Status& creation_status);
 
   absl::Status onSecretUpdated() override;
 

@@ -13,8 +13,8 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
     Envoy::Event::Dispatcher& dispatcher) {
   ASSERT(transport_socket_factory.has_value());
-  return std::unique_ptr<EnvoyTlsServerHandshaker>(
-      new EnvoyTlsServerHandshaker(session, crypto_config, dispatcher, transport_socket_factory.value()));
+  return std::unique_ptr<EnvoyTlsServerHandshaker>(new EnvoyTlsServerHandshaker(
+      session, crypto_config, dispatcher, transport_socket_factory.value()));
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,

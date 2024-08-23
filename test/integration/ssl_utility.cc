@@ -61,7 +61,6 @@ void initializeUpstreamTlsContextConfig(
     certs->mutable_private_key()->set_filename(key);
   }
 
-
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {

@@ -325,7 +325,8 @@ public:
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;
     auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
-    initializeUpstreamTlsContextConfig(ssl_client_option_, *tls_context, with_test_private_key_provider_);
+    initializeUpstreamTlsContextConfig(ssl_client_option_, *tls_context,
+                                       with_test_private_key_provider_);
     tls_context->mutable_common_tls_context()->add_alpn_protocols(client_alpn_);
 
     envoy::config::core::v3::TransportSocket message;

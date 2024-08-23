@@ -30,24 +30,24 @@ namespace Envoy {
 namespace Quic {
 
 using ChainCertPair = std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
-            std::shared_ptr<quic::CertificatePrivateKey>>;
+                                std::shared_ptr<quic::CertificatePrivateKey>>;
 
-class MockQuicServerTransportSocketFactory: public QuicServerTransportSocketFactory {
+class MockQuicServerTransportSocketFactory : public QuicServerTransportSocketFactory {
 public:
-  MockQuicServerTransportSocketFactory(Stats::Scope& store, const std::string& perspective) :
-    QuicServerTransportSocketFactory(store, perspective) {}
+  MockQuicServerTransportSocketFactory(Stats::Scope& store, const std::string& perspective)
+      : QuicServerTransportSocketFactory(store, perspective) {}
 
   MOCK_METHOD(Network::TransportSocketPtr, createDownstreamTransportSocket, (), (const, override));
   MOCK_METHOD(bool, implementsSecureTransport, (), (const, override));
   MOCK_METHOD(void, initialize, (), (override));
 
-  MOCK_METHOD(ChainCertPair,
-            getTlsCertificateAndKey, (absl::string_view, bool*), (const, override));
+  MOCK_METHOD(ChainCertPair, getTlsCertificateAndKey, (absl::string_view, bool*),
+              (const, override));
 
-  MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr,
-            getPrivateKeyMethodProvider, (absl::string_view), (const, override));
+  MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, getPrivateKeyMethodProvider,
+              (absl::string_view), (const, override));
   MOCK_METHOD(std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>,
-            legacyGetTlsCertificates, (), (const, override));
+              legacyGetTlsCertificates, (), (const, override));
   MOCK_METHOD(bool, earlyDataEnabled, (), (const, override));
   MOCK_METHOD(bool, handleCertsWithSharedTlsCode, (), (const, override));
 
