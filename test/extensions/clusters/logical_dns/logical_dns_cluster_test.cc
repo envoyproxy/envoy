@@ -634,7 +634,6 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
   uint64_t random_return = 8000;
   uint64_t jitter_ms = random_return % 512; // default value
 
-  // We don't set `respect_dns_ttl`, so we use `dns_refresh_rate` instead of the ttl.
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
   setupFromV3Yaml(config);
