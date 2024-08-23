@@ -22,13 +22,13 @@ def generate_compilation_database(args):
     if args.exclude_contrib:
         source_dir_targets.remove("//contrib/...")
 
-    subprocess.check_call([args.bazel, *bazel_startup_options, "build"] + bazel_options + [
+    subprocess.check_call(["bazel", *bazel_startup_options, "build"] + bazel_options + [
         "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
     ] + source_dir_targets)
 
     execroot = subprocess.check_output([
-        args.bazel, *bazel_startup_options, "info", *bazel_options, "execution_root", *bazel_options
+        "bazel", *bazel_startup_options, "info", *bazel_options, "execution_root", *bazel_options
     ]).decode().strip()
 
     db_entries = []
@@ -128,7 +128,6 @@ if __name__ == "__main__":
         help=
         'Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.'
     )
-    parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
         'bazel_targets', nargs='*', default=[
             "//source/...",
