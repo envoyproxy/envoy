@@ -1042,7 +1042,7 @@ case $CI_TARGET in
                  --trigger-workflow="$WORKFLOW" \
                  --trigger-inputs="$INPUTS"
         ;;
-    
+
     refresh_compdb)
         "${CURRENT_SCRIPT_DIR}/../tools/vscode/refresh_compdb.sh"
         ;;
