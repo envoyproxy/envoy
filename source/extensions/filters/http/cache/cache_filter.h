@@ -93,12 +93,12 @@ private:
   void getTrailers();
 
   // Callbacks for HttpCache to call when headers/body/trailers are ready.
-  void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers);
-  void onBody(Buffer::InstancePtr&& body);
+  void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers, bool end_stream);
+  void onBody(Buffer::InstancePtr&& bod, bool end_stream);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
   // Set required state in the CacheFilter for handling a cache hit.
-  void handleCacheHit();
+  void handleCacheHit(bool end_stream_after_headers);
 
   // Set up the required state in the CacheFilter for handling a range
   // request.
@@ -128,7 +128,7 @@ private:
   // Adds a cache lookup result to the response encoding stream.
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was validated successfully.
-  void encodeCachedResponse();
+  void encodeCachedResponse(bool end_stream_after_headers);
 
   // Precondition: finished adding a response from cache to the response encoding stream.
   // Updates filter_state_ and continues the encoding stream if necessary.
@@ -156,10 +156,6 @@ private:
   std::vector<AdjustedByteRange> remaining_ranges_;
 
   const std::shared_ptr<const CacheFilterConfig> config_;
-
-  // True if the response has trailers.
-  // TODO(toddmgreer): cache trailers.
-  bool response_has_trailers_ = false;
 
   // True if a request allows cache inserts according to:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability

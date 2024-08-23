@@ -134,7 +134,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
     // We shouldn't be calling sendDataToBridge with newly arrived data if there's buffered data.
     ASSERT(!response_data_.get() || response_data_->length() == 0);
-    sendDataToBridge(data, end_stream);
+    sendData(data, end_stream);
   }
 
   // If not all the bytes have been sent up, buffer any remaining data in response_data.
@@ -147,7 +147,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   }
 }
 
-void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, bool end_stream) {
+void Client::DirectStreamCallbacks::sendData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!explicit_flow_control_ || bytes_to_send_ > 0);
 
   // Cap by bytes_to_send_ if and only if applying explicit flow control.
@@ -202,10 +202,10 @@ void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& tra
     return;
   }
 
-  sendTrailersToBridge(trailers);
+  sendTrailers(trailers);
 }
 
-void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMap& trailers) {
+void Client::DirectStreamCallbacks::sendTrailers(const ResponseTrailerMap& trailers) {
   ENVOY_LOG(debug, "[S{}] dispatching to platform response trailers for stream:\n{}",
             direct_stream_.stream_handle_, trailers);
 
@@ -237,13 +237,13 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
   // 1) it has been received from the peer and
   // 2) there are no trailers
   if (hasDataToSend()) {
-    sendDataToBridge(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
+    sendData(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
     bytes_to_send_ = 0;
   }
 
   // If all buffered data has been sent, send and free up trailers.
   if (!hasDataToSend() && response_trailers_.get() && bytes_to_send_ > 0) {
-    sendTrailersToBridge(*response_trailers_);
+    sendTrailers(*response_trailers_);
     response_trailers_.reset();
     bytes_to_send_ = 0;
   }
@@ -317,10 +317,10 @@ void Client::DirectStreamCallbacks::onError() {
 
   http_client_.removeStream(direct_stream_.stream_handle_);
   direct_stream_.request_decoder_ = nullptr;
-  sendErrorToBridge();
+  sendError();
 }
 
-void Client::DirectStreamCallbacks::sendErrorToBridge() {
+void Client::DirectStreamCallbacks::sendError() {
   if (remote_end_stream_forwarded_) {
     // If the request was not fully sent, but the response was complete, Envoy
     // will reset the stream after sending the fin bit. Don't pass this class of
