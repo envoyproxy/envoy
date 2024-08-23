@@ -128,11 +128,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
-        std::chrono::milliseconds jitter(0);
-        if (parent_.dns_jitter_ms_.count() > 0) {
-          jitter = std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_;
-        }
-        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_ + jitter;
+        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           parent_.info_->configUpdateStats().update_success_.inc();
@@ -192,10 +188,15 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
               ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = ttl_refresh_rate + jitter;
+            final_refresh_rate = ttl_refresh_rate;
             ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }
+          if (parent_.dns_jitter_ms_.count() > 0) {
+            final_refresh_rate +=
+                std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_;
+          }
+
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
         } else {

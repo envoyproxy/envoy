@@ -102,11 +102,7 @@ void LogicalDnsCluster::startResolve() {
         active_dns_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
-        std::chrono::milliseconds jitter(0);
-        if (dns_jitter_ms_.count() > 0) {
-          jitter = std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
-        }
-        std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_ + jitter;
+        std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 
         // If the DNS resolver successfully resolved with an empty response list, the logical DNS
         // cluster does not update. This ensures that a potentially previously resolved address does
@@ -152,7 +148,10 @@ void LogicalDnsCluster::startResolve() {
           failure_backoff_strategy_->reset();
 
           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
-            final_refresh_rate = addrinfo.ttl_ + jitter;
+            final_refresh_rate = addrinfo.ttl_;
+          }
+          if (dns_jitter_ms_.count() != 0) {
+            final_refresh_rate += std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
           }
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
