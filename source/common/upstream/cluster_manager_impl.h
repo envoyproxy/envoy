@@ -44,18 +44,6 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
-#else
-namespace Envoy {
-
-// Dumb definitions of QUIC classes if QUICHE is compiled out.
-namespace Quic {
-
-class EnvoyQuicNetworkObserverRegistryFactory {};
-class EnvoyQuicNetworkObserverRegistry {};
-
-} // namespace Quic
-
-} // namespace Envoy
 #endif
 
 namespace Envoy {

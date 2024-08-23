@@ -41,8 +41,14 @@ namespace Envoy {
 
 namespace Quic {
 
+#ifdef ENVOY_ENABLE_QUIC
 class EnvoyQuicNetworkObserverRegistryFactory;
 class EnvoyQuicNetworkObserverRegistry;
+#else
+// Dumb definitions of QUIC classes if QUICHE is compiled out.
+class EnvoyQuicNetworkObserverRegistryFactory {};
+class EnvoyQuicNetworkObserverRegistry {};
+#endif
 
 } // namespace Quic
 
