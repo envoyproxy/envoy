@@ -1483,7 +1483,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
 
   ASSERT(!request_trailers_);
   if (!validateTrailers(*trailers)) {
-    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *request_trailers_);
+    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *trailers);
     return;
   }
   maybeRecordLastByteReceived(true);
