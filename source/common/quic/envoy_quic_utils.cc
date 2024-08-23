@@ -219,7 +219,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     connection_socket->bind(local_addr);
     ASSERT(local_addr->ip());
   }
-  if (auto result = connection_socket->connect(peer_addr); result.return_value_ != 0) {
+  if (auto result = connection_socket->connect(peer_addr); result.return_value_ == -1) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
                    errorDetails(result.errno_));

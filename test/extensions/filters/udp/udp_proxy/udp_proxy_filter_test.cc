@@ -116,6 +116,7 @@ public:
         EXPECT_CALL(*socket_->io_handle_, connect(_)).Times(0);
       }
       if (!connect_sys_errno) {
+        EXPECT_CALL(*socket_->io_handle_, isConnected()).WillOnce(Return(false));
         EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
             .WillOnce(Invoke(
                 [this, data, local_ip, sys_errno](

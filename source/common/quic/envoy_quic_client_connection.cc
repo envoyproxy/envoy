@@ -167,7 +167,7 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
   probeWithNewPort(peer_address(), quic::PathValidationReason::kPortMigration);
 }
 
-void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                                                  quic::PathValidationReason reason) {
   const Network::Address::InstanceConstSharedPtr& current_local_address =
       connectionSocket()->connectionInfoProvider().localAddress();
@@ -182,9 +182,10 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
   }
 
   // The probing socket will have the same host but a different port.
-  auto probing_socket =
-      createConnectionSocket(quicAddressToEnvoyAddressInstance(peer_address), new_local_address,
-                             connectionSocket()->options(), prefer_gro_);
+  auto probing_socket = createConnectionSocket(
+      peer_addr == peer_address() ? connectionSocket()->connectionInfoProvider().remoteAddress()
+                                  : quicAddressToEnvoyAddressInstance(peer_addr),
+      new_local_address, connectionSocket()->options(), prefer_gro_);
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
@@ -192,7 +193,7 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
       probing_socket->connectionInfoProvider().localAddress()->ip());
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(
-      self_address, peer_address, std::move(writer), std::move(probing_socket));
+      self_address, peer_addr, std::move(writer), std::move(probing_socket));
   ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this),
                reason);
 }
