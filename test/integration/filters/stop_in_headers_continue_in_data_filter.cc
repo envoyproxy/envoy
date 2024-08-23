@@ -11,8 +11,7 @@
 
 namespace Envoy {
 
-// A test filter that stops iteration of headers request/response
-// then injects a body later.
+// A test filter that stops iteration in decodeHeaders then continues in decodeBody.
 class StopInHeadersContinueInBodyFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "stop-in-headers-continue-in-body-filter";
