@@ -276,7 +276,13 @@ EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
-  native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
+  native_filter_chain_.emplace_back(NativeFilterConfig(std::move(name), std::move(typed_config)));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
+                                              const ProtobufWkt::Any& typed_config) {
+  native_filter_chain_.push_back(NativeFilterConfig(name, typed_config));
   return *this;
 }
 
@@ -361,15 +367,20 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
        ++filter) {
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name(filter->name_);
+    if (!filter->textproto_typed_config_.empty()) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS
-    Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
-                                          native_filter->mutable_typed_config());
-    RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
-                   "Failed to parse: " + (*filter).typed_config_);
+      Protobuf::TextFormat::ParseFromString((*filter).textproto_typed_config_,
+                                            native_filter->mutable_typed_config());
+      RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
+                     "Failed to parse: " + (*filter).textproto_typed_config_);
 #else
-    RELEASE_ASSERT(native_filter->mutable_typed_config()->ParseFromString((*filter).typed_config_),
-                   "Failed to parse binary proto: " + (*filter).typed_config_);
+      RELEASE_ASSERT(
+          native_filter->mutable_typed_config()->ParseFromString((*filter).textproto_typed_config_),
+          "Failed to parse binary proto: " + (*filter).textproto_typed_config_);
 #endif // !ENVOY_ENABLE_FULL_PROTOS
+    } else {
+      *native_filter->mutable_typed_config() = filter->typed_config_;
+    }
   }
 
   // Set up the optional filters
