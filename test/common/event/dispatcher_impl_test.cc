@@ -751,11 +751,28 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
       ->runFatalActionsOnTrackedObject(actions);
   ASSERT_EQ(action->getNumTimesRan(), 0);
 
+  // Make sure the test_thread has called dispatcher_.run().
+  dispatcher_->post([this]() {
+    {
+      Thread::LockGuard lock(mu_);
+      ASSERT(!work_finished_);
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  {
+    Thread::LockGuard lock(mu_);
+    while (!work_finished_) {
+      cv_.wait(mu_);
+    }
+  }
   // Should not run when not on same thread
   static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
   ASSERT_EQ(action->getNumTimesRan(), 0);
 
   // Should run since on same thread as dispatcher
+  work_finished_ = false;
   dispatcher_->post([this, &actions]() {
     {
       Thread::LockGuard lock(mu_);
