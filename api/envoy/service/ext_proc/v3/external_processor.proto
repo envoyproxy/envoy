@@ -285,6 +285,9 @@ message CommonResponse {
   // Instructions on how to manipulate the headers. When responding to an
   // HttpBody request, header mutations will only take effect if
   // the current processing mode for the body is BUFFERED.
+  // [#comment:TODO(yanjunxiang-google) rephrase last sentence once send_body_without_waiting_for_header_response is not hidden:
+  // the current processing mode for the body is: 1) BUFFERED; 2) or STREAMED and
+  // the :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>` is enabled.]
   HeaderMutation header_mutation = 2;
 
   // Replace the body of the last message sent to the remote server on this
