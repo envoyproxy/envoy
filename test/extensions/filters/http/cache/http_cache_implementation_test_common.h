@@ -71,9 +71,11 @@ protected:
                       const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body,
                       std::chrono::milliseconds timeout = std::chrono::seconds(1));
 
-  Http::ResponseHeaderMapPtr getHeaders(LookupContext& context);
+  // Returns the headers and a bool for end_stream.
+  std::pair<Http::ResponseHeaderMapPtr, bool> getHeaders(LookupContext& context);
 
-  std::string getBody(LookupContext& context, uint64_t start, uint64_t end);
+  // Returns a body chunk and a bool for end_stream.
+  std::pair<std::string, bool> getBody(LookupContext& context, uint64_t start, uint64_t end);
 
   Http::TestResponseTrailerMapImpl getTrailers(LookupContext& context);
 
@@ -94,6 +96,7 @@ protected:
   std::unique_ptr<HttpCacheTestDelegate> delegate_;
   VaryAllowList vary_allow_list_;
   LookupResult lookup_result_;
+  bool lookup_end_stream_after_headers_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Event::SimulatedTimeSystem time_system_;
   Event::MockDispatcher dispatcher_;

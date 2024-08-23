@@ -213,6 +213,10 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     }
   }
 
+  if (soft_drain_http1_) {
+    stats_.named_.downstream_cx_http1_soft_drain_.dec();
+  }
+
   conn_length_->complete();
   user_agent_.completeConnectionLength(*conn_length_);
 }
@@ -411,6 +415,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     }
     ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
     stats_.named_.downstream_cx_max_requests_reached_.inc();
+  }
+
+  if (soft_drain_http1_) {
+    new_stream->filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+    // Prevent erroneous debug log of closing due to incoming connection close header.
+    drain_state_ = DrainState::Closing;
   }
 
   new_stream->state_.is_internally_created_ = is_internally_created;
@@ -724,7 +734,15 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
                       StreamInfo::CoreResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
-    startDrainSequence();
+    if (config_->http1SafeMaxConnectionDuration() && codec_->protocol() < Protocol::Http2) {
+      ENVOY_CONN_LOG(debug,
+                     "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
+                     read_callbacks_->connection());
+      stats_.named_.downstream_cx_http1_soft_drain_.inc();
+      soft_drain_http1_ = true;
+    } else {
+      startDrainSequence();
+    }
   }
 }
 
@@ -1152,17 +1170,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Both shouldDrainConnectionUponCompletion() and is_head_request_ affect local replies: set them
   // as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
-    if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
-      // Only mark the connection to be closed if the request indicates so. The connection might
-      // already be marked so before this step, in which case if shouldCloseConnection() returns
-      // false, the stream info value shouldn't be overridden.
-      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
-    }
-  } else {
-    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(
-        HeaderUtility::shouldCloseConnection(protocol, *request_headers_));
+  if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
+    // Only mark the connection to be closed if the request indicates so. The connection might
+    // already be marked so before this step, in which case if shouldCloseConnection() returns
+    // false, the stream info value shouldn't be overridden.
+    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
   }
 
   filter_manager_.streamInfo().protocol(protocol);
