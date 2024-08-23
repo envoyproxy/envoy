@@ -34,7 +34,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
         cancel_action_in_flight_ = nullptr;
         if (!open_result.ok()) {
           cache_.stats().cache_miss_.inc();
-          cb(LookupResult{});
+          cb(LookupResult{}, /* end_stream (ignored) = */ false);
           return;
         }
         ASSERT(!file_handle_);
@@ -48,14 +48,14 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                   read_result.value()->length() != CacheFileFixedBlock::size()) {
                 invalidateCacheEntry();
                 cache_.stats().cache_miss_.inc();
-                cb(LookupResult{});
+                cb(LookupResult{}, /* end_stream (ignored) = */ false);
                 return;
               }
               header_block_.populateFromStringView(read_result.value()->toString());
               if (!header_block_.isValid()) {
                 invalidateCacheEntry();
                 cache_.stats().cache_miss_.inc();
-                cb(LookupResult{});
+                cb(LookupResult{}, /* end_stream (ignored) = */ false);
                 return;
               }
               auto queued = file_handle_->read(
@@ -67,7 +67,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                         read_result.value()->length() != header_block_.headerSize()) {
                       invalidateCacheEntry();
                       cache_.stats().cache_miss_.inc();
-                      cb(LookupResult{});
+                      cb(LookupResult{}, /* end_stream (ignored) = */ false);
                       return;
                     }
                     auto header_proto = makeCacheFileHeaderProto(*read_result.value());
@@ -79,7 +79,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                           lookup().requestHeaders());
                       if (!maybe_vary_key.has_value()) {
                         cache_.stats().cache_miss_.inc();
-                        cb(LookupResult{});
+                        cb(LookupResult{}, /* end_stream (ignored) = */ false);
                         return;
                       }
                       key_ = maybe_vary_key.value();
@@ -96,9 +96,11 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                       return;
                     }
                     cache_.stats().cache_hit_.inc();
-                    cb(lookup().makeLookupResult(
-                        headersFromHeaderProto(header_proto), metadataFromHeaderProto(header_proto),
-                        header_block_.bodySize(), header_block_.trailerSize() > 0));
+                    cb(lookup().makeLookupResult(headersFromHeaderProto(header_proto),
+                                                 metadataFromHeaderProto(header_proto),
+                                                 header_block_.bodySize()),
+                       /* end_stream = */ header_block_.trailerSize() == 0 &&
+                           header_block_.bodySize() == 0);
                   });
               ASSERT(queued.ok(), queued.status().ToString());
               cancel_action_in_flight_ = queued.value();
@@ -135,10 +137,12 @@ void FileLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallba
         if (!read_result.ok() || read_result.value()->length() != range.length()) {
           invalidateCacheEntry();
           // Calling callback with nullptr fails the request.
-          cb(nullptr);
+          cb(nullptr, /* end_stream (ignored) = */ false);
           return;
         }
-        cb(std::move(read_result.value()));
+        cb(std::move(read_result.value()),
+           /* end_stream = */ range.end() == header_block_.bodySize() &&
+               header_block_.trailerSize() == 0);
       });
   ASSERT(queued.ok(), queued.status().ToString());
   cancel_action_in_flight_ = queued.value();

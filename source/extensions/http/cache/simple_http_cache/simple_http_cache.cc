@@ -41,14 +41,15 @@ public:
     body_ = std::move(entry.body_);
     trailers_ = std::move(entry.trailers_);
     cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
-                                                           std::move(entry.metadata_), body_.size(),
-                                                           trailers_ != nullptr)
-                               : LookupResult{});
+                                                           std::move(entry.metadata_), body_.size())
+                               : LookupResult{},
+       body_.empty() && trailers_ == nullptr);
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
     ASSERT(range.end() <= body_.length(), "Attempt to read past end of body.");
-    cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()));
+    cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()),
+       trailers_ == nullptr && range.end() == body_.length());
   }
 
   // The cache must call cb with the cached trailers.
