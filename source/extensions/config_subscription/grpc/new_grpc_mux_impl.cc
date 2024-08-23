@@ -68,7 +68,10 @@ NewGrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
               callbacks, std::move(grpc_mux_context.async_client_),
               grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
               grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-              grpc_mux_context.rate_limit_settings_);
+              grpc_mux_context.rate_limit_settings_,
+              GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                         envoy::service::discovery::v3::DeltaDiscoveryResponse>::
+                  ConnectedStateValue::FIRST_ENTRY);
         },
         /*failover_stream_creator=*/
         grpc_mux_context.failover_async_client_
@@ -91,7 +94,10 @@ NewGrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
                             GrpcMuxFailover<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                             envoy::service::discovery::v3::DeltaDiscoveryResponse>::
                                 DefaultFailoverBackoffMilliseconds),
-                        grpc_mux_context.rate_limit_settings_);
+                        grpc_mux_context.rate_limit_settings_,
+                        GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                                   envoy::service::discovery::v3::DeltaDiscoveryResponse>::
+                            ConnectedStateValue::SECOND_ENTRY);
                   })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
@@ -101,7 +107,10 @@ NewGrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
                                      envoy::service::discovery::v3::DeltaDiscoveryResponse>>(
       this, std::move(grpc_mux_context.async_client_), grpc_mux_context.service_method_,
       grpc_mux_context.dispatcher_, grpc_mux_context.scope_,
-      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_);
+      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_,
+      GrpcStream<
+          envoy::service::discovery::v3::DeltaDiscoveryRequest,
+          envoy::service::discovery::v3::DeltaDiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
 }
 
 NewGrpcMuxImpl::~NewGrpcMuxImpl() { AllMuxes::get().erase(this); }
