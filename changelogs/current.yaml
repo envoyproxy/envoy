@@ -66,6 +66,10 @@ minor_behavior_changes:
     When computing SNI and SAN value for the auto-sni and auto-san verification feature,
     route host manipulations are now taken into account. This behavior can be reverted
     by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to false.
+- area: aws
+  change: |
+    Aws request signing common code uses http async client by default, moving curl to deprecation path. This behavior change can be
+    reverted by setting the ``envoy_reloadable_features_use_http_client_to_fetch_aws_credentials`` runtime flag to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -227,5 +231,8 @@ new_features:
     :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
     A default configuration will be used if not provided. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` to false.
+- area: geoip
+  change: |
+    Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
 
 deprecated:
