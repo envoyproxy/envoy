@@ -664,16 +664,17 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
 
   // Ensure basic flow with primary works. Validate that the
   // initial_resource_versions for delta-xDS is empty.
-  // TODO(adisuissa): ensure initial_resource_versions is empty, once this is supported.
+  const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
-                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                                      xds_stream_.get()));
-  EXPECT_TRUE(
-      compareDiscoveryRequest(EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {},
-                              false, Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get()));
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      OptRef(empty_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"failover_cluster_0"},
+                                      {"failover_cluster_0"}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      OptRef(empty_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(LdsTypeUrl, "", {}, {}, {}, false,
-                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                                      xds_stream_.get()));
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      OptRef(empty_initial_resource_versions_map)));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       CdsTypeUrl, {ConfigHelper::buildCluster("primary_cluster_0")},
       {ConfigHelper::buildCluster("primary_cluster_0")}, {}, "primary1", {}, xds_stream_.get());
@@ -778,18 +779,22 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
   RELEASE_ASSERT(result, result.message());
   failover_xds_stream_->startGrpcStream();
 
-  // Ensure basic flow with primary works. Validate that the
-  // initial_resource_versions for delta-xDS is empty.
-  // TODO(adisuissa): ensure initial_resource_versions contains the correct versions.
-  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
-                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                                      failover_xds_stream_.get()));
+  // Ensure basic flow with failover after it was connected to failover is
+  // preserved. The initial resource versions of LDS will be empty, because no
+  // LDS response was previously sent.
+  const absl::flat_hash_map<std::string, std::string> cds_eds_initial_resource_versions_map{
+      {"failover_cluster_0", "failover1"}};
+  const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
+  EXPECT_TRUE(compareDiscoveryRequest(
+      CdsTypeUrl, "", {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+      failover_xds_stream_.get(), OptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
-      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(LdsTypeUrl, "", {}, {}, {}, false,
-                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                                      failover_xds_stream_.get()));
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get(),
+      OptRef(cds_eds_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      LdsTypeUrl, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+      failover_xds_stream_.get(), OptRef(empty_initial_resource_versions_map)));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_1")},
       {ConfigHelper::buildCluster("failover_cluster_1")}, {}, "failover2", {},
