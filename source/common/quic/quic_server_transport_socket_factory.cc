@@ -29,7 +29,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
   }
 
-  auto factory_or_error = QuicServerTransportSocketFactory::create(
+  auto factory_or_error = QuicServerTransportSocketFactoryImpl::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
       context.statsScope(), std::move(server_config), context.sslContextManager(), server_names);
   RETURN_IF_NOT_OK(factory_or_error.status());
@@ -98,22 +98,22 @@ absl::Status initializeQuicCertAndKey(Ssl::TlsContext& context,
 } // namespace
 
 absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
-QuicServerTransportSocketFactory::create(bool enable_early_data, Stats::Scope& store,
+QuicServerTransportSocketFactoryImpl::create(bool enable_early_data, Stats::Scope& store,
                                          Ssl::ServerContextConfigPtr config,
                                          Envoy::Ssl::ContextManager& manager,
                                          const std::vector<std::string>& server_names) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(new QuicServerTransportSocketFactory(
+  auto ret = std::unique_ptr<QuicServerTransportSocketFactoryImpl>(new QuicServerTransportSocketFactoryImpl(
       enable_early_data, store, std::move(config), manager, server_names, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
+QuicServerTransportSocketFactoryImpl::QuicServerTransportSocketFactoryImpl(
     bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
     Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names,
     absl::Status& creation_status)
-    : QuicTransportSocketFactoryBase(scope, "server"),
+    : QuicServerTransportSocketFactory(scope, "server"),
       handle_certs_with_shared_tls_code_(Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.quic_handle_certs_with_shared_tls_code")),
       manager_(manager), stats_scope_(scope), config_(std::move(config)),
@@ -125,12 +125,12 @@ QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
   }
 }
 
-QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
+QuicServerTransportSocketFactoryImpl::~QuicServerTransportSocketFactoryImpl() {
   manager_.removeContext(ssl_ctx_);
 }
 
 absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
-QuicServerTransportSocketFactory::createSslServerContext() const {
+QuicServerTransportSocketFactoryImpl::createSslServerContext() const {
   auto context_or_error = manager_.createSslServerContext(stats_scope_, *config_, server_names_,
                                                           initializeQuicCertAndKey);
   RETURN_IF_NOT_OK(context_or_error.status());
@@ -142,7 +142,7 @@ ProtobufTypes::MessagePtr QuicServerTransportSocketConfigFactory::createEmptyCon
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>();
 }
 
-void QuicServerTransportSocketFactory::initialize() {
+void QuicServerTransportSocketFactoryImpl::initialize() {
   config_->setSecretUpdateCallback([this]() {
     // The callback also updates config_ with the new secret.
     return onSecretUpdated();
@@ -154,7 +154,7 @@ void QuicServerTransportSocketFactory::initialize() {
 
 std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
           std::shared_ptr<quic::CertificatePrivateKey>>
-QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
+QuicServerTransportSocketFactoryImpl::getTlsCertificateAndKey(absl::string_view sni,
                                                           bool* cert_matched_sni) const {
   auto tls_context = getTlsContext(sni, cert_matched_sni);
 
@@ -168,7 +168,7 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
 }
 
 Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
-    QuicServerTransportSocketFactory::getPrivateKeyMethodProvider(absl::string_view sni) const {
+    QuicServerTransportSocketFactoryImpl::getPrivateKeyMethodProvider(absl::string_view sni) const {
   bool cert_matched_sni = false;
   auto tls_context = getTlsContext(sni, &cert_matched_sni);
   if (tls_context == absl::nullopt) {
@@ -177,7 +177,7 @@ Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
   return tls_context->getPrivateKeyMethodProvider();
 }
 
-OptRef<const Ssl::TlsContext> QuicServerTransportSocketFactory::getTlsContext(absl::string_view sni, bool* cert_matched_sni) const {
+OptRef<const Ssl::TlsContext> QuicServerTransportSocketFactoryImpl::getTlsContext(absl::string_view sni, bool* cert_matched_sni) const {
   // onSecretUpdated() could be invoked in the middle of checking the existence of , and using,
   // ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and use the same ssl_ctx.
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
@@ -198,7 +198,7 @@ OptRef<const Ssl::TlsContext> QuicServerTransportSocketFactory::getTlsContext(ab
   return tls_context;
 }
 
-absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
+absl::Status QuicServerTransportSocketFactoryImpl::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
 
   if (handle_certs_with_shared_tls_code_) {

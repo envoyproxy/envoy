@@ -325,7 +325,7 @@ public:
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;
     auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
-    initializeUpstreamTlsContextConfig(ssl_client_option_, *tls_context);
+    initializeUpstreamTlsContextConfig(ssl_client_option_, *tls_context, with_test_private_key_provider_);
     tls_context->mutable_common_tls_context()->add_alpn_protocols(client_alpn_);
 
     envoy::config::core::v3::TransportSocket message;
@@ -475,6 +475,7 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   std::string client_alpn_;
+  bool with_test_private_key_provider_{false};
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
@@ -784,6 +785,38 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, WithTestPrivateKeyProvider) {
+  with_test_private_key_provider_ = true;
+  concurrency_ = 1;
+  initialize();
+  // Start the first connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  // Send a complete request on the first connection.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  // Close the first connection.
+  codec_client_->close();
+
+  // // Start a second connection.
+  // codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // // Send a complete request on the second connection.
+  // auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // waitForNextUpstreamRequest(0);
+  // upstream_request_->encodeHeaders(default_response_headers_, true);
+  // ASSERT_TRUE(response2->waitForEndStream());
+  // // Ensure the 2nd connection is using resumption ticket but doesn't accept early data.
+  // EnvoyQuicClientSession* quic_session =
+  //     static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  // EXPECT_TRUE(quic_session->IsResumption());
+  // EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  // // Close the second connection.
+  // codec_client_->close();
 }
 
 TEST_P(QuicHttpIntegrationTest, LegacyCertLoadingAndSelection) {

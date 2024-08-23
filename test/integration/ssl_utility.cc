@@ -25,7 +25,8 @@ namespace Ssl {
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context,
+    bool with_test_private_key_provider) {
   const std::string rundir = TestEnvironment::runfilesDirectory();
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
@@ -48,7 +49,18 @@ void initializeUpstreamTlsContextConfig(
     key = rundir + "/test/config/integration/certs/clientkey.pem";
   }
   certs->mutable_certificate_chain()->set_filename(chain);
-  certs->mutable_private_key()->set_filename(key);
+  if (with_test_private_key_provider) {
+    certs->mutable_private_key_provider()->set_provider_name("test");
+    ProtobufWkt::Struct provider_struct;
+    (*provider_struct.mutable_fields())["private_key_file"].set_string_value(key);
+    (*provider_struct.mutable_fields())["mode"].set_string_value("rsa");
+    (*provider_struct.mutable_fields())["expected_operation"].set_string_value("sign");
+    certs->mutable_private_key_provider()->mutable_typed_config()->PackFrom(provider_struct);
+
+  } else {
+    certs->mutable_private_key()->set_filename(key);
+  }
+
 
   auto* common_context = tls_context.mutable_common_tls_context();
 

@@ -13,15 +13,37 @@
 namespace Envoy {
 namespace Quic {
 
+class QuicServerTransportSocketFactory: public Network::DownstreamTransportSocketFactory,
+                                        public QuicTransportSocketFactoryBase {
+public:
+  QuicServerTransportSocketFactory(Stats::Scope& store, const std::string& perspective) :
+    QuicTransportSocketFactoryBase(store, perspective) {}
+  ~QuicServerTransportSocketFactory() = default;
+
+  virtual std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
+            std::shared_ptr<quic::CertificatePrivateKey>>
+  getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const PURE;
+
+  virtual Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
+  getPrivateKeyMethodProvider(absl::string_view sni) const PURE;
+
+  virtual std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
+  legacyGetTlsCertificates() const PURE;
+
+  virtual bool earlyDataEnabled() const PURE;
+
+  virtual bool handleCertsWithSharedTlsCode() const PURE;
+};
+
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
-class QuicServerTransportSocketFactory : public Network::DownstreamTransportSocketFactory,
-                                         public QuicTransportSocketFactoryBase {
+class QuicServerTransportSocketFactoryImpl: public QuicServerTransportSocketFactory {
 public:
+  ~QuicServerTransportSocketFactoryImpl() override;
+
   static absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
   create(bool enable_early_data, Stats::Scope& store, Ssl::ServerContextConfigPtr config,
          Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names);
-  ~QuicServerTransportSocketFactory() override;
 
   // Network::DownstreamTransportSocketFactory
   Network::TransportSocketPtr createDownstreamTransportSocket() const override {
@@ -33,13 +55,13 @@ public:
 
   std::pair<quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>,
             std::shared_ptr<quic::CertificatePrivateKey>>
-  getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const;
+  getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const override;
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
-  getPrivateKeyMethodProvider(absl::string_view sni) const;
+  getPrivateKeyMethodProvider(absl::string_view sni) const override;
 
   // Return TLS certificates if the context config is ready.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
-  legacyGetTlsCertificates() const {
+  legacyGetTlsCertificates() const override {
     if (!config_->isReady()) {
       ENVOY_LOG(warn, "SDS hasn't finished updating Ssl context config yet.");
       stats_.downstream_context_secrets_not_ready_.inc();
@@ -48,12 +70,12 @@ public:
     return config_->tlsCertificates();
   }
 
-  bool earlyDataEnabled() const { return enable_early_data_; }
+  bool earlyDataEnabled() const override { return enable_early_data_; }
 
-  bool handleCertsWithSharedTlsCode() const { return handle_certs_with_shared_tls_code_; }
+  bool handleCertsWithSharedTlsCode() const override { return handle_certs_with_shared_tls_code_; }
 
 protected:
-  QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
+  QuicServerTransportSocketFactoryImpl(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config,
                                    Envoy::Ssl::ContextManager& manager,
                                    const std::vector<std::string>& server_names,

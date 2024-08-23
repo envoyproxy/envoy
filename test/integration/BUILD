@@ -2474,6 +2474,7 @@ envoy_cc_test(
         "//source/common/quic:quic_client_factory_lib",
         "//source/common/quic:quic_server_factory_lib",
         "//test/common/quic:test_utils_lib",
+        "//test/common/tls:test_private_key_method_provider_test_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/integration/filters:test_network_filter_lib",

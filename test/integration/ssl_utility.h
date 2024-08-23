@@ -81,7 +81,8 @@ struct ClientSslTransportOptions {
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context,
+    bool with_test_provider_key_provider = false);
 
 Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,

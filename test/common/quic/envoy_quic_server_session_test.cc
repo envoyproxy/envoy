@@ -10,6 +10,7 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/server/configuration_impl.h"
 
@@ -40,6 +41,7 @@ using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Quic {
@@ -88,14 +90,16 @@ private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
 
-class TestEnvoyQuicTlsServerHandshaker : public quic::TlsServerHandshaker,
+class TestEnvoyQuicTlsServerHandshaker : public EnvoyTlsServerHandshaker,
                                          public ProofSourceDetailsSetter {
 public:
   ~TestEnvoyQuicTlsServerHandshaker() override = default;
 
   TestEnvoyQuicTlsServerHandshaker(quic::QuicSession* session,
-                                   const quic::QuicCryptoServerConfig& crypto_config)
-      : quic::TlsServerHandshaker(session, &crypto_config),
+                                   const quic::QuicCryptoServerConfig& crypto_config,
+                                   Envoy::Event::Dispatcher& dispatcher,
+                                   const Network::DownstreamTransportSocketFactory& transport_socket_factory)
+      : EnvoyTlsServerHandshaker(session, &crypto_config, dispatcher, transport_socket_factory),
         params_(new quic::QuicCryptoNegotiatedParameters) {
     params_->cipher_suite = 1;
   }
@@ -123,14 +127,14 @@ public:
       const quic::QuicCryptoServerConfig* crypto_config,
       quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
       quic::QuicCryptoServerStreamBase::Helper* helper,
-      OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
-      Event::Dispatcher& /*dispatcher*/) override {
+      OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
+      Event::Dispatcher& dispatcher) override {
     switch (session->connection()->version().handshake_protocol) {
     case quic::PROTOCOL_QUIC_CRYPTO:
       return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
                                                           session, helper);
     case quic::PROTOCOL_TLS1_3:
-      return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
+      return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config, dispatcher, transport_socket_factory.value());
     case quic::PROTOCOL_UNSUPPORTED:
       ASSERT(false, "Unknown handshake protocol");
     }
@@ -167,8 +171,16 @@ public:
             connection_stats_, debug_visitor_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
-            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
+            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
+        transport_socket_factory_(listener_config_.listenerScope(), "") {
 
+    ON_CALL(filter_chain_, transportSocketFactory()).WillByDefault(ReturnRef(transport_socket_factory_));
+    EXPECT_CALL(transport_socket_factory_, earlyDataEnabled()).WillOnce(Return(false));
+    filter_chain_map_[&filter_chain_].push_front(
+        std::reference_wrapper<Network::Connection>(envoy_quic_session_));
+    envoy_quic_session_.storeConnectionMapPosition(filter_chain_map_, filter_chain_,
+                                             filter_chain_map_[&filter_chain_].begin());
+    
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
 
@@ -278,6 +290,9 @@ protected:
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  FilterChainToConnectionMap filter_chain_map_;
+  testing::NiceMock<Network::MockFilterChain> filter_chain_;
+  MockQuicServerTransportSocketFactory transport_socket_factory_;
 };
 
 TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
