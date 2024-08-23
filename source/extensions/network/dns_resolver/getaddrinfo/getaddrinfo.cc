@@ -164,19 +164,15 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         response = processResponse(*next_query, addrinfo_wrapper.get());
       } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
         absl::MutexLock guard(&mutex_);
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
-            num_retries.has_value()) {
+        if (num_retries.has_value()) {
           (*num_retries)--;
         }
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
-            num_retries.has_value() && *num_retries > 0) {
+        if (num_retries.has_value() && *num_retries > 0) {
           ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
           pending_queries_.push_back({std::move(next_query), *num_retries});
           continue;
-        } else if (Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.getaddrinfo_num_retries") &&
-                   num_retries.has_value() && *num_retries == 0) {
+        } else if (num_retries.has_value() && *num_retries == 0) {
           ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
                     *num_retries);
           response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
