@@ -24,8 +24,8 @@
 #include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/message_data/message_data.h"
-#include "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
+#include "proto_processing_lib/proto_scrubber/field_mask_path_checker.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 #include "proto_processing_lib/proto_scrubber/unknown_field_checker.h"
@@ -44,8 +44,8 @@ using ::google::grpc::transcoding::TypeHelper;
 using ::google::protobuf::util::converter::JsonObjectWriter;
 using ::google::protobuf::util::converter::ProtoStreamObjectSource;
 using ::google::protobuf::util::converter::TypeInfo;
-using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
 using ::proto_processing_lib::proto_scrubber::FieldCheckerInterface;
+using ::proto_processing_lib::proto_scrubber::FieldMaskPathChecker;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::proto_processing_lib::proto_scrubber::UnknownFieldChecker;
 
@@ -96,7 +96,7 @@ ProtoScrubber::ProtoScrubber(ScrubberContext scrubber_context, const TypeHelper*
 
   // Only create the scrubber if there are fields to retain.
   if (!scrubbed_message_field_mask.paths().empty()) {
-    field_checker_ = std::make_unique<CloudAuditLogFieldChecker>(message_type_, type_finder_);
+    field_checker_ = std::make_unique<FieldMaskPathChecker>(message_type_, type_finder_);
 
     if (!scrubbed_message_field_mask.paths().empty()) {
       absl::Status status = field_checker_->AddOrIntersectFieldPaths(std::vector<std::string>(
@@ -143,6 +143,7 @@ ProtoScrubber::ScrubMessage(const Protobuf::field_extraction::MessageData& raw_m
       break;
     }
   }
+
   // If there are no fields to retain, no need to scrub and only populate @type
   // property.
   if (scrubber_ == nullptr) {
@@ -155,7 +156,7 @@ ProtoScrubber::ScrubMessage(const Protobuf::field_extraction::MessageData& raw_m
                                &scrubbed_message_metadata.scrubbed_message);
 
   if (!success) {
-    ENVOY_LOG_MISC(error, "Failed to scrub message.");
+    ENVOY_LOG_MISC(debug, "Failed to scrub message.");
   }
 
   // Handle redacted fields.

@@ -39,7 +39,7 @@ envoy_cc_library(
         "@com_google_protoconverter//:all",
         "@com_google_protofieldextraction//:all_libs",
         "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:cloud_audit_log_field_checker",
+        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
         "@envoy_api//envoy/extensions/filters/http/proto_message_scrubbing/v3:pkg_cc_proto",
     ],
 )
@@ -58,7 +58,7 @@ envoy_cc_extension(
         "@com_google_protoconverter//:all",
         "@com_google_protofieldextraction//:all_libs",
         "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:cloud_audit_log_field_checker",
+        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
         "@envoy_api//envoy/extensions/filters/http/proto_message_scrubbing/v3:pkg_cc_proto",
     ],
 )

@@ -279,9 +279,6 @@ void RedactPath(std::vector<std::string>::const_iterator path_begin,
     return;
   }
 
-  // Fail if trying to redact non-message-type field.
-  CHECK(field_value.has_struct_value()) << "Cannot redact non-message-type field" << field;
-
   RedactPath(path_begin, path_end, field_value.mutable_struct_value());
 }
 

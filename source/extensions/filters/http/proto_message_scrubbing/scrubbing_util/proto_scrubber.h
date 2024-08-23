@@ -11,7 +11,7 @@
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/message_data/message_data.h"
-#include "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
+#include "proto_processing_lib/proto_scrubber/field_mask_path_checker.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 
@@ -56,7 +56,7 @@ private:
   // rehash behavior.
   std::map<ScrubbedMessageDirective, ProtobufWkt::FieldMask> directives_mapping_;
   std::function<const ::Envoy::ProtobufWkt::Type*(const std::string&)> type_finder_;
-  std::unique_ptr<proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker> field_checker_;
+  std::unique_ptr<proto_processing_lib::proto_scrubber::FieldMaskPathChecker> field_checker_;
   std::unique_ptr<proto_processing_lib::proto_scrubber::ProtoScrubber> scrubber_;
   // A field path for 'location_selector' associated with the field marked as
   // 'SCRUB_TARGET_RESOURCE', or 'SCRUB_TARGET_RESOURCE_CALLBACK' or empty value

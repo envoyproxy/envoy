@@ -214,14 +214,12 @@ Filter::HandleDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
 
     extractor_->processRequest(*message_data->message());
 
-    if (end_stream) {
-      ScrubbedMessageResult result = extractor_->GetResult();
+    ScrubbedMessageResult result = extractor_->GetResult();
 
-      if (result.request_data.empty()) {
-        return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
-      }
-      handleRequestScrubbingResult(result.request_data);
+    if (result.request_data.empty()) {
+      return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
     }
+    handleRequestScrubbingResult(result.request_data);
 
     auto buf_convert_status = request_msg_converter_->convertBackToBuffer(std::move(message_data));
     // The message_data is not modified, ConvertBack should return OK.
@@ -329,14 +327,12 @@ Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
 
     extractor_->processResponse(*stream_message->message());
 
-    if (end_stream) {
-      ScrubbedMessageResult result = extractor_->GetResult();
+    ScrubbedMessageResult result = extractor_->GetResult();
 
-      if (result.response_data.empty()) {
-        return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
-      }
-      handleResponseScrubbingResult(result.response_data);
+    if (result.response_data.empty()) {
+      return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
     }
+    handleResponseScrubbingResult(result.response_data);
 
     auto buf_convert_status =
         response_msg_converter_->convertBackToBuffer(std::move(stream_message));

@@ -22,7 +22,7 @@
 #include "ocpdiag/core/testing/status_matchers.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/test_utils/utils.h"
-#include "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
+#include "proto_processing_lib/proto_scrubber/field_mask_path_checker.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 #include "proto_processing_lib/proto_scrubber/utility.h"
@@ -43,7 +43,7 @@ using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
-using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
+using ::proto_processing_lib::proto_scrubber::FieldMaskPathChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::scrubbing::TestRequest;
@@ -727,7 +727,7 @@ TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrTypeHelper) {
 
   std::vector<std::string> paths = {"bucket.ratio", "bucket.objects", "id"};
 
-  CloudAuditLogFieldChecker field_checker(request_type_, type_finder_);
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
   ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
   ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
                                ScrubberContext::kTestScrubbing);
