@@ -22,6 +22,7 @@ namespace Cache {
 namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::testing::Gt;
 using ::testing::IsNull;
 using ::testing::NotNull;
 
@@ -371,7 +372,7 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
         return std::move(mock_insert_context);
       });
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
-    cb(LookupResult{});
+    cb(LookupResult{}, false);
   });
   EXPECT_CALL(*mock_insert_context, insertHeaders(_, _, _, false))
       .WillOnce([&](const Http::ResponseHeaderMap&, const ResponseMetadata&,
@@ -443,7 +444,7 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
         return std::move(mock_insert_context);
       });
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
-    cb(LookupResult{});
+    cb(LookupResult{}, false);
   });
   EXPECT_CALL(*mock_insert_context, insertHeaders(_, _, _, false))
       .WillOnce([&](const Http::ResponseHeaderMap&, const ResponseMetadata&,
@@ -494,6 +495,139 @@ MATCHER_P2(RangeMatcher, begin, end, "") {
          testing::ExplainMatchResult(end, arg.end(), result_listener);
 }
 
+TEST_F(CacheFilterTest, CacheEntryStreamedWithTrailersAndNoContentLengthCanDeliverTrailers) {
+  request_headers_.setHost("CacheEntryStreamedWithTrailers");
+  const std::string body = "abcde";
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  // response_headers_ intentionally has no content length, LookupResult also has no content length.
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    cb(LookupResult{CacheEntryStatus::Ok,
+                    std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                    absl::nullopt, absl::nullopt},
+       /* end_stream = */ false);
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, Gt(5)), _))
+      .WillOnce([&](AdjustedByteRange, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>(body), false);
+      });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(5, Gt(5)), _))
+      .WillOnce([&](AdjustedByteRange, LookupBodyCallback&& cb) { cb(nullptr, false); });
+  EXPECT_CALL(*mock_lookup_context, getTrailers(_)).WillOnce([&](LookupTrailersCallback&& cb) {
+    cb(std::make_unique<Http::TestResponseTrailerMapImpl>());
+  });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq("abcde")), false));
+    EXPECT_CALL(decoder_callbacks_, encodeTrailers_(_));
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    // The posted lookup callback will cause another callback to be posted (when getBody() is
+    // called) which should also be invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheHit));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::NoInsertCacheHit));
+  }
+}
+
+TEST_F(CacheFilterTest, OnDestroyBeforeOnHeadersAbortsAction) {
+  request_headers_.setHost("CacheHitWithBody");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt}, false);
+  });
+  auto filter = makeFilter(mock_http_cache, false);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  filter->onDestroy();
+  // Nothing extra should happen when the posted lookup completion resolves, because
+  // the filter was destroyed.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(CacheFilterTest, OnDestroyBeforeOnBodyAbortsAction) {
+  request_headers_.setHost("CacheHitWithBody");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt}, false);
+  });
+  LookupBodyCallback body_callback;
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) { body_callback = cb; });
+  auto filter = makeFilter(mock_http_cache, false);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  filter->onDestroy();
+  // onBody should do nothing because the filter was destroyed.
+  body_callback(std::make_unique<Buffer::OwnedImpl>("abcde"), true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(CacheFilterTest, OnDestroyBeforeOnTrailersAbortsAction) {
+  request_headers_.setHost("CacheHitWithTrailers");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<NiceMock<MockLookupContext>>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    std::unique_ptr<Http::ResponseHeaderMap> response_headers =
+        std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 5, absl::nullopt}, false);
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>("abcde"), false);
+      });
+  LookupTrailersCallback trailers_callback;
+  EXPECT_CALL(*mock_lookup_context, getTrailers(_)).WillOnce([&](LookupTrailersCallback&& cb) {
+    trailers_callback = cb;
+  });
+  auto filter = makeFilter(mock_http_cache, false);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  filter->onDestroy();
+  // onTrailers should do nothing because the filter was destroyed.
+  trailers_callback(std::make_unique<Http::TestResponseTrailerMapImpl>());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
 TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   request_headers_.setHost("CacheHitWithBody");
   // Set the buffer limit to 5 bytes, and we will have the file be of size
@@ -509,15 +643,15 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
     std::unique_ptr<Http::ResponseHeaderMap> response_headers =
         std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_);
-    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt});
+    cb(LookupResult{CacheEntryStatus::Ok, std::move(response_headers), 8, absl::nullopt}, false);
   });
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
       .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
-        cb(std::make_unique<Buffer::OwnedImpl>("abcde"));
+        cb(std::make_unique<Buffer::OwnedImpl>("abcde"), false);
       });
   EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(5, 8), _))
       .WillOnce([&](const AdjustedByteRange&, LookupBodyCallback&& cb) {
-        cb(std::make_unique<Buffer::OwnedImpl>("fgh"));
+        cb(std::make_unique<Buffer::OwnedImpl>("fgh"), true);
       });
   EXPECT_CALL(*mock_lookup_context, onDestroy());
 
@@ -569,7 +703,7 @@ TEST_F(CacheFilterTest, CacheInsertAbortedByCache) {
         return std::move(mock_insert_context);
       });
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
-    cb(LookupResult{});
+    cb(LookupResult{}, false);
   });
   EXPECT_CALL(*mock_insert_context, insertHeaders(_, _, _, false))
       .WillOnce([&](const Http::ResponseHeaderMap&, const ResponseMetadata&,
@@ -619,7 +753,7 @@ TEST_F(CacheFilterTest, FilterDeletedWhileIncompleteCacheWriteInQueueShouldAband
         return std::move(mock_insert_context);
       });
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
-    cb(LookupResult{});
+    cb(LookupResult{}, false);
   });
   InsertCallback captured_insert_header_callback;
   EXPECT_CALL(*mock_insert_context, insertHeaders(_, _, _, false))
@@ -667,7 +801,7 @@ TEST_F(CacheFilterTest, FilterDeletedWhileCompleteCacheWriteInQueueShouldContinu
         return std::move(mock_insert_context);
       });
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
-    cb(LookupResult{});
+    cb(LookupResult{}, false);
   });
   InsertCallback captured_insert_header_callback;
   InsertCallback captured_insert_body_callback;
@@ -796,6 +930,90 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     filter->onStreamComplete();
     EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::StaleHitWithSuccessfulValidation));
     EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::HeaderUpdate));
+  }
+}
+
+TEST_F(CacheFilterTest, SuccessfulValidationWithFilterDestroyedDuringContinueEncoding) {
+  request_headers_.setHost("SuccessfulValidation");
+  const std::string body = "abc";
+  const std::string etag = "abc123";
+  const std::string last_modified_date = formatter_.now(time_source_);
+  {
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+  }
+  waitBeforeSecondRequest();
+  {
+    // Create filter for request 2
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_, /*auto_destroy=*/false);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Decoding the request should find a cached response that requires validation.
+    // As far as decoding the request is concerned, this is the same as a cache miss with the
+    // exception of injecting validation precondition headers.
+    testDecodeRequestMiss(filter);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    // Encode 304 response
+    // Advance time to make sure the cached date is updated with the 304 date
+    const std::string not_modified_date = formatter_.now(time_source_);
+    Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
+                                                                     {"date", not_modified_date}};
+
+    // The filter should stop encoding iteration when encodeHeaders is called as a cached response
+    // is being fetched and added to the encoding stream. StopIteration does not stop encodeData of
+    // the same filter from being called
+    EXPECT_EQ(filter->encodeHeaders(not_modified_response_headers, true),
+              Http::FilterHeadersStatus::StopIteration);
+
+    // Check for the cached response headers with updated date
+    Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
+    updated_response_headers.setDate(not_modified_date);
+    EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
+
+    // A 304 response should not have a body, so encodeData should not be called
+    // However, if a body is present by mistake, encodeData should stop iteration until
+    // encoding the cached response is done
+    Buffer::OwnedImpl not_modified_body;
+    EXPECT_EQ(filter->encodeData(not_modified_body, true),
+              Http::FilterDataStatus::StopIterationAndBuffer);
+
+    // The filter should add the cached response body to encoded data.
+    Buffer::OwnedImpl buffer(body);
+    EXPECT_CALL(
+        encoder_callbacks_,
+        addEncodedData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    EXPECT_CALL(encoder_callbacks_, continueEncoding()).WillOnce([&]() { filter->onDestroy(); });
+
+    // The cache getBody callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
   }
 }
 
@@ -1162,6 +1380,80 @@ TEST_F(CacheFilterTest, LocalReplyDuringLookup) {
 // Mark tests with EXPECT_ENVOY_BUG as death tests:
 // https://google.github.io/googletest/advanced.html#death-test-naming
 using CacheFilterDeathTest = CacheFilterTest;
+
+TEST_F(CacheFilterDeathTest, BadRangeRequestLookup) {
+  request_headers_.setHost("BadRangeRequestLookup");
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    // LookupResult with unknown length and an unsatisfiable RangeDetails is invalid.
+    cb(LookupResult{CacheEntryStatus::Ok,
+                    std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                    absl::nullopt,
+                    RangeDetails{/*satisfiable_ = */ false, {AdjustedByteRange{0, 5}}}},
+       false);
+  });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
+    // encodeHeaders can be called when ENVOY_BUG doesn't exit.
+    response_headers_ = {{":status", "416"}};
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), true))
+        .Times(testing::AnyNumber());
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=-5");
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    EXPECT_ENVOY_BUG(
+        dispatcher_->run(Event::Dispatcher::RunType::Block),
+        "handleCacheHitWithRangeRequest() should not be called with satisfiable_=false");
+  }
+}
+
+TEST_F(CacheFilterTest, RangeRequestSatisfiedBeforeLengthKnown) {
+  request_headers_.setHost("RangeRequestSatisfiedBeforeLengthKnown");
+  std::string body = "abcde";
+  auto mock_http_cache = std::make_shared<MockHttpCache>();
+  auto mock_lookup_context = std::make_unique<MockLookupContext>();
+  EXPECT_CALL(*mock_http_cache, makeLookupContext(_, _))
+      .WillOnce([&](LookupRequest&&,
+                    Http::StreamDecoderFilterCallbacks&) -> std::unique_ptr<LookupContext> {
+        return std::move(mock_lookup_context);
+      });
+  EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {
+    // LookupResult with unknown length and an unsatisfiable RangeDetails is invalid.
+    cb(LookupResult{CacheEntryStatus::Ok,
+                    std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
+                    absl::nullopt,
+                    RangeDetails{/*satisfiable_ = */ true, {AdjustedByteRange{0, 5}}}},
+       false);
+  });
+  EXPECT_CALL(*mock_lookup_context, getBody(RangeMatcher(0, 5), _))
+      .WillOnce([&](AdjustedByteRange, LookupBodyCallback&& cb) {
+        cb(std::make_unique<Buffer::OwnedImpl>(body), false);
+      });
+  EXPECT_CALL(*mock_lookup_context, onDestroy());
+  {
+    CacheFilterSharedPtr filter = makeFilter(mock_http_cache);
+    response_headers_ = {{":status", "206"}, {"content-range", "bytes 0-4/*"}};
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false))
+        .Times(testing::AnyNumber());
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=-5");
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+}
 
 TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
   request_headers_.setHost("StreamTimeoutDuringLookup");

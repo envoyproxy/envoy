@@ -7,6 +7,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -29,12 +30,35 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
 
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
-    Network::TransportSocketOptionsConstSharedPtr options)
+    Network::TransportSocketOptionsConstSharedPtr options,
+    std::shared_ptr<const Upstream::HostDescription> host)
     : PassthroughSocket(std::move(transport_socket)), options_(options) {
-  if (options_ && options_->http11ProxyInfo() && transport_socket_->ssl()) {
-    header_buffer_.add(
-        absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
-    need_to_strip_connect_response_ = true;
+  // If the filter state metadata has populated the relevant entries in the transport socket
+  // options, we want to maintain the original behavior of this transport socket.
+  if (options_ && options_->http11ProxyInfo()) {
+    if (transport_socket_->ssl()) {
+      header_buffer_.add(
+          absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
+      need_to_strip_connect_response_ = true;
+    }
+
+    return;
+  }
+
+  // The absence of proxy info from the transport socket options means that we should use the host
+  // address of the provided HostDescription if it has the appropriate metadata set.
+  for (auto& metadata : {host->metadata(), host->localityMetadata()}) {
+    if (metadata == nullptr) {
+      continue;
+    }
+
+    const bool has_proxy_addr = metadata->typed_filter_metadata().contains(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
+    if (has_proxy_addr) {
+      header_buffer_.add(
+          absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+      need_to_strip_connect_response_ = true;
+    }
   }
 }
 
@@ -139,7 +163,7 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options);
+  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host);
 }
 
 void UpstreamHttp11ConnectSocketFactory::hashKey(

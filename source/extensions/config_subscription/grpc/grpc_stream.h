@@ -26,15 +26,24 @@ template <class RequestProto, class ResponseProto>
 class GrpcStream : public GrpcStreamInterface<RequestProto, ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
+  // The entry value corresponding to the grpc stream's configuration entry index.
+  enum class ConnectedStateValue {
+    // The first entry in the config corresponds to the primary xDS source.
+    FIRST_ENTRY = 1,
+    // The second entry in the config corresponds to the failover xDS source.
+    SECOND_ENTRY
+  };
+
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
              Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
-             const RateLimitSettings& rate_limit_settings)
+             const RateLimitSettings& rate_limit_settings, ConnectedStateValue connected_state_val)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method),
         control_plane_stats_(Utility::generateControlPlaneStats(scope)),
         time_source_(dispatcher.timeSource()), backoff_strategy_(std::move(backoff_strategy)),
-        rate_limiting_enabled_(rate_limit_settings.enabled_) {
+        rate_limiting_enabled_(rate_limit_settings.enabled_),
+        connected_state_val_(connected_state_val) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
@@ -65,7 +74,7 @@ public:
       setRetryTimer();
       return;
     }
-    control_plane_stats_.connected_state_.set(1);
+    control_plane_stats_.connected_state_.set(static_cast<uint64_t>(connected_state_val_));
     callbacks_->onStreamEstablished();
   }
 
@@ -91,7 +100,7 @@ public:
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
-    control_plane_stats_.connected_state_.set(1);
+    control_plane_stats_.connected_state_.set(static_cast<uint64_t>(connected_state_val_));
     callbacks_->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
 
@@ -258,6 +267,10 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
+
+  // A stream value to be set in the control_plane.connected_state gauge once
+  // the gRPC-stream is establishing a connection or connected to the server.
+  ConnectedStateValue connected_state_val_;
 
   // Records the initial message and timestamp of the most recent remote closes with the same
   // status.
