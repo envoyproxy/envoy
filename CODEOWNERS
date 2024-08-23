@@ -29,8 +29,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanavlasov
-/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov @yanavlasov
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov
+/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
 # grpc_field_extraction http filter extension
