@@ -286,6 +286,36 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
 
+TEST_F(IpTaggingFilterTest, CustomHeader) {
+  const std::string external_request_yaml = R"EOF(
+request_type: external
+custom_header: foo
+ip_tags:
+  - ip_tag_name: external_request
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+  initializeFilter(external_request_yaml);
+  EXPECT_EQ(FilterRequestType::EXTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"}};
+
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+  EXPECT_EQ("external_request", request_headers.get_("foo"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
 } // namespace
 } // namespace IpTagging
 } // namespace HttpFilters

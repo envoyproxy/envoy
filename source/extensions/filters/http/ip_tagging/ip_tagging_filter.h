@@ -37,6 +37,7 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
+  const Http::LowerCaseString& customHeader() const { return custom_header_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
   void incHit(absl::string_view tag) {
@@ -63,6 +64,7 @@ private:
   void incCounter(Stats::StatName name);
 
   const FilterRequestType request_type_;
+  const Http::LowerCaseString custom_header_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Stats::StatNameSetPtr stat_name_set_;

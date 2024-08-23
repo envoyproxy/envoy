@@ -16,8 +16,8 @@ namespace IpTagging {
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
+    : request_type_(requestTypeEnum(config.request_type())), custom_header_(config.custom_header()),
+      scope_(scope), runtime_(runtime), stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
       unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
@@ -77,12 +77,19 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (!config_->customHeader().get().empty()) {
+    headers.remove(config_->customHeader());
+  }
+
   std::vector<std::string> tags =
       config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");
     headers.appendEnvoyIpTags(tags_join, ",");
+    if (!config_->customHeader().get().empty()) {
+      headers.setReferenceKey(config_->customHeader(), tags_join);
+    }
 
     // We must clear the route cache or else we can't match on x-envoy-ip-tags.
     callbacks_->downstreamCallbacks()->clearRouteCache();
