@@ -479,6 +479,58 @@ TEST_F(HttpConnectionManagerImplTest, MaxRequests) {
   conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// max_requests_per_connection is met first then the drain timer fires. Drain timer should be
+// ignored.
+TEST_F(HttpConnectionManagerImplTest, DrainConnectionUponCompletionVsOnDrainTimeoutHttp11) {
+  // Http1.1 is used for this test because it defaults to keeping the connection alive.
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+  max_requests_per_connection_ = 2;
+  max_connection_duration_ = std::chrono::milliseconds(10);
+
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
+  // Set up connection.
+  setup();
+
+  // Create a filter so we can encode responses.
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  startRequest(true);
+  // Encode response, connection will not be closed since we're using http 1.1.
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  // Now connection is established and codec is not nullptr. This should start the drain timer.
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  connection_duration_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+
+  // Get a fresh mock filter.
+  filter = new NiceMock<MockStreamDecoderFilter>();
+  // Send a second request. This will cause max_requests_per_connection limit to be reached.
+  // Connection drain state will be set to closing.
+  startRequest(true);
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_requests_reached_.value());
+
+  drain_timer->invokeCallback();
+
+  // Send the last response. The drain timer having already fired should not be an issue.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
 TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   max_connection_duration_ = (std::chrono::milliseconds(10));
   Event::MockTimer* connection_duration_timer = setUpTimer();

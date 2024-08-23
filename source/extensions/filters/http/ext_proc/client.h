@@ -24,6 +24,7 @@ public:
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual void notifyFilterDestroy() PURE;
 };
 
