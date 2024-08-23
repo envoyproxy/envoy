@@ -1,3 +1,4 @@
+#include "test/common/http/filters/assertion/filter.pb.h"
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
@@ -9,26 +10,31 @@
 
 namespace Envoy {
 
-inline constexpr absl::string_view ASSERTION_FILTER_TEXT_PROTO = R"(
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-    match_config: {
-      http_request_headers_match: {
-        headers: { name: ':method', exact_match: 'GET' }
-        headers: { name: ':scheme', exact_match: 'https' }
-        headers: { name: ':path', exact_match: '/' }
-      }
-    }
-  }
-)";
-
 TEST(SendHeadersTest, Success) {
+  envoymobile::extensions::filters::http::assertion::Assertion assertion;
+  auto* http_request_headers_match =
+      assertion.mutable_match_config()->mutable_http_request_headers_match();
+  auto* headers1 = http_request_headers_match->add_headers();
+  headers1->set_name(":method");
+  headers1->set_exact_match("GET");
+  auto* headers2 = http_request_headers_match->add_headers();
+  headers2->set_name(":scheme");
+  headers2->set_exact_match("https");
+  auto* headers3 = http_request_headers_match->add_headers();
+  headers3->set_name(":path");
+  headers3->set_exact_match("/");
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url(
+      "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion");
+  std::string serialized_assertion;
+  assertion.SerializeToString(&serialized_assertion);
+  typed_config.set_value(serialized_assertion);
+
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
       .setLogLevel(Logger::Logger::debug)
-#ifdef ENVOY_ENABLE_FULL_PROTOS
-      .addNativeFilter("envoy.filters.http.assertion", std::string(ASSERTION_FILTER_TEXT_PROTO))
-#endif
+      .addNativeFilter("envoy.filters.http.assertion", typed_config)
       .setOnEngineRunning([&]() { engine_running.Notify(); });
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS);
   engine_running.WaitForNotification();
