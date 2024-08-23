@@ -39,6 +39,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
           {{Envoy::Http::Headers::get().Method, "POST"},
            {Envoy::Http::Headers::get().Scheme, "http"},
            {Envoy::Http::Headers::get().Path, std::string(path)},
+           {Envoy::Http::Headers::get().ContentType, "application/json"},
            {Envoy::Http::Headers::get().Host, std::string(host)}});
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));

@@ -135,6 +135,9 @@ protected:
     ASSERT_TRUE(side_stream->waitForHttpConnection(*dispatcher_, processor_connection_));
     ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+    EXPECT_THAT(processor_stream_->headers(),
+                SingleHeaderValueIs("content-type", "application/json"));
+    EXPECT_THAT(processor_stream_->headers(), SingleHeaderValueIs(":method", "POST"));
 
     if (send_bad_resp) {
       processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
@@ -153,8 +156,10 @@ protected:
         // Sending 200 response with the ProcessingResponse JSON encoded in the body.
         std::string response_str =
             MessageUtil::getJsonStringFromMessageOrError(response, true, true);
-        processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
-                                         false);
+        processor_stream_->encodeHeaders(
+            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                            {"content-type", "application/json"}},
+            false);
         processor_stream_->encodeData(response_str, true);
       }
     } else {
