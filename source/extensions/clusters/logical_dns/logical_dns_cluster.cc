@@ -103,7 +103,7 @@ void LogicalDnsCluster::startResolve() {
         ENVOY_LOG(trace, "async DNS resolution complete for {} details {}", dns_address_, details);
 
         std::chrono::milliseconds jitter(0);
-        if (dns_jitter_ms_.count() != 0) {
+        if (dns_jitter_ms_.count() > 0) {
           jitter = std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
         }
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_ + jitter;

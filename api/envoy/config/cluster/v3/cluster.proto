@@ -959,7 +959,7 @@ message Cluster {
   // If the DNS jitter is specified the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
-  // DNS jitter causes the cluster to refresh DNS entries later by a random amount to avoid a
+  // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
   // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
   // There will be no jitter if this value is omitted. For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
