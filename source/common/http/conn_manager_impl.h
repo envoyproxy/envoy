@@ -176,8 +176,8 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(MetadataMapPtr&&) override;
 
-    // Mark that the last downstream byte is received, and the downstream stream is complete.
-    void maybeEndDecode(bool end_stream);
+    // Record the timestamp of last downstream byte is received.
+    void maybeRecordLastByteReceived(bool end_stream);
 
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
@@ -410,7 +410,7 @@ private:
     //    harmonize this behavior with H/1.
     // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
     // HTTP connection manager configuration, then the entire connection is closed.
-    bool validateTrailers();
+    bool validateTrailers(RequestTrailerMap& trailers);
 
     std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
 
@@ -508,6 +508,7 @@ private:
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
     std::queue<MetadataMapPtr> deferred_metadata_;
+    RequestTrailerMapPtr deferred_request_trailers_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
