@@ -129,7 +129,7 @@ func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.Statu
 	return api.Continue
 }
 
-func (f *filter) OnLog() {
+func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
 	f.assertProperty("response.size", "7") // "goodbye"
 
 	// panic if any condition is not met
