@@ -145,8 +145,8 @@ build:clang-asan --linkopt=-fsanitize=vptr,function
 
 # macOS
 build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
-build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
-build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
+build:macos --action_env=PATH=/opt/homebrew/bin:/opt/homebrew/opt/llvm/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
+build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/homebrew/opt/llvm/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
 
 # macOS ASAN/UBSAN
