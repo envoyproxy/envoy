@@ -99,7 +99,10 @@ bug_fixes:
     the number of requests per I/O cycle is configured and an HTTP decoder filter that pauses filter chain is present. This behavior
     can be reverted by setting the runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream``
     to false.
-
+- area: oauth
+  change: |
+    Set token cookies in response regardless of :ref:`forward_bearer_token
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>` config option.
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: upstream
@@ -242,11 +245,13 @@ new_features:
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
 - area: oauth
   change: |
-    Added :ref:`disable_access_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_access_token_set_cookie>`
+    Added :ref:`disable_access_token_set_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_access_token_set_cookie>`
     to disable setting the Access Token cookie.
 - area: oauth
   change: |
-    Added :ref:`disable_refresh_token_set_cookie <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_refresh_token_set_cookie>`
+    Added :ref:`disable_refresh_token_set_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_refresh_token_set_cookie>`
     to disable setting the Refresh Token cookie.
 
 deprecated:

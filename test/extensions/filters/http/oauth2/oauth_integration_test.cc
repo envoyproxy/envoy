@@ -289,7 +289,7 @@ typed_config:
     checkClientSecretInRequest(token_secret);
 
     oauth2_request_->encodeHeaders(
-        Http::TestRequestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
         false);
 
     envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
@@ -329,6 +329,10 @@ typed_config:
         Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
     std::string oauth_expires = Http::Utility::parseSetCookieValue(
         response->headers(), default_cookie_names_.oauth_expires_);
+    std::string bearer_token = Http::Utility::parseSetCookieValue(
+        response->headers(), default_cookie_names_.bearer_token_);
+    std::string refresh_token = Http::Utility::parseSetCookieValue(
+        response->headers(), default_cookie_names_.refresh_token_);
 
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     cleanup();
@@ -344,6 +348,8 @@ typed_config:
         {"authority", "Bearer token"},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+        {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
     };
     auto encoder_decoder2 = codec_client_->startRequest(headersWithCookie, true);
     response = std::move(encoder_decoder2.second);
