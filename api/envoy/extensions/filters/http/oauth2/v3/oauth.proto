@@ -79,7 +79,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 18]
+// [#next-free-field: 20]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -166,6 +166,18 @@ message OAuth2Config {
   // will still process incoming ID Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the IdToken cookie header.
   bool disable_id_token_set_cookie = 17;
+
+  // If set to true, Envoy will not set a cookie for Access Token even if one is received from the Identity Provider.
+  // Enabling this option will only disable setting the cookie response header, the filter
+  // will still process incoming Access Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+  // sessions would not set the Access Token cookie header.
+  bool disable_access_token_set_cookie = 18;
+
+  // If set to true, Envoy will not set a cookie for Refresh Token even if one is received from the Identity Provider.
+  // Enabling this option will only disable setting the cookie response header, the filter
+  // will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+  // sessions would not set the Refresh Token cookie header.
+  bool disable_refresh_token_set_cookie = 19;
 }
 
 // Filter config.

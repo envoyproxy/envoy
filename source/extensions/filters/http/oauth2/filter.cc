@@ -196,7 +196,9 @@ FilterConfig::FilterConfig(
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(proto_config.use_refresh_token().value()),
-      disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()) {
+      disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
+      disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
+      disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()){
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -521,14 +523,25 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 // Called after fetching access/refresh tokens.
 void OAuth2Filter::updateTokens(const std::string& access_token, const std::string& id_token,
                                 const std::string& refresh_token, std::chrono::seconds expires_in) {
-  access_token_ = access_token;
+  if (!config_->disableAccessTokenSetCookie()) {
+    // Preventing this here excludes all other Access Token functionality
+    // * setting the cookie
+    // * omitting from HMAC computation (for setting, not for validating)
+    access_token_ = access_token;
+  }
   if (!config_->disableIdTokenSetCookie()) {
     // Preventing this here excludes all other ID Token functionality
     // * setting the cookie
     // * omitting from HMAC computation (for setting, not for validating)
     id_token_ = id_token;
   }
-  refresh_token_ = refresh_token;
+  if (!config_->disableRefreshTokenSetCookie()) {
+    // Preventing this here excludes all other Refresh Token functionality
+    // * setting the cookie
+    // * omitting from HMAC computation (for setting, not for validating)
+    refresh_token_ = refresh_token;
+  }
+
   expires_in_ = std::to_string(expires_in.count());
   expires_refresh_token_in_ = getExpiresTimeForRefreshToken(refresh_token, expires_in);
   expires_id_token_in_ = getExpiresTimeForIdToken(id_token, expires_in);
@@ -651,7 +664,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
 
   if (config_->forwardBearerToken()) {
-    cookies.insert_or_assign(cookie_names.bearer_token_, access_token_);
+    if (!access_token_.empty()) {
+        cookies.insert_or_assign(cookie_names.bearer_token_, access_token_);
+    }
     if (!id_token_.empty()) {
       cookies.insert_or_assign(cookie_names.id_token_, id_token_);
     }
@@ -704,9 +719,11 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    headers.addReferenceKey(
-        Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
+    if (!access_token_.empty()) {
+        headers.addReferenceKey(
+                Http::Headers::get().SetCookie,
+                absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
+    }
 
     if (!id_token_.empty()) {
       const std::string id_token_cookie_tail_http_only =
