@@ -101,7 +101,7 @@ public:
   NiceMock<OverrideOsSysCallsImpl> override_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&override_syscall_};
   bool recvbuf_large_enough_{true};
-  const IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_;
+  const IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
