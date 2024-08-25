@@ -7,6 +7,9 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi_version.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -27,7 +30,29 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to load dynamic module: ", object_file_path, " : ", dlerror()));
   }
-  return std::make_shared<DynamicModule>(handle);
+
+  DynamicModuleSharedPtr dynamic_module = std::make_shared<DynamicModule>(handle);
+
+  const auto init_function =
+      dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
+          "envoy_dynamic_module_on_program_init");
+
+  if (init_function == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to resolve envoy_dynamic_module_on_program_init: ", dlerror()));
+  }
+
+  const char* abi_version = (*init_function)();
+  if (abi_version == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize dynamic module: ", object_file_path));
+  }
+  // Checks the kAbiVersion and the version of the dynamic module.
+  if (absl::string_view(abi_version) != absl::string_view(kAbiVersion)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
+  }
+  return dynamic_module;
 }
 
 DynamicModule::~DynamicModule() { dlclose(handle_); }

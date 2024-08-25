@@ -185,7 +185,9 @@ public:
       const std::vector<std::string>& expected_resource_names_added,
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "", FakeStream* stream = nullptr);
+      const std::string& expected_error_message = "", FakeStream* stream = nullptr,
+      OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
+          absl::nullopt);
 
   template <class T>
   void
@@ -219,7 +221,9 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "", bool expect_node = true);
+      const std::string& expected_error_message = "", bool expect_node = true,
+      OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
+          absl::nullopt);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,

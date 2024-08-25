@@ -30,6 +30,7 @@ envoy_cc_test(
         "//test/common/mocks/event:event_mocks",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/mocks/thread:thread_mocks",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
         "@envoy_build_config//:test_extensions",
     ],
 )

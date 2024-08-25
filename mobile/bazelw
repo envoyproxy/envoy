@@ -42,7 +42,7 @@ case "$bazel_platform" in
 esac
 
 readonly bazel_version_url="https://github.com/bazelbuild/bazelisk/releases/download/v$bazelisk_version/bazelisk-$bazel_platform"
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_root="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 readonly bazelisk="$script_root/tmp/bazel/versions/bazelisk-$bazelisk_version-$bazel_platform"
 
 if [[ ! -x "$bazelisk" ]]; then
