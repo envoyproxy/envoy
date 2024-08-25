@@ -159,6 +159,13 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
 
 new_features:
+- area: dns
+  change: |
+    for the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and :ref:`logical DNS
+    <arch_overview_service_discovery_types_logical_dns>` cluster types,
+    the new :ref:`dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>` field, if
+    provided, will causes the cluster to refresh DNS entries later by a random amount of time as to
+    avoid stampedes of DNS requests. This field sets the upper bound (exclusive) for the random amount.
 - area: redis
   change: |
     Added support for publish.
