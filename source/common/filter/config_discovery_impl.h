@@ -181,20 +181,14 @@ private:
   const ProtobufTypes::MessagePtr default_configuration_;
 };
 
-// Struct of canonical filter name and HTTP stream filter factory callback.
-struct NamedHttpFilterFactoryCb {
-  // Canonical filter name.
-  std::string name;
-  // Factory function used to create filter instances.
-  Http::FilterFactoryCb factory_cb;
-};
+using HttpFilterFactoryCb = Http::FilterFactoryCb;
 
 // Implementation of a HTTP dynamic filter config provider.
 // NeutralHttpFilterConfigFactory can either be a NamedHttpFilterConfigFactory
 // or an UpstreamHttpFilterConfigFactory.
 template <class FactoryCtx, class NeutralHttpFilterConfigFactory>
 class HttpDynamicFilterConfigProviderImpl
-    : public DynamicFilterConfigProviderImpl<NamedHttpFilterFactoryCb> {
+    : public DynamicFilterConfigProviderImpl<HttpFilterFactoryCb> {
 public:
   HttpDynamicFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
@@ -219,14 +213,11 @@ public:
   }
 
 private:
-  absl::StatusOr<NamedHttpFilterFactoryCb>
+  absl::StatusOr<HttpFilterFactoryCb>
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    absl::StatusOr<Http::FilterFactoryCb> error_or_factory =
-        factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
-    RETURN_IF_NOT_OK_REF(error_or_factory.status());
-    return NamedHttpFilterFactoryCb{factory->name(), error_or_factory.value()};
+    return factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -351,6 +342,41 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory =
         Registry::FactoryRegistry<Server::Configuration::NamedUdpListenerFilterConfigFactory>::
+            getFactoryByType(message.GetTypeName());
+    return factory->createFilterFactoryFromProto(message, factory_context_);
+  }
+};
+
+class UdpSessionDynamicFilterConfigProviderImpl
+    : public DynamicFilterConfigProviderImpl<Network::UdpSessionFilterFactoryCb> {
+public:
+  UdpSessionDynamicFilterConfigProviderImpl(
+      FilterConfigSubscriptionSharedPtr& subscription,
+      const absl::flat_hash_set<std::string>& require_type_urls,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::FactoryContext& factory_context,
+      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type, absl::string_view stat_prefix,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
+      : DynamicFilterConfigProviderImpl<Network::UdpSessionFilterFactoryCb>(
+            subscription, require_type_urls, factory_context.serverFactoryContext().threadLocal(),
+            std::move(default_config), last_filter_in_filter_chain, filter_chain_type, stat_prefix,
+            listener_filter_matcher),
+        factory_context_(factory_context) {}
+
+  void validateMessage(const std::string&, const Protobuf::Message&,
+                       const std::string&) const override {
+    // UDP session filters don't use the concept of terminal filters.
+  }
+
+protected:
+  Server::Configuration::FactoryContext& factory_context_;
+
+private:
+  absl::StatusOr<Network::UdpSessionFilterFactoryCb>
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedUdpSessionFilterConfigFactory>::
             getFactoryByType(message.GetTypeName());
     return factory->createFilterFactoryFromProto(message, factory_context_);
   }
@@ -651,7 +677,7 @@ protected:
 // HTTP filter
 class HttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::NamedHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
+          Server::Configuration::NamedHttpFilterConfigFactory, HttpFilterFactoryCb,
           Server::Configuration::FactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::FactoryContext,
@@ -679,7 +705,7 @@ protected:
 // HTTP filter
 class UpstreamHttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
-          Server::Configuration::UpstreamHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
+          Server::Configuration::UpstreamHttpFilterConfigFactory, HttpFilterFactoryCb,
           Server::Configuration::UpstreamFactoryContext,
           HttpDynamicFilterConfigProviderImpl<
               Server::Configuration::UpstreamFactoryContext,
@@ -781,6 +807,19 @@ public:
 
 protected:
   const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
+};
+
+// UDP session filter
+class UdpSessionFilterConfigProviderManagerImpl
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedUdpSessionFilterConfigFactory,
+          Network::UdpSessionFilterFactoryCb, Server::Configuration::FactoryContext,
+          UdpSessionDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "udp_session_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_udp_session"; }
 };
 
 // QUIC listener filter

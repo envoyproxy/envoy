@@ -99,7 +99,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -275,6 +275,20 @@ message ExternalProcessor {
   // backend stream lifetime. In this case, Envoy will eventually timeout the external processor stream according to this time limit.
   // The default value is 5000 milliseconds (5 seconds) if not specified.
   google.protobuf.Duration deferred_close_timeout = 19;
+
+  // [#not-implemented-hide:]
+  // Send body to the side stream server once it arrives without waiting for the header response from that server.
+  // It only works for STREAMED body processing mode. For any other body processing modes, it is ignored.
+  //
+  // The server has two options upon receiving a header request:
+  // 1. Instant Response: Send the header response as soon as the header request is received.
+  // 2. Delayed Response: Wait for the body before sending any response.
+  //   If the server chooses the second option, it has two further choices:
+  //   2.1 Separate Responses: Send the header response first, followed by separate body responses.
+  //   2.2 Combined Response: Include both the header response and the first chunk of the body response
+  //       in a single body response message, followed by the remaining body responses.
+  // In all scenarios, the header-body ordering must always be maintained.
+  bool send_body_without_waiting_for_header_response = 21;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

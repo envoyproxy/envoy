@@ -127,7 +127,7 @@ protected:
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
-        local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
+        local_address_(Network::Test::getAnyAddress(version_, true)),
         connection_handler_(*dispatcher_, absl::nullopt),
         transport_socket_factory_(*Quic::QuicServerTransportSocketFactory::create(
             true, *store_.rootScope(), std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
@@ -259,14 +259,22 @@ protected:
     }
   }
 
-  void sendCHLO(quic::QuicConnectionId connection_id) {
+  void sendCHLO(quic::QuicConnectionId connection_id) { sendCHLO(connection_id, false); }
+
+  void sendCHLO(quic::QuicConnectionId connection_id, bool dual_stack) {
+    Network::Address::InstanceConstSharedPtr client_address;
+    if (dual_stack) {
+      client_address = Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4);
+    } else {
+      client_address = Network::Test::getCanonicalLoopbackAddress(version_);
+    }
     client_sockets_.push_back(
-        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
+        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, client_address,
                                               nullptr, Network::SocketCreationOptions{}));
     // Set outgoing ECN marks on client packets.
     int level = IPPROTO_IP;
     int optname = IP_TOS;
-    if (local_address_->ip()->version() == Network::Address::IpVersion::v6) {
+    if (client_address->ip()->version() == Network::Address::IpVersion::v6) {
       level = IPPROTO_IPV6;
       optname = IPV6_TCLASS;
     }
@@ -276,10 +284,21 @@ protected:
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
+    Network::Address::InstanceConstSharedPtr dest_address;
+    if (client_address->ip()->version() == Network::Address::IpVersion::v4) {
+      dest_address = std::make_shared<const Network::Address::Ipv4Instance>(
+          client_address->ip()->addressAsString(),
+          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+    } else {
+      dest_address = std::make_shared<const Network::Address::Ipv6Instance>(
+          client_address->ip()->addressAsString(),
+          listen_socket_->connectionInfoProvider().localAddress()->ip()->port(),
+          &(listen_socket_->connectionInfoProvider().localAddress()->socketInterface()));
+    }
     // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc = Network::Utility::writeToSocket(
-        client_sockets_.back()->ioHandle(), slice.data(), 1, nullptr,
-        *listen_socket_->connectionInfoProvider().localAddress());
+    auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(),
+                                                   1, nullptr, *dest_address);
     ASSERT_EQ(slice[0].len_, send_rc.return_value_);
   }
 
@@ -338,6 +357,9 @@ protected:
       name: "envoy.quic.proof_source.filter_chain"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig
+    save_cmsg_config:
+      level: 1
+      type: 2
 )EOF",
                        connection_window_size_, stream_window_size_, idle_timeout_,
                        handshake_timeout_);
@@ -603,14 +625,23 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
   Network::Socket& socket = ActiveQuicListenerPeer::socket(*quic_listener_);
   absl::optional<Network::Address::IpVersion> version = socket.ipVersion();
   EXPECT_TRUE(version.has_value());
-  int optval;
+  int optval = 0;
   socklen_t optlen = sizeof(optval);
   Api::SysCallIntResult rv;
   if (*version == Network::Address::IpVersion::v6) {
     rv = socket.getSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, &optlen);
-  } else {
-    rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
+    EXPECT_EQ(rv.return_value_, 0);
+    EXPECT_EQ(optval, 1);
+    EXPECT_FALSE(local_address_->ip()->ipv6()->v6only());
+#ifdef __APPLE__
+    return;
+#endif // __APPLE__
   }
+  // Check the IPv4 version of the sockopt if the socket is v4 or dual-stack.
+  // Platform/ APIs for ECN reporting are poorly documented, but this test
+  // should uncover any issues.
+  optval = 0;
+  rv = socket.getSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, &optlen);
   EXPECT_EQ(rv.return_value_, 0);
   EXPECT_EQ(optval, 1);
 }
@@ -621,6 +652,24 @@ TEST_P(ActiveQuicListenerTest, EcnReporting) {
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   sendCHLO(connection_id);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  quic::QuicConnection* connection =
+      quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
+  EXPECT_EQ(connection->connection_id(), quic::test::TestConnectionId(1));
+  ASSERT(connection != nullptr);
+  const quic::QuicConnectionStats& stats = connection->GetStats();
+  EXPECT_EQ(stats.num_ecn_marks_received.ect1, 1);
+}
+
+TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
+  if (local_address_->ip()->version() == Network::Address::IpVersion::v4) {
+    return;
+  }
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
+  initialize();
+  maybeConfigureMocks(/* connection_count = */ 1);
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  sendCHLO(connection_id, /*dual_stack=*/true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   quic::QuicConnection* connection =
       quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();

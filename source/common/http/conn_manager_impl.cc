@@ -213,6 +213,10 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     }
   }
 
+  if (soft_drain_http1_) {
+    stats_.named_.downstream_cx_http1_soft_drain_.dec();
+  }
+
   conn_length_->complete();
   user_agent_.completeConnectionLength(*conn_length_);
 }
@@ -243,8 +247,9 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
   // explicitly nulls out response_encoder to avoid the downstream being notified of the
   // Envoy-internal stream instance being ended.
-  if (stream.response_encoder_ != nullptr && (!stream.filter_manager_.decoderObservedEndStream() ||
-                                              !stream.state_.codec_saw_local_complete_)) {
+  if (stream.response_encoder_ != nullptr &&
+      (!stream.filter_manager_.hasLastDownstreamByteReceived() ||
+       !stream.state_.codec_saw_local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
@@ -290,7 +295,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
     // fully read, as there's no race condition to avoid.
     const bool connection_close =
         stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
-    const bool request_complete = stream.filter_manager_.decoderObservedEndStream();
+    const bool request_complete = stream.filter_manager_.hasLastDownstreamByteReceived();
 
     // Don't do delay close for HTTP/1.0 or if the request is complete.
     checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
@@ -411,6 +416,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     }
     ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
     stats_.named_.downstream_cx_max_requests_reached_.inc();
+  }
+
+  if (soft_drain_http1_) {
+    new_stream->filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+    // Prevent erroneous debug log of closing due to incoming connection close header.
+    drain_state_ = DrainState::Closing;
   }
 
   new_stream->state_.is_internally_created_ = is_internally_created;
@@ -724,7 +735,15 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
                       StreamInfo::CoreResponseFlag::DurationTimeout,
                       StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
-    startDrainSequence();
+    if (config_->http1SafeMaxConnectionDuration() && codec_->protocol() < Protocol::Http2) {
+      ENVOY_CONN_LOG(debug,
+                     "HTTP1-safe max connection duration is configured -- skipping drain sequence.",
+                     read_callbacks_->connection());
+      stats_.named_.downstream_cx_http1_soft_drain_.inc();
+      soft_drain_http1_ = true;
+    } else {
+      startDrainSequence();
+    }
   }
 }
 
@@ -925,32 +944,35 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
   filter_manager_.streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
-                 "stream timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
+  sendLocalReply(
+      Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
+      "stream timeout", nullptr, absl::nullopt,
+      StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
-                 "request timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+  sendLocalReply(
+      Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
+      "request timeout", nullptr, absl::nullopt,
+      StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
   connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
-                 "request header timeout", nullptr, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
+  sendLocalReply(
+      Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
+      "request header timeout", nullptr, absl::nullopt,
+      StreamInfo::ResponseCodeDetails::get().RequestHeaderTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.decoderObservedEndStream()),
-                 "downstream duration timeout", nullptr,
-                 Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
-                 StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+  sendLocalReply(
+      Http::Utility::maybeRequestTimeoutCode(filter_manager_.hasLastDownstreamByteReceived()),
+      "downstream duration timeout", nullptr, Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+      StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
@@ -1068,15 +1090,15 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   return true;
 }
 
-bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
+bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& trailers) {
   if (!header_validator_) {
     return true;
   }
 
-  auto validation_result = header_validator_->validateRequestTrailers(*request_trailers_);
+  auto validation_result = header_validator_->validateRequestTrailers(trailers);
   std::string failure_details(validation_result.details());
   if (validation_result.ok()) {
-    auto transformation_result = header_validator_->transformRequestTrailers(*request_trailers_);
+    auto transformation_result = header_validator_->transformRequestTrailers(trailers);
     if (transformation_result.ok()) {
       return true;
     }
@@ -1111,12 +1133,12 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
   return false;
 }
 
-void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::maybeRecordLastByteReceived(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
-  if (end_stream && !filter_manager_.decoderObservedEndStream()) {
+  if (end_stream && !filter_manager_.hasLastDownstreamByteReceived()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
-    ENVOY_STREAM_LOG(debug, "request end stream", *this);
+    ENVOY_STREAM_LOG(debug, "request end stream timestamp recorded", *this);
   }
 }
 
@@ -1136,7 +1158,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
                    *headers);
   // We only want to record this when reading the headers the first time, not when recreating
   // a stream.
-  if (!filter_manager_.decoderObservedEndStream()) {
+  if (!filter_manager_.hasLastDownstreamByteReceived()) {
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
   }
@@ -1152,23 +1174,17 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // Both shouldDrainConnectionUponCompletion() and is_head_request_ affect local replies: set them
   // as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_connection_close_header_in_redirect")) {
-    if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
-      // Only mark the connection to be closed if the request indicates so. The connection might
-      // already be marked so before this step, in which case if shouldCloseConnection() returns
-      // false, the stream info value shouldn't be overridden.
-      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
-    }
-  } else {
-    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(
-        HeaderUtility::shouldCloseConnection(protocol, *request_headers_));
+  if (HeaderUtility::shouldCloseConnection(protocol, *request_headers_)) {
+    // Only mark the connection to be closed if the request indicates so. The connection might
+    // already be marked so before this step, in which case if shouldCloseConnection() returns
+    // false, the stream info value shouldn't be overridden.
+    filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
   }
 
   filter_manager_.streamInfo().protocol(protocol);
 
   // We end the decode here to mark that the downstream stream is complete.
-  maybeEndDecode(end_stream);
+  maybeRecordLastByteReceived(end_stream);
 
   if (!validateHeaders()) {
     ENVOY_STREAM_LOG(debug, "request headers validation failed\n{}", *this, *request_headers_);
@@ -1446,7 +1462,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
-  maybeEndDecode(end_stream);
+  maybeRecordLastByteReceived(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
   if (!state_.deferred_to_next_io_iteration_) {
     filter_manager_.decodeData(data, end_stream);
@@ -1466,14 +1482,19 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
   resetIdleTimer();
 
   ASSERT(!request_trailers_);
-  request_trailers_ = std::move(trailers);
-  if (!validateTrailers()) {
-    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *request_trailers_);
+  if (!validateTrailers(*trailers)) {
+    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *trailers);
     return;
   }
-  maybeEndDecode(true);
+  maybeRecordLastByteReceived(true);
   if (!state_.deferred_to_next_io_iteration_) {
+    request_trailers_ = std::move(trailers);
     filter_manager_.decodeTrailers(*request_trailers_);
+  } else {
+    // Save trailers in a different variable since `request_trailers_` is available to the filter
+    // manager via `requestTrailers()` callback and makes filter manager see trailers prematurely
+    // when deferred request is processed.
+    deferred_request_trailers_ = std::move(trailers);
   }
 }
 
@@ -1764,7 +1785,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
-  if (!filter_manager_.decoderObservedEndStream()) {
+  if (!filter_manager_.hasLastDownstreamByteReceived()) {
     if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }
@@ -2209,7 +2230,7 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   }
   state_.deferred_to_next_io_iteration_ = false;
   bool end_stream = state_.deferred_end_stream_ && deferred_data_ == nullptr &&
-                    request_trailers_ == nullptr && deferred_metadata_.empty();
+                    deferred_request_trailers_ == nullptr && deferred_metadata_.empty();
   filter_manager_.decodeHeaders(*request_headers_, end_stream);
   if (end_stream) {
     return true;
@@ -2223,10 +2244,11 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   // Filter manager will return early from decodeData and decodeTrailers if
   // request has completed.
   if (deferred_data_ != nullptr) {
-    end_stream = state_.deferred_end_stream_ && request_trailers_ == nullptr;
+    end_stream = state_.deferred_end_stream_ && deferred_request_trailers_ == nullptr;
     filter_manager_.decodeData(*deferred_data_, end_stream);
   }
-  if (request_trailers_ != nullptr) {
+  if (deferred_request_trailers_ != nullptr) {
+    request_trailers_ = std::move(deferred_request_trailers_);
     filter_manager_.decodeTrailers(*request_trailers_);
   }
   return true;

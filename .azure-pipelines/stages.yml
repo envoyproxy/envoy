@@ -103,13 +103,3 @@ stages:
       runPackaging: variables['RUN_PACKAGING']
       publishDockerhub: variables['PUBLISH_DOCKERHUB']
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
-
-- stage: verify
-  displayName: Verify
-  dependsOn: ["env", "publish"]
-  variables:
-    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
-  jobs:
-  - template: stage/verify.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)

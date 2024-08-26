@@ -150,10 +150,11 @@ public:
       }
       EXPECT_CALL(*socket_->io_handle_, supportsMmsg()).Times(1u);
       // Return the datagram.
-      EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
+      EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _, _))
           .WillOnce(
               Invoke([this, data, recv_sys_errno](
                          Buffer::RawSlice* slices, const uint64_t, uint32_t,
+                         const Network::IoHandle::UdpSaveCmsgConfig&,
                          Network::IoHandle::RecvMsgOutput& output) -> Api::IoCallUint64Result {
                 if (recv_sys_errno != 0) {
                   return makeError(recv_sys_errno);
@@ -179,7 +180,7 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
+        EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _, _))
             .WillOnce(Return(ByMove(
                 Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError()))));
       }
@@ -1618,6 +1619,10 @@ session_filters:
   EXPECT_THAT(output_.front(), testing::HasSubstr("session_complete"));
 }
 
+using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;
+using MockUpstreamTunnelCallbacks = SessionFilters::MockUpstreamTunnelCallbacks;
+using MockTunnelCreationCallbacks = SessionFilters::MockTunnelCreationCallbacks;
+
 class HttpUpstreamImplTest : public testing::Test {
 public:
   struct HeaderToAdd {
@@ -1941,6 +1946,8 @@ TEST_F(HttpUpstreamImplTest, TargetHostPercentEncoding) {
 
   setAndExpectRequestEncoder(expected_headers, is_ssl);
 }
+
+using MockHttpStreamCallbacks = SessionFilters::MockHttpStreamCallbacks;
 
 class TunnelingConnectionPoolImplTest : public testing::Test {
 public:

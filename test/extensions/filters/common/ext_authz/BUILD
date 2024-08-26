@@ -36,7 +36,6 @@ envoy_cc_test(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

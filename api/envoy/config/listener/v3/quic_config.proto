@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
+import "envoy/config/core/v3/socket_cmsg_headers.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -24,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -86,4 +87,11 @@ message QuicProtocolOptions {
   // If not specified, no debug visitor will be attached to connections.
   // [#extension-category: envoy.quic.connection_debug_visitor]
   core.v3.TypedExtensionConfig connection_debug_visitor_config = 11;
+
+  // Configure a type of UDP cmsg to pass to listener filters via QuicReceivedPacket.
+  // Both level and type must be specified for cmsg to be saved.
+  // Cmsg may be truncated or omitted if expected size is not set.
+  // If not specified, no cmsg will be saved to QuicReceivedPacket.
+  repeated core.v3.SocketCmsgHeaders save_cmsg_config = 12
+      [(validate.rules).repeated = {max_items: 1}];
 }
