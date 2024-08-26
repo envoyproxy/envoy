@@ -34,8 +34,8 @@ public:
    */
   virtual void processPacket(Address::InstanceConstSharedPtr local_address,
                              Address::InstanceConstSharedPtr peer_address,
-                             Buffer::InstancePtr buffer, MonotonicTime receive_time,
-                             uint8_t tos) PURE;
+                             Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                             Buffer::RawSlice saved_cmsg) PURE;
 
   /**
    * Called whenever datagrams are dropped due to overflow or truncation.
@@ -53,6 +53,8 @@ public:
    * An estimated number of packets to read in each read event.
    */
   virtual size_t numPacketsExpectedPerEventLoop() const PURE;
+
+  virtual const IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const PURE;
 };
 
 static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "SocketCmsgHeadersProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Socket CMSG headers]
+
+// Configuration for socket cmsg headers.
+// See `:ref:CMSG <https://man7.org/linux/man-pages/man3/cmsg.3.html>`_ for further information.
+message SocketCmsgHeaders {
+  // cmsg level. Default is unset.
+  google.protobuf.UInt32Value level = 1;
+
+  // cmsg type. Default is unset.
+  google.protobuf.UInt32Value type = 2;
+
+  // Expected size of cmsg value. Default is zero.
+  uint32 expected_size = 3;
+}

@@ -224,6 +224,11 @@ new_features:
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:`save_cmsg_config
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.save_cmsg_config>` to optionally specify a CMSG header type to be
+    propagated from the first packet on the connection to QuicListenerFilter.
 - area: dns
   change: |
     Prefer using IPv6 address when addresses from both families are available.
