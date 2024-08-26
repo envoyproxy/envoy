@@ -66,7 +66,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 1. the extracted field names/values will be wrapped in be ``field<StringValue
 // or MapValue>`` -> ``values<ListValue of StringValue or StructValue>``, which will be added in the dynamic ``metadata<google.protobuf.Struct>``.
 //
-// 2. if the field value is empty, an empty ``<ListValue>`` will be set.
+// 2. if the field value is empty, an empty ``Value`` will be set.
 //
 // Performance
 // -----------

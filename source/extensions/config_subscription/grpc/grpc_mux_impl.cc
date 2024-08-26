@@ -535,7 +535,7 @@ void GrpcMuxImpl::onStreamEstablished() {
   }
 }
 
-void GrpcMuxImpl::onEstablishmentFailure() {
+void GrpcMuxImpl::onEstablishmentFailure(bool) {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second->watches_) {
       watch->callbacks_.onConfigUpdateFailed(

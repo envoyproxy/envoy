@@ -31,7 +31,7 @@ public:
 
   void onWriteable() override {}
   void onStreamEstablished() override {}
-  void onEstablishmentFailure() override {}
+  void onEstablishmentFailure(bool) override {}
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
 };
