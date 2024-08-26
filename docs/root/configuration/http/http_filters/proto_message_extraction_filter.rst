@@ -35,7 +35,7 @@ On the request and response path, it will check
 
   a. buffer the incoming data to complete protobuf messages
   b. extract individual protobuf messages according to directives
-  c. write the result into the dynamic metadata.
+  c. write the result into the dynamic metadata
   d. pass through the request/response data
 
 2. otherwise, pass through the request.
