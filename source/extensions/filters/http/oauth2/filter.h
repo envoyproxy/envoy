@@ -204,8 +204,9 @@ public:
 
 class OAuth2CookieValidator : public CookieValidator {
 public:
-  explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names, const std::string& cookie_domain)
-      : time_source_(time_source), cookie_names_(cookie_names),cookie_domain_(cookie_domain) {}
+  explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names,
+                                 const std::string& cookie_domain)
+      : time_source_(time_source), cookie_names_(cookie_names), cookie_domain_(cookie_domain) {}
 
   const std::string& token() const override { return token_; }
   const std::string& refreshToken() const override { return refresh_token_; }

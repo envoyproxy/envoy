@@ -235,13 +235,14 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
 bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
-  std::string cookie_domain = host_;
+  absl::string_view cookie_domain = host_;
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return (
-      (encodeHmacBase64(secret_, cookie_domain, expires_, token_, id_token_, refresh_token_) == hmac_) ||
-      (encodeHmacHexBase64(secret_, cookie_domain, expires_, token_, id_token_, refresh_token_) == hmac_));
+  return ((encodeHmacBase64(secret_, cookie_domain, expires_, token_, id_token_, refresh_token_) ==
+           hmac_) ||
+          (encodeHmacHexBase64(secret_, cookie_domain, expires_, token_, id_token_,
+                               refresh_token_) == hmac_));
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
@@ -506,25 +507,27 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
   const std::string new_path = absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
 
-  std::string cookie_delete_format_string = CookieDeleteFormatString;
+  std::string cookie_domain;
   if (!config_->cookieDomain().empty()) {
-    cookie_delete_format_string =
-        absl::StrCat(cookie_delete_format_string,
-                     fmt::format(CookieDomainFormatString, config_->cookieDomain()));
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(cookie_delete_format_string, config_->cookieNames().oauth_hmac_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_),
+                   cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(cookie_delete_format_string, config_->cookieNames().bearer_token_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+                   cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(cookie_delete_format_string, config_->cookieNames().id_token_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+                   cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(cookie_delete_format_string, config_->cookieNames().refresh_token_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                   cookie_domain));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -556,7 +559,7 @@ std::string OAuth2Filter::getEncodedToken() const {
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   std::string encoded_token;
 
-  domain = host_;
+  absl::string_view domain = host_;
   if (!config_->cookieDomain().empty()) {
     domain = config_->cookieDomain();
   }
