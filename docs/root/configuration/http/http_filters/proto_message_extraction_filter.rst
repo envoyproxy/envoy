@@ -1,7 +1,7 @@
 .. _config_http_filters_proto_message_extraction:
 
 Proto Message Extraction
-=======================
+========================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig``.
