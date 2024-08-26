@@ -131,7 +131,7 @@ void Cluster::checkIdleSubCluster() {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
         cluster_map_.erase(it++);
-        cm_.removeCluster(cluster_name);
+        cm_.removeClusterAddedViaApi(cluster_name);
       } else {
         ++it;
       }
@@ -167,6 +167,11 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   config.set_lb_policy(sub_cluster_lb_policy_);
   config.set_type(
       envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
+
+  // Set ignore_removal to true to prevent the cluster from being removed during a CDS update.
+  // Without this setting, the cluster would be removed during a CDS update as it would be considered a difference from the CDS.
+  // The cluster will be removed when it becomes idle. Ref: https://github.com/envoyproxy/envoy/issues/35171
+  config.set_ignore_removal(true);
 
   // Set endpoint.
   auto load_assignments = config.mutable_load_assignment();
@@ -304,7 +309,7 @@ void Cluster::onDnsHostAddOrUpdate(
 
   std::unique_ptr<Upstream::HostVector> hosts_added;
   addOrUpdateHost(host, host_info, hosts_added);
-  if (hosts_added != nullptr) {
+  if (hosts_added != nullptr) { 
     ASSERT(!hosts_added->empty());
     updatePriorityState(*hosts_added, {});
   }

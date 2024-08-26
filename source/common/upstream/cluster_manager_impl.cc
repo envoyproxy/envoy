@@ -877,7 +877,7 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   warming_clusters_.erase(warming_it);
 }
 
-bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
+bool ClusterManagerImpl::removeClusterAddedViaApi(const std::string& cluster_name) {
   bool removed = false;
   auto existing_active_cluster = active_clusters_.find(cluster_name);
   if (existing_active_cluster != active_clusters_.end() &&
@@ -924,6 +924,20 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   }
 
   return removed;
+}
+
+bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
+  auto existing_active_cluster = active_clusters_.find(cluster_name);
+  auto existing_warming_cluster = warming_clusters_.find(cluster_name);
+  if ((existing_active_cluster != active_clusters_.end() &&
+      existing_active_cluster->second->added_via_api_ &&
+      !existing_active_cluster->second->cluster().info()->ignoreRemoval()) ||   
+    (existing_warming_cluster != warming_clusters_.end() &&
+      existing_warming_cluster->second->added_via_api_ &&
+      !existing_active_cluster->second->cluster().info()->ignoreRemoval())) {
+    return removeClusterAddedViaApi(cluster_name);
+  }
+  return false;
 }
 
 absl::StatusOr<ClusterManagerImpl::ClusterDataPtr>

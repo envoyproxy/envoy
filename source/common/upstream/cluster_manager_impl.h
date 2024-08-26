@@ -288,6 +288,7 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
+  bool removeClusterAddedViaApi(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
     shutdown_ = true;
