@@ -47,6 +47,7 @@ public:
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
+  const VirtualHost& virtualHost() const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;
@@ -73,6 +74,7 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
   absl::optional<std::string>
@@ -101,8 +103,6 @@ public:
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override;
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override;
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override;
-  const VirtualHost& virtualHost() const override;
   bool autoHostRewrite() const override;
   bool appendXfh() const override;
   const MetadataMatchCriteria* metadataMatchCriteria() const override;

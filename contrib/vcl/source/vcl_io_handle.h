@@ -42,8 +42,10 @@ public:
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Envoy::Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port, const UdpSaveCmsgConfig& save_cmsg_config,
+                                  RecvMsgOutput& output) override;
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& save_cmsg_config,
                                    RecvMsgOutput& output) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;

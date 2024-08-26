@@ -4,7 +4,6 @@ import Foundation
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
-  // swiftlint:disable:previous type_body_length
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
   private var connectTimeoutSeconds: UInt32 = 30
@@ -18,11 +17,7 @@ open class EngineBuilder: NSObject {
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableGzipDecompression: Bool = true
   private var enableBrotliDecompression: Bool = false
-#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
-#else
-  private var enableHttp3: Bool = false
-#endif
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
@@ -174,7 +169,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -208,7 +202,6 @@ open class EngineBuilder: NSObject {
     self.quicCanonicalSuffixes.append(suffix)
     return self
   }
-#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.

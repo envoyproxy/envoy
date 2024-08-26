@@ -1236,12 +1236,16 @@ public:
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
   /**
-   * @return absl::optional<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+   * @return OptRef<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
    * an optional value of the configuration for happy eyeballs for this cluster.
    */
-  virtual const absl::optional<
-      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  virtual OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const PURE;
+
+  /**
+   * @return Reference to the optional config for LRS endpoint metric reporting.
+   */
+  virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
 
 protected:
   /**

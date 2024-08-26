@@ -59,11 +59,12 @@ public:
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::RawSlice saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos);
+                                             receive_time, tos, saved_cmsg);
     ++num_packets_received_;
   }
 
@@ -278,7 +279,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   quic::QuicStreamId stream_id = stream.id();
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream_id,
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ProtocolError, _));
   envoy_quic_session_->OnRstStream(rst1);
 
   EXPECT_EQ(
@@ -294,7 +295,7 @@ TEST_P(EnvoyQuicClientSessionTest, SendResetFrame) {
 
   // IETF bi-directional stream.
   quic::QuicStreamId stream_id = stream.id();
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ProtocolError, _));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   envoy_quic_session_->ResetStream(stream_id, quic::QUIC_ERROR_PROCESSING_STREAM);
 
@@ -474,14 +475,14 @@ TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
     auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                       stateless_reset_packet->length());
     quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                    time_system_.monotonicTime(), /*tos=*/0);
+                                    time_system_.monotonicTime(), /*tos=*/0, /*saved_cmsg=*/{});
   }
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .Times(0);
   auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                     stateless_reset_packet->length());
   quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                  time_system_.monotonicTime(), /*tos=*/0);
+                                  time_system_.monotonicTime(), /*tos=*/0, /*saved_cmsg=*/{});
 }
 
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.

@@ -9,6 +9,7 @@
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
@@ -18,7 +19,8 @@ class AutoSniIntegrationTest : public testing::TestWithParam<Network::Address::I
 public:
   AutoSniIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void setup(const std::string& override_auto_sni_header = "") {
+  void setup(const std::string& override_auto_sni_header = "",
+             const envoy::config::route::v3::RouteConfiguration* route_config = nullptr) {
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     config_helper_.addConfigModifier(
@@ -41,6 +43,14 @@ public:
           cluster_config.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
           cluster_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
         });
+    if (route_config != nullptr) {
+      config_helper_.addConfigModifier(
+          [route_config](envoy::extensions::filters::network::http_connection_manager::v3::
+                             HttpConnectionManager& hcm) {
+            auto* new_route_config = hcm.mutable_route_config();
+            new_route_config->CopyFrom(*route_config);
+          });
+    }
 
     HttpIntegrationTest::initialize();
   }
@@ -60,7 +70,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
@@ -88,6 +98,141 @@ TEST_P(AutoSniIntegrationTest, BasicAutoSniTest) {
       dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
   EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniTestWithHostRewrite) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/"
+    name: "foo"
+    route:
+      cluster: cluster_0
+      host_rewrite_literal: foo
+  )EOF";
+  envoy::config::route::v3::RouteConfiguration route_config;
+  TestUtility::loadFromYaml(yaml, route_config);
+  setup("", &route_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("foo", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniTestWithHostRewriteLegacy) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/"
+    name: "foo"
+    route:
+      cluster: cluster_0
+      host_rewrite_literal: foo
+  )EOF";
+  envoy::config::route::v3::RouteConfiguration route_config;
+  TestUtility::loadFromYaml(yaml, route_config);
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san", "false");
+  setup("", &route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STRNE("foo", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniTestWithHostRewriteRegex) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/"
+    name: "foo"
+    route:
+      cluster: cluster_0
+      host_rewrite_path_regex:
+        pattern:
+            regex: ".*"
+        substitution: "foo"
+  )EOF";
+  envoy::config::route::v3::RouteConfiguration route_config;
+  TestUtility::loadFromYaml(yaml, route_config);
+  setup("", &route_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("foo", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, AutoSniTestWithHostRewriteHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/"
+    name: "foo"
+    route:
+      cluster: cluster_0
+      host_rewrite_header: bar
+  )EOF";
+  envoy::config::route::v3::RouteConfiguration route_config;
+  TestUtility::loadFromYaml(yaml, route_config);
+  setup("", &route_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ =
+      sendRequestAndWaitForResponse(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "localhost"},
+                                                                   {"bar", "foo"}},
+                                    0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("foo", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
 TEST_P(AutoSniIntegrationTest, AutoSniWithAltHeaderNameTest) {

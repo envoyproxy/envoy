@@ -32,7 +32,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: Checkout repository
-      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.1.6
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
       with:
         fetch-depth: 2
 
@@ -61,14 +61,11 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.30
-      with:
-        to_remove: |
-          /usr/local/lib/android
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.35
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # codeql-bundle-v3.25.8
+      uses: github/codeql-action/init@2c779ab0d087cd7fe7b826087247c2c81f27bfa6  # codeql-bundle-v3.26.5
       with:
         languages: cpp
 
@@ -112,4 +109,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@2e230e8fe0ad3a14a340ad0815ddb96d599d2aff  # codeql-bundle-v3.25.8
+      uses: github/codeql-action/analyze@2c779ab0d087cd7fe7b826087247c2c81f27bfa6  # codeql-bundle-v3.26.5

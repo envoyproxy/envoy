@@ -94,11 +94,12 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
-        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainManager& manager) -> bool {
-          return filter_factory_.createFilterChain(manager);
-        }));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
+        .WillRepeatedly(
+            Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                       FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
+              return filter_factory_.createFilterChain(manager);
+            }));
   }
 
   Http::ForwardClientCertType
@@ -151,6 +152,9 @@ public:
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
+  }
+  bool http1SafeMaxConnectionDuration() const override {
+    return http1_safe_max_connection_duration_;
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
@@ -275,6 +279,7 @@ public:
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  bool http1_safe_max_connection_duration_{false};
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};

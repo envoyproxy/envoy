@@ -179,7 +179,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   // We can never assume the decodeHeaders() was called before encodeHeaders().
-  if (token_bucket_context_.has_value()) {
+  if (used_config_->enableXRateLimitHeaders() && token_bucket_context_.has_value()) {
     headers.addReferenceKey(
         HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
         token_bucket_context_->maxTokens());
@@ -241,11 +241,11 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
   case VhRateLimitOptions::Ignore:
     return;
   case VhRateLimitOptions::Include:
-    populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
+    populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     return;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
+      populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     }
     return;
   }

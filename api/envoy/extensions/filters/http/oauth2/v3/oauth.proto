@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.oauth2]
 //
 
+// [#next-free-field: 6]
 message OAuth2Credentials {
   // [#next-free-field: 6]
   message CookieNames {
@@ -70,6 +71,10 @@ message OAuth2Credentials {
 
   // The cookie names used in OAuth filters flow.
   CookieNames cookie_names = 4;
+
+  // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
+  // This is useful when token cookies need to be shared across multiple subdomains.
+  string cookie_domain = 5;
 }
 
 // OAuth config
@@ -153,7 +158,7 @@ message OAuth2Config {
   //
   // If this value is not set, it will default to ``604800s``. In this case, the cookie with the refresh token will be expired
   // in a week.
-  // This setting is only considered if ``use_refresh_token`` is set to true, otherwise the authorization server expiration or ``defaul_expires_in`` is used.
+  // This setting is only considered if ``use_refresh_token`` is set to true, otherwise the authorization server expiration or ``default_expires_in`` is used.
   google.protobuf.Duration default_refresh_token_expires_in = 15;
 
   // If set to true, Envoy will not set a cookie for ID Token even if one is received from the Identity Provider. This may be useful in cases where the ID

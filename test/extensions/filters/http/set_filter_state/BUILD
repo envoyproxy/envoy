@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.set_filter_state"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/set_filter_state:config",
         "//test/mocks/http:http_mocks",

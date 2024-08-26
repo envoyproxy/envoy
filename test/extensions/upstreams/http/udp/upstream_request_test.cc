@@ -46,7 +46,7 @@ public:
     udp_upstream_ =
         std::make_unique<UdpUpstream>(&mock_upstream_to_downstream_, std::move(mock_socket),
                                       std::move(mock_host), mock_dispatcher_);
-    EXPECT_NO_THROW(udp_upstream_->enableHalfClose());
+    EXPECT_NO_THROW(udp_upstream_->enableTcpTunneling());
   }
 
 protected:
@@ -105,7 +105,8 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
   EXPECT_CALL(mock_upstream_to_downstream_,
               decodeData(BufferStringEqual(decoded_capsule_fragment), false));
   Envoy::MonotonicTime timestamp;
-  udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp, /*tos=*/0);
+  udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp, /*tos=*/0,
+                               /*saved_cmsg=*/{});
 }
 
 TEST_F(UdpUpstreamTest, HeaderOnlyRequest) {

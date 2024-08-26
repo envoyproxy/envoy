@@ -168,11 +168,12 @@ public:
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::RawSlice saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos);
+                                             receive_time, tos, saved_cmsg);
   }
 
   Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
@@ -2133,6 +2134,10 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }
+
+  // Close connections before `SocketInterfaceSwap` goes out of scope to ensure packets aren't
+  // processed while it is being swapped back.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
@@ -2254,15 +2259,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   ASSERT_TRUE(response->complete());
 
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
-    test_server_->waitForCounterGe(
-        "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
-  } else {
-    EXPECT_EQ(
-        0u,
-        test_server_->counter("listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address")
-            ->value());
-  }
+  test_server_->waitForCounterGe(
+      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
 }
 
 TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFilter) {
@@ -2417,12 +2415,10 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  // TODO(https://github.com/envoyproxy/envoy/issues/34492) fix
-  return;
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   std::string listener = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
-  EXPECT_LOG_CONTAINS(
+  WAIT_FOR_LOG_CONTAINS(
       "info",
       fmt::format("Quic connection from {} with id {} closed {} with details:",
                   quic_connection_->self_address().ToString(),
@@ -2460,11 +2456,16 @@ TEST_P(QuicHttpIntegrationTest, StreamTimeoutWithHalfClose) {
   codec_client_->close();
 }
 
-TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacket) {
+TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
   useAccessLog(fmt::format("%FILTER_STATE({}:PLAIN)%", TestFirstPacketReceivedFilterState::key()));
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listener_filter =
-        bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    envoy::config::core::v3::SocketCmsgHeaders* cmsg =
+        listener->mutable_udp_listener_config()->mutable_quic_options()->add_save_cmsg_config();
+    cmsg->mutable_level()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
+    cmsg->mutable_type()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    cmsg->set_expected_size(128);
+    auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
     auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
     configuration.set_added_value("foo");
@@ -2483,11 +2484,13 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacket) {
   std::string log = waitForAccessLog(access_log_name_, 0);
   // Log format defined in TestFirstPacketReceivedFilterState::serializeAsString.
   std::vector<std::string> metrics = absl::StrSplit(log, ',');
-  ASSERT_EQ(metrics.size(), 2);
+  ASSERT_EQ(metrics.size(), 3);
   // onFirstPacketReceived was called only once.
   EXPECT_EQ(std::stoi(metrics.at(0)), 1);
   // first packet has length greater than zero.
   EXPECT_GT(std::stoi(metrics.at(1)), 0);
+  // first packet has packet headers length greater than zero.
+  EXPECT_GT(std::stoi(metrics.at(2)), 0);
 }
 
 } // namespace Quic

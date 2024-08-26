@@ -2,8 +2,10 @@
 
 set -e
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 # shellcheck source=ci/envoy_build_sha.sh
-. "$(dirname "$0")"/envoy_build_sha.sh
+. "${CURRENT_SCRIPT_DIR}"/envoy_build_sha.sh
 
 function is_windows() {
   [[ "$(uname -s)" == *NT* ]]

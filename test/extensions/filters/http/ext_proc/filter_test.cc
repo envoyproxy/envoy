@@ -30,7 +30,6 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -90,7 +89,6 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -180,7 +178,7 @@ protected:
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                      const Envoy::Http::AsyncClient::StreamOptions&,
-                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) {
+                                     Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
     if (final_expected_grpc_service_.has_value()) {
       EXPECT_TRUE(TestUtility::protoEqual(final_expected_grpc_service_.value(),
                                           config_with_hash_key.config()));
@@ -615,7 +613,6 @@ protected:
   TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
   Event::MockTimer* deferred_close_timer_;
-  TestScopedRuntime scoped_runtime_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
@@ -711,11 +708,11 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
         auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
         auto add1 = headers_mut->add_set_headers();
         add1->mutable_header()->set_key("x-new-header");
-        add1->mutable_header()->set_value("new");
+        add1->mutable_header()->set_raw_value("new");
         add1->mutable_append()->set_value(false);
         auto add2 = headers_mut->add_set_headers();
         add2->mutable_header()->set_key("x-some-other-header");
-        add2->mutable_header()->set_value("no");
+        add2->mutable_header()->set_raw_value("no");
         add2->mutable_append()->set_value(true);
         *headers_mut->add_remove_headers() = "x-do-we-want-this";
       });
@@ -750,7 +747,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
     resp_add1->mutable_header()->set_key("x-new-header");
-    resp_add1->mutable_header()->set_value("new");
+    resp_add1->mutable_header()->set_raw_value("new");
   });
 
   // We should now have changed the original header a bit
@@ -801,15 +798,15 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
   hdr1->mutable_header()->set_key("content-type");
-  hdr1->mutable_header()->set_value("text/plain");
+  hdr1->mutable_header()->set_raw_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
   hdr2->mutable_append()->set_value(true);
   hdr2->mutable_header()->set_key("x-another-thing");
-  hdr2->mutable_header()->set_value("1");
+  hdr2->mutable_header()->set_raw_value("1");
   auto* hdr3 = immediate_headers->add_set_headers();
   hdr3->mutable_append()->set_value(true);
   hdr3->mutable_header()->set_key("x-another-thing");
-  hdr3->mutable_header()->set_value("2");
+  hdr3->mutable_header()->set_raw_value("2");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   TestResponseHeaderMapImpl expected_response_headers{
@@ -856,7 +853,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
   hdr1->mutable_header()->set_key("content-type");
-  hdr1->mutable_header()->set_value("text/plain");
+  hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   Buffer::OwnedImpl req_data("foo");
@@ -2729,7 +2726,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
   });
 
@@ -2746,7 +2743,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
   });
 
@@ -2779,7 +2776,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
   });
 
@@ -2796,7 +2793,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
   });
 
@@ -2929,7 +2926,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearHeaderMutation) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
   });
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
@@ -3008,7 +3005,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainWithHeaderMutation) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
   });
 
@@ -3036,7 +3033,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainResponseNotWithHeaderMut
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
   });
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
@@ -3067,7 +3064,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key(":method");
-        hdr->mutable_header()->set_value("POST");
+        hdr->mutable_header()->set_raw_value("POST");
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
       });
 
@@ -3128,7 +3125,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key("x-test-header");
-        hdr->mutable_header()->set_value("true");
+        hdr->mutable_header()->set_raw_value("true");
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
       });
 
@@ -3331,7 +3328,7 @@ TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
         auto add1 = headers_mut->add_set_headers();
         // Not allowed to change the "host" header by default
         add1->mutable_header()->set_key("Host");
-        add1->mutable_header()->set_value("wrong:1234");
+        add1->mutable_header()->set_raw_value("wrong:1234");
         // Not allowed to remove x-envoy headers by default.
         headers_mut->add_remove_headers("x-envoy-special-thing");
       });
@@ -3379,7 +3376,7 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   auto add1 = headers_mut->add_set_headers();
   // Not allowed to change the "host" header by default
   add1->mutable_header()->set_key("Host");
-  add1->mutable_header()->set_value("wrong:1234");
+  add1->mutable_header()->set_raw_value("wrong:1234");
   // Not allowed to remove x-envoy headers by default.
   headers_mut->add_remove_headers("x-envoy-special-thing");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -3421,10 +3418,10 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
         // size limit 2kb. But the result header map size exceeds the count limit 2kb.
         auto add1 = headers_mut->add_set_headers();
         add1->mutable_header()->set_key("x-new-header-0123456789");
-        add1->mutable_header()->set_value("new-header-0123456789");
+        add1->mutable_header()->set_raw_value("new-header-0123456789");
         auto add2 = headers_mut->add_set_headers();
         add2->mutable_header()->set_key("x-some-other-header-0123456789");
-        add2->mutable_header()->set_value("some-new-header-0123456789");
+        add2->mutable_header()->set_raw_value("some-new-header-0123456789");
       },
       false);
   filter_->onDestroy();
@@ -3987,7 +3984,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
     resp_add->mutable_header()->set_key("x-new-header");
-    resp_add->mutable_header()->set_value("new");
+    resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
   });
 
@@ -4030,7 +4027,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
   hdr1->mutable_header()->set_key("content-type");
-  hdr1->mutable_header()->set_value("text/plain");
+  hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
   TestResponseHeaderMapImpl expected_response_headers{};
   // Send local reply never happened.
@@ -4264,7 +4261,7 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
     envoy_grpc:
       cluster_name: "ext_proc_server"
   )EOF");
-  HttpConnectionManagerImplMixin::setup(false, "fake-server");
+  HttpConnectionManagerImplMixin::setup(Envoy::Http::SetupOpts().setServerName("fake-server"));
   HttpConnectionManagerImplMixin::initial_buffer_limit_ = 10;
   HttpConnectionManagerImplMixin::setUpBufferLimits();
 
@@ -4324,10 +4321,10 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
         auto* hdr =
             headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key("foo");
-        hdr->mutable_header()->set_value("gift-from-external-server");
+        hdr->mutable_header()->set_raw_value("gift-from-external-server");
         hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key(":path");
-        hdr->mutable_header()->set_value("/mutated_path/bluh");
+        hdr->mutable_header()->set_raw_value("/mutated_path/bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
 
         return ::Envoy::Http::okStatus();
@@ -4355,7 +4352,7 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
     response_trailer_mode: "SKIP"
 
   )EOF");
-  HttpConnectionManagerImplMixin::setup(false, "fake-server");
+  HttpConnectionManagerImplMixin::setup(Envoy::Http::SetupOpts().setServerName("fake-server"));
   HttpConnectionManagerImplMixin::initial_buffer_limit_ = 10;
   HttpConnectionManagerImplMixin::setUpBufferLimits();
 
@@ -4429,10 +4426,10 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         auto* hdr =
             headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key("foo");
-        hdr->mutable_header()->set_value("gift-from-external-server");
+        hdr->mutable_header()->set_raw_value("gift-from-external-server");
         hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key("new_response_header");
-        hdr->mutable_header()->set_value("bluh");
+        hdr->mutable_header()->set_raw_value("bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
         return FilterHeadersStatus::StopIteration;
       }));

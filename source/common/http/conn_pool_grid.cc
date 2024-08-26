@@ -26,12 +26,19 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
-std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
+std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPtr& options,
+                              Upstream::HostConstSharedPtr& host) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  return std::string(transport_socket_factory.defaultServerNameIndication());
+  std::string default_sni =
+      std::string(host->transportSocketFactory().defaultServerNameIndication());
+  if (!default_sni.empty() ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
+    return default_sni;
+  }
+  // If there's no configured SNI the hostname is probably an IP address. Return it here.
+  return host->hostname();
 }
 
 } // namespace
@@ -133,6 +140,11 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
+    if (!grid_.isPoolHttp3(attempt->pool())) {
+      // TCP pool failed before HTTP/3 pool.
+      prev_tcp_pool_failure_reason_ = reason;
+      prev_tcp_pool_transport_failure_reason_ = transport_failure_reason;
+    }
     return;
   }
 
@@ -154,6 +166,15 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
   deleteThis();
   if (callbacks != nullptr) {
     ENVOY_LOG(trace, "Passing pool failure up to caller.");
+    std::string failure_str;
+    if (prev_tcp_pool_failure_reason_.has_value()) {
+      // TCP pool failed early on, log its error details as well.
+      failure_str = fmt::format("{} (with earlier TCP attempt failure reason {}, {})",
+                                transport_failure_reason,
+                                static_cast<int>(prev_tcp_pool_failure_reason_.value()),
+                                prev_tcp_pool_transport_failure_reason_);
+      transport_failure_reason = failure_str;
+    }
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
   }
 }
@@ -201,7 +222,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   if (callbacks != nullptr) {
     callbacks->onPoolReady(encoder, host, info, protocol);
-  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.avoid_zombie_streams")) {
+  } else {
     encoder.getStream().resetStream(StreamResetReason::LocalReset);
   }
 }
@@ -283,7 +304,7 @@ ConnectivityGrid::ConnectivityGrid(
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-      origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
+      origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
       quic_info_(quic_info), priority_(priority) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
