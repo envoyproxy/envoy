@@ -120,12 +120,6 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
                                      std::vector<std::string>::const_iterator path_pieces_end,
                                      ProtobufWkt::Struct* message_struct);
 
-absl::StatusOr<bool>
-IsMessageFieldPathPresent(const Protobuf::Type& type,
-                          std::function<const Protobuf::Type*(const std::string&)> type_finder,
-                          const std::string& path,
-                          const Protobuf::field_extraction::MessageData& message);
-
 // Converts given proto message to Struct. It also adds
 // a "@type" property with proto type url to the generated Struct. Expects the
 // TypeResolver to handle types prefixed with "type.googleapis.com/".

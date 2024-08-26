@@ -390,35 +390,6 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
                                  (*fields)[current_piece].mutable_struct_value());
 }
 
-absl::StatusOr<bool>
-IsMessageFieldPathPresent(const Protobuf::Type& type,
-                          std::function<const Protobuf::Type*(const std::string&)> type_finder,
-                          const std::string& path,
-                          const Protobuf::field_extraction::MessageData& message) {
-  if (path.empty()) {
-    return absl::InvalidArgumentError("Field path cannot be empty.");
-  }
-
-  auto extract_func = [](const Type& /*enclosing_type*/, const Field* field,
-                         CodedInputStream* input_stream) -> absl::StatusOr<bool> {
-    if (field->kind() != Field::TYPE_MESSAGE) {
-      return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is not a message type field.", field->name()));
-    } else if (field->cardinality() == Field::CARDINALITY_REPEATED) {
-      return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is not a singular field.", field->name()));
-    } else { // singular message field
-      return FieldExtractor::SearchField(*field, input_stream);
-    }
-  };
-
-  FieldExtractor field_extractor(&type, std::move(type_finder));
-  Protobuf::field_extraction::MessageData& msg(
-      const_cast<Protobuf::field_extraction::MessageData&>(message));
-  return field_extractor.ExtractFieldInfo<int64_t>(path, msg.CreateCodedInputStreamWrapper()->Get(),
-                                                   extract_func);
-}
-
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
                              const Envoy::ProtobufWkt::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,

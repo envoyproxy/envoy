@@ -1,3 +1,4 @@
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <string>
@@ -36,13 +37,14 @@ namespace {
 
 using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::FieldMask;
+using Envoy::Protobuf::FileDescriptorSet;
 using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::CordMessageData;
-using ::Envoy::Protobuf::field_extraction::testing::TypeHelper;
 using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
+using ::google::grpc::transcoding::TypeHelper;
 using ::proto_processing_lib::proto_scrubber::FieldMaskPathChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
@@ -127,7 +129,7 @@ class ScrubbingUtilTest : public ::testing::Test {
 protected:
   ScrubbingUtilTest() = default;
   const Protobuf::Type* FindType(const std::string& type_url) {
-    absl::StatusOr<const Protobuf::Type*> result = type_helper_->ResolveTypeUrl(type_url);
+    absl::StatusOr<const Protobuf::Type*> result = type_helper_->Info()->ResolveTypeUrl(type_url);
     if (!result.ok()) {
       return nullptr;
     }
@@ -137,8 +139,32 @@ protected:
   void SetUp() override {
     const std::string descriptor_path =
         TestEnvironment::runfilesPath("test/proto/scrubbing.descriptor");
-    absl::StatusOr<std::unique_ptr<TypeHelper>> status = TypeHelper::Create(descriptor_path);
-    type_helper_ = std::move(status.value());
+
+    // Create an input file stream
+    std::ifstream file(descriptor_path, std::ios::in | std::ios::binary);
+    if (!file) {
+      LOG(ERROR) << "Failed to open the file: " << descriptor_path << std::endl;
+    }
+
+    // Read the file contents into a stringstream
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string file_contents = buffer.str();
+
+    FileDescriptorSet descriptor_set;
+    if (!descriptor_set.ParseFromString(file_contents)) {
+      LOG(ERROR) << "Unable to parse proto descriptor from file " << descriptor_path;
+    }
+
+    for (const auto& file : descriptor_set.file()) {
+      if (descriptor_pool_->BuildFile(file) == nullptr) {
+        LOG(ERROR) << "Unable to build proto descriptor pool";
+      }
+    }
+
+    type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
+        Protobuf::util::NewTypeResolverForDescriptorPool("type.googleapis.com",
+                                                         descriptor_pool_.get()));
 
     type_finder_ = std::bind_front(&ScrubbingUtilTest::FindType, this);
 
@@ -179,6 +205,9 @@ protected:
 
   // A TypeHelper for testing.
   std::unique_ptr<TypeHelper> type_helper_ = nullptr;
+
+  std::unique_ptr<Protobuf::DescriptorPool> descriptor_pool_ =
+      std::make_unique<Protobuf::DescriptorPool>();
 
   std::function<const Type*(const std::string&)> type_finder_;
 
@@ -283,6 +312,31 @@ TEST_F(ScrubbingUtilTest, GetMonitoredResourceLabels_EmptyLabelExtractor) {
   EXPECT_EQ(labels_.size(), 0);
 }
 
+TEST_F(ScrubbingUtilTest, SingularFieldUseLastValue_EmptyLastValue) {
+  Field field;
+  field.set_name("id");
+  field.set_number(1);
+  field.set_kind(Field::TYPE_INT64);
+
+  absl::StatusOr<std::string> st = SingularFieldUseLastValue(
+      "first_value", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  EXPECT_TRUE(st.ok());
+  EXPECT_EQ(st.value(), "first_value");
+}
+
+TEST_F(ScrubbingUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
+  Field field;
+  field.set_name("repeated_strings");
+  field.set_number(3);
+  field.set_kind(Field::TYPE_STRING);
+  field.set_cardinality(Field::CARDINALITY_REPEATED);
+
+  absl::StatusOr<std::string> st = SingularFieldUseLastValue(
+      "", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  EXPECT_TRUE(st.ok());
+  EXPECT_EQ(st.value(), "repeated-string-0");
+}
+
 TEST_F(ScrubbingUtilTest, RedactStructRecursively_EmptyPath) {
   Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
   EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
@@ -338,41 +392,6 @@ TEST_F(ScrubbingUtilTest, RedactStructRecursively_NullptrMessageStruct) {
   std::vector<std::string> path_pieces = {"level1"};
   EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), nullptr),
             absl::InvalidArgumentError("message_struct cannot be nullptr."));
-}
-
-TEST_F(ScrubbingUtilTest, IsMessageFieldPathPresent_EmptyPath) {
-  EXPECT_EQ(
-      IsMessageFieldPathPresent(*request_type_, type_finder_, "", test_request_raw_proto_).status(),
-      absl::InvalidArgumentError("Field path cannot be empty."));
-}
-
-TEST_F(ScrubbingUtilTest, IsMessageFieldPathPresent_EmptyType) {
-  Type empty_type;
-  EXPECT_EQ(
-      IsMessageFieldPathPresent(empty_type, type_finder_, "id", test_request_raw_proto_).status(),
-      absl::InvalidArgumentError("Cannot find field 'id' in '' message."));
-}
-
-TEST_F(ScrubbingUtilTest, IsMessageFieldPathPresent_InvalidPath) {
-  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "invalid_path",
-                                      test_request_raw_proto_)
-                .status(),
-            absl::InvalidArgumentError(
-                "Cannot find field 'invalid_path' in 'scrubbing.TestRequest' message."));
-}
-
-TEST_F(ScrubbingUtilTest, IsMessageFieldPathPresent_ValidPath) {
-  EXPECT_TRUE(
-      IsMessageFieldPathPresent(*request_type_, type_finder_, "bucket", test_request_raw_proto_)
-          .status()
-          .ok());
-}
-
-TEST_F(ScrubbingUtilTest, IsMessageFieldPathPresent_NotMessageField) {
-  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "repeated_strings",
-                                      test_request_raw_proto_)
-                .status(),
-            absl::InvalidArgumentError("Field 'repeated_strings' is not a message type field."));
 }
 
 TEST_F(ScrubbingUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
@@ -696,6 +715,31 @@ TEST_F(ScrubbingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST_F(ScrubbingUtilTest, ScrubToStruct_Success) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  std::vector<std::string> paths = {"bucket.name", "bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+  ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_TRUE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper_, &raw_proto, &actual_struct));
+}
+
 TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrScrubber) {
   TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
     id: 123445
@@ -710,11 +754,27 @@ TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrScrubber) {
   CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
   Struct actual_struct;
 
-  EXPECT_FALSE(ScrubToStruct(nullptr /*scrubber*/, *request_type_, nullptr /*type_helper*/,
-                             &raw_proto, &actual_struct));
+  EXPECT_FALSE(ScrubToStruct(nullptr /*scrubber*/, *request_type_, *type_helper_, &raw_proto,
+                             &actual_struct));
 }
 
-TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrTypeHelper) {
+TEST_F(ScrubbingUtilTest, ScrubToStruct_InvalidMessageData) {
+  std::vector<std::string> paths = {"bucket.name", "bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+  ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  absl::Cord cord("some_data");
+  CordMessageData raw_proto = CordMessageData(cord);
+  Struct actual_struct;
+
+  EXPECT_FALSE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper_, &raw_proto, &actual_struct));
+}
+
+TEST_F(ScrubbingUtilTest, ScrubToStruct_Failure) {
   TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
     id: 123445
     bucket {
@@ -725,7 +785,33 @@ TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrTypeHelper) {
     }
   )pb");
 
-  std::vector<std::string> paths = {"bucket.ratio", "bucket.objects", "id"};
+  std::vector<std::string> paths = {"bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+
+  ProtoScrubber proto_scrubber(response_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_FALSE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper_, &raw_proto, &actual_struct));
+}
+
+TEST_F(ScrubbingUtilTest, ScrubToStruct_InvalidTypeHelper) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  std::vector<std::string> paths = {"bucket.name", "bucket.ratio"};
 
   FieldMaskPathChecker field_checker(request_type_, type_finder_);
   ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
@@ -735,9 +821,11 @@ TEST_F(ScrubbingUtilTest, ScrubToStruct_NullptrTypeHelper) {
   CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
   Struct actual_struct;
 
-  EXPECT_DEATH(ScrubToStruct(&proto_scrubber, *request_type_, nullptr /*type_helper*/, &raw_proto,
-                             &actual_struct),
-               ".*");
+  std::unique_ptr<TypeHelper> type_helper = std::make_unique<google::grpc::transcoding::TypeHelper>(
+      Protobuf::util::NewTypeResolverForDescriptorPool("", descriptor_pool_.get()));
+
+  EXPECT_FALSE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper, &raw_proto, &actual_struct));
 }
 
 TEST(ScrubUtilTest, RedactPaths_Basic) {
