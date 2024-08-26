@@ -19,9 +19,9 @@ namespace {
 Network::Address::InstanceConstSharedPtr
 getLoopbackAddress(const Network::Address::IpVersion version) {
   if (version == Network::Address::IpVersion::v6) {
-    return Network::Utility::getIpv6LoopbackAddress();
+    return std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
-  return Network::Utility::getCanonicalIpv4LoopbackAddress();
+  return std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
 }
 
 } // namespace
