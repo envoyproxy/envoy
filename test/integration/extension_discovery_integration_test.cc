@@ -217,6 +217,13 @@ public:
       RELEASE_ASSERT(result, result.message());
       ecds_connection_.reset();
     }
+    if (ecds2_connection_ != nullptr) {
+      AssertionResult result = ecds2_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = ecds2_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      ecds2_connection_.reset();
+    }
     if (lds_connection_ != nullptr) {
       AssertionResult result = lds_connection_->close();
       RELEASE_ASSERT(result, result.message());

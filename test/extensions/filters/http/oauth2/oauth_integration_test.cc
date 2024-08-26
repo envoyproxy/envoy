@@ -183,6 +183,12 @@ resources:
       result = fake_oauth2_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
     }
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
     if (fake_upstream_connection_ != nullptr) {
       AssertionResult result = fake_upstream_connection_->close();
       RELEASE_ASSERT(result, result.message());
