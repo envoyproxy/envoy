@@ -20,8 +20,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 
 //                                                ┌──────────────────┐
 //                                                │   Envoy Proxy    │
@@ -55,18 +55,20 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
 
   @Test
   fun `attempts an HTTPs request through a proxy using an async DNS resolution that fails`() {
-    val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
-    val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
-    Mockito.doReturn(connectivityManager)
-      .`when`(context)
-      .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.defaultProxy)
-      .thenReturn(ProxyInfo.buildDirectProxy("loopback", httpProxyTestServer.port))
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val connectivityManager =
+      context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    connectivityManager.bindProcessToNetwork(connectivityManager.activeNetwork)
+    Shadows.shadowOf(connectivityManager)
+      .setProxyForNetwork(
+        connectivityManager.activeNetwork,
+        ProxyInfo.buildDirectProxy("loopback", httpProxyTestServer.port)
+      )
 
     val onEngineRunningLatch = CountDownLatch(1)
     val onErrorLatch = CountDownLatch(1)
 
-    context.sendStickyBroadcast(Intent(Proxy.PROXY_CHANGE_ACTION))
+    context.sendBroadcast(Intent(Proxy.PROXY_CHANGE_ACTION))
 
     val builder = AndroidEngineBuilder(context)
     val engine =
