@@ -81,17 +81,24 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
+absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response) {
+  ENVOY_LOG(debug, "Applying header mutations");
+  const auto mut_status = MutationUtils::applyHeaderMutations(
+      common_response.header_mutation(), *headers_,
+      common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+      filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+      shouldRemoveContentLength());
+  return mut_status;
+}
+
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
-  if (callback_state_ == CallbackState::HeadersCallback) {
+  if ((callback_state_ == CallbackState::HeadersCallback) ||
+      (callback_state_ == CallbackState::StreamedBodyCallback && filter_.config().sendBodyWithoutWaitingForHeaderResponse())) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
     if (common_response.has_header_mutation()) {
-      const auto mut_status = MutationUtils::applyHeaderMutations(
-          common_response.header_mutation(), *headers_,
-          common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-          filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
-          shouldRemoveContentLength());
+      const auto mut_status = processHeaderMutation(common_response);
       if (!mut_status.ok()) {
         return mut_status;
       }
@@ -123,6 +130,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       // or response to the processor. Clear flags to make sure.
       body_mode_ = ProcessingMode::NONE;
       send_trailers_ = false;
+      // Clear any data left over in the chunk queue.
+      clearStreamingChunk();
       clearWatermark();
     } else {
       if (no_body_) {
@@ -217,6 +226,12 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 }
 
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
+  if (body_mode_ == ProcessingMode::NONE) {
+    // If body processing mode is none, and a body response is received,
+    // just ignore it.
+    return absl::OkStatus();
+  }
+
   bool should_continue = false;
   const auto& common_response = response.response();
   if (callback_state_ == CallbackState::BufferedBodyCallback ||
@@ -226,12 +241,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     if (callback_state_ == CallbackState::BufferedBodyCallback) {
       if (common_response.has_header_mutation()) {
         if (headers_ != nullptr) {
-          ENVOY_LOG(debug, "Applying header mutations to buffered body message");
-          const auto mut_status = MutationUtils::applyHeaderMutations(
-              common_response.header_mutation(), *headers_,
-              common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
-              shouldRemoveContentLength());
+          const auto mut_status = processHeaderMutation(common_response);
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -263,6 +273,17 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
+      if (filter_.config().sendBodyWithoutWaitingForHeaderResponse()) {
+        // Apply header mutation if the body response contains it.
+        // Note, headers_ will be set into nullptr after the 1st body response is processed.
+        if (headers_ != nullptr && common_response.has_header_mutation()) {
+          const auto mut_status = processHeaderMutation(common_response);
+          if (!mut_status.ok()) {
+            return mut_status;
+          }
+        }
+      }
+
       Buffer::OwnedImpl chunk_data;
       auto chunk = dequeueStreamingChunk(chunk_data);
       ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
@@ -291,12 +312,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       ENVOY_BUG(chunk != nullptr, "Bad partial body callback state");
       if (common_response.has_header_mutation()) {
         if (headers_ != nullptr) {
-          ENVOY_LOG(debug, "Applying header mutations to buffered body message");
-          const auto mut_status = MutationUtils::applyHeaderMutations(
-              common_response.header_mutation(), *headers_,
-              common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
-              filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
-              shouldRemoveContentLength());
+          const auto mut_status = processHeaderMutation(common_response);
           if (!mut_status.ok()) {
             return mut_status;
           }
@@ -372,6 +388,10 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
   if (queueOverHighLimit()) {
     requestWatermark();
   }
+}
+
+void ProcessorState::clearStreamingChunk() {
+  chunk_queue_.clear();
 }
 
 void ProcessorState::clearAsyncState() {
@@ -521,6 +541,13 @@ const QueuedChunk& ChunkQueue::consolidate() {
   }
   auto& chunk = *(queue_.front());
   return chunk;
+}
+
+void ChunkQueue::clear() {
+  if (queue_.size() > 1) {
+    received_data_.drain(received_data_.length());
+    queue_.clear();
+  }
 }
 
 } // namespace ExternalProcessing

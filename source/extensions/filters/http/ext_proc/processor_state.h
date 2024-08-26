@@ -40,6 +40,7 @@ public:
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream);
+  void clear();
   QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
@@ -153,6 +154,7 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
+  absl::Status processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
   absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
   absl::Status
@@ -272,6 +274,7 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
+  void clearStreamingChunk();
 };
 
 class DecodingProcessorState : public ProcessorState {

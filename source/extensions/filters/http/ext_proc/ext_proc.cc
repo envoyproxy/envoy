@@ -188,6 +188,7 @@ FilterConfig::FilterConfig(
       deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
                                                          DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
       message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+      send_body_without_waiting_for_header_response_(config.send_body_without_waiting_for_header_response()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -493,16 +494,20 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
-    // We don't know what to do with the body until the response comes back.
-    // We must buffer it in case we need it when that happens.
-    // Raise a watermark to prevent a buffer overflow until the response comes back.
-    // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
-    // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
-    // buffer limit.
-    state.setPaused(true);
-    state.requestWatermark();
-    return FilterDataStatus::StopIterationAndWatermark;
+    if (state.bodyMode() != ProcessingMode::STREAMED || !config_->sendBodyWithoutWaitingForHeaderResponse()) {
+      ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
+      // We don't know what to do with the body until the response comes back.
+      // We must buffer it in case we need it when that happens.
+      // Raise a watermark to prevent a buffer overflow until the response comes back.
+      // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
+      // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
+      // buffer limit.
+      state.setPaused(true);
+      state.requestWatermark();
+      return FilterDataStatus::StopIterationAndWatermark;
+    } else {
+      ENVOY_LOG(trace, "Header processing still in progress. STREAMED body mode and send_body_without_waiting_for_header_response is enabled ---- sending body data");
+    }
   }
 
   FilterDataStatus result;

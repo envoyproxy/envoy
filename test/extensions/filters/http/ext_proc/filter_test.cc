@@ -3966,6 +3966,89 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
   filter_->onDestroy();
 }
 
+// External processing M:N test
+TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_body_mode: "STREAMED"
+  send_body_before_recv_header_resp: true
+  )EOF");
+
+  EXPECT_EQ(config_->sendBodyBeforeRecvHeaderResp(), true);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  // processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  //  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  // Before header response is received sending 7 chunks data to the ext_proc server.
+  for (int i = 0; i < 7; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  // Send the 1st body response which include header response.
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        // Adding header mutation.
+        auto* header_mut = resp.mutable_response()->mutable_header_mutation();
+        auto* resp_add = header_mut->add_set_headers();
+        resp_add->mutable_header()->set_key("x-new-header");
+        resp_add->mutable_header()->set_raw_value("new");
+        // Adding body mutation.
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(" 0 ");
+        want_response_body.add(" 0 ");
+      },
+      false);
+
+  // Send body responses for the rest 6 chunks.
+  for (int i = 1; i <= 6; i++) {
+    processResponseBody(
+        [&want_response_body, i](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          std::string new_body = absl::StrCat(" ",std::to_string(i)," ");
+          body_mut->set_body(new_body);
+          want_response_body.add(new_body);
+        },
+        false);
+  }
+
+  // Send the last empty request chunk.
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
+  // The two buffers should match.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  filter_->onDestroy();
+}
+
+
 // Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
 // sends back response with clear_route_cache set to true, it is ignored.
 TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
