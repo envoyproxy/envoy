@@ -36,9 +36,14 @@ On the request and response path, it will check
   a. buffer the incoming data to complete protobuf messages
   b. extract individual protobuf messages according to directives
   c. write the result into the dynamic metadata.
-  d. pass through the request data
+  d. pass through the request/response data
 
 2. otherwise, pass through the request.
+
+The extraction process in this filter is not on the critical path, as it does not
+modify the request or response. The filter extracts the specified fields,
+writes them to dynamic metadata, and then passes the request/response
+through without modification. 
 
 Config Requirements
 -------------------
