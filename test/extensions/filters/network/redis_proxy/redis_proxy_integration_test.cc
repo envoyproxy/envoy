@@ -566,6 +566,8 @@ public:
   }
 
   void initialize() override {
+    simTime().setSystemTime(std::chrono::seconds(0));
+
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto fake_auth_cluster = config_helper_.buildStaticCluster(
           "fake_auth", 0, Network::Test::getLoopbackAddressString(ipVersion()));
@@ -1573,7 +1575,7 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSent
   proxyRequestStep(makeBulkStringArray({"auth", "somepassword"}), redis_client);
   FakeStreamPtr auth_request2;
   expectExternalAuthRequest(fake_upstream_external_auth, auth_request2, "somepassword", true);
-  auto expiration_time = timeSystem().systemTime() + std::chrono::seconds(5);
+  auto expiration_time = timeSystem().systemTime() + std::chrono::hours(1);
   sendExternalAuthResponse(
       auth_request2, true,
       duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
@@ -1584,7 +1586,7 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSent
                           redis_client, fake_upstream_redis_connection, "", "");
 
   // Expiration passes
-  timeSystem().advanceTimeWait(std::chrono::seconds(6));
+  timeSystem().advanceTimeWait(std::chrono::hours(2));
 
   // Sending a command after expiration should return NOAUTH error.
   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
