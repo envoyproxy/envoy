@@ -9,6 +9,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/integration.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -547,7 +548,8 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_FAULT_INJECTION, 2) {}
 };
 
-class RedisProxyWithExternalAuthIntegrationTest : public Grpc::BaseGrpcClientIntegrationParamTest,
+class RedisProxyWithExternalAuthIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                  public Grpc::BaseGrpcClientIntegrationParamTest,
                                                   public RedisProxyIntegrationTest {
 
 public:
@@ -1571,7 +1573,7 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSent
   proxyRequestStep(makeBulkStringArray({"auth", "somepassword"}), redis_client);
   FakeStreamPtr auth_request2;
   expectExternalAuthRequest(fake_upstream_external_auth, auth_request2, "somepassword", true);
-  auto expiration_time = timeSystem().systemTime() + std::chrono::seconds(2);
+  auto expiration_time = timeSystem().systemTime() + std::chrono::seconds(5);
   sendExternalAuthResponse(
       auth_request2, true,
       duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
@@ -1582,7 +1584,7 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSent
                           redis_client, fake_upstream_redis_connection, "", "");
 
   // Expiration passes
-  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
 
   // Sending a command after expiration should return NOAUTH error.
   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
