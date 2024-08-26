@@ -66,18 +66,18 @@ envoy_proto_descriptor(
 )
 
 envoy_proto_library(
-    name = "scrubbing_proto",
+    name = "extraction_proto",
     srcs = [
-        "scrubbing.proto",
+        "extraction.proto",
     ],
 )
 
 envoy_proto_descriptor(
-    name = "scrubbing_proto_descriptor",
+    name = "extraction_proto_descriptor",
     srcs = [
-        "scrubbing.proto",
+        "extraction.proto",
     ],
-    out = "scrubbing.descriptor",
+    out = "extraction.descriptor",
 )
 
 envoy_proto_library(
