@@ -53,6 +53,7 @@ namespace UdpProxy {
   COUNTER(downstream_sess_tx_datagrams)                                                            \
   COUNTER(downstream_sess_tx_errors)                                                               \
   COUNTER(idle_timeout)                                                                            \
+  COUNTER(session_filter_config_missing)                                                           \
   GAUGE(downstream_sess_active, Accumulate)
 
 /**
@@ -561,8 +562,8 @@ private:
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
 
-    void createFilterChain() {
-      cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
+    bool createFilterChain() {
+      return cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
     }
 
     uint64_t sessionId() const { return session_id_; };

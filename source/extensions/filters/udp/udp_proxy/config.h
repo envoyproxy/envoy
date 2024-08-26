@@ -157,14 +157,18 @@ public:
   Random::RandomGenerator& randomGenerator() const override { return random_generator_; }
 
   // UdpSessionFilterChainFactory
-  void createFilterChain(Network::UdpSessionFilterChainFactoryCallbacks& callbacks) const override {
+  bool createFilterChain(Network::UdpSessionFilterChainFactoryCallbacks& callbacks) const override {
     for (const auto& filter_config_provider : filter_factories_) {
       auto config = filter_config_provider->config();
-      if (config.has_value()) {
-        Network::UdpSessionFilterFactoryCb& factory = config.value();
-        factory(callbacks);
+      if (!config.has_value()) {
+        return false;
       }
+
+      Network::UdpSessionFilterFactoryCb& factory = config.value();
+      factory(callbacks);
     }
+
+    return true;
   };
 
 private:

@@ -103,3 +103,21 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "udp_session_extension_discovery_integration_test",
+    size = "large",
+    srcs = ["udp_session_extension_discovery_integration_test.cc"],
+    extension_names = ["envoy.filters.udp_listener.udp_proxy"],
+    deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/udp/udp_proxy:config",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
+        "//test/integration:integration_lib",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
+    ],
+)

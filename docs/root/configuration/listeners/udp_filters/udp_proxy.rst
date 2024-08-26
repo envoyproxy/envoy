@@ -146,6 +146,7 @@ statistics are rooted at *udp.<stat_prefix>.* with the following statistics:
   downstream_sess_tx_datagrams, Counter, Number of datagrams transmitted
   downstream_sess_tx_errors, Counter, Number of datagram transmission errors
   idle_timeout, Counter, Number of sessions destroyed due to idle timeout
+  session_filter_config_missing, Counter, Number of sessions destroyed due to missing session filter configuration
   downstream_sess_active, Gauge, Number of sessions currently active
 
 The following standard :ref:`upstream cluster stats <config_cluster_manager_cluster_stats>` are used
