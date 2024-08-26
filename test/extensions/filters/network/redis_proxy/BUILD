@@ -185,6 +185,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/integration:integration_lib",
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
     ],
 )
 
