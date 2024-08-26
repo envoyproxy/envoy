@@ -223,11 +223,12 @@ TEST(UtilityTest, TestMapX509Stack) {
   auto func = [](X509& cert) -> std::string { return Utility::getSubjectFromCertificate(cert); };
   EXPECT_EQ(expected_subject, Utility::mapX509Stack(*cert_chain, func));
 
-  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*sk_X509_new_null(), func), "x509 stack is empty or NULL");
+  bssl::UniquePtr<STACK_OF(X509)> empty_chain(sk_X509_new_null());
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*empty_chain, func), "x509 stack is empty or NULL");
   EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "field_extractor is nullptr");
-  bssl::UniquePtr<STACK_OF(X509)> fakeCertChain(sk_X509_new_null());
-  sk_X509_push(fakeCertChain.get(), nullptr);
-  EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fakeCertChain, func));
+  bssl::UniquePtr<STACK_OF(X509)> fake_cert_chain(sk_X509_new_null());
+  sk_X509_push(fake_cert_chain.get(), nullptr);
+  EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fake_cert_chain, func));
 }
 
 } // namespace
