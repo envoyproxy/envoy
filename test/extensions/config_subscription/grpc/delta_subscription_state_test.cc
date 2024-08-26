@@ -138,11 +138,11 @@ protected:
     return deliverDiscoveryResponse(add, remove, version_info);
   }
 
-  void markStreamFresh() {
+  void markStreamFresh(bool should_send_initial_resource_versions) {
     if (should_use_unified_) {
-      absl::get<1>(state_)->markStreamFresh();
+      absl::get<1>(state_)->markStreamFresh(should_send_initial_resource_versions);
     } else {
-      absl::get<0>(state_)->markStreamFresh();
+      absl::get<0>(state_)->markStreamFresh(should_send_initial_resource_versions);
     }
   }
 
@@ -193,7 +193,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
   // We should send a request after a new stream is established if we are interested in some
   // resource.
   EXPECT_FALSE(subscriptionUpdatePending());
-  markStreamFresh();
+  markStreamFresh(true);
   EXPECT_TRUE(subscriptionUpdatePending());
   getNextRequestAckless();
 
@@ -206,7 +206,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
 
   // We should not be sending anything after stream reestablishing, because we are not interested in
   // anything.
-  markStreamFresh();
+  markStreamFresh(true);
   EXPECT_FALSE(subscriptionUpdatePending());
 }
 
@@ -224,7 +224,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequest
   EXPECT_TRUE(req->initial_resource_versions().empty());
 
   deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}}, {}, "d1");
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -237,7 +237,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequest
   EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
   deliverSimpleDiscoveryResponse({}, {"foo"}, "d2");
 
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -256,7 +256,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
   deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"wild1", "1"}}, {}, "d1");
 
   // ensure that foo is a part of resource versions
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -270,7 +270,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
   EXPECT_TRUE(req->resource_names_subscribe().empty());
   EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
   // didn't receive a reply
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -292,7 +292,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
   deliverSimpleDiscoveryResponse({{"foo", "1"}, {"baz", "1"}, {"wild1", "1"}}, {}, "d1");
 
   // ensure that foo is a part of resource versions, bar won't be, because we don't have its version
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(),
               UnorderedElementsAre(WildcardStr, "foo", "bar", "baz"));
@@ -307,7 +307,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
   EXPECT_TRUE(req->resource_names_subscribe().empty());
   EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo", "bar"));
   deliverSimpleDiscoveryResponse({}, {"foo"}, "d2");
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "baz"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -326,7 +326,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildca
   deliverSimpleDiscoveryResponse({{"foo", "1"}, {"wild1", "1"}}, {}, "d1");
 
   updateSubscriptionInterest({"foo"}, {});
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -347,7 +347,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbigu
   // make foo ambiguous and request it again
   updateSubscriptionInterest({}, {"foo"});
   updateSubscriptionInterest({"foo"}, {});
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -366,7 +366,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   // unsubscribing from unknown resource should keep the legacy
   // wildcard mode
   updateSubscriptionInterest({}, {"unknown"});
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_TRUE(req->resource_names_subscribe().empty());
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -382,7 +382,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
   deliverSimpleDiscoveryResponse({}, {"foo"}, "d1");
 
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_TRUE(req->resource_names_subscribe().empty());
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -404,12 +404,35 @@ TEST_P(DeltaSubscriptionStateTestBlank, ReconnectResourcesVersions) {
   deliverSimpleDiscoveryResponse({{"foo", "2"}, {"wild", "2"}}, {}, "d2");
 
   // Reconnect, and end validate the initial resources versions.
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
   EXPECT_THAT(req->initial_resource_versions(),
               UnorderedElementsAre(Pair("foo", "2"), Pair("bar", "1"), Pair("wild", "2")));
+}
+
+// Validates that if the reconnection notes that it should not send initial resource version,
+// then that field isn't populated.
+TEST_P(DeltaSubscriptionStateTestBlank, ReconnectAvoidResourcesVersions) {
+  // Subscribe to foo and bar.
+  updateSubscriptionInterest({WildcardStr, "foo", "bar"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  // Deliver foo, bar, and a wild with version 1.
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"wild", "1"}}, {}, "d1");
+
+  // Update the versions of foo and wild to 2.
+  deliverSimpleDiscoveryResponse({{"foo", "2"}, {"wild", "2"}}, {}, "d2");
+
+  // Reconnect, and end validate the initial resources versions.
+  markStreamFresh(false);
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
 }
 
 // Check that ambiguous resources may also receive a heartbeat message.
@@ -482,7 +505,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
   // Force a reconnection and resending of the "initial" message. If the initial_resource_versions
   // in the message contains resources like did-not-want or spam, we haven't ignored that as we
   // should.
-  markStreamFresh();
+  markStreamFresh(true);
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
@@ -550,7 +573,7 @@ TEST_P(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
   }
   {
     // On Reconnection, only "name4", "name5", "name6" are sent.
-    markStreamFresh();
+    markStreamFresh(true);
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name4", "name5", "name6"));
@@ -571,7 +594,7 @@ TEST_P(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   { // Simulate a stream reconnection, just to see the current resource_state_.
-    markStreamFresh();
+    markStreamFresh(true);
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name4", "name5", "name6"));
@@ -725,7 +748,7 @@ TEST_P(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
     EXPECT_CALL(*ttl_timer_, disableTimer());
     deliverDiscoveryResponse(add1_2, {}, "debugversion1");
-    markStreamFresh(); // simulate a stream reconnection
+    markStreamFresh(true); // simulate a stream reconnection
     auto cur_request = getNextRequestAckless();
     EXPECT_EQ("version1A", cur_request->initial_resource_versions().at("name1"));
     EXPECT_EQ("version2A", cur_request->initial_resource_versions().at("name2"));
@@ -741,7 +764,7 @@ TEST_P(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove2.Add() = "name2";
     EXPECT_CALL(*ttl_timer_, disableTimer()).Times(2);
     deliverDiscoveryResponse(add1_3, remove2, "debugversion2");
-    markStreamFresh(); // simulate a stream reconnection
+    markStreamFresh(true); // simulate a stream reconnection
     auto cur_request = getNextRequestAckless();
     EXPECT_EQ("version1B", cur_request->initial_resource_versions().at("name1"));
     EXPECT_EQ(cur_request->initial_resource_versions().end(),
@@ -755,7 +778,7 @@ TEST_P(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove1_3.Add() = "name1";
     *remove1_3.Add() = "name3";
     deliverDiscoveryResponse({}, remove1_3, "debugversion3");
-    markStreamFresh(); // simulate a stream reconnection
+    markStreamFresh(true); // simulate a stream reconnection
     auto cur_request = getNextRequestAckless();
     EXPECT_TRUE(cur_request->initial_resource_versions().empty());
   }
@@ -786,7 +809,7 @@ TEST_P(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   updateSubscriptionInterest({"name4"}, {"name1"});
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
@@ -810,7 +833,7 @@ TEST_P(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
 
   // switch into wildcard mode
   updateSubscriptionInterest({"name4", WildcardStr}, {"name1"});
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
@@ -826,7 +849,7 @@ TEST_P(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
       populateRepeatedResource({{"name4", "version4A"}, {"name5", "version5A"}});
   deliverDiscoveryResponse(add4_5, {}, "debugversion1");
 
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
@@ -851,7 +874,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
   EXPECT_CALL(*ttl_timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
@@ -872,7 +895,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   updateSubscriptionInterest({"name3"}, {});
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: see below
@@ -896,7 +919,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscriptio
   auto cur_request = getNextRequestAckless();
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
   EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   // Regarding the resource_names_subscribe field:
   // name1: do not include, see below
   // name2: do not include: it came from wildcard subscription we lost interest in, so we are not
@@ -926,7 +949,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscriptio
   cur_request = getNextRequestAckless();
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
   EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   // Regarding the resource_names_subscribe field:
   // name1: do not include: see name2
   // name2: do not include: it came as a part of wildcard subscription we cancelled, so we are not
@@ -948,7 +971,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
 
   // verify that neither name1 nor name2 appears in the initial request (they are of implicit
   // interest and initial wildcard request should not contain those).
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
@@ -963,7 +986,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
 
   // verify that name1 and * appear in the initial request (name1 is of explicit interest and we are
   // in explicit wildcard mode).
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   cur_request = getNextRequestAckless();
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
@@ -972,7 +995,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2_b =
       populateRepeatedResource({{"name1", "version1B"}, {"name2", "version2B"}});
   deliverDiscoveryResponse(add1_2_b, {}, "debugversion1");
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   cur_request = getNextRequestAckless();
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
@@ -992,7 +1015,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStream
   cur_request = getNextRequestAckless();
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
   EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("resource"));
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   cur_request = getNextRequestAckless();
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
@@ -1007,7 +1030,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStream
   cur_request = getNextRequestAckless();
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
   EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("resource"));
-  markStreamFresh(); // simulate a stream reconnection
+  markStreamFresh(true); // simulate a stream reconnection
   updateSubscriptionInterest({}, {});
   cur_request = getNextRequestAckless();
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
@@ -1025,7 +1048,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWil
   }
   {
     // On Reconnection, only "name4", "name5", "name6" and wildcard resource are sent.
-    markStreamFresh();
+    markStreamFresh(true);
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre(WildcardStr, "name4", "name5", "name6"));
@@ -1046,7 +1069,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWil
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   { // Simulate a stream reconnection, just to see the current resource_state_.
-    markStreamFresh();
+    markStreamFresh(true);
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre(WildcardStr, "name4", "name5", "name6"));
@@ -1069,7 +1092,7 @@ TEST_P(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
             {{"name1", "version1A"}, {"name2", "version2A"}, {"name3", "version3A"}});
     EXPECT_CALL(*ttl_timer_, disableTimer());
     deliverDiscoveryResponse(add_all, {}, "debugversion1");
-    markStreamFresh(); // simulate a stream reconnection
+    markStreamFresh(true); // simulate a stream reconnection
     auto cur_request = getNextRequestAckless();
     EXPECT_EQ("version1A", cur_request->initial_resource_versions().at("name1"));
     EXPECT_EQ("version2A", cur_request->initial_resource_versions().at("name2"));
@@ -1098,7 +1121,7 @@ TEST_P(DeltaSubscriptionStateTest, CheckUpdatePending) {
   EXPECT_FALSE(subscriptionUpdatePending());
   updateSubscriptionInterest({}, {}); // no change
   EXPECT_FALSE(subscriptionUpdatePending());
-  markStreamFresh();
+  markStreamFresh(true);
   EXPECT_TRUE(subscriptionUpdatePending());  // no change, BUT fresh stream
   updateSubscriptionInterest({}, {"name3"}); // one removed
   EXPECT_TRUE(subscriptionUpdatePending());
@@ -1250,7 +1273,7 @@ TEST_P(DeltaSubscriptionStateTest, NoVersionUpdateOnNack) {
     EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // Verify that a reconnect keeps the old versions.
-  markStreamFresh();
+  markStreamFresh(true);
   {
     auto req = getNextRequestAckless();
     EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("name1", "name2", "name3"));

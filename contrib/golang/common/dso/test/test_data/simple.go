@@ -62,6 +62,10 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64, decodingState *C.p
 	respHeaderNum, respHeaderBytes, respTrailerNum, respTrailerBytes uint64) {
 }
 
+//export envoyGoFilterOnHttpStreamComplete
+func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
+}
+
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 }

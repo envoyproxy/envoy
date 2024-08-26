@@ -263,8 +263,10 @@ jclass JniHelper::findClassFromCache(const char* class_name) {
   if (auto i = jclass_cache_map.find(class_name); i != jclass_cache_map.end()) {
     return i->second;
   }
+  // In the debug mode, the code will fail if the class is not in the cache since this is most
+  // likely due to a bug in the code. In the release mode, the code will use the non-caching class.
   ASSERT(false, absl::StrFormat("Unable to find class '%s'.", class_name));
-  return nullptr;
+  return env_->FindClass(class_name);
 }
 
 LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {

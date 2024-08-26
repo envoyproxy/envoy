@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
 #
 # Helper script to run tests under valgrind.  Usage:
 #    bazel test --run_under=`pwd`/tools/debugging/run-valgrind.sh ...
 #
 
-dir=$(dirname "$0")
+dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 # In order to add suppressions, it's helpful to run the tool in a mode
 # where it uses the suppressions file we have so far, but also
