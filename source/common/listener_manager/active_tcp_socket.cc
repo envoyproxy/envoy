@@ -105,8 +105,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
         }
         continueFilterChain(true);
       },
-      (*iter_)->maxReadBytes() == 0,
-      (*iter_)->maxReadBytes());
+      (*iter_)->maxReadBytes() == 0, (*iter_)->maxReadBytes());
 }
 
 void ActiveTcpSocket::continueFilterChain(bool success) {

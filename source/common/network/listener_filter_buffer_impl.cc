@@ -9,8 +9,7 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
                                                    Event::Dispatcher& dispatcher,
                                                    ListenerFilterBufferOnCloseCb close_cb,
                                                    ListenerFilterBufferOnDataCb on_data_cb,
-                                                   bool on_data_cb_disabled,
-                                                   uint64_t buffer_size)
+                                                   bool on_data_cb_disabled, uint64_t buffer_size)
     : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
       on_data_cb_(on_data_cb), on_data_cb_disabled_(on_data_cb_disabled),
       buffer_size_(on_data_cb_disabled ? 1 : buffer_size),
