@@ -134,7 +134,7 @@ public:
 };
 
 /**
- * Filter without buffer returns `Network::FilterStatus::StopIteration`
+ * Filter with on_data_cb disabled buffer returns `Network::FilterStatus::StopIteration`
  * from `onAccept`, then is recovered and returns success.
  */
 TEST_F(ActiveTcpListenerTest, ListenerFilterWithoutInspectData) {
@@ -408,7 +408,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
 }
 
 /**
- * Similar to above test, but with no buffer filter recovered by actively calling
+ * Similar to above test, but with no inspect data filter recovered by actively calling
  * continueFilterChain().
  */
 TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters3) {
@@ -515,7 +515,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters3) {
 /**
  * Trigger the file closed event.
  */
-TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose1) {
   initializeWithInspectFilter();
 
   // The filter stop the filter iteration and waiting for the data.
@@ -545,6 +545,36 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   // emit the read event
   EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
   EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_remote_close_.value(), 1);
+}
+
+/**
+ * Trigger the file closed event for listener filter with on_data_cb disabled.
+ */
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose2) {
+  initializeWithFilter();
+
+  // The filter stop the filter iteration and waiting for the data.
+  EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+  // ensure the listener filter buffer will register the file event.
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
+
+  // buffer is set to 1 for filter with on_data_cb disabled
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(1, Api::IoError::none()))));
+
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 }
 
 TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
