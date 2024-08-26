@@ -9,10 +9,11 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
                                                    Event::Dispatcher& dispatcher,
                                                    ListenerFilterBufferOnCloseCb close_cb,
                                                    ListenerFilterBufferOnDataCb on_data_cb,
+                                                   bool on_data_cb_disabled,
                                                    uint64_t buffer_size)
     : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
-      on_data_cb_(on_data_cb), zero_buffer_size_(buffer_size == 0),
-      buffer_size_(zero_buffer_size_ ? 1 : buffer_size),
+      on_data_cb_(on_data_cb), on_data_cb_disabled_(on_data_cb_disabled),
+      buffer_size_(on_data_cb_disabled ? 1 : buffer_size),
       buffer_(std::make_unique<uint8_t[]>(buffer_size_)), base_(buffer_.get()) {
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
 
@@ -102,7 +103,7 @@ absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ASSERT(events == Event::FileReadyType::Read);
 
   auto state = peekFromSocket();
-  if (state == PeekState::Done && !zero_buffer_size_) {
+  if (state == PeekState::Done && !on_data_cb_disabled_) {
     // buffer_size_ will be set to 1 if the first listener filter in
     // filter chain has maxReadBytes() of 0. Bypass onData callback of it.
     on_data_cb_(*this);

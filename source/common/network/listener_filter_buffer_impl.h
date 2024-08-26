@@ -31,7 +31,8 @@ class ListenerFilterBufferImpl : public ListenerFilterBuffer, Logger::Loggable<L
 public:
   ListenerFilterBufferImpl(IoHandle& io_handle, Event::Dispatcher& dispatcher,
                            ListenerFilterBufferOnCloseCb close_cb,
-                           ListenerFilterBufferOnDataCb on_data_cb, uint64_t buffer_size);
+                           ListenerFilterBufferOnDataCb on_data_cb,
+                           bool on_data_cb_disabled, uint64_t buffer_size);
 
   // ListenerFilterBuffer
   const Buffer::ConstRawSlice rawSlice() const override;
@@ -47,7 +48,7 @@ public:
   void activateFileEvent(uint32_t events);
   uint64_t capacity() const { return buffer_size_; }
   void resetCapacity(uint64_t size);
-  void setZeroBufferSize(bool zero_buffer_size) { zero_buffer_size_ = zero_buffer_size; }
+  void disableOnDataCallback(bool on_data_cb_disabled) { on_data_cb_disabled_ = on_data_cb_disabled; }
 
 private:
   absl::Status onFileEvent(uint32_t events);
@@ -57,7 +58,7 @@ private:
   ListenerFilterBufferOnCloseCb on_close_cb_;
   ListenerFilterBufferOnDataCb on_data_cb_;
 
-  bool zero_buffer_size_{};
+  bool on_data_cb_disabled_{};
   // The size of buffer;
   uint64_t buffer_size_;
   // The size of valid data.

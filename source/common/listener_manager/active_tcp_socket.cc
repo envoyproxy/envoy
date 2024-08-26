@@ -105,6 +105,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
         }
         continueFilterChain(true);
       },
+      (*iter_)->maxReadBytes() == 0,
       (*iter_)->maxReadBytes());
 }
 
@@ -134,7 +135,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
             createListenerFilterBuffer();
           }
           if ((*iter_)->maxReadBytes() > 0) {
-            listener_filter_buffer_->setZeroBufferSize(false);
+            listener_filter_buffer_->disableOnDataCallback(false);
             // If the current filter expect more data than previous filters, then
             // increase the filter buffer's capacity.
             if (listener_filter_buffer_->capacity() < (*iter_)->maxReadBytes()) {
@@ -149,7 +150,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               listener_filter_buffer_->activateFileEvent(Event::FileReadyType::Read);
             }
           } else {
-            listener_filter_buffer_->setZeroBufferSize(true);
+            listener_filter_buffer_->disableOnDataCallback(true);
           }
 
           return;
