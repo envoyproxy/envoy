@@ -169,8 +169,9 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
       envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
 
   // Set ignore_removal to true to prevent the cluster from being removed during a CDS update.
-  // Without this setting, the cluster would be removed during a CDS update as it would be considered a difference from the CDS.
-  // The cluster will be removed when it becomes idle. Ref: https://github.com/envoyproxy/envoy/issues/35171
+  // Without this setting, the cluster would be removed during a CDS update as it would be
+  // considered a difference from the CDS. The cluster will be removed when it becomes idle. Ref:
+  // https://github.com/envoyproxy/envoy/issues/35171
   config.set_ignore_removal(true);
 
   // Set endpoint.
@@ -309,7 +310,7 @@ void Cluster::onDnsHostAddOrUpdate(
 
   std::unique_ptr<Upstream::HostVector> hosts_added;
   addOrUpdateHost(host, host_info, hosts_added);
-  if (hosts_added != nullptr) { 
+  if (hosts_added != nullptr) {
     ASSERT(!hosts_added->empty());
     updatePriorityState(*hosts_added, {});
   }

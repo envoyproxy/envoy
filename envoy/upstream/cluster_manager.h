@@ -322,7 +322,8 @@ public:
   /**
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
    * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
-   * removed. This will remove cluster even if cluster's ignore_removal is set to true (useful for dynamic clusters created with custom implementation).
+   * removed. This will remove cluster even if cluster's ignore_removal is set to true (useful for
+   * dynamic clusters created with custom implementation).
    *
    * @return true if the action results in the removal of a cluster.
    */
