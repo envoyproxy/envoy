@@ -43,7 +43,7 @@ On the request and response path, it will check
 The extraction process in this filter is not on the critical path, as it does not
 modify the request or response. The filter extracts the specified fields,
 writes them to dynamic metadata, and then passes the request/response
-through without modification. 
+through without modification.
 
 Config Requirements
 -------------------
