@@ -106,15 +106,20 @@ public:
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
 
-  // Invoked when a new orca report is received for this LB context.
-  using OrcaLoadReportCb =
-      std::function<absl::Status(const xds::data::orca::v3::OrcaLoadReport& orca_load_report)>;
+  // Interface for callbacks when ORCA load reports are received from upstream.
+  class OrcaLoadReportCallbacks {
+  public:
+    virtual ~OrcaLoadReportCallbacks() = default;
+    // Invoked when a new orca report is received for this LB context.
+    virtual absl::Status
+    onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report) PURE;
+  };
 
   /**
    * Install a callback to be invoked when ORCA Load report is received for this
    * LB context.
    */
-  virtual void setOrcaLoadReportCb(OrcaLoadReportCb callback) PURE;
+  virtual void setOrcaLoadReportCallbacks(OrcaLoadReportCallbacks& callbacks) PURE;
 };
 
 /**

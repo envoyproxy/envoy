@@ -200,8 +200,8 @@ public:
       return wrapped_->overrideHostToSelect();
     }
 
-    void setOrcaLoadReportCb(OrcaLoadReportCb callback) override {
-      return wrapped_->setOrcaLoadReportCb(std::move(callback));
+    void setOrcaLoadReportCallbacks(OrcaLoadReportCallbacks& callbacks) override {
+      wrapped_->setOrcaLoadReportCallbacks(callbacks);
     }
 
   private:
