@@ -421,7 +421,8 @@ public:
    * @param proxy_response supplies proxy data in response to the client's request.
    * @param redis_client a handle to the fake redis client that sends the request.
    */
-  void proxyResponseOnlyStep(const std::string& proxy_response, IntegrationTcpClientPtr& redis_client);
+  void proxyResponseOnlyStep(const std::string& proxy_response,
+                             IntegrationTcpClientPtr& redis_client);
 
   /**
    * A single step of a larger test involving a fake Redis client and the proxy server.
@@ -564,7 +565,8 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto fake_auth_cluster = config_helper_.buildStaticCluster("fake_auth", 0, Network::Test::getLoopbackAddressString(ipVersion()));
+      auto fake_auth_cluster = config_helper_.buildStaticCluster(
+          "fake_auth", 0, Network::Test::getLoopbackAddressString(ipVersion()));
       ConfigHelper::setHttp2(fake_auth_cluster);
       *bootstrap.mutable_static_resources()->add_clusters() = fake_auth_cluster;
     });
@@ -572,10 +574,13 @@ public:
     RedisProxyIntegrationTest::initialize();
   }
 
-  void expectExternalAuthRequest(FakeHttpConnectionPtr& fake_upstream_connection, FakeStreamPtr& auth_request, const std::string password, const bool existing_connection = false) {
+  void expectExternalAuthRequest(FakeHttpConnectionPtr& fake_upstream_connection,
+                                 FakeStreamPtr& auth_request, const std::string password,
+                                 const bool existing_connection = false) {
     // Connect if not yet.
     if (!existing_connection) {
-      auto result = fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection);
+      auto result =
+          fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection);
       RELEASE_ASSERT(result, result.message());
     }
 
@@ -602,13 +607,16 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  void sendExternalAuthResponse(FakeStreamPtr& auth_request, const bool authorized, const int64_t expiration_epoch) {
+  void sendExternalAuthResponse(FakeStreamPtr& auth_request, const bool authorized,
+                                const int64_t expiration_epoch) {
     // Start the stream.
     auth_request->startGrpcStream();
 
     // Create the response
     envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse response;
-    response.mutable_status()->set_code(authorized ? Grpc::Status::WellKnownGrpcStatus::Ok : Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+    response.mutable_status()->set_code(authorized
+                                            ? Grpc::Status::WellKnownGrpcStatus::Ok
+                                            : Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
     auto* msg = response.mutable_message();
     *msg = authorized ? "Authorized" : "Unauthorized";
     response.mutable_expiration()->set_seconds(expiration_epoch);
@@ -665,7 +673,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithExternalAuthIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                          TestUtility::ipTestParamsToString);
+                         TestUtility::ipTestParamsToString);
 
 void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
@@ -734,12 +742,14 @@ void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstr
   redis_client->close();
 }
 
-void RedisProxyIntegrationTest::proxyRequestStep(const std::string& request, IntegrationTcpClientPtr& redis_client) {
+void RedisProxyIntegrationTest::proxyRequestStep(const std::string& request,
+                                                 IntegrationTcpClientPtr& redis_client) {
   redis_client->clearData();
   ASSERT_TRUE(redis_client->write(request));
 }
 
-void RedisProxyIntegrationTest::proxyResponseOnlyStep(const std::string& proxy_response, IntegrationTcpClientPtr& redis_client) {
+void RedisProxyIntegrationTest::proxyResponseOnlyStep(const std::string& proxy_response,
+                                                      IntegrationTcpClientPtr& redis_client) {
   redis_client->waitForData(proxy_response);
   // After sending the request to the proxy, the fake redis client should receive proxy_response.
   EXPECT_EQ(proxy_response, redis_client->data());
@@ -1562,7 +1572,9 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSent
   FakeStreamPtr auth_request2;
   expectExternalAuthRequest(fake_upstream_external_auth, auth_request2, "somepassword", true);
   auto expiration_time = timeSystem().systemTime() + std::chrono::seconds(2);
-  sendExternalAuthResponse(auth_request2, true, duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
+  sendExternalAuthResponse(
+      auth_request2, true,
+      duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
   proxyResponseOnlyStep("+OK\r\n", redis_client);
 
   // Further requests should be successful.
