@@ -907,7 +907,7 @@ TEST_F(OAuth2Test, CookieValidatorWithCookieDomain) {
        fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
       {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
       {Http::Headers::get().Cookie.get(),
-       absl::StrCat(cookie_names.oauth_hmac_, "=dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI=")},
+       absl::StrCat(cookie_names.oauth_hmac_, "zgWoFFmB6rbPHQQYQj35H+Fz+GYZgUrh/C48y0WHWRM=")},
   };
 
   auto cookie_validator =
