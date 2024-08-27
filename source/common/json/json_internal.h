@@ -35,9 +35,11 @@ public:
    * Serializes a string in JSON format, throwing an exception if not valid UTF-8.
    *
    * @param The raw string -- must be in UTF-8 format.
+   * @param replace_valid_utf8 If true, replace valid UTF-8 with a placeholder `U+FFFD`.
+   * Else, exception will be thrown if the string is not valid UTF-8.
    * @return A string suitable for inclusion in a JSON stream, including double-quotes.
    */
-  static std::string serialize(absl::string_view str);
+  static std::string serialize(absl::string_view str, bool replace_valid_utf8 = false);
 
   /*
    * Serializes a JSON string to a byte vector using the MessagePack serialization format.

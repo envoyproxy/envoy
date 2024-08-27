@@ -46,5 +46,15 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str);
  */
 absl::string_view stripDoubleQuotes(absl::string_view str);
 
+/**
+ * Sanitizes a string so it is suitable for JSON. Same as sanitize(), but
+ * exception will be suppressed.
+ * @param buffer a string in which an escaped string can be written, if needed.
+ * @param str the string to be translated
+ * @return the translated string_view, valid as long as both buffer and str are
+ *         valid.
+ */
+absl::string_view sanitizeExceptionFree(std::string& buffer, absl::string_view str);
+
 } // namespace Json
 } // namespace Envoy

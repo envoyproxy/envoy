@@ -47,7 +47,7 @@ static constexpr uint32_t needs_slow_sanitizer[256] = {
 // SPELLCHECKER(on)
 // clang-format on
 
-absl::string_view sanitize(std::string& buffer, absl::string_view str) {
+bool needSlowSanitize(absl::string_view str) {
   // Fast-path to see whether any escapes or utf-encoding are needed. If str has
   // only unescaped ascii characters, we can simply return it.
   //
@@ -62,7 +62,11 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
     // and backslash.
     need_slow |= needs_slow_sanitizer[static_cast<uint8_t>(c)];
   }
-  if (need_slow == 0) {
+  return need_slow != 0; // At least one character needs escaping.
+}
+
+absl::string_view sanitize(std::string& buffer, absl::string_view str) {
+  if (!needSlowSanitize(str)) {
     return str; // Fast path, should be executed most of the time.
   }
   TRY_ASSERT_MAIN_THREAD {
@@ -104,6 +108,14 @@ absl::string_view stripDoubleQuotes(absl::string_view str) {
            absl::StrCat("stripDoubleQuotes called on a str that lacks double-quotes: ", str));
   }
   return str;
+}
+
+absl::string_view sanitizeExceptionFree(std::string& buffer, absl::string_view str) {
+  if (!needSlowSanitize(str)) {
+    return str; // Fast path, should be executed most of the time.
+  }
+  buffer = Nlohmann::Factory::serialize(str, true);
+  return stripDoubleQuotes(buffer);
 }
 
 } // namespace Json
