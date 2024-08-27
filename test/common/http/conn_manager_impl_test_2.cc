@@ -3883,9 +3883,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationB
   setup(false, "");
   expectUhvTrailerCheck(
       HeaderValidator::ValidationResult::success(),
-      HeaderValidator::TransformationResult(
-          HeaderValidator::TransformationResult::Action::Reject,
-          "bad_trailer_map"));
+      HeaderValidator::TransformationResult(HeaderValidator::TransformationResult::Action::Reject,
+                                            "bad_trailer_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
