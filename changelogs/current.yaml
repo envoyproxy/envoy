@@ -242,7 +242,8 @@ new_features:
     the configured duration.
 - area: extension_discovery_service
   change: |
-    added ECDS support for :ref:`UDP session filters<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.
+    added ECDS support for :ref:`UDP session filters
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.
 - area: http3
   change: |
     ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.
