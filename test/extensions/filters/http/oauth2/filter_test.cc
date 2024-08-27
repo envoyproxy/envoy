@@ -988,7 +988,7 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
       test_time_,
-      CookieNames("BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"));
+      CookieNames("BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"), "");
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->canUpdateTokenByRefreshToken());
@@ -1990,7 +1990,7 @@ TEST_F(OAuth2Test, CookieValidatorInTransition) {
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
       test_time_,
-      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"});
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"}, "");
   cookie_validator->setParams(request_headers_base64only, "mock-secret");
   EXPECT_TRUE(cookie_validator->hmacIsValid());
 
