@@ -171,7 +171,7 @@ public:
   }
 
   // Validates the behavior of the cookie validator.
-  void expectValidCookies(const CookieNames& cookie_names) {
+  void expectValidCookies(const CookieNames& cookie_names, const std::string& cookie_domain) {
     // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
@@ -188,7 +188,8 @@ public:
          absl::StrCat(cookie_names.oauth_hmac_, "=dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI=")},
     };
 
-    auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
+    auto cookie_validator =
+        std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names, cookie_domain);
     EXPECT_EQ(cookie_validator->token(), "");
     EXPECT_EQ(cookie_validator->refreshToken(), "");
     cookie_validator->setParams(request_headers, "mock-secret");
@@ -881,13 +882,14 @@ TEST_F(OAuth2Test, AjaxDoesNotRedirect) {
 // Validates the behavior of the cookie validator.
 TEST_F(OAuth2Test, CookieValidator) {
   expectValidCookies(
-      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"});
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"}, "");
 }
 
 // Validates the behavior of the cookie validator with custom cookie names.
 TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
   expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires",
-                                 "CustomIdToken", "CustomRefreshToken"});
+                                 "CustomIdToken", "CustomRefreshToken"},
+                     "");
 }
 
 // Validates the behavior of the cookie validator when the combination of some fields could be same.
