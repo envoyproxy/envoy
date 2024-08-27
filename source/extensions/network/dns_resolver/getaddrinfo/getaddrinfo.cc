@@ -118,7 +118,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
   while (true) {
     PendingQuerySharedPtr next_query;
-    absl::optional<uint32_t> num_retries = absl::nullopt;
+    absl::optional<uint32_t> num_retries;
     const bool reresolve =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
     const bool treat_nodata_noname_as_success =
@@ -133,7 +133,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         break;
       }
 
-      auto pending_query_info = std::move(pending_queries_.front());
+      PendingQueryInfo pending_query_info = std::move(pending_queries_.front());
       next_query = pending_query_info.pending_query_;
       num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
@@ -167,20 +167,20 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         if (num_retries.has_value()) {
           (*num_retries)--;
         }
-        if (num_retries.has_value() && *num_retries > 0) {
+        if (!num_retries.has_value()) {
+          ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
+          pending_queries_.push_back({std::move(next_query), absl::nullopt});
+          continue;
+        }
+        if (*num_retries > 0) {
           ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
           pending_queries_.push_back({std::move(next_query), *num_retries});
           continue;
-        } else if (num_retries.has_value() && *num_retries == 0) {
-          ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
-                    *num_retries);
-          response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-        } else {
-          ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
-          pending_queries_.push_back({next_query, absl::nullopt});
-          continue;
         }
+        ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
+                  *num_retries);
+        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       } else if (treat_nodata_noname_as_success &&
                  (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
         // Treat NONAME and NODATA as DNS records with no results.
