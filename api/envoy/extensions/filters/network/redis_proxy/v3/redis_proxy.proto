@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.redis_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "google/protobuf/duration.proto";
@@ -25,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -353,6 +354,15 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
+
+  // External authentication configuration. If set, instead of validating username and password against ``downstream_auth_username`` and ``downstream_auth_password``,
+  // the filter will call an external gRPC service to authenticate the client.
+  // A typical usage of this feature is for situations where the password is a one-time token that needs to be validated against a remote service, like a sidecar.
+  // Expiration is also supported, which will disable any further commands from the client after the expiration time, unless a new AUTH command is received and the external auth service returns a new expiration time.
+  // If the external auth service returns an error, authentication is considered failed.
+  // If this setting is set together with ``downstream_auth_username`` and ``downstream_auth_password``, the external auth service will be source of truth, but those fields will still be used for downstream authentication to the cluster.
+  // The API is defined by :ref:`RedisProxyExternalAuthRequest <envoy_v3_api_msg_service.redis_auth.v3.RedisProxyExternalAuthRequest>`.
+  RedisExternalAuthProvider external_auth_provider = 10;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
@@ -369,4 +379,23 @@ message RedisProtocolOptions {
   // Upstream server username as defined by the ``user`` directive
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+}
+
+// RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.
+// This service will be called every time an AUTH command is received from a client.
+// If the service returns an error, authentication is considered failed.
+// If the service returns a success, the client is considered authenticated.
+// The service can also return an expiration timestamp, which will be used to disable any further
+// commands from the client after it passes, unless a new AUTH command is received and the
+// external auth service returns a new expiration timestamp.
+message RedisExternalAuthProvider {
+  // External auth gRPC service configuration.
+  // It will be called every time an AUTH command is received from a client.
+  config.core.v3.GrpcService grpc_service = 1;
+
+  // If set to true, the filter will expect an expiration timestamp in the response from the external
+  // auth service. This timestamp will be used to disable any further commands from the client after
+  // the expiration time, unless a new AUTH command is received and the external auth service returns
+  // a new expiration timestamp.
+  bool enable_auth_expiration = 2;
 }
