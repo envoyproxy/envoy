@@ -3880,7 +3880,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
 
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationBeforeResponse) {
   codec_->protocol_ = Protocol::Http11;
-  setup(false, "");
+  setup();
   expectUhvTrailerCheck(
       HeaderValidator::ValidationResult::success(),
       HeaderValidator::TransformationResult(HeaderValidator::TransformationResult::Action::Reject,
