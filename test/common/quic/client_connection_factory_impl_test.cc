@@ -134,6 +134,27 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+TEST_P(QuicNetworkConnectionTest, LocalAddress) {
+  initialize();
+  const int port = 30;
+  Network::Address::InstanceConstSharedPtr local_addr =
+      (GetParam() == Network::Address::IpVersion::v6)
+          ? Network::Utility::getIpv6LoopbackAddress()
+          : Network::Utility::getCanonicalIpv4LoopbackAddress();
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
+      dispatcher_, test_address_, local_addr, quic_stat_names_, {}, *store_.rootScope(), nullptr,
+      nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
+  EXPECT_EQ(Network::Connection::State::Open, client_connection->state());
+  EXPECT_THAT(client_connection->connectionInfoProvider().localAddress(), testing::NotNull());
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_P(QuicNetworkConnectionTest, Srtt) {
   initialize();
 
