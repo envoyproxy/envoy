@@ -136,25 +136,25 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
   return query_params;
 }
 
-std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string_view host,
+std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
                                 absl::string_view expires, absl::string_view token = "",
                                 absl::string_view id_token = "",
                                 absl::string_view refresh_token = "") {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
-      absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
+      absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
   std::string encoded_hmac;
   absl::Base64Escape(Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload)), &encoded_hmac);
   return encoded_hmac;
 }
 
-std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view host,
+std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
                              absl::string_view expires, absl::string_view token = "",
                              absl::string_view id_token = "",
                              absl::string_view refresh_token = "") {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
-      absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
+      absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
 
   std::string base64_encoded_hmac;
   std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
@@ -163,10 +163,10 @@ std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_vi
   return base64_encoded_hmac;
 }
 
-std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
+std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view domain,
                        absl::string_view expires, absl::string_view token = "",
                        absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
+  return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
 } // namespace
