@@ -296,8 +296,7 @@ message ExtAuthz {
   // added to StreamInfo's filter state under the namespace corresponding to the ext_authz filter
   // name.
   //
-  // If this is unset and ``emit_filter_state_stats`` is false, the filter will not emit any filter
-  // state.
+  // Only effective if ``emit_filter_state_stats`` is true.
   google.protobuf.Struct filter_metadata = 28;
 
   // When set to true, the filter will emit per-stream stats for access logging. The filter state
@@ -306,7 +305,7 @@ message ExtAuthz {
   // If using Envoy GRPC, emits latency, bytes sent / received, upstream info, and upstream cluster
   // info. If not using Envoy GRPC, emits only latency.
   //
-  // If this is false and ``filter_metadata`` is unset, the filter will not emit any filter state.
+  // If this is false the filter will not emit any filter state.
   bool emit_filter_state_stats = 29;
 }
 

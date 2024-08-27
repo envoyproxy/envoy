@@ -275,6 +275,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // Initiate a call to the authorization server since we are not disabled.
   initiateCall(headers);
+  ENVOY_LOG_MISC(debug, "filter return == stop ? {}" , filter_return_ == FilterReturn::StopDecoding);
   return filter_return_ == FilterReturn::StopDecoding
              ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
              : Http::FilterHeadersStatus::Continue;
@@ -382,8 +383,10 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if ((config_->filterMetadata().has_value() || config_->emitFilterStateStats()) &&
+  ENVOY_LOG_MISC(debug, "TRY ADD FILTER STATE");
+  if (config_->emitFilterStateStats() &&
       !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    ENVOY_LOG_MISC(debug, "ADD FILTER STATE AT {}", decoder_callbacks_->filterConfigName());
     filter_state->setData(decoder_callbacks_->filterConfigName(),
                           std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
                           Envoy::StreamInfo::FilterState::StateType::Mutable,
