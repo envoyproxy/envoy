@@ -19,13 +19,13 @@ rust_static_library(
     crate_root = "crates/c-api/src/lib.rs",
     edition = "2018",
     proc_macro_deps = [
-        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime:wasmtime_c_api_macros",
+        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:wasmtime-c-api-macros",
     ],
     deps = [
         ":helpers_lib",
-        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime",
-        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime:anyhow",
-        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime:env_logger",
-        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime:once_cell",
+        # "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote",
+        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:anyhow",
+        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:env_logger",
+        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:once_cell",
     ],
 )
