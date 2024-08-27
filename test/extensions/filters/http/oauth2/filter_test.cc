@@ -911,7 +911,7 @@ TEST_F(OAuth2Test, CookieValidatorSame) {
        absl::StrCat(cookie_names.oauth_hmac_, "=MSq8mkNQGdXx2LKGlLHMwSIj8rLZRnrHE6EWvvTUFx0=")},
   };
 
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names, "");
   EXPECT_EQ(cookie_validator->token(), "");
   cookie_validator->setParams(request_headers, "mock-secret");
 
