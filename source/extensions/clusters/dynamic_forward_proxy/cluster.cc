@@ -93,7 +93,9 @@ Cluster::~Cluster() {
     auto cluster_name = it->first;
     ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
     cluster_map_.erase(it++);
-    cm_.removeCluster(cluster_name);
+    // Instead of removeCluster(), use removeClusterAddedViaApi() to remove cluster with
+    // ignore_removal set to true
+    cm_.removeClusterAddedViaApi(cluster_name);
   }
 }
 

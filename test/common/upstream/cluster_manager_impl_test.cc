@@ -6501,6 +6501,58 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
             "gRPC client cluster 'added_via_api' is not static");
 }
 
+TEST_F(ClusterManagerImplTest, ClusterIgnoreRemoval) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: good
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: good
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  const std::string added_via_api_yaml = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  auto cluster = parseClusterFromV3Yaml(added_via_api_yaml);
+  cluster.set_ignore_removal(true);
+
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "v1"));
+
+  EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
+  EXPECT_TRUE(cluster_manager_->checkActiveStaticCluster("good").ok());
+
+  // This should not remove the cluster as ignore_removal set to true
+  EXPECT_FALSE(cluster_manager_->removeCluster("added_via_api"));
+  EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
+
+  // This should remove the cluster as removeClusterAddedViaApi will not consider ignore_removal
+  // attribute
+  EXPECT_TRUE(cluster_manager_->removeClusterAddedViaApi("added_via_api"));
+  EXPECT_EQ(1, cluster_manager_->clusters().active_clusters_.size());
+}
+
 #ifdef WIN32
 TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWin32) {
   const std::string yaml = fmt::format(R"EOF(
