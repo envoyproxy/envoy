@@ -199,9 +199,9 @@ private:
           (remote_end_stream_received_ && !remote_end_stream_forwarded_ && !response_trailers_));
     }
 
-    void sendDataToBridge(Buffer::Instance& data, bool end_stream);
-    void sendTrailersToBridge(const ResponseTrailerMap& trailers);
-    void sendErrorToBridge();
+    void sendData(Buffer::Instance& data, bool end_stream);
+    void sendTrailers(const ResponseTrailerMap& trailers);
+    void sendError();
     envoy_stream_intel streamIntel();
     envoy_final_stream_intel& finalStreamIntel();
 

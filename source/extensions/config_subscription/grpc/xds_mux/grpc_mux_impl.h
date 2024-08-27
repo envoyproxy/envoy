@@ -96,7 +96,9 @@ public:
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override { handleEstablishedStream(); }
-  void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }
+  void onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) override {
+    handleStreamEstablishmentFailure(next_attempt_may_send_initial_resource_version);
+  }
   void onWriteable() override { trySendDiscoveryRequests(); }
   void onDiscoveryResponse(std::unique_ptr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {
@@ -152,7 +154,7 @@ protected:
   S& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
-  void handleStreamEstablishmentFailure();
+  void handleStreamEstablishmentFailure(bool next_attempt_may_send_initial_resource_version);
   void genericHandleResponse(const std::string& type_url, const RS& response_proto,
                              ControlPlaneStats& control_plane_stats);
   void trySendDiscoveryRequests();
@@ -226,6 +228,10 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
+
+  // Used to track whether initial_resource_versions should be populated on the
+  // next reconnection.
+  bool should_send_initial_resource_versions_{true};
 
   bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is

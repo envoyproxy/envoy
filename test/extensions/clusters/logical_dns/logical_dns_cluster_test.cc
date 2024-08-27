@@ -607,6 +607,46 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 }
 
+TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
+  const std::string config = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  dns_jitter:
+    seconds: 0
+    nanos: 512000000
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  uint64_t random_return = 8000;
+  uint64_t jitter_ms = random_return % 512; // default value
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(config);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000 + jitter_ms), _));
+  ON_CALL(random_, random()).WillByDefault(Return(random_return));
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Success, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

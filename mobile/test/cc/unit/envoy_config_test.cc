@@ -6,6 +6,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 
 #include "test/test_common/utility.h"
 
@@ -409,8 +410,35 @@ private:
   mutable int count_ = 0;
 };
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
 TEST(TestConfig, AddNativeFilters) {
+  EngineBuilder engine_builder;
+
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
+
+  envoy::extensions::filters::http::buffer::v3::Buffer buffer;
+  buffer.mutable_max_request_bytes()->set_value(5242880);
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
+  std::string serialized_buffer;
+  buffer.SerializeToString(&serialized_buffer);
+  typed_config.set_value(serialized_buffer);
+
+  engine_builder.addNativeFilter(filter_name1, typed_config);
+  engine_builder.addNativeFilter(filter_name2, typed_config);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string hcm_config =
+      bootstrap->static_resources().listeners(0).api_listener().DebugString();
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name1));
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name2));
+  EXPECT_THAT(hcm_config,
+              HasSubstr("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer"));
+  EXPECT_THAT(hcm_config, HasSubstr(std::to_string(5242880)));
+}
+
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+TEST(TestConfig, AddTextProtoNativeFilters) {
   EngineBuilder engine_builder;
 
   std::string filter_name1 = "envoy.filters.http.buffer1";
