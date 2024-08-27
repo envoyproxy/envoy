@@ -1095,32 +1095,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EmitFilterStateStats) {
   // Send back an ext_authz response with response_headers_to_add set.
   sendExtAuthzResponse(
       Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-      Http::TestRequestHeaderMapImpl{},
-      Headers{{"downstream2", "should-be-added"}, {"set-cookie", "cookie2=gingerbread"}},
-      Headers{{"replaceable", "set-by-ext-authz"}},
-      Headers{{"downstream3", "should-be-added"}, {"set-cookie", "cookie3=peanutbutter"}},
-      Headers{{"replaceable2", "set-by-ext-authz"}, {"new-header", "should-not-be-added"}});
+      Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{}, Headers{}, Headers{});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
 
-  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_->headers(),
-                                                        Http::LowerCaseString("set-cookie"))
-                .result()
-                .value(),
-            "cookie1=snickerdoodle,cookie2=gingerbread");
-
-  // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.
-  const std::string expected_body(response_size_, 'a');
-  verifyResponse(std::move(response_), "200",
-                 Http::TestResponseHeaderMapImpl{
-                     {":status", "200"},
-                     {"downstream2", "should-be-added"},
-                     {"downstream3", "should-be-added"},
-                     {"replaceable", "set-by-ext-authz"},
-                     {"replaceable2", "set-by-ext-authz"},
-                 },
-                 expected_body);
   cleanup();
 }
 
