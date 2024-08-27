@@ -1043,6 +1043,10 @@ case $CI_TARGET in
                  --trigger-inputs="$INPUTS"
         ;;
 
+    refresh_compdb)
+        "${CURRENT_SCRIPT_DIR}/../tools/vscode/refresh_compdb.sh"
+        ;;
+
     *)
         echo "Invalid do_ci.sh target (${CI_TARGET}), see ci/README.md for valid targets."
         exit 1

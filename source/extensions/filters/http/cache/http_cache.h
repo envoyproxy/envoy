@@ -39,16 +39,15 @@ struct LookupResult {
   // header with this value, replacing any preexisting content-length header.
   // (This lets us dechunk responses as we insert them, then later serve them
   // with a content-length header.)
-  uint64_t content_length_;
+  // If the cache entry is still populating, and the cache supports streaming,
+  // and the response had no content-length header, the content length may be
+  // unknown at lookup-time.
+  absl::optional<uint64_t> content_length_;
 
   // If the request is a range request, this struct indicates if the ranges can
   // be satisfied and which ranges are requested. nullopt indicates that this is
   // not a range request or the range header has been ignored.
   absl::optional<RangeDetails> range_details_;
-
-  // TODO(toddmgreer): Implement trailer support.
-  // True if the cached response has trailers.
-  bool has_trailers_ = false;
 
   // Update the content length of the object and its response headers.
   void setContentLength(uint64_t new_length) {
@@ -97,8 +96,8 @@ public:
   // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                ResponseMetadata&& metadata, uint64_t content_length,
-                                bool has_trailers) const;
+                                ResponseMetadata&& metadata,
+                                absl::optional<uint64_t> content_length) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
@@ -123,8 +122,8 @@ struct CacheInfo {
   bool supports_range_requests_ = false;
 };
 
-using LookupBodyCallback = std::function<void(Buffer::InstancePtr&&)>;
-using LookupHeadersCallback = std::function<void(LookupResult&&)>;
+using LookupBodyCallback = std::function<void(Buffer::InstancePtr&&, bool end_stream)>;
+using LookupHeadersCallback = std::function<void(LookupResult&&, bool end_stream)>;
 using LookupTrailersCallback = std::function<void(Http::ResponseTrailerMapPtr&&)>;
 using InsertCallback = std::function<void(bool success_ready_for_more)>;
 
@@ -192,6 +191,14 @@ class LookupContext {
 public:
   // Get the headers from the cache. It is a programming error to call this
   // twice.
+  // In the case that a cache supports shared streaming (serving content from
+  // the cache entry while it is still being populated), and a range request is made
+  // for a streaming entry that didn't have a content-length header from upstream, range
+  // requests may be unable to receive a response until the content-length is
+  // known to exceed the end of the requested range. In this case a cache
+  // implementation should wait until that is known before calling the callback,
+  // and must pass a LookupResult with range_details_->satisfiable_ = false
+  // if the request is invalid.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next fragment from the cache, calling cb when the fragment is ready.
@@ -199,9 +206,19 @@ public:
   //
   // The cache must call cb with a range of bytes starting at range.start() and
   // ending at or before range.end(). Caller is responsible for tracking what
-  // ranges have been received, what to request next, and when to stop. A cache
-  // can report an error, and cause the response to be aborted, by calling cb
-  // with nullptr.
+  // ranges have been received, what to request next, and when to stop.
+  //
+  // A request may have a range that exceeds the size of the content, in support
+  // of a "shared stream" cache entry, where the request may not know the size of
+  // the content in advance. In this case the cache should call cb with
+  // end_stream=true when the end of the body is reached, if there are no trailers.
+  //
+  // If there are trailers *and* the size of the content was not known when the
+  // LookupContext was created, the cache should pass a null buffer pointer to the
+  // LookupBodyCallback (when getBody is called with a range starting beyond the
+  // end of the actual content-length) to indicate that no more body is available
+  // and the filter should request trailers. It is invalid to pass a null buffer
+  // pointer other than in this case.
   //
   // If a cache happens to load data in fragments of a set size, it may be
   // efficient to respond with fewer than the requested number of bytes. For
@@ -213,7 +230,8 @@ public:
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
   virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) PURE;
 
-  // Get the trailers from the cache. Only called if LookupResult::has_trailers == true. The
+  // Get the trailers from the cache. Only called if the request reached the end of
+  // the body and LookupBodyCallback did not pass true for end_stream. The
   // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 
@@ -244,6 +262,10 @@ class HttpCache {
 public:
   // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
   // miss, the returned LookupContext will be given to the insert call (if any).
+  //
+  // It is possible for a cache to make a "shared stream" of responses allowing
+  // read access to a cache entry before its write is complete. In this case the
+  // content-length value may be unset.
   virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
                                              Http::StreamDecoderFilterCallbacks& callbacks) PURE;
 

@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 58]
+// [#next-free-field: 59]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -955,6 +955,17 @@ message Cluster {
   // this setting is ignored.
   google.protobuf.Duration dns_refresh_rate = 16
       [(validate.rules).duration = {gt {nanos: 1000000}}];
+
+  // DNS jitter can be optionally specified if the cluster type is either
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
+  // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
+  // There will be no jitter if this value is omitted. For cluster types other than
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
+  // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
+  // this setting is ignored.
+  google.protobuf.Duration dns_jitter = 58;
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
