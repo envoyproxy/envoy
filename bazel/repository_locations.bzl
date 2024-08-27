@@ -502,15 +502,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QAT-ZSTD-Plugin",
         project_desc = "Intel® QuickAssist Technology ZSTD Plugin (QAT ZSTD Plugin)",
         project_url = "https://github.com/intel/QAT-ZSTD-Plugin/",
-        version = "0.1.0",
-        sha256 = "74c5bfbb3b0c6f1334e128ee0b43958d1d34751a4762e54e8f970c443e445f33",
+        version = "0.2.0",
+        sha256 = "e42e2ac9aeb01d812f9a3156b3b85df6ee29670a5968b9d231b0139fba97f287",
         strip_prefix = "QAT-ZSTD-Plugin-{version}",
         urls = ["https://github.com/intel/QAT-ZSTD-Plugin/archive/refs/tags/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.compression.qatzstd.compressor",
         ],
-        release_date = "2023-09-08",
+        release_date = "2024-08-26",
         cpe = "N/A",
     ),
     com_github_luajit_luajit = dict(
