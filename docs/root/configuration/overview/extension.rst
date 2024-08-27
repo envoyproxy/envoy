@@ -65,7 +65,7 @@ re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_m
 If the configuration is missing a local HTTP response with '500' status code will be returned.
 
 UDP Session filters
-^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
 
 For UDP session filters, UDP proxy supports :ref:`dynamic filter
 re-configuration<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.

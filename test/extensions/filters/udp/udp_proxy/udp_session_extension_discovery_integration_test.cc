@@ -59,10 +59,12 @@ typed_config:
 
       auto* discovery = session_filter->mutable_config_discovery();
       discovery->add_type_urls(
-          "type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionFilterConfig");
+          "type.googleapis.com/"
+          "test.extensions.filters.udp.udp_proxy.session_filters.DrainerUdpSessionFilterConfig");
 
       if (set_default_config) {
-        auto default_configuration = Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig();
+        auto default_configuration =
+            Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig();
         default_configuration.set_downstream_bytes_to_drain(default_bytes_to_drain_);
         default_configuration.set_upstream_bytes_to_drain(default_bytes_to_drain_);
         default_configuration.set_stop_iteration_on_new_session(false);
@@ -95,20 +97,21 @@ typed_config:
   }
 
   void addStaticFilter(const std::string& name, uint32_t bytes_to_drain) {
-    config_helper_.addConfigModifier([name, bytes_to_drain](ConfigHelper::UdpProxyConfig& udp_proxy) {
-      auto* session_filter = udp_proxy.add_session_filters();
-      session_filter->set_name(name);
+    config_helper_.addConfigModifier(
+        [name, bytes_to_drain](ConfigHelper::UdpProxyConfig& udp_proxy) {
+          auto* session_filter = udp_proxy.add_session_filters();
+          session_filter->set_name(name);
 
-      auto configuration = Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig();
-      configuration.set_downstream_bytes_to_drain(bytes_to_drain);
-      configuration.set_upstream_bytes_to_drain(bytes_to_drain);
-      configuration.set_stop_iteration_on_new_session(false);
-      configuration.set_stop_iteration_on_first_read(false);
-      configuration.set_continue_filter_chain(false);
-      configuration.set_stop_iteration_on_first_write(false);
+          auto configuration = Extensions::UdpFilters::UdpProxy::SessionFilters::DrainerConfig();
+          configuration.set_downstream_bytes_to_drain(bytes_to_drain);
+          configuration.set_upstream_bytes_to_drain(bytes_to_drain);
+          configuration.set_stop_iteration_on_new_session(false);
+          configuration.set_stop_iteration_on_first_read(false);
+          configuration.set_continue_filter_chain(false);
+          configuration.set_stop_iteration_on_first_write(false);
 
-      session_filter->mutable_typed_config()->PackFrom(configuration);
-    });
+          session_filter->mutable_typed_config()->PackFrom(configuration);
+        });
   }
 
   void addEcdsCluster(const std::string& cluster_name) {
@@ -285,9 +288,9 @@ typed_config:
     test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", active_sessions_);
   }
 
-  void requestResponseWithListenerAddress(
-      const Network::Address::Instance& listener_address, std::string request,
-      std::string expected_request, std::string response, std::string expected_response) {
+  void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
+                                          std::string request, std::string expected_request,
+                                          std::string response, std::string expected_response) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
     client.write(request, listener_address);
@@ -594,16 +597,20 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNam
   // Send 1st config update.
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload", 1);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload", 1);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
+                                 1);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
+                                 1);
   // The two filters drain 3 + 4  bytes.
   sendDataVerifyResults(7);
 
   // Send 2nd config update.
   sendXdsResponse("foo", "2", 4);
   sendXdsResponse("bar", "2", 5, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload", 2);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload", 2);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
+                                 2);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
+                                 2);
   // The two filters drain 4 + 5  bytes.
   sendDataVerifyResults(9);
 }
@@ -733,8 +740,10 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTy
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload", 1);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload", 1);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
+                                 1);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
+                                 1);
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -782,8 +791,10 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWi
 
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload", 1);
-  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload", 1);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.foo.config_reload",
+                                 1);
+  test_server_->waitForCounterGe("extension_config_discovery.udp_session_filter.bar.config_reload",
+                                 1);
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200",
             request("admin", "GET", "/config_dump?resource=ecds_filters&name_regex=.a.", response));
@@ -855,8 +866,9 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToEx
   test_server_->waitForCounterGe(
       "extension_config_discovery.udp_session_filter." + filter_name_ + ".config_reload", 2);
 
-  // Using the same client to send another datagram. It should not create a new session, and the number of
-  // bytes drained should not change, as the new configuration does not apply to the existing session.
+  // Using the same client to send another datagram. It should not create a new session, and the
+  // number of bytes drained should not change, as the new configuration does not apply to the
+  // existing session.
   client.write(request, *listener_address);
   Network::UdpRecvData request_datagram2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram2));
