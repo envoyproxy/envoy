@@ -7,10 +7,42 @@
 #include "envoy/buffer/buffer.h"
 
 #include "absl/strings/string_view.h"
+#include "source/common/json/json_sanitizer.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Json {
+
+class Constants {
+public:
+  // Constants for common JSON values.
+  static constexpr absl::string_view True = R"(true)";
+  static constexpr absl::string_view False = R"(false)";
+  static constexpr absl::string_view Null = R"(null)";
+
+  // Constants for JSON delimiters.
+  static constexpr absl::string_view MapBeg = R"({)";
+  static constexpr absl::string_view MapEnd = R"(})";
+  static constexpr absl::string_view ArrayBeg = R"([)";
+  static constexpr absl::string_view ArrayEnd = R"(])";
+  static constexpr absl::string_view Quote = R"(")";
+  static constexpr absl::string_view Comma = R"(,)";
+};
+
+using BufferOutput = Envoy::Buffer::Instance;
+
+class StringOutput {
+public:
+  StringOutput(size_t initial_buffer_size = 2048) { buffer_.reserve(initial_buffer_size); }
+
+  void addFragments(absl::Span<const absl::string_view> fragments) {
+    for (absl::string_view fragment : fragments) {
+      buffer_.append(fragment.data(), fragment.size());
+    }
+  }
+  std::string buffer_;
+};
 
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
@@ -19,17 +51,17 @@ namespace Json {
  * require building an intermediate data structure with redundant copies of all
  * strings, maps, and arrays.
  */
-class Streamer {
+template <class OutputType> class StreamerBase {
 public:
   using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool>;
 
   /**
-   * @param response The buffer in which to stream output. Note: this buffer can
-   *                 be flushed during population; it is not necessary to hold
-   *                 the entire json structure in memory before streaming it to
-   *                 the network.
+   * @param output The buffer in which to stream output. Note: this buffer can
+   *               be flushed during population; it is not necessary to hold
+   *               the entire json structure in memory before streaming it to
+   *               the network.
    */
-  explicit Streamer(Buffer::Instance& response) : response_(response) {}
+  explicit StreamerBase(Buffer::Instance& output) : output_(output) {}
 
   class Array;
   using ArrayPtr = std::unique_ptr<Array>;
@@ -42,7 +74,7 @@ public:
    */
   class Level {
   public:
-    Level(Streamer& streamer, absl::string_view opener, absl::string_view closer);
+    Level(StreamerBase& streamer, absl::string_view opener, absl::string_view closer);
     virtual ~Level();
 
     /**
@@ -94,6 +126,8 @@ public:
     void addBool(bool b);
 
   protected:
+    friend StreamerBase;
+
     /**
      * Initiates a new field, serializing a comma separator if this is not the
      * first one.
@@ -110,10 +144,10 @@ public:
     void addValue(const Value& value);
 
   private:
-    friend Streamer;
+    friend StreamerBase;
 
     bool is_first_{true}; // Used to control whether a comma-separator is added for a new entry.
-    Streamer& streamer_;
+    StreamerBase& streamer_;
     absl::string_view closer_;
   };
   using LevelPtr = std::unique_ptr<Level>;
@@ -127,7 +161,7 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    Map(Streamer& streamer) : Level(streamer, "{", "}") {}
+    Map(StreamerBase& streamer) : Level(streamer, "{", "}") {}
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
@@ -161,7 +195,7 @@ public:
    */
   class Array : public Level {
   public:
-    Array(Streamer& streamer) : Level(streamer, "[", "]") {}
+    Array(StreamerBase& streamer) : Level(streamer, "[", "]") {}
     using Entries = absl::Span<const Value>;
 
     /**
@@ -220,7 +254,7 @@ private:
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) { response_.addFragments({str}); }
+  void addConstantString(absl::string_view str) { output_.addFragments({str}); }
 
 #ifndef NDEBUG
   /**
@@ -239,7 +273,7 @@ private:
   void pop(Level* level);
 #endif
 
-  Buffer::Instance& response_;
+  OutputType& output_;
   std::string sanitize_buffer_;
 
 #ifndef NDEBUG
@@ -248,6 +282,8 @@ private:
   std::stack<Level*> levels_;
 #endif
 };
+
+using Streamer = StreamerBase<BufferOutput>;
 
 } // namespace Json
 } // namespace Envoy
