@@ -931,10 +931,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   if ((existing_active_cluster != active_clusters_.end() &&
        existing_active_cluster->second->added_via_api_ &&
-       !existing_active_cluster->second->cluster().info()->ignoreRemoval()) ||
+       !existing_active_cluster->second->ignore_removal_) ||
       (existing_warming_cluster != warming_clusters_.end() &&
        existing_warming_cluster->second->added_via_api_ &&
-       !existing_active_cluster->second->cluster().info()->ignoreRemoval())) {
+       !existing_active_cluster->second->ignore_removal_)) {
     return removeClusterAddedViaApi(cluster_name);
   }
   return false;
