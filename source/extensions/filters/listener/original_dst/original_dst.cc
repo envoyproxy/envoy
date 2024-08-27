@@ -24,7 +24,14 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
 
   switch (socket.addressType()) {
   case Network::Address::Type::Ip: {
-    Network::Address::InstanceConstSharedPtr original_local_address = getOriginalDst(socket);
+    Network::Address::InstanceConstSharedPtr original_local_address;
+
+    if (Network::Utility::isTransparent(socket)) {
+      original_local_address = socket.connectionInfoProvider().localAddress();
+    } else {
+      original_local_address = getOriginalDst(socket);
+    }
+
     // A listener that has the use_original_dst flag set to true can still receive
     // connections that are NOT redirected using iptables. If a connection was not redirected,
     // the address returned by getOriginalDst() matches the local address of the new socket.
