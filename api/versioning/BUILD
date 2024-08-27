@@ -299,6 +299,7 @@ proto_library(
         "//envoy/service/metrics/v3:pkg",
         "//envoy/service/rate_limit_quota/v3:pkg",
         "//envoy/service/ratelimit/v3:pkg",
+        "//envoy/service/redis_auth/v3:pkg",
         "//envoy/service/route/v3:pkg",
         "//envoy/service/runtime/v3:pkg",
         "//envoy/service/secret/v3:pkg",

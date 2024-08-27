@@ -52,6 +52,15 @@ MockInstance::MockInstance() = default;
 MockInstance::~MockInstance() = default;
 
 } // namespace CommandSplitter
+
+namespace ExternalAuth {
+MockExternalAuthClient::MockExternalAuthClient() = default;
+MockExternalAuthClient::~MockExternalAuthClient() = default;
+
+MockAuthenticateCallback::MockAuthenticateCallback() = default;
+MockAuthenticateCallback::~MockAuthenticateCallback() = default;
+} // namespace ExternalAuth
+
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

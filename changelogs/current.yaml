@@ -252,5 +252,9 @@ new_features:
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
+- area: redis_proxy
+  change: |
+    Added :ref:`external_auth_provider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    external authentication for redis proxy.
 
 deprecated:
