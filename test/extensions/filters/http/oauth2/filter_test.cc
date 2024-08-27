@@ -893,7 +893,7 @@ TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
 }
 
 // Validates the behavior of the cookie validator with custom cookie domain.
-TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
+TEST_F(OAuth2Test, CookieValidatorWithCookieDomain) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
