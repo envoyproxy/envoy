@@ -93,7 +93,8 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
 
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if ((callback_state_ == CallbackState::HeadersCallback) ||
-      (callback_state_ == CallbackState::StreamedBodyCallback && filter_.config().sendBodyWithoutWaitingForHeaderResponse())) {
+      (callback_state_ == CallbackState::StreamedBodyCallback &&
+       filter_.config().sendBodyWithoutWaitingForHeaderResponse())) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
@@ -125,6 +126,11 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
             MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
           });
         }
+      }
+
+      if (body_mode_ == ProcessingMode::STREAMED &&
+          filter_.config().sendBodyWithoutWaitingForHeaderResponse()) {
+        header_resp_with_replace_ = true;
       }
       // Once this message is received, we won't send anything more on this request
       // or response to the processor. Clear flags to make sure.
@@ -226,9 +232,10 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 }
 
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
-  if (body_mode_ == ProcessingMode::NONE) {
-    // If body processing mode is none, and a body response is received,
-    // just ignore it.
+  if (header_resp_with_replace_) {
+    // If header response has CONTINUE_AND_REPLACE status, and some body response is received,
+    // this means some body chunks are already sent to the server before header response is
+    // received. just ignore body response in this case.
     return absl::OkStatus();
   }
 
@@ -390,9 +397,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
   }
 }
 
-void ProcessorState::clearStreamingChunk() {
-  chunk_queue_.clear();
-}
+void ProcessorState::clearStreamingChunk() { chunk_queue_.clear(); }
 
 void ProcessorState::clearAsyncState() {
   onFinishProcessorCall(Grpc::Status::Aborted);

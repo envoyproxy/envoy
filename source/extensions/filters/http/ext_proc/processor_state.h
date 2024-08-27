@@ -80,8 +80,9 @@ public:
                           const std::vector<std::string>& typed_forwarding_namespaces,
                           const std::vector<std::string>& untyped_receiving_namespaces)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
-        complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        partial_body_processed_(false), traffic_direction_(traffic_direction),
+        complete_body_available_(false), trailers_available_(false),
+        header_resp_with_replace_(false), body_replaced_(false), partial_body_processed_(false),
+        traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces) {}
@@ -154,7 +155,8 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
-  absl::Status processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  absl::Status
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
   absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
   absl::Status
@@ -237,8 +239,13 @@ protected:
   bool complete_body_available_ : 1;
   // If true, then the filter received the trailers
   bool trailers_available_ : 1;
-  // If true, then a CONTINUE_AND_REPLACE status was used on a response
+
+  // If true, then a CONTINUE_AND_REPLACE status was used on a header response.
+  bool header_resp_with_replace_ : 1;
+
+  // If true, then a CONTINUE_AND_REPLACE status was used on a response, and body is replaced.
   bool body_replaced_ : 1;
+
   // If true, we are in "buffered partial" mode and we already reached the buffer
   // limit, sent the body in a message, and got back a reply.
   bool partial_body_processed_ : 1;

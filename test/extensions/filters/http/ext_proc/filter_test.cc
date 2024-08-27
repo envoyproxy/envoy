@@ -3975,18 +3975,17 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
   processing_mode:
     request_header_mode: "SKIP"
     response_body_mode: "STREAMED"
-  send_body_before_recv_header_resp: true
+  send_body_without_waiting_for_header_response: true
   )EOF");
 
-  EXPECT_EQ(config_->sendBodyBeforeRecvHeaderResp(), true);
+  EXPECT_EQ(config_->sendBodyWithoutWaitingForHeaderResponse(), true);
 
   // Create synthetic HTTP request
   HttpTestUtility::addDefaultHeaders(request_headers_);
   request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  // processRequestHeaders(false, absl::nullopt);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -3994,7 +3993,6 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  //  processResponseHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -4009,6 +4007,7 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
+  // processResponseHeaders(false, absl::nullopt);
   // Send the 1st body response which include header response.
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
@@ -4029,7 +4028,7 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
     processResponseBody(
         [&want_response_body, i](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
           auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-          std::string new_body = absl::StrCat(" ",std::to_string(i)," ");
+          std::string new_body = absl::StrCat(" ", std::to_string(i), " ");
           body_mut->set_body(new_body);
           want_response_body.add(new_body);
         },
@@ -4047,7 +4046,6 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
   filter_->onDestroy();
 }
-
 
 // Verify if ext_proc filter is in the upstream filter chain, and if the ext_proc server
 // sends back response with clear_route_cache set to true, it is ignored.

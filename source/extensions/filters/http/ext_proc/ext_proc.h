@@ -216,7 +216,9 @@ public:
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
-  bool sendBodyWithoutWaitingForHeaderResponse() const { return send_body_without_waiting_for_header_response_; }
+  bool sendBodyWithoutWaitingForHeaderResponse() const {
+    return send_body_without_waiting_for_header_response_;
+  }
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
