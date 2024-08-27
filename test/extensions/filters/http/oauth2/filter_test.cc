@@ -894,6 +894,11 @@ TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
 
 // Validates the behavior of the cookie validator with custom cookie domain.
 TEST_F(OAuth2Test, CookieValidatorWithCookieDomain) {
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  auto cookie_names =
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"};
+  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 5;
+
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
@@ -905,9 +910,8 @@ TEST_F(OAuth2Test, CookieValidatorWithCookieDomain) {
        absl::StrCat(cookie_names.oauth_hmac_, "=dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI=")},
   };
 
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_,
-      CookieNames("BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"), "example.com");
+  auto cookie_validator =
+      std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names, "example.com");
 
   EXPECT_EQ(cookie_validator->token(), "");
   EXPECT_EQ(cookie_validator->refreshToken(), "");
