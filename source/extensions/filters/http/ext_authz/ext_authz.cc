@@ -403,8 +403,10 @@ void Filter::updateLoggingInfo() {
   }
 
   // Latency is the only stat available if we aren't using envoy grpc.
-  logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
-      decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
+  if (start_time_.has_value()) {
+    logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
+        decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
+  }
 
   if (!config_->clientIsEnvoyGrpc()) {
     return;
