@@ -73,6 +73,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dispatcher
+  change: |
+    Update approximate now after polling instead of before polling. This is only used by QUIC.
+    The behavior can be reverted by setting ``envoy.restart_features.fix_dispatcher_approximate_now`` to false.
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
