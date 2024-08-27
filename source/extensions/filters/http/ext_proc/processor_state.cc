@@ -93,7 +93,8 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
 
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if ((callback_state_ == CallbackState::HeadersCallback) ||
-      handleHeaderRespInNonHeaderState(callback_state_)) {
+      ((callback_state_ == CallbackState::StreamedBodyCallback) &&
+       filter_.config().sendBodyWithoutWaitingForHeaderResponse() && send_headers_)) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
@@ -127,14 +128,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         }
       }
 
-      if (handleHeaderRespInNonHeaderState(callback_state_)) {
-        // With response status as CONTINUE_AND_REPLACE, the external processing in
-        // this direction is completed. Clear any data left over in the chunk queue.
-        clearStreamingChunk();
-        // Set this flag to true so if later on there is any body response received
-        // from the side stream server, they will be ignored.
-        header_resp_with_replace_ = true;
-      }
+      // In case any data left over in the chunk queue, clear them.
+      clearStreamingChunk();
       // Once this message is received, we won't send anything more on this request
       // or response to the processor. Clear flags to make sure.
       body_mode_ = ProcessingMode::NONE;
@@ -233,11 +228,6 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 }
 
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
-  if (header_resp_with_replace_) {
-    // With this flag set to true, the body response
-    return absl::OkStatus();
-  }
-
   bool should_continue = false;
   const auto& common_response = response.response();
   if (callback_state_ == CallbackState::BufferedBodyCallback ||
@@ -394,14 +384,6 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
   if (queueOverHighLimit()) {
     requestWatermark();
   }
-}
-
-void ProcessorState::clearStreamingChunk() { chunk_queue_.clear(); }
-
-bool ProcessorState::handleHeaderRespInNonHeaderState(CallbackState callback_state) {
-  return ((callback_state == CallbackState::StreamedBodyCallback) &&
-          filter_.config().sendBodyWithoutWaitingForHeaderResponse() &&
-          send_headers_);
 }
 
 void ProcessorState::clearAsyncState() {
