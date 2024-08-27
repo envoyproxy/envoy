@@ -49,7 +49,7 @@ public:
   }
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
-  bool isConnected() const override;
+  bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,

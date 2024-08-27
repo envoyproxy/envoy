@@ -29,7 +29,7 @@ IoSocketHandleBaseImpl::~IoSocketHandleBaseImpl() {
 
 bool IoSocketHandleBaseImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
-bool IoSocketHandleBaseImpl::isConnected() const { return is_connected_; }
+bool IoSocketHandleBaseImpl::wasConnected() const { return was_connected_; }
 
 bool IoSocketHandleBaseImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();

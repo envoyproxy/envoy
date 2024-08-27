@@ -289,13 +289,13 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321, nullptr);
   auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
   EXPECT_TRUE(connection_socket->isOpen());
-  EXPECT_TRUE(connection_socket->ioHandle().isConnected());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   connection_socket->close();
 
   Network::Address::InstanceConstSharedPtr no_local_addr = nullptr;
   connection_socket = createConnectionSocket(peer_addr, no_local_addr, nullptr);
   EXPECT_TRUE(connection_socket->isOpen());
-  EXPECT_TRUE(connection_socket->ioHandle().isConnected());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_EQ("127.0.0.1", no_local_addr->ip()->addressAsString());
   connection_socket->close();
 
@@ -305,13 +305,13 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
       std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr);
   connection_socket = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
   EXPECT_TRUE(connection_socket->isOpen());
-  EXPECT_TRUE(connection_socket->ioHandle().isConnected());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   connection_socket->close();
 
   Network::Address::InstanceConstSharedPtr no_local_addr_v6 = nullptr;
   connection_socket = createConnectionSocket(peer_addr_v6, no_local_addr_v6, nullptr);
   EXPECT_TRUE(connection_socket->isOpen());
-  EXPECT_TRUE(connection_socket->ioHandle().isConnected());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_EQ("::1", no_local_addr_v6->ip()->addressAsString());
   connection_socket->close();
 }

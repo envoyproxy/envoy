@@ -117,7 +117,7 @@ public:
       }
       if (!connect_sys_errno) {
         if (expect_connect) {
-          EXPECT_CALL(*socket_->io_handle_, isConnected()).WillOnce(Return(true));
+          EXPECT_CALL(*socket_->io_handle_, wasConnected()).WillOnce(Return(true));
           EXPECT_CALL(*socket_->io_handle_, writev(_, 1))
               .WillOnce(Invoke([data, sys_errno](const Buffer::RawSlice* slices,
                                                  uint64_t) -> Api::IoCallUint64Result {
@@ -132,7 +132,7 @@ public:
                 }
               }));
         } else {
-          EXPECT_CALL(*socket_->io_handle_, isConnected()).WillOnce(Return(false));
+          EXPECT_CALL(*socket_->io_handle_, wasConnected()).WillOnce(Return(false));
           EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
               .WillOnce(Invoke(
                   [this, data, local_ip, sys_errno](

@@ -66,10 +66,10 @@ public:
   virtual bool isOpen() const PURE;
 
   /**
-   * Return true if connect() has successfully been called on the socket.
+   * Return true if the socket has had connect() successfully called on it.
    * Use isOpen() to check if the socket is still connected or not.
    */
-  virtual bool isConnected() const PURE;
+  virtual bool wasConnected() const PURE;
 
   /**
    * Read data into given slices.
