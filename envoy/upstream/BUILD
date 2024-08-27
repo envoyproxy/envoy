@@ -86,6 +86,7 @@ envoy_cc_library(
         ":upstream_interface",
         "//envoy/router:router_interface",
         "//envoy/upstream:types_interface",
+        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
