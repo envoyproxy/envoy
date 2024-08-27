@@ -40,7 +40,7 @@ public:
       // This is for test coverage purpose only.
       // onData shouldn't be called since maxReadBytes is zero.
       Network::ListenerFilterBufferImpl buffer(
-          io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, 1);
+          io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, false, 1);
       return filter_.onData(buffer);
     }
 

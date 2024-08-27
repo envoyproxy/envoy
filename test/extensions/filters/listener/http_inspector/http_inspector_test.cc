@@ -50,7 +50,7 @@ public:
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
         *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-        filter_->maxReadBytes());
+        filter_->maxReadBytes() == 0, filter_->maxReadBytes());
   }
 
   void testHttpInspectMultipleReadsNotFound(absl::string_view header, bool http2 = false) {

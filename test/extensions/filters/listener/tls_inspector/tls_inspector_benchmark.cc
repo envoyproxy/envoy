@@ -79,7 +79,7 @@ static void bmTlsInspector(benchmark::State& state) {
   FastMockListenerFilterCallbacks cb(socket);
   Network::ListenerFilterBufferImpl buffer(
       socket.ioHandle(), dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-      cfg->maxClientHelloSize());
+      cfg->maxClientHelloSize() == 0, cfg->maxClientHelloSize());
   EXPECT_TRUE(dispatcher.file_event_callback_(Event::FileReadyType::Read).ok());
 
   for (auto _ : state) {

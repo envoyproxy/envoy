@@ -36,7 +36,7 @@ public:
             on_data_cb_(filter_buffer);
           }
         },
-        buffer_size_);
+        buffer_size_ == 0, buffer_size_);
   }
   std::unique_ptr<ListenerFilterBufferImpl> listener_buffer_;
   Network::MockIoHandle io_handle_;
