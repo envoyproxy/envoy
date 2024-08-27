@@ -934,7 +934,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
        !existing_active_cluster->second->ignore_removal_) ||
       (existing_warming_cluster != warming_clusters_.end() &&
        existing_warming_cluster->second->added_via_api_ &&
-       !existing_active_cluster->second->ignore_removal_)) {
+       !existing_warming_cluster->second->ignore_removal_)) {
     return removeClusterAddedViaApi(cluster_name);
   }
   return false;
