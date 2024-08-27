@@ -36,6 +36,8 @@ struct GrpcInitializeConfigOpts {
   bool validate_mutations = false;
   bool retry_5xx = false;
   bool emit_filter_state_stats = false;
+  // Only effective if emit_filter_state_stats = true.
+  bool stats_expect_response_bytes = true;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -154,6 +156,7 @@ public:
         logging_filter_config.set_expect_stats(true);
         logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
                                                                    Grpc::ClientType::EnvoyGrpc);
+        logging_filter_config.set_expect_response_bytes(opts.stats_expect_response_bytes);
 
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging_filter");
@@ -1099,6 +1102,29 @@ TEST_P(ExtAuthzGrpcIntegrationTest, EmitFilterStateStats) {
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, EmitFilterStateStatsTimeout) {
+  // Set up ext_authz filter.
+  GrpcInitializeConfigOpts opts;
+  opts.emit_filter_state_stats = true;
+  opts.stats_expect_response_bytes = false;
+  opts.timeout_ms = 1;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  // Do not sendExtAuthzResponse(). Envoy should reject the request after 1 ms.
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
 
   cleanup();
 }

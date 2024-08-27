@@ -7,4 +7,5 @@ message LoggingTestFilterConfig {
   string upstream_cluster_name = 2;
   bool expect_stats = 3;
   bool expect_envoy_grpc_specific_stats = 4;
+  bool expect_response_bytes = 5;
 }

@@ -23,9 +23,11 @@ namespace ExternalProcessing {
 class LoggingTestFilter : public Http::PassThroughFilter {
 public:
   LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name,
-                    bool expect_stats, bool expect_envoy_grpc_specific_stats)
+                    bool expect_stats, bool expect_envoy_grpc_specific_stats,
+                    bool expect_response_bytes)
       : logging_id_(logging_id), expected_cluster_name_(cluster_name), expect_stats_(expect_stats),
-        expect_envoy_grpc_specific_stats_(expect_envoy_grpc_specific_stats) {}
+        expect_envoy_grpc_specific_stats_(expect_envoy_grpc_specific_stats),
+        expect_response_bytes_(expect_response_bytes) {}
   void encodeComplete() override {
     ASSERT(decoder_callbacks_ != nullptr);
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
@@ -38,7 +40,9 @@ public:
       EXPECT_GT(ext_authz_logging_info->latency().count(), 0);
       if (expect_envoy_grpc_specific_stats_) {
         EXPECT_GT(ext_authz_logging_info->bytesSent(), 0);
-        EXPECT_GT(ext_authz_logging_info->bytesReceived(), 0);
+        if (expect_response_bytes_) {
+          EXPECT_GT(ext_authz_logging_info->bytesReceived(), 0);
+        }
         ASSERT_NE(ext_authz_logging_info->upstreamHost(), nullptr);
         EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
       }
@@ -50,6 +54,7 @@ private:
   const std::string expected_cluster_name_;
   const bool expect_stats_;
   const bool expect_envoy_grpc_specific_stats_;
+  const bool expect_response_bytes_;
 };
 
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
@@ -63,7 +68,8 @@ public:
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(
           proto_config.logging_id(), proto_config.upstream_cluster_name(),
-          proto_config.expect_stats(), proto_config.expect_envoy_grpc_specific_stats()));
+          proto_config.expect_stats(), proto_config.expect_envoy_grpc_specific_stats(),
+          proto_config.expect_response_bytes()));
     };
   }
 };
