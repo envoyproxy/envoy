@@ -9,15 +9,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "logging_util_test",
-    srcs = ["logging_util_test.cc"],
+    name = "extraction_util_test",
+    srcs = ["extraction_util_test.cc"],
     data = [
-        "//test/proto:logging.proto",
-        "//test/proto:logging_proto_descriptor",
+        "//test/proto:extraction.proto",
+        "//test/proto:extraction_proto_descriptor",
     ],
     deps = [
-        "//source/extensions/filters/http/proto_message_logging/logging_util",
-        "//test/proto:logging_proto_cc_proto",
+        "//source/extensions/filters/http/proto_message_extraction/extraction_util",
+        "//test/proto:extraction_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "@com_google_absl//absl/log:check",
@@ -28,7 +28,8 @@ envoy_cc_test(
         "@com_google_protoconverter//:all",
         "@com_google_protofieldextraction//:all_libs",
         "@com_google_protofieldextraction//proto_field_extraction/test_utils:utils",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:cloud_audit_log_field_checker",
+        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
+        "@ocp//ocpdiag/core/testing:parse_text_proto",
         "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )

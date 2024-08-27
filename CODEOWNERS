@@ -35,8 +35,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
-# proto_message_logging http filter extension
-/*/extensions/filters/http/proto_message_logging @dchakarwarti @taoxuy @yanavlasov
+# proto_message_extraction http filter extension
+/*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
