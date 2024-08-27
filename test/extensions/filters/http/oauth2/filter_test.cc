@@ -892,6 +892,32 @@ TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
                      "");
 }
 
+// Validates the behavior of the cookie validator with custom cookie domain.
+TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(),
+       fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
+      {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.bearer_token_, "=xyztoken")},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat(cookie_names.oauth_hmac_, "=dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI=")},
+  };
+
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
+      test_time_,
+      CookieNames("BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"), "example.com");
+
+  EXPECT_EQ(cookie_validator->token(), "");
+  EXPECT_EQ(cookie_validator->refreshToken(), "");
+  cookie_validator->setParams(request_headers, "mock-secret");
+
+  EXPECT_TRUE(cookie_validator->hmacIsValid());
+  EXPECT_TRUE(cookie_validator->timestampIsValid());
+  EXPECT_TRUE(cookie_validator->isValid());
+}
+
 // Validates the behavior of the cookie validator when the combination of some fields could be same.
 TEST_F(OAuth2Test, CookieValidatorSame) {
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
@@ -1400,7 +1426,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
     Http::TestRequestHeaderMapImpl second_response_headers{
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC=aPoIhN7QYMrYc9nTGCCWgd3rJpZIEdjOtxPDdmVDS6E=;"
+         "OauthHMAC=fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
          "domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=;domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
