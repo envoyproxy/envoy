@@ -2118,7 +2118,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   auto host = upstream_request.upstreamHost();
   const bool need_to_send_load_report =
       (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
-  if (!need_to_send_load_report) {
+  if (!need_to_send_load_report && !orca_load_report_callbacks_.has_value()) {
     return;
   }
 
@@ -2132,10 +2132,19 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   orca_load_report_received_ = true;
 
-  ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
-                   orca_load_report->DebugString());
-  Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
-      cluster_->lrsReportMetricNames().value(), orca_load_report.value(), host->loadMetricStats());
+  if (need_to_send_load_report) {
+    ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
+                     orca_load_report->DebugString());
+    Envoy::Orca::addOrcaLoadReportToLoadMetricStats(cluster_->lrsReportMetricNames().value(),
+                                                    orca_load_report.value(),
+                                                    host->loadMetricStats());
+  }
+  if (orca_load_report_callbacks_.has_value()) {
+    const absl::Status status = orca_load_report_callbacks_->onOrcaLoadReport(*orca_load_report);
+    if (!status.ok()) {
+      ENVOY_LOG_MISC(error, "Failed to invoke OrcaLoadReportCallbacks: {}", status.message());
+    }
+  }
 }
 
 RetryStatePtr
