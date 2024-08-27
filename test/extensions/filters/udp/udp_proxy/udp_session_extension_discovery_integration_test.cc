@@ -1,8 +1,8 @@
 #include <memory>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
@@ -777,7 +777,8 @@ TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTy
 }
 
 // ECDS config dump test with specified resource and regex name search.
-TEST_P(UdpSessionExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithResourceAndRegex) {
+TEST_P(UdpSessionExtensionDiscoveryIntegrationTest,
+       TwoSubscriptionsConfigDumpWithResourceAndRegex) {
   DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
