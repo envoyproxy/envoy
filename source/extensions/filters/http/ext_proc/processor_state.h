@@ -281,6 +281,7 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
+  bool handleHeaderRespInNonHeaderState(CallbackState callback_state);
   void clearStreamingChunk();
 };
 

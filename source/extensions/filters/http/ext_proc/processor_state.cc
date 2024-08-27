@@ -93,8 +93,7 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
 
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if ((callback_state_ == CallbackState::HeadersCallback) ||
-      (callback_state_ == CallbackState::StreamedBodyCallback &&
-       filter_.config().sendBodyWithoutWaitingForHeaderResponse())) {
+      handleHeaderRespInNonHeaderState(callback_state_)) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
@@ -128,16 +127,18 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         }
       }
 
-      if (body_mode_ == ProcessingMode::STREAMED &&
-          filter_.config().sendBodyWithoutWaitingForHeaderResponse()) {
+      if (handleHeaderRespInNonHeaderState(callback_state_)) {
+        // With response status as CONTINUE_AND_REPLACE, the external processing in
+        // this direction is completed. Clear any data left over in the chunk queue.
+        clearStreamingChunk();
+        // Set this flag to true so if later on there is any body response received
+        // from the side stream server, they will be ignored.
         header_resp_with_replace_ = true;
       }
       // Once this message is received, we won't send anything more on this request
       // or response to the processor. Clear flags to make sure.
       body_mode_ = ProcessingMode::NONE;
       send_trailers_ = false;
-      // Clear any data left over in the chunk queue.
-      clearStreamingChunk();
       clearWatermark();
     } else {
       if (no_body_) {
@@ -233,9 +234,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   if (header_resp_with_replace_) {
-    // If header response has CONTINUE_AND_REPLACE status, and some body response is received,
-    // this means some body chunks are already sent to the server before header response is
-    // received. just ignore body response in this case.
+    // With this flag set to true, the body response
     return absl::OkStatus();
   }
 
@@ -398,6 +397,12 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 void ProcessorState::clearStreamingChunk() { chunk_queue_.clear(); }
+
+bool ProcessorState::handleHeaderRespInNonHeaderState(CallbackState callback_state) {
+  return ((callback_state == CallbackState::StreamedBodyCallback) &&
+          filter_.config().sendBodyWithoutWaitingForHeaderResponse() &&
+          send_headers_);
+}
 
 void ProcessorState::clearAsyncState() {
   onFinishProcessorCall(Grpc::Status::Aborted);
