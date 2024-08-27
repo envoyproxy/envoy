@@ -130,8 +130,11 @@ Use pipelining wherever possible for the best performance.
 At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
-configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream
-authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
+configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
+to an external service and act according to the authentication response. If a downstream password is set together
+with external authentication, the validation will be done still externally and the downstream password used for
+upstream authentication. Envoy will transparently issue AUTH commands upon connecting to upstream servers,
+if upstream authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
 Arguments to PING are not allowed. Envoy responds to ECHO immediately with the command argument.
 All other supported commands must contain a key. Supported commands are functionally identical to the
 original Redis command except possibly in failure scenarios.
@@ -305,10 +308,11 @@ Envoy can also generate its own errors in response to the client.
   wrong number of arguments for command, "Certain commands check in Envoy that the number of
   arguments is correct."
   "NOAUTH Authentication required.", "The command was rejected because a downstream authentication
-  password has been set and the client has not successfully authenticated."
+  password or external authentication have been set and the client has not successfully authenticated."
   ERR invalid password, "The authentication command failed due to an invalid password."
+  ERR <external-message>, "The authentication command failed on the external auth provider."
   "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
-  downstream authentication password has been configured."
+  downstream authentication password or external authentication provider have been configured."
 
 
 In the case of MGET, each individual key that cannot be fetched will generate an error response.
