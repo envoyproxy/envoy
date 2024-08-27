@@ -347,6 +347,41 @@ private:
   }
 };
 
+class UdpSessionDynamicFilterConfigProviderImpl
+    : public DynamicFilterConfigProviderImpl<Network::UdpSessionFilterFactoryCb> {
+public:
+  UdpSessionDynamicFilterConfigProviderImpl(
+      FilterConfigSubscriptionSharedPtr& subscription,
+      const absl::flat_hash_set<std::string>& require_type_urls,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::FactoryContext& factory_context,
+      ProtobufTypes::MessagePtr&& default_config, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type, absl::string_view stat_prefix,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
+      : DynamicFilterConfigProviderImpl<Network::UdpSessionFilterFactoryCb>(
+            subscription, require_type_urls, factory_context.serverFactoryContext().threadLocal(),
+            std::move(default_config), last_filter_in_filter_chain, filter_chain_type, stat_prefix,
+            listener_filter_matcher),
+        factory_context_(factory_context) {}
+
+  void validateMessage(const std::string&, const Protobuf::Message&,
+                       const std::string&) const override {
+    // UDP session filters don't use the concept of terminal filters.
+  }
+
+protected:
+  Server::Configuration::FactoryContext& factory_context_;
+
+private:
+  absl::StatusOr<Network::UdpSessionFilterFactoryCb>
+  instantiateFilterFactory(const Protobuf::Message& message) const override {
+    auto* factory =
+        Registry::FactoryRegistry<Server::Configuration::NamedUdpSessionFilterConfigFactory>::
+            getFactoryByType(message.GetTypeName());
+    return factory->createFilterFactoryFromProto(message, factory_context_);
+  }
+};
+
 class QuicListenerDynamicFilterConfigProviderImpl
     : public ListenerDynamicFilterConfigProviderImpl<Network::QuicListenerFilterFactoryCb> {
 public:
@@ -772,6 +807,19 @@ public:
 
 protected:
   const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
+};
+
+// UDP session filter
+class UdpSessionFilterConfigProviderManagerImpl
+    : public FilterConfigProviderManagerImpl<
+          Server::Configuration::NamedUdpSessionFilterConfigFactory,
+          Network::UdpSessionFilterFactoryCb, Server::Configuration::FactoryContext,
+          UdpSessionDynamicFilterConfigProviderImpl> {
+public:
+  absl::string_view statPrefix() const override { return "udp_session_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_udp_session"; }
 };
 
 // QUIC listener filter

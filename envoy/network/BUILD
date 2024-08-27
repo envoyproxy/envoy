@@ -140,6 +140,7 @@ envoy_cc_library(
         ":address_interface",
         "//envoy/api:io_error_interface",
         "//envoy/api:os_sys_calls_interface",
+        "//envoy/buffer:buffer_interface",
         "//envoy/event:file_event_interface",
         "//source/common/common:assert_lib",
     ],

@@ -18,8 +18,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 
 //                                               ┌──────────────────┐
 //                                               │   Envoy Proxy    │
@@ -53,16 +53,18 @@ class ProxyPollPerformHTTPRequestUsingProxyTest {
 
   @Test
   fun `performs an HTTP request through a proxy`() {
-    val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
-    val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
-    Mockito.doReturn(connectivityManager)
-      .`when`(context)
-      .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.defaultProxy)
-      .thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", httpProxyTestServer.port))
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val connectivityManager =
+      context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    connectivityManager.bindProcessToNetwork(connectivityManager.activeNetwork)
+    Shadows.shadowOf(connectivityManager)
+      .setProxyForNetwork(
+        connectivityManager.activeNetwork,
+        ProxyInfo.buildDirectProxy("127.0.0.1", httpProxyTestServer.port)
+      )
 
     val onEngineRunningLatch = CountDownLatch(1)
-    val onRespondeHeadersLatch = CountDownLatch(1)
+    val onResponseHeadersLatch = CountDownLatch(1)
 
     val builder = AndroidEngineBuilder(context)
     val engine =
@@ -92,13 +94,13 @@ class ProxyPollPerformHTTPRequestUsingProxyTest {
         val status = responseHeaders.httpStatus ?: 0L
         assertThat(status).isEqualTo(301)
         assertThat(responseHeaders.value("x-proxy-response")).isEqualTo(listOf("true"))
-        onRespondeHeadersLatch.countDown()
+        onResponseHeadersLatch.countDown()
       }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
 
-    onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
-    assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
+    onResponseHeadersLatch.await(15, TimeUnit.SECONDS)
+    assertThat(onResponseHeadersLatch.count).isEqualTo(0)
 
     engine.terminate()
   }
