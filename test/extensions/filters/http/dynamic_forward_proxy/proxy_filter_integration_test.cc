@@ -7,6 +7,7 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/ssl_socket.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -1303,6 +1304,64 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+// Verify that no DFP clusters are removed when CDS Reload is triggered.
+TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
+  const std::string cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
+
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // one more sub cluster
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  // Cause a cluster reload via CDS.
+  cds_helper_.setCds({cluster_, cluster});
+  // a new cluster is added and no dfp cluster is removed
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
+  // No DFP cluster should be removed.
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  // The fake upstream connection should stay connected
+  ASSERT_TRUE(fake_upstream_connection_->connected());
+
+  // Now send another request. This should not create new sub cluster.
+  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+  checkSimpleRequestSuccess(512, 512, response.get());
+
+  // No new cluster should be added as DFP cluster already exists
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
 } // namespace
