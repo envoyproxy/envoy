@@ -23,9 +23,9 @@ rust_static_library(
     ],
     deps = [
         ":helpers_lib",
-        # "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote",
         "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:anyhow",
         "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:env_logger",
         "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:once_cell",
+        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:wasmtime",
     ],
 )
