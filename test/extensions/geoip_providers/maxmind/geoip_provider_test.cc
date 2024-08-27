@@ -653,8 +653,7 @@ TEST_P(MmdbReloadImplTest, MmdbNotReloadedRuntimeFeatureDisabled) {
   TestScopedRuntime scoped_runtime_;
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.mmdb_files_reload_enabled", "false"}});
   MmdbReloadTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
-  initializeProvider(test_case.yaml_config_, cb_added_opt);
+  initializeProvider(test_case.yaml_config_, cb_added_nullopt);
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
