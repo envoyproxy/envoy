@@ -1121,7 +1121,9 @@ public:
                      std::move(parent_filter_state)),
         local_reply_(local_reply),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
-            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
+        use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream")) {
     ENVOY_LOG_ONCE_IF(
         trace, downstream_filter_load_shed_point_ == nullptr,
         "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
@@ -1153,11 +1155,24 @@ public:
                       absl::string_view details) override;
 
   /**
-   * Whether remote processing has been marked as complete.
-   * For the DownstreamFilterManager rely on external state, to handle the case
-   * of internal redirects.
+   * Whether downstream has observed end_stream.
    */
   bool decoderObservedEndStream() const override {
+    // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream
+    // runtime flag.
+    if (use_filter_manager_state_for_downstream_end_stream_) {
+      return state_.observed_decode_end_stream_;
+    }
+
+    return hasLastDownstreamByteReceived();
+  }
+
+  /**
+   * Return true if the timestamp of the downstream end_stream was recorded.
+   * For the HCM to handle the case of internal redirects, timeout error replies
+   * and stream resets on premature upstream response.
+   */
+  bool hasLastDownstreamByteReceived() const {
     return streamInfo().downstreamTiming() &&
            streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
   }
@@ -1206,6 +1221,9 @@ private:
   const LocalReply::LocalReply& local_reply_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
+  // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime
+  // flag.
+  const bool use_filter_manager_state_for_downstream_end_stream_{};
 };
 
 } // namespace Http

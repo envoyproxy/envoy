@@ -39,6 +39,8 @@ NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.deterministic_connection_id_generator",
     "envoy.quic.proof_source.filter_chain",
     "envoy.quic.server_preferred_address.fixed",
+    "envoy.quic.server_preferred_address.datasource",
+    "envoy.quic.connection_debug_visitor.basic",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP

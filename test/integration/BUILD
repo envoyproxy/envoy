@@ -392,7 +392,7 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
-        "//tools:socket_passing",
+        "//tools/socket_passing",
     ],
     # Hot restart does not apply on Windows, skipping
     tags = ["skip_on_windows"],
@@ -540,6 +540,7 @@ envoy_cc_test(
         "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
