@@ -1430,7 +1430,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
     Http::TestRequestHeaderMapImpl second_response_headers{
         {Http::Headers::get().Status.get(), "302"},
         {Http::Headers::get().SetCookie.get(),
-         "OauthHMAC=fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
+         "OauthHMAC=aPoIhN7QYMrYc9nTGCCWgd3rJpZIEdjOtxPDdmVDS6E=;"
          "domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
         {Http::Headers::get().SetCookie.get(),
          "OauthExpires=;domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
