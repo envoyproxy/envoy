@@ -610,10 +610,8 @@ case $CI_TARGET in
               --//distribution:envoy-contrib-binary=//distribution:custom/envoy-contrib \
               //distribution:packages.tar.gz
         if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
-            echo "Packages created: ${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
         else
-            echo "Packages created: ${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
             cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.arm64.tar.gz"
         fi
         ;;
