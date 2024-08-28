@@ -166,7 +166,6 @@
     builder.addPlatformFilter([filterFactory.filterName toCXXString]);
   }
 
-#ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
   for (NSString *host in self.quicHints) {
     builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
@@ -174,7 +173,6 @@
   for (NSString *suffix in self.quicCanonicalSuffixes) {
     builder.addQuicCanonicalSuffix([suffix toCXXString]);
   }
-#endif
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
   builder.enableBrotliDecompression(self.enableBrotliDecompression);

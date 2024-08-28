@@ -268,7 +268,7 @@ TEST_F(SotwSubscriptionStateTest, LastUpdateNonceAndVersionAfterStreamRefresh) {
   EXPECT_EQ("nonce1", cur_request->response_nonce());
   EXPECT_EQ("version1", cur_request->version_info());
   // Reconnect the stream.
-  state_->markStreamFresh();
+  state_->markStreamFresh(true);
   cur_request = getNextDiscoveryRequestAckless();
   EXPECT_EQ("", cur_request->response_nonce());
   EXPECT_EQ("version1", cur_request->version_info());
@@ -313,7 +313,7 @@ TEST_F(SotwSubscriptionStateTest, CheckUpdatePending) {
   EXPECT_FALSE(state_->subscriptionUpdatePending());
   state_->updateSubscriptionInterest({}, {}); // no change
   EXPECT_FALSE(state_->subscriptionUpdatePending());
-  state_->markStreamFresh();
+  state_->markStreamFresh(true);
   EXPECT_TRUE(state_->subscriptionUpdatePending());  // no change, BUT fresh stream
   state_->updateSubscriptionInterest({}, {"name3"}); // one removed
   EXPECT_TRUE(state_->subscriptionUpdatePending());

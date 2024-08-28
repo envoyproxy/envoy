@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-using cpp2sky::TracingContextPtr;
+using cpp2sky::TracingContextSharedPtr;
 
 class TraceSegmentReporter : public Logger::Loggable<Logger::Id::tracing>,
                              public Grpc::AsyncStreamCallbacks<skywalking::v3::Commands> {
@@ -34,7 +34,7 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 
-  void report(TracingContextPtr tracing_context);
+  void report(TracingContextSharedPtr tracing_context);
 
 private:
   /*
@@ -48,7 +48,7 @@ private:
 
   SkyWalkingTracerStatsSharedPtr tracing_stats_;
   Grpc::AsyncClient<skywalking::v3::SegmentObject, skywalking::v3::Commands> client_;
-  Grpc::AsyncStream<skywalking::v3::SegmentObject> stream_{};
+  Grpc::AsyncStream<skywalking::v3::SegmentObject> stream_;
   const Protobuf::MethodDescriptor& service_method_;
   Random::RandomGenerator& random_generator_;
   // If the connection is unavailable when reporting data, the created SegmentObject will be cached

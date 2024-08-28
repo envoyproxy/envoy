@@ -457,6 +457,7 @@ envoy_cc_library(
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/init:manager_lib",
+        "//source/common/orca:orca_load_metrics_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:deferred_creation",
         "//source/common/stats:isolated_store_lib",

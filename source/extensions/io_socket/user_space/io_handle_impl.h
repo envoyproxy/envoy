@@ -59,8 +59,11 @@ public:
                                   const Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port,
+                                  const Network::IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config,
+                                  RecvMsgOutput& output) override;
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const Network::IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config,
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
   bool supportsMmsg() const override;

@@ -58,9 +58,8 @@ message HttpConnectionManager {
     // Prior knowledge is allowed).
     HTTP2 = 2;
 
-    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
-    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
-    // to distinguish HTTP1 and HTTP2 traffic.
+    // The connection manager will assume that the client is speaking HTTP/3.
+    // This needs to be consistent with listener and transport socket config.
     HTTP3 = 3;
   }
 
@@ -474,7 +473,6 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/3 settings that are passed directly to the HTTP/3 codec.
-  // [#not-implemented-hide:]
   config.core.v3.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server

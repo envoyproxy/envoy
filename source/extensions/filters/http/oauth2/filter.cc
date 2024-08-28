@@ -41,6 +41,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
+constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -187,6 +188,7 @@ FilterConfig::FilterConfig(
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
+      cookie_domain_(proto_config.credentials().cookie_domain()),
       auth_type_(getAuthType(proto_config.auth_type())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
@@ -689,8 +691,12 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
 void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                                       const std::string& encoded_token) const {
   // We use HTTP Only cookies.
-  const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+  if (!config_->cookieDomain().empty()) {
+    cookie_tail_http_only = absl::StrCat(
+        fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+  }
+
   const CookieNames& cookie_names = config_->cookieNames();
 
   headers.addReferenceKey(
