@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-// This test ensure that abi_version.h contains the correct sha256 hash of ABI header files.
+// This test ensures that abi_version.h contains the correct sha256 hash of ABI header files.
 TEST(DynamicModules, ABIVersionCheck) {
   const auto abi_header_path =
       TestEnvironment::substitute("{{ test_rundir }}/source/extensions/dynamic_modules/abi.h");
@@ -25,6 +25,16 @@ TEST(DynamicModules, ABIVersionCheck) {
       Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(
           Buffer::OwnedImpl(abi_header)));
   EXPECT_EQ(sha256, kAbiVersion);
+}
+
+TEST(DynamicModules, IdenticalABIHeaders) {
+  const std::string original_abi_header = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/source/extensions/dynamic_modules/abi.h"));
+  const std::string rust_sdk_abi_header =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/source/extensions/dynamic_modules/sdk/rust/abi.h"));
+  EXPECT_EQ(original_abi_header, rust_sdk_abi_header);
+  // TODO: Go SDK.
 }
 
 } // namespace DynamicModules
