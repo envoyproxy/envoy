@@ -8,11 +8,21 @@
 namespace Envoy {
 namespace Orca {
 
-// Header used to send ORCA load metrics from the backend.
+// Headers used to send ORCA load metrics from the backend.
+static constexpr absl::string_view kEndpointLoadMetricsHeader = "endpoint-load-metrics";
 static constexpr absl::string_view kEndpointLoadMetricsHeaderBin = "endpoint-load-metrics-bin";
+static constexpr absl::string_view kEndpointLoadMetricsHeaderJson = "endpoint-load-metrics-json";
+// The following fields are the names of the metrics tracked in the ORCA load
+// report proto.
+static constexpr absl::string_view kApplicationUtilizationField = "application_utilization";
+static constexpr absl::string_view kCpuUtilizationField = "cpu_utilization";
+static constexpr absl::string_view kMemUtilizationField = "mem_utilization";
+static constexpr absl::string_view kEpsField = "eps";
+static constexpr absl::string_view kRpsFractionalField = "rps_fractional";
+static constexpr absl::string_view kNamedMetricsFieldPrefix = "named_metrics.";
 
 // Parses ORCA load metrics from a header map into an OrcaLoadReport proto.
-// Supports serialized binary formats.
+// Supports native HTTP, JSON and serialized binary formats.
 absl::StatusOr<xds::data::orca::v3::OrcaLoadReport>
 parseOrcaLoadReportHeaders(const Envoy::Http::HeaderMap& headers);
 } // namespace Orca
