@@ -294,7 +294,8 @@ message ExtAuthz {
 
   // Deprecated in favor of
   // :ref:`LoggingOptions.filter_metadata<envoy.config.filter.http.ext_authz.v2.LoggingOptions.filter_metadata>`.
-  google.protobuf.Struct filter_metadata = 28 [deprecated = true];
+  google.protobuf.Struct filter_metadata = 28
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // When not empty, the filter will emit per-stream stats for access logging. The filter state key
   // will be the same as the filter name.
