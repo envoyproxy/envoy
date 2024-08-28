@@ -85,7 +85,7 @@ TEST_F(JsonStreamerTest, MapOneSanitized) {
   {
     Streamer::MapPtr map = streamer_.makeRootMap();
     map->addKey("a");
-    map->addString("\b\001");
+    map->addValue("\b\001");
   }
   EXPECT_EQ(R"EOF({"a":"\b\u0001"})EOF", buffer_.toString());
 }
@@ -94,9 +94,9 @@ TEST_F(JsonStreamerTest, MapTwoSanitized) {
   {
     Streamer::MapPtr map = streamer_.makeRootMap();
     map->addKey("a");
-    map->addString("\b\001");
+    map->addValue("\b\001");
     map->addKey("b");
-    map->addString("\r\002");
+    map->addValue("\r\002");
   }
   EXPECT_EQ(R"EOF({"a":"\b\u0001","b":"\r\u0002"})EOF", buffer_.toString());
 }
@@ -116,9 +116,9 @@ TEST_F(JsonStreamerTest, SubArray) {
 TEST_F(JsonStreamerTest, TopArray) {
   {
     Streamer::ArrayPtr array = streamer_.makeRootArray();
-    array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
+    array->addEntries({1.0, "two", 3.5, true, false, std::nan(""), {}});
   }
-  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null])EOF", buffer_.toString());
+  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null,null])EOF", buffer_.toString());
 }
 
 TEST_F(JsonStreamerTest, SubMap) {
@@ -129,6 +129,22 @@ TEST_F(JsonStreamerTest, SubMap) {
   sub_map.reset();
   map.reset();
   EXPECT_EQ(R"EOF({"a":{"one":1,"three.5":3.5}})EOF", buffer_.toString());
+}
+
+class JsonStreamerStringOutputTest : public testing::Test {
+protected:
+  std::string buffer_;
+  Json::StreamerBase<Json::StringOutput> streamer_{buffer_};
+};
+
+TEST_F(JsonStreamerStringOutputTest, Empty) { EXPECT_EQ("", buffer_); }
+
+TEST_F(JsonStreamerStringOutputTest, TopArray) {
+  {
+    StreamerBase<Json::StringOutput>::ArrayPtr array = streamer_.makeRootArray();
+    array->addEntries({1.0, "two", 3.5, true, false, std::nan(""), {}});
+  }
+  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null,null])EOF", buffer_);
 }
 
 } // namespace

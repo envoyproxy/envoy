@@ -86,6 +86,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "json_streamer_speed_test",
+    srcs = ["json_streamer_speed_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:json_streamer_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
 envoy_cc_test_binary(
     name = "gen_excluded_unicodes",
     srcs = ["gen_excluded_unicodes.cc"],

@@ -45,7 +45,7 @@ public:
     char buf[100];
     std::to_chars_result result = std::to_chars(buf, buf + sizeof(buf), number);
     ENVOY_BUG(result.ec == std::errc{}, std::make_error_code(result.ec).message());
-    buffer.addFragments({absl::string_view(buf, result.ptr - buf)});
+    buffer.add(absl::string_view(buf, result.ptr - buf));
 
     // Note: there is room to speed this up further by serializing the number directly
     // into the buffer. However, buffer does not currently make it easy and fast
@@ -54,7 +54,7 @@ public:
     // On older compilers, such as those found on Apple, and gcc, std::to_chars
     // does not work with 'double', so we revert to the next fastest correct
     // implementation.
-    buffer.addFragments({fmt::to_string(number)});
+    buffer.add(fmt::to_string(number));
 #endif
   }
 };
