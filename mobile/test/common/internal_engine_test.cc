@@ -2,6 +2,8 @@
 
 #include <atomic>
 
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+
 #include "source/common/common/assert.h"
 
 #include "test/common/http/common.h"
@@ -323,7 +325,6 @@ TEST_F(InternalEngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
       test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(kDefaultTimeoutSec)));
 }
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
 TEST_F(InternalEngineTest, BasicStream) {
   TestServer test_server;
   test_server.start(TestServerType::HTTP1_WITHOUT_TLS);
@@ -331,10 +332,17 @@ TEST_F(InternalEngineTest, BasicStream) {
   EngineTestContext test_context{};
   std::unique_ptr<InternalEngine> engine = std::make_unique<InternalEngine>(
       createDefaultEngineCallbacks(test_context), /*logger=*/nullptr, /*event_tracker=*/nullptr);
+
+  envoy::extensions::filters::http::buffer::v3::Buffer buffer;
+  buffer.mutable_max_request_bytes()->set_value(65000);
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
+  std::string serialized_buffer;
+  buffer.SerializeToString(&serialized_buffer);
+  typed_config.set_value(serialized_buffer);
+
   Platform::EngineBuilder builder;
-  builder.addNativeFilter("buffer",
-                          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { "
-                          "max_request_bytes: { value: 65000 } }");
+  builder.addNativeFilter("buffer", typed_config);
   runEngine(engine, builder, LOG_LEVEL);
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
@@ -364,7 +372,6 @@ TEST_F(InternalEngineTest, BasicStream) {
 
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(10)));
 }
-#endif
 
 TEST_F(InternalEngineTest, ResetStream) {
   EngineTestContext test_context{};

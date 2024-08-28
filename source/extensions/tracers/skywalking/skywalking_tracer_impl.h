@@ -17,7 +17,7 @@ namespace SkyWalking {
 
 using cpp2sky::TracerConfig;
 using cpp2sky::TracingContextFactory;
-using cpp2sky::TracingContextPtr;
+using cpp2sky::TracingContextSharedPtr;
 
 class Driver : public Tracing::Driver, public Logger::Loggable<Logger::Id::tracing> {
 public:

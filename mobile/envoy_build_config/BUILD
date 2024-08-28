@@ -2,7 +2,6 @@ load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_mobile_package",
-    "envoy_select_enable_http3",
     "envoy_select_envoy_mobile_listener",
 )
 
@@ -21,6 +20,7 @@ envoy_cc_library(
         "extension_registry_platform_additions",
         "@envoy//source/common/http/matching:inputs_lib",
         "@envoy//source/common/network:socket_lib",
+        "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//source/common/upstream:default_local_address_selector_factory",
@@ -52,12 +52,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/key_value/platform:config",
         "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
-    ] + envoy_select_enable_http3(
-        [
-            "@envoy//source/common/quic:quic_transport_socket_factory_lib",
-        ],
-        "@envoy",
-    ) + envoy_select_envoy_mobile_listener(
+    ] + envoy_select_envoy_mobile_listener(
         [
             "@envoy//source/extensions/udp_packet_writer/default:config",
             "@envoy//source/common/listener_manager:listener_manager_lib",
