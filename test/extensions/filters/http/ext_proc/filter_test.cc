@@ -4074,7 +4074,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
 
   // Header response arrives after some amount of body data sent.
   auto response = std::make_unique<ProcessingResponse>();
-  (void )response->mutable_response_headers();
+  (void)response->mutable_response_headers();
   stream_callbacks_->onReceiveMessage(std::move(response));
 
   // Three body responses follows the header response.
@@ -4295,7 +4295,7 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(last_req_chunk, true));
   // Header response arrives
   auto req_response = std::make_unique<ProcessingResponse>();
-  (void )req_response->mutable_request_headers();
+  (void)req_response->mutable_request_headers();
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   stream_callbacks_->onReceiveMessage(std::move(req_response));
 
@@ -4319,7 +4319,7 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   }
 
   auto resp_response = std::make_unique<ProcessingResponse>();
-  (void )resp_response->mutable_response_headers();
+  (void)resp_response->mutable_response_headers();
   stream_callbacks_->onReceiveMessage(std::move(resp_response));
 
   // Send body responses

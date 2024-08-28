@@ -86,8 +86,7 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   // Move the current buffer into the queue for remote processing and clear the buffered data.
   if (hasBufferedData()) {
     Buffer::OwnedImpl buffered_chunk;
-    modifyBufferedData(
-        [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+    modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_LOG(debug, "Sending a chunk of buffered data ({})", buffered_chunk.length());
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
