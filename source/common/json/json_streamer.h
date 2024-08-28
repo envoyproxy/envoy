@@ -3,6 +3,7 @@
 #include <memory>
 #include <stack>
 #include <string>
+#include <type_traits>
 
 #include "envoy/buffer/buffer.h"
 
@@ -53,7 +54,7 @@ public:
  */
 template <class OutputType> class StreamerBase {
 public:
-  using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool>;
+  using Value = absl::variant<absl::monostate, absl::string_view, double, uint64_t, int64_t, bool>;
 
   /**
    * @param output The buffer in which to stream output. Note: this buffer can
@@ -98,53 +99,24 @@ public:
     ArrayPtr addArray();
 
     /**
-     * Adds a numeric value to the current array or map. It's a programming
-     * error to call this method on a map or array that's not the top level.
-     * It's also a programming error to call this on map that isn't expecting
-     * a value. You must call Map::addKey prior to calling this.
-     */
-    void addNumber(double d);
-    void addNumber(uint64_t u);
-    void addNumber(int64_t i);
-
-    /**
-     * Adds a string constant value to the current array or map. The string
-     * will be sanitized per JSON rules.
+     * Serializes a number or string or bool to the output stream. Doubles that are NaN are rendered
+     * as 'null'. Strings are sanitized if needed, and surrounded by quotes.
      *
-     * It's a programming error to call this method on a map or array that's not
-     * the top level. It's also a programming error to call this on map that
-     * isn't expecting a value. You must call Map::addKey prior to calling this.
+     * @param value the variant value to render.
      */
-    void addString(absl::string_view str);
-
-    /**
-     * Adds a bool constant value to the current array or map. It's a programming
-     * error to call this method on a map or array that's not the top level.
-     * It's also a programming error to call this on map that isn't expecting
-     * a value. You must call Map::addKey prior to calling this.
-     */
-    void addBool(bool b);
+    void addValue(const Value& value);
 
   protected:
-    friend StreamerBase;
+    template <class Type, class Expected> static constexpr bool isSameType() {
+      return std::is_same_v<
+          typename std::remove_cv<typename std::remove_reference<Type>::type>::type, Expected>;
+    }
 
     /**
      * Initiates a new field, serializing a comma separator if this is not the
      * first one.
      */
     virtual void nextField();
-
-    /**
-     * Renders a string or a number in json format. Doubles that are NaN are
-     * rendered as 'null'. Strings are json-sanitized if needed, and surrounded
-     * by quotes.
-     *
-     * @param Value the value to render.
-     */
-    void addValue(const Value& value);
-
-  private:
-    friend StreamerBase;
 
     bool is_first_{true}; // Used to control whether a comma-separator is added for a new entry.
     StreamerBase& streamer_;
@@ -180,7 +152,7 @@ public:
      * programming error to call this method on a map that's not the current top
      * level.
      */
-    void addEntries(const Entries& entries);
+    void addEntries(Entries entries);
 
   protected:
     void nextField() override;
@@ -205,7 +177,7 @@ public:
      *
      * @param entries the array of numeric or string values.
      */
-    void addEntries(const Entries& entries);
+    void addEntries(Entries entries);
   };
 
   /**
@@ -226,11 +198,6 @@ public:
    */
   ArrayPtr makeRootArray();
 
-private:
-  friend Level;
-  friend Map;
-  friend Array;
-
   /**
    * Takes a raw string, sanitizes it using JSON syntax, surrounds it
    * with a prefix and suffix, and streams it out.
@@ -238,23 +205,40 @@ private:
   void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix);
 
   /**
+   * Serializes a string to the output stream. The string is sanitized if needed, and surrounded
+   * by quotes.
+   */
+  void addString(absl::string_view str) { addSanitized(Constants::Quote, str, Constants::Quote); }
+  void addString(const char* str) { addSanitized(Constants::Quote, str, Constants::Quote); }
+
+  /**
    * Serializes a number.
    */
   void addNumber(double d);
   void addNumber(uint64_t u);
   void addNumber(int64_t i);
+
+  /**
+   * Serializes a bool to the output stream.
+   */
   void addBool(bool b);
 
   /**
-   * Flushes out any pending fragments.
+   * Serializes a null to the output stream.
    */
-  void flush();
+  void addNull() { output_.addFragments({Constants::Null}); }
 
   /**
-   * Adds a constant string to the output stream. The string must outlive the
-   * Streamer object, and is intended for literal strings such as punctuation.
+   * Adds a raw string piece to the output stream. The string must be pre-sanitized and is legal
+   * JSON piece.
+   * @param str the string to append.
    */
-  void addConstantString(absl::string_view str) { output_.addFragments({str}); }
+  void addDirectly(absl::string_view str) { output_.addFragments({str}); }
+
+private:
+  friend Level;
+  friend Map;
+  friend Array;
 
 #ifndef NDEBUG
   /**

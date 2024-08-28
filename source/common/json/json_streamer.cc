@@ -31,14 +31,14 @@ template <class T>
 StreamerBase<T>::Level::Level(StreamerBase& streamer, absl::string_view opener,
                               absl::string_view closer)
     : streamer_(streamer), closer_(closer) {
-  streamer_.addConstantString(opener);
+  streamer_.addDirectly(opener);
 #ifndef NDEBUG
   streamer_.push(this);
 #endif
 }
 
 template <class T> StreamerBase<T>::Level::~Level() {
-  streamer_.addConstantString(closer_);
+  streamer_.addDirectly(closer_);
 #ifndef NDEBUG
   streamer_.pop(this);
 #endif
@@ -66,36 +66,6 @@ template <class T> StreamerBase<T>::ArrayPtr StreamerBase<T>::Level::addArray() 
   return std::make_unique<Array>(streamer_);
 }
 
-template <class T> void StreamerBase<T>::Level::addNumber(double number) {
-  ASSERT_THIS_IS_TOP_LEVEL;
-  nextField();
-  streamer_.addNumber(number);
-}
-
-template <class T> void StreamerBase<T>::Level::addNumber(uint64_t number) {
-  ASSERT_THIS_IS_TOP_LEVEL;
-  nextField();
-  streamer_.addNumber(number);
-}
-
-template <class T> void StreamerBase<T>::Level::addNumber(int64_t number) {
-  ASSERT_THIS_IS_TOP_LEVEL;
-  nextField();
-  streamer_.addNumber(number);
-}
-
-template <class T> void StreamerBase<T>::Level::addBool(bool b) {
-  ASSERT_THIS_IS_TOP_LEVEL;
-  nextField();
-  streamer_.addBool(b);
-}
-
-template <class T> void StreamerBase<T>::Level::addString(absl::string_view str) {
-  ASSERT_THIS_IS_TOP_LEVEL;
-  nextField();
-  streamer_.addSanitized("\"", str, "\"");
-}
-
 #ifndef NDEBUG
 template <class T> void StreamerBase<T>::pop(Level* level) {
   ASSERT(levels_.top() == level);
@@ -109,7 +79,7 @@ template <class T> void StreamerBase<T>::Level::nextField() {
   if (is_first_) {
     is_first_ = false;
   } else {
-    streamer_.addConstantString(",");
+    streamer_.addDirectly(Constants::Comma);
   }
 }
 
@@ -129,7 +99,7 @@ template <class T> void StreamerBase<T>::Map::addKey(absl::string_view key) {
   expecting_value_ = true;
 }
 
-template <class T> void StreamerBase<T>::Map::addEntries(const Entries& entries) {
+template <class T> void StreamerBase<T>::Map::addEntries(Entries entries) {
   for (const NameValue& entry : entries) {
     addKey(entry.first);
     this->addValue(entry.second);
@@ -137,39 +107,47 @@ template <class T> void StreamerBase<T>::Map::addEntries(const Entries& entries)
 }
 
 template <class T> void StreamerBase<T>::Level::addValue(const Value& value) {
+  ASSERT_THIS_IS_TOP_LEVEL;
+  nextField();
   switch (value.index()) {
   case 0:
-    static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
-                  "value at index 0 must be an absl::string_vlew");
-    addString(absl::get<absl::string_view>(value));
+    static_assert(isSameType<decltype(absl::get<0>(value)), absl::monostate>(),
+                  "value at index 0 must be an absl::monostate");
+    this->streamer_.addNull();
     break;
   case 1:
-    static_assert(std::is_same<decltype(absl::get<1>(value)), const double&>::value,
-                  "value at index 1 must be a double");
-    addNumber(absl::get<double>(value));
+    static_assert(isSameType<decltype(absl::get<1>(value)), absl::string_view>(),
+                  "value at index 1 must be an absl::string_vlew");
+    this->streamer_.addString(absl::get<absl::string_view>(value));
     break;
   case 2:
-    static_assert(std::is_same<decltype(absl::get<2>(value)), const uint64_t&>::value,
-                  "value at index 2 must be a uint64_t");
-    addNumber(absl::get<uint64_t>(value));
+    static_assert(isSameType<decltype(absl::get<2>(value)), double>(),
+                  "value at index 2 must be a double");
+    this->streamer_.addNumber(absl::get<double>(value));
     break;
   case 3:
-    static_assert(std::is_same<decltype(absl::get<3>(value)), const int64_t&>::value,
-                  "value at index 3 must be an int64_t");
-    addNumber(absl::get<int64_t>(value));
+    static_assert(isSameType<decltype(absl::get<3>(value)), uint64_t>(),
+                  "value at index 3 must be a uint64_t");
+    this->streamer_.addNumber(absl::get<uint64_t>(value));
     break;
   case 4:
-    static_assert(std::is_same<decltype(absl::get<4>(value)), const bool&>::value,
-                  "value at index 4 must be a bool");
-    addBool(absl::get<bool>(value));
+    static_assert(isSameType<decltype(absl::get<4>(value)), int64_t>(),
+                  "value at index 4 must be an int64_t");
+    this->streamer_.addNumber(absl::get<int64_t>(value));
+    break;
+  case 5:
+    static_assert(isSameType<decltype(absl::get<5>(value)), bool>(),
+                  "value at index 5 must be a bool");
+    this->streamer_.addBool(absl::get<bool>(value));
     break;
   default:
     IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
+    this->streamer_.addNull();
     break;
   }
 }
 
-template <class T> void StreamerBase<T>::Array::addEntries(const Entries& values) {
+template <class T> void StreamerBase<T>::Array::addEntries(Entries values) {
   for (const Value& value : values) {
     this->addValue(value);
   }
@@ -192,7 +170,7 @@ template <class T> void StreamerBase<T>::addNumber(int64_t number) {
 }
 
 template <class T> void StreamerBase<T>::addBool(bool b) {
-  output_.addFragments({b ? "true" : "false"});
+  output_.addFragments({b ? Constants::True : Constants::False});
 }
 
 template <class T>
