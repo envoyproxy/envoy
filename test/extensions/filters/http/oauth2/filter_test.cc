@@ -115,8 +115,7 @@ public:
                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                     OAuth2Config_AuthType_URL_ENCODED_BODY,
             int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
-            bool disable_id_token_set_cookie = false,
-            envoy::config::route::v3::RetryPolicy retry_policy = {}) {
+            bool disable_id_token_set_cookie = false) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -157,8 +156,6 @@ public:
     credentials->mutable_hmac_secret()->set_name("hmac");
     // Skipping setting credentials.cookie_names field should give default cookie names:
     // BearerToken, OauthHMAC, and OauthExpires.
-
-    p.mutable_retry_policy()->MergeFrom(retry_policy);
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -2321,33 +2318,6 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
   EXPECT_EQ(cookies.at("RefreshToken"), "refreshToken");
 }
-
-class RetryPolicyTest : public OAuth2Test {
-public:
-  RetryPolicyTest() : OAuth2Test(false) {
-    envoy::config::route::v3::RetryPolicy retry_policy;
-    retry_policy.set_retry_on("5xx");
-    retry_policy.mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
-    retry_policy.mutable_retry_back_off()->mutable_max_interval()->set_seconds(10);
-    retry_policy.mutable_num_retries()->set_value(5);
-
-    init(getConfig(true /* forward_bearer_token */, false /* use_refresh_token */,
-                   ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                       OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
-                   0 /* default_refresh_token_expires_in */,
-                   false /* preserve_authorization_header */,
-                   false /* disable_id_token_set_cookie */, retry_policy));
-  }
-
-  void init(FilterConfigSharedPtr config) {
-    // Set up the OAuth client.
-    oauth_client_ = std::make_unique<OAuth2ClientImpl>(
-        cm_, config->oauthTokenEndpoint(), config->retryPolicy(), config->defaultExpiresIn());
-  }
-
-  std::unique_ptr<OAuth2Client> oauth_client_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-};
 
 } // namespace Oauth2
 } // namespace HttpFilters
