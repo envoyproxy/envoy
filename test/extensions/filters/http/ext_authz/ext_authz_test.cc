@@ -2317,6 +2317,7 @@ TEST_F(HttpFilterTest, FilterDisabled) {
     default_value:
       numerator: 0
       denominator: HUNDRED
+  emit_filter_state_stats: true
   )EOF");
 
   ON_CALL(factory_context_.runtime_loader_.snapshot_,
@@ -2328,6 +2329,9 @@ TEST_F(HttpFilterTest, FilterDisabled) {
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  // The stats / logging filter state should not be added if no request is sent.
+  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  EXPECT_FALSE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 }
 
 // Test that filter can be enabled via the filter_enabled field.

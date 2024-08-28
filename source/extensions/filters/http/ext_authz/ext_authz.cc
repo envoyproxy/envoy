@@ -177,6 +177,20 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
+  // Now that we'll definitely be making the request, add filter state stats if configured to do so.
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if (config_->emitFilterStateStats() &&
+      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    filter_state->setData(decoder_callbacks_->filterConfigName(),
+                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                          Envoy::StreamInfo::FilterState::StateType::Mutable,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+    logging_info_ =
+        filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+  }
+
   auto&& maybe_merged_per_route_config =
       Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
           decoder_callbacks_, [](FilterConfigPerRoute& cfg_base, const FilterConfigPerRoute& cfg) {
@@ -381,20 +395,6 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
-      decoder_callbacks_->streamInfo().filterState();
-  ENVOY_LOG_MISC(debug, "TRY ADD FILTER STATE");
-  if (config_->emitFilterStateStats() &&
-      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
-    ENVOY_LOG_MISC(debug, "ADD FILTER STATE AT {}", decoder_callbacks_->filterConfigName());
-    filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::Mutable,
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
-
-    logging_info_ =
-        filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
-  }
 }
 
 void Filter::updateLoggingInfo() {
