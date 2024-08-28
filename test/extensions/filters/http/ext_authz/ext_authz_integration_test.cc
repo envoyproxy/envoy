@@ -159,8 +159,8 @@ public:
         logging_filter_config.set_logging_id("envoy.filters.http.ext_authz");
         logging_filter_config.set_upstream_cluster_name("ext_authz_cluster");
         logging_filter_config.set_expect_stats(opts.expect_stats_override.value_or(true));
-        logging_filter_config.set_expect_envoy_grpc_specific_stats(
-            clientType() == Grpc::ClientType::EnvoyGrpc);
+        logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
+                                                                   Grpc::ClientType::EnvoyGrpc);
         logging_filter_config.set_expect_response_bytes(opts.stats_expect_response_bytes);
 
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;

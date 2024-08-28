@@ -3098,7 +3098,6 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsWithFilterMetadata) {
   auto upstream_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info.upstream_cluster_info_ = upstream_cluster_info;
 
-
   Envoy::ProtobufWkt::Struct filter_metadata;
   *(*filter_metadata.mutable_fields())["foo"].mutable_string_value() = "bar";
 

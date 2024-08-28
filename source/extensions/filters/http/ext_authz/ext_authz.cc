@@ -289,7 +289,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // Initiate a call to the authorization server since we are not disabled.
   initiateCall(headers);
-  ENVOY_LOG_MISC(debug, "filter return == stop ? {}" , filter_return_ == FilterReturn::StopDecoding);
   return filter_return_ == FilterReturn::StopDecoding
              ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
              : Http::FilterHeadersStatus::Continue;
