@@ -4,6 +4,7 @@
 #include <stack>
 #include <string>
 #include <type_traits>
+#include <variant>
 
 #include "envoy/buffer/buffer.h"
 
@@ -158,50 +159,42 @@ public:
       ASSERT_THIS_IS_TOP_LEVEL;
       nextField();
 
+      static_assert(absl::variant_size_v<Value> == 6, "variant size must be 6");
       switch (value.index()) {
       case 0:
-        static_assert(isSameType<decltype(absl::get<0>(value)), absl::monostate>(),
+        static_assert(std::is_same_v<std::variant_alternative_t<0, Value>, absl::monostate>,
                       "value at index 0 must be an absl::monostate");
         this->streamer_.addNull();
         break;
       case 1:
-        static_assert(isSameType<decltype(absl::get<1>(value)), absl::string_view>(),
+        static_assert(std::is_same_v<std::variant_alternative_t<1, Value>, absl::string_view>,
                       "value at index 1 must be an absl::string_vlew");
         this->streamer_.addString(absl::get<absl::string_view>(value));
         break;
       case 2:
-        static_assert(isSameType<decltype(absl::get<2>(value)), double>(),
+        static_assert(std::is_same_v<std::variant_alternative_t<2, Value>, double>,
                       "value at index 2 must be a double");
         this->streamer_.addNumber(absl::get<double>(value));
         break;
       case 3:
-        static_assert(isSameType<decltype(absl::get<3>(value)), uint64_t>(),
+        static_assert(std::is_same_v<std::variant_alternative_t<3, Value>, uint64_t>,
                       "value at index 3 must be a uint64_t");
         this->streamer_.addNumber(absl::get<uint64_t>(value));
         break;
       case 4:
-        static_assert(isSameType<decltype(absl::get<4>(value)), int64_t>(),
+        static_assert(std::is_same_v<std::variant_alternative_t<4, Value>, int64_t>,
                       "value at index 4 must be an int64_t");
         this->streamer_.addNumber(absl::get<int64_t>(value));
         break;
       case 5:
-        static_assert(isSameType<decltype(absl::get<5>(value)), bool>(),
+        static_assert(std::is_same_v<std::variant_alternative_t<5, Value>, bool>,
                       "value at index 5 must be a bool");
         this->streamer_.addBool(absl::get<bool>(value));
-        break;
-      default:
-        IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
-        this->streamer_.addNull();
         break;
       }
     }
 
   protected:
-    template <class Type, class Expected> static constexpr bool isSameType() {
-      return std::is_same_v<
-          typename std::remove_cv<typename std::remove_reference<Type>::type>::type, Expected>;
-    }
-
     /**
      * Initiates a new field, serializing a comma separator if this is not the
      * first one.
