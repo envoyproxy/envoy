@@ -190,7 +190,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
           : 0u;
 
   if (local_addr == nullptr && !should_connect) {
-    local_addr = getLoopbackAddress(peer_addr->ip()->version());
+    local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram,
