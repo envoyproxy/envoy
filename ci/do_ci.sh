@@ -8,8 +8,10 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 # shellcheck source=ci/build_setup.sh
-. "$(dirname "$0")"/build_setup.sh
+. "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
 echo "building using ${NUM_CPUS} CPUs"
 echo "building for ${ENVOY_BUILD_ARCH}"
@@ -1039,6 +1041,10 @@ case $CI_TARGET in
                  --trigger-ref="$ENVOY_BRANCH" \
                  --trigger-workflow="$WORKFLOW" \
                  --trigger-inputs="$INPUTS"
+        ;;
+
+    refresh_compdb)
+        "${CURRENT_SCRIPT_DIR}/../tools/vscode/refresh_compdb.sh"
         ;;
 
     *)

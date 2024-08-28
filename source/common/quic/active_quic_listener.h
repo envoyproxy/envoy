@@ -60,6 +60,9 @@ public:
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
   size_t numPacketsExpectedPerEventLoop() const override;
+  const Network::IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const override {
+    return udp_save_cmsg_config_;
+  }
 
   // ActiveListenerImplBase
   void pauseListening() override;
@@ -97,6 +100,7 @@ private:
   bool reject_all_{false};
   // During hot restart, an optional handler for packets that weren't for existing connections.
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+  Network::IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

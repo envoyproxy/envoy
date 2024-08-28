@@ -1,5 +1,7 @@
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 
+#include <chrono>
+
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
@@ -29,6 +31,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0)),
       respect_dns_ttl_(cluster.respect_dns_ttl()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
@@ -189,6 +192,11 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }
+          if (parent_.dns_jitter_ms_.count() > 0) {
+            final_refresh_rate +=
+                std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_;
+          }
+
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
         } else {

@@ -6745,5 +6745,127 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
   ASSERT_EQ(load_metric_stats_map, nullptr);
 }
 
+class TestOrcaLoadReportCallbacks : public Filter::OrcaLoadReportCallbacks {
+public:
+  MOCK_METHOD(absl::Status, onOrcaLoadReport,
+              (const xds::data::orca::v3::OrcaLoadReport& orca_load_report), (override));
+};
+
+TEST_F(RouterTest, OrcaLoadReportCallbacks) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Configure ORCA callbacks to receive the report.
+  TestOrcaLoadReportCallbacks callbacks;
+  xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
+  EXPECT_CALL(callbacks, onOrcaLoadReport(_))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+        received_orca_load_report = orca_load_report;
+        return absl::OkStatus();
+      }));
+  router_->setOrcaLoadReportCallbacks(callbacks);
+
+  // Send ORCA report in the headers.
+  xds::data::orca::v3::OrcaLoadReport headers_orca_load_report;
+  headers_orca_load_report.set_cpu_utilization(0.5);
+  headers_orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string headers_proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(headers_orca_load_report);
+  std::string headers_orca_load_report_header_bin =
+      Envoy::Base64::encode(headers_proto_string.c_str(), headers_proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", headers_orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  // Send different ORCA report in the trailers. Expect it to be ignored.
+  xds::data::orca::v3::OrcaLoadReport trailers_orca_load_report;
+  trailers_orca_load_report.set_cpu_utilization(1.0);
+  trailers_orca_load_report.mutable_named_metrics()->insert({"good", 0.1});
+  std::string trailers_proto_string =
+      TestUtility::getProtobufBinaryStringFromMessage(trailers_orca_load_report);
+  std::string trailers_orca_load_report_header_bin =
+      Envoy::Base64::encode(trailers_proto_string.c_str(), trailers_proto_string.length());
+  Http::ResponseTrailerMapPtr response_trailers(new Http::TestResponseTrailerMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", trailers_orca_load_report_header_bin}});
+  response_decoder->decodeTrailers(std::move(response_trailers));
+  // Verify that received load report is set in headers.
+  EXPECT_EQ(received_orca_load_report.cpu_utilization(),
+            headers_orca_load_report.cpu_utilization());
+}
+
+TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Configure ORCA callbacks to receive the report.
+  TestOrcaLoadReportCallbacks callbacks;
+  xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
+  EXPECT_CALL(callbacks, onOrcaLoadReport(_))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+        received_orca_load_report = orca_load_report;
+        // Return an error that gets logged by router filter.
+        return absl::InvalidArgumentError("Unexpected ORCA load Report");
+      }));
+  router_->setOrcaLoadReportCallbacks(callbacks);
+
+  // Send metrics in the trailers.
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseTrailerMapPtr response_trailers(new Http::TestResponseTrailerMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeTrailers(std::move(response_trailers));
+  EXPECT_EQ(received_orca_load_report.named_metrics().at("good"), 0.7);
+}
+
+TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Configure ORCA callbacks to receive the report, but don't expect it to be
+  // called for invalid orca header.
+  TestOrcaLoadReportCallbacks callbacks;
+  EXPECT_CALL(callbacks, onOrcaLoadReport(_)).Times(0);
+  router_->setOrcaLoadReportCallbacks(callbacks);
+
+  // Send report with invalid ORCA proto.
+  std::string proto_string = "Invalid ORCA proto value";
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 } // namespace Router
 } // namespace Envoy

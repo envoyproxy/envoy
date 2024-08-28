@@ -357,6 +357,9 @@ protected:
       name: "envoy.quic.proof_source.filter_chain"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig
+    save_cmsg_config:
+      level: 1
+      type: 2
 )EOF",
                        connection_window_size_, stream_window_size_, idle_timeout_,
                        handshake_timeout_);
