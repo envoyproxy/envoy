@@ -3966,14 +3966,168 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataUseLast) {
   filter_->onDestroy();
 }
 
-// External processing M:N test
-TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
+TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
     request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    response_body_mode: "STREAMED"
+  send_body_without_waiting_for_header_response: true
+  )EOF");
+
+  EXPECT_EQ(config_->sendBodyWithoutWaitingForHeaderResponse(), true);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  // Header response arrives before any body data.
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  // Send body responses
+  for (int i = 0; i < 5; i++) {
+    processResponseBody(
+        [&want_response_body, i](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          std::string new_body = absl::StrCat(" ", std::to_string(i), " ");
+          body_mut->set_body(new_body);
+          want_response_body.add(new_body);
+        },
+        false);
+  }
+
+  // Send the last empty request chunk.
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
+  // The two buffers should match.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    response_body_mode: "STREAMED"
+  send_body_without_waiting_for_header_response: true
+  )EOF");
+
+  EXPECT_EQ(config_->sendBodyWithoutWaitingForHeaderResponse(), true);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  // Header response arrives after some amount of body data sent.
+  auto response = std::make_unique<ProcessingResponse>();
+  (void )response->mutable_response_headers();
+  stream_callbacks_->onReceiveMessage(std::move(response));
+
+  // Three body responses follows the header response.
+  for (int i = 0; i < 2; i++) {
+    processResponseBody(
+        [&want_response_body, i](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          std::string new_body = absl::StrCat(" ", std::to_string(i), " ");
+          body_mut->set_body(new_body);
+          want_response_body.add(new_body);
+        },
+        false);
+  }
+
+  // Now sends the rest of the body chunks to the server.
+  for (int i = 5; i < 10; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  // Send body responses
+  for (int i = 2; i < 10; i++) {
+    processResponseBody(
+        [&want_response_body, i](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+          std::string new_body = absl::StrCat(" ", std::to_string(i), " ");
+          body_mut->set_body(new_body);
+          want_response_body.add(new_body);
+        },
+        false);
+  }
+
+  // Send the last empty request chunk.
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
+  // The two buffers should match.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, HeaderMutationInBodyResp) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
     response_body_mode: "STREAMED"
   send_body_without_waiting_for_header_response: true
   )EOF");
@@ -4007,7 +4161,6 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  // processResponseHeaders(false, absl::nullopt);
   // Send the 1st body response which include header response.
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
@@ -4043,6 +4196,141 @@ TEST_F(HttpFilterTest, SendBodyBeforeRecvHeaderRespTest) {
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, HeaderRespWithStatusContinueAndReplace) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    response_body_mode: "STREAMED"
+  send_body_without_waiting_for_header_response: true
+  )EOF");
+
+  EXPECT_EQ(config_->sendBodyWithoutWaitingForHeaderResponse(), true);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  // Header response arrives after some amount of body data sent with status CONTINUE_AND_REPLACE.
+  auto response = std::make_unique<ProcessingResponse>();
+  auto* hdrs_resp = response->mutable_response_headers();
+  hdrs_resp->mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+  auto* hdr = hdrs_resp->mutable_response()->mutable_header_mutation()->add_set_headers();
+  hdr->mutable_header()->set_key(":method");
+  hdr->mutable_header()->set_raw_value("POST");
+  hdrs_resp->mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
+  stream_callbacks_->onReceiveMessage(std::move(response));
+
+  // Now sends the rest of the body chunks to the server.
+  for (int i = 5; i < 10; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(last_resp_chunk, true));
+
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_header_mode: "SEND"
+    response_body_mode: "STREAMED"
+  send_body_without_waiting_for_header_response: true
+  )EOF");
+
+  EXPECT_EQ(config_->sendBodyWithoutWaitingForHeaderResponse(), true);
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(resp_chunk, false));
+  }
+  // Send the last empty request chunk.
+  Buffer::OwnedImpl last_req_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(last_req_chunk, true));
+  // Header response arrives
+  auto req_response = std::make_unique<ProcessingResponse>();
+  (void )req_response->mutable_request_headers();
+  stream_callbacks_->onReceiveMessage(std::move(req_response));
+
+  // Data response arrives
+  for (int i = 0; i < 5; i++) {
+    processRequestBody(absl::nullopt, false);
+  }
+  processRequestBody(absl::nullopt, true);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  for (int i = 0; i < 7; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  }
+
+  auto resp_response = std::make_unique<ProcessingResponse>();
+  (void )resp_response->mutable_response_headers();
+  stream_callbacks_->onReceiveMessage(std::move(resp_response));
+
+  // Send body responses
+  for (int i = 0; i < 7; i++) {
+    processResponseBody(absl::nullopt, false);
+  }
+
+  // Send the last empty request chunk.
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
   filter_->onDestroy();
 }

@@ -106,8 +106,13 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     }
 
     clearRouteCache(common_response);
-    onFinishProcessorCall(Grpc::Status::Ok);
-
+    if (callback_state_ == CallbackState::HeadersCallback ||
+        common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
+      onFinishProcessorCall(Grpc::Status::Ok);
+    } else {
+      // STREAMED body mode and body already sent
+      onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+    }
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       ENVOY_LOG(debug, "Replacing complete message");
       // Completely replace the body that may already exist.

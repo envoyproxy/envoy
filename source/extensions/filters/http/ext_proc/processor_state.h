@@ -238,7 +238,6 @@ protected:
   bool complete_body_available_ : 1;
   // If true, then the filter received the trailers
   bool trailers_available_ : 1;
-
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
   // If true, we are in "buffered partial" mode and we already reached the buffer
