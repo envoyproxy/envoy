@@ -1039,6 +1039,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "protocol error";
   case Http::StreamResetReason::OverloadManager:
     return "overload manager reset";
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    return "HTTP/1 premature upstream half close";
   }
 
   return "";

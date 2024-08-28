@@ -271,6 +271,9 @@ TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {
   EXPECT_ENVOY_BUG(
       envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteRefusedStreamReset),
       "Remote reset ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::Http1PrematureUpstreamHalfClose),
+      "not applicable");
 }
 
 TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {

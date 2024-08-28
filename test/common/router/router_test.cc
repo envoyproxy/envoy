@@ -3425,6 +3425,11 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
 }
 
 TEST_F(RouterTest, NoRetryWithBodyLimit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
+
+  recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -3445,6 +3450,40 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
+  // This test half closes upstream connection before downstream. Enabling the
+  // allow_multiplexed_upstream_half_close flag causes the clean-up sequence to
+  // change and this requires explicit destruction of the filter before mock
+  // objects. This test was added to validate that the old behavior is preserved
+  // when allow_multiplexed_upstream_half_close is false.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
+  recreateFilter();
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(0));
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  Buffer::OwnedImpl body("t");
+  router_->decodeData(body, false);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  // router filter no longer resets the stream due to upstream half closing first
+  router_->onDestroy();
 }
 
 // Verifies that when the request fails with an upstream reset (per try timeout in this case)
@@ -3858,6 +3897,10 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  // With upstream half close enabled router filter no longer resets the stream
+  // when upstream half closing first. As such it needs to be destroyed explicitly
+  // to avoid clean up problems in mocks
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
@@ -4277,6 +4320,10 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  // With upstream half close enabled router filter no longer resets the stream
+  // when upstream half closing first. As such it needs to be destroyed explicitly
+  // to avoid clean up problems in mocks
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {

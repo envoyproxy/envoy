@@ -153,6 +153,11 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change)
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
+// TODO(yanavlasov): Flip to true after prod testing.
+// Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
+// before downstream.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

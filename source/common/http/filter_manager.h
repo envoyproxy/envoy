@@ -280,6 +280,10 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestDataTooLarge();
   void requestDataDrained();
+  // Encoding end_stream by a non-terminal filters (i.e. cache filter) always causes the decoding to
+  // be stopped even if independent half-close is enabled. For simplicity, independent half-close is
+  // enabled only when the terminal filter is encoding the response.
+  void stopDecodingIfNonTerminalFilterEncodedEndStream(bool encoded_end_stream);
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
@@ -656,7 +660,11 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_) << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
+       << DUMP_MEMBER(state_.decoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.encoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.observed_decode_end_stream_)
+       << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -785,6 +793,15 @@ public:
    */
   void maybeEndEncode(bool end_stream);
 
+  /**
+   * If terminal_filter_decoded_end_stream is true, marks decoding as complete. This is a noop if
+   * terminal_filter_decoded_end_stream is false.
+   * @param end_stream whether decoding is complete.
+   */
+  void maybeEndDecode(bool terminal_filter_decoded_end_stream);
+
+  void checkAndCloseStreamIfFullyClosed();
+
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -871,16 +888,22 @@ public:
 protected:
   struct State {
     State()
-        : encoder_filter_chain_complete_(false), observed_decode_end_stream_(false),
-          observed_encode_end_stream_(false), has_1xx_headers_(false), created_filter_chain_(false),
-          is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
-          saw_downstream_reset_(false) {}
+        : decoder_filter_chain_complete_(false), encoder_filter_chain_complete_(false),
+          observed_decode_end_stream_(false), observed_encode_end_stream_(false),
+          has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false),
+          under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
     uint32_t filter_call_state_{0};
 
+    // Set after decoder filter chain has completed iteration. Prevents further calls to decoder
+    // filters. This flag is used to determine stream completion when the independent half-close is
+    // enabled.
+    bool decoder_filter_chain_complete_ : 1;
+
     // Set after encoder filter chain has completed iteration. Prevents further calls to encoder
-    // filters.
+    // filters. This flag is used to determine stream completion when the independent half-close is
+    // enabled.
     bool encoder_filter_chain_complete_ : 1;
 
     // Set `true` when the filter manager observes end stream on the decoder path (from downstream
@@ -1038,6 +1061,8 @@ private:
   }
 
   bool stopDecoderFilterChain() { return state_.decoder_filter_chain_aborted_; }
+
+  bool isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const;
 
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
