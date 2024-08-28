@@ -3,12 +3,6 @@ name: Publish
 permissions:
   contents: read
 
-# The matrices in this config can be combined once the calling workflow has shifted
-# to a `pull_request`/`commit` pattern (ie not `workflow_dispatch`)
-#
-# For now pre/post submit is split between `publish_ci`/`publish`, the latter running
-# only for "trusted" runs and having access to secrets/permissions
-
 on:
   workflow_call:
     secrets:
@@ -47,6 +41,8 @@ jobs:
       target: ${{ matrix.target }}
       rbe: false
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      downloads: |
+        release.signed: release.signed
       source: ${{ matrix.source }}
       request: ${{ inputs.request }}
       steps-pre: ${{ matrix.steps-pre }}
@@ -61,29 +57,6 @@ jobs:
             export ENVOY_COMMIT=${{ fromJSON(inputs.request).request.sha }}
             export ENVOY_REPO=${{ github.repository }}
             export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
-          steps-pre: |
-            - id: url
-              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.30
-              with:
-                options: -Rr
-                input: >-
-                  ${{ inputs.trusted
-                      && fromJSON(inputs.request).request.sha
-                      || fromJSON(inputs.request).request.ref }}
-                filter: |
-                  .[:7] as $sha
-                  | "release/release.signed.tar.zst" as $path
-                  | if ${{ inputs.trusted }} then
-                      "envoy-postsubmit"
-                    else
-                      "envoy-pr"
-                    end
-                  | . as $bucket
-                  | "https://storage.googleapis.com/\($bucket)/\($sha)/\($path)"
-            - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.2.30
-              with:
-                url: %{{ steps.url.outputs.value }}
-                path: %{{ runner.temp }}/release.signed
 
   publish_docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
