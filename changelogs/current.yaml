@@ -246,8 +246,11 @@ new_features:
     the configured duration.
 - area: ext_authz
   change: |
-    Added :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>`
-    which when set to true enables filter state stats for access logging.
+    Added :ref:`logging_options <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.logging_options>`
+    which when non-empty enables filter state stats for access logging. Deprecated
+    :ref:`ExtAuthz.filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_metadata>`
+    in favor of
+    :ref:`LoggingOptions.filter_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.LoggingOptions.filter_metadata>`.
 - area: http3
   change: |
     ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.
