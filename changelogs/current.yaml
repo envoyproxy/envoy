@@ -260,6 +260,12 @@ new_features:
     :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
     A default configuration will be used if not provided. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` to false.
+- area: getaddrinfo
+  change: |
+    Added :ref:`num_retries<envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_retries>`
+    to configure the number of retries. If this field is not provided, the ``getaddrinfo`` resolver will retry indefinitely until it
+    succeeds or the DNS query times out. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.getaddrinfo_num_retries`` to false.
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
