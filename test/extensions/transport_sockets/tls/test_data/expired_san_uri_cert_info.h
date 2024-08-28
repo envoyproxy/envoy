@@ -1,8 +1,10 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_EXPIRED_SAN_URI_CERT_256_HASH[] =
-    "dc685419c226a3c8262bfb7ccf5ed1691896ec939426fd98786f72f973df7e5a";
-constexpr char TEST_EXPIRED_SAN_URI_CERT_1_HASH[] = "a07e8be8ecca1202bb4bbfe3aecb10c547ec0767";
-constexpr char TEST_EXPIRED_SAN_URI_CERT_SPKI[] = "dhyGS5qdX3wBT0qDNfKKnXCm6K8BaT5kLJbeagD2/Tc=";
-constexpr char TEST_EXPIRED_SAN_URI_CERT_SERIAL[] = "efcf8569427514fc";
-constexpr char TEST_EXPIRED_SAN_URI_CERT_NOT_BEFORE[] = "Aug 28 17:04:09 2024 GMT";
-constexpr char TEST_EXPIRED_SAN_URI_CERT_NOT_AFTER[] = "Aug 29 17:04:09 2023 GMT";
+    "2bbbc8d037a18ba0221e4ddcedfe8bf89616278bce682730eab28d45b65faafd";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_1_HASH[] = "29f6814cbeab23801ade63ea1b5f8c5c0ca0702f";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_SPKI[] = "iud2lp7fgwNMej+52D6dgp0eUs0SEzQdWNIgTmfYg5c=";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_SERIAL[] = "8aa2cdb4fc21cbce";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_NOT_BEFORE[] = "Aug 28 17:18:47 2024 GMT";
+constexpr char TEST_EXPIRED_SAN_URI_CERT_NOT_AFTER[] = "Aug 29 17:18:47 2023 GMT";
