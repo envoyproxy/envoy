@@ -14,6 +14,8 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
@@ -170,6 +172,14 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
 
     protoc_gen_jsonschema_go_dependencies()
     rules_proto_grpc_toolchains()
+
+    crate_universe_dependencies(bootstrap = True)
+    crates_repository(
+        name = "dynamic_modules_rust_sdk_crate_index",
+        cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+        generator = "@cargo_bazel_bootstrap//:cargo-bazel",
+        manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+    )
 
 def envoy_download_go_sdks(go_version):
     go_download_sdk(
