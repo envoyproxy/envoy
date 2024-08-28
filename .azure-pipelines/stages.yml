@@ -49,18 +49,22 @@ stages:
   displayName: Prechecks
   dependsOn: ["env"]
   variables:
-    RUN_PRECHECKS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
+    PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
   jobs:
   - template: stage/prechecks.yml
     parameters:
       concurrencyPrechecks: ${{ parameters.concurrencyPrechecks }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       authGCP: $(GcpServiceAccountKey)
+      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
+      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
+      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
-      runPrechecks: variables['RUN_PRECHECKS']
+      publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
+      runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
 
 - stage: check
   displayName: Checks (Linux x64)
@@ -76,43 +80,3 @@ stages:
       authGCP: $(GcpServiceAccountKey)
       bucketGCP: $(GcsArtifactBucket)
       runChecks: variables['RUN_CHECKS']
-
-- stage: publish
-  displayName: Publish
-  dependsOn: ["env", "prechecks"]
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
-    RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
-    PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
-    PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
-  jobs:
-  - template: stage/publish.yml
-    parameters:
-      authDockerUser: $(DockerUsername)
-      authDockerPassword: $(DockerPassword)
-      authGCP: $(GcpServiceAccountKey)
-      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
-      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
-      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
-      authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
-      authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
-      authGPGPath: $(MaintainerGPGKey.secureFilePath)
-      bucketGCP: $(GcsArtifactBucket)
-      timeoutDockerBuild: ${{ parameters.timeoutDockerBuild }}
-      timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
-      runBuild: variables['RUN_BUILD']
-      runDocker: variables['RUN_DOCKER']
-      runPackaging: variables['RUN_PACKAGING']
-      publishDockerhub: variables['PUBLISH_DOCKERHUB']
-      publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
-
-- stage: verify
-  displayName: Verify
-  dependsOn: ["env", "publish"]
-  variables:
-    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
-  jobs:
-  - template: stage/verify.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)
