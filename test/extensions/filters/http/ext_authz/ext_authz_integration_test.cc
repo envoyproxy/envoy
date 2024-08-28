@@ -130,7 +130,12 @@ public:
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
-      proto_config_.set_emit_filter_state_stats(emitFilterStateStats());
+      if (emitFilterStateStats()) {
+        *(*proto_config_.mutable_logging_options()
+               ->mutable_filter_metadata()
+               ->mutable_fields())["foo"]
+             .mutable_string_value() = "bar";
+      }
 
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
@@ -162,6 +167,10 @@ public:
         logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
                                                                    Grpc::ClientType::EnvoyGrpc);
         logging_filter_config.set_expect_response_bytes(opts.stats_expect_response_bytes);
+
+        // Set the same filter metadata to the ext authz filter and the logging test filter.
+        *(*logging_filter_config.mutable_filter_metadata()->mutable_fields())["foo"]
+             .mutable_string_value() = "bar";
 
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging_filter");

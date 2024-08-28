@@ -99,9 +99,9 @@ public:
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
     TestUtility::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
     proto_config.set_failure_mode_allow(failure_mode_allow);
-    ENVOY_LOG_MISC(debug, "setting emit filter state stats to {}", emit_filter_state_stats);
-    proto_config.set_emit_filter_state_stats(emit_filter_state_stats);
-    ENVOY_LOG_MISC(debug, "proto config: {}", proto_config.DebugString());
+    if (emit_filter_state_stats) {
+      proto_config.mutable_logging_options();
+    }
     return proto_config;
   }
 
@@ -2317,7 +2317,7 @@ TEST_F(HttpFilterTest, FilterDisabled) {
     default_value:
       numerator: 0
       denominator: HUNDRED
-  emit_filter_state_stats: true
+  logging_options: {}
   )EOF");
 
   ON_CALL(factory_context_.runtime_loader_.snapshot_,
@@ -3078,9 +3078,9 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsDenied) {
 
 TEST_P(HttpFilterTestParam, EmitFilterStateStatsWithFilterMetadata) {
   auto proto_config = getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam()), true);
-  auto fields = *proto_config.mutable_filter_metadata()->mutable_fields();
+  auto fields =
+      *proto_config.mutable_logging_options()->mutable_filter_metadata()->mutable_fields();
   *fields["foo"].mutable_string_value() = "bar";
-  ENVOY_LOG_MISC(debug, "proto config: {}", proto_config.DebugString());
   initialize(proto_config);
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -3182,14 +3182,12 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsNullUpstreamHost) {
   testEmitFilterStateStatsCase(&stream_info, response, expected);
 }
 
-// Test that when emit_filter_state_stats is false, stats are not emitted. There is no
-// filter_metadata configured either so ext_authz should add nothing to the filter state at all.
+// Test that when logging_options is empty, the logging info is not emitted.
 TEST_F(HttpFilterTest, NoEmitFilterStateStats) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
-  emit_filter_state_stats: false
   )EOF");
 
   prepareCheck();
@@ -3210,34 +3208,6 @@ TEST_F(HttpFilterTest, NoEmitFilterStateStats) {
 
   auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
   ASSERT_FALSE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
-}
-
-TEST_F(HttpFilterTest, FilterMetadataWithoutFilterStateStats) {
-  InSequence s;
-
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_authz_server"
-  filter_metadata:
-    foo: "bar"
-  )EOF");
-
-  prepareCheck();
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
-        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-      }));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
-
-  auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-  EXPECT_FALSE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
 }
 
 // Test that if no filter metadata is configured, filter state is not added to stream info.

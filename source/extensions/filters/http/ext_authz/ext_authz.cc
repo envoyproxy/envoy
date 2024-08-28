@@ -87,9 +87,11 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       enable_dynamic_metadata_ingestion_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
-      filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
-                                                    : absl::nullopt),
-      emit_filter_state_stats_(config.emit_filter_state_stats()),
+      filter_metadata_(config.has_logging_options() &&
+                               config.logging_options().has_filter_metadata()
+                           ? absl::optional(config.logging_options().filter_metadata())
+                           : absl::nullopt),
+      emit_filter_state_stats_(config.has_logging_options()),
       client_is_envoy_grpc_(config.has_grpc_service() && config.grpc_service().has_envoy_grpc()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(

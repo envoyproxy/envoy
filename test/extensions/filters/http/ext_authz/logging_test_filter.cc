@@ -24,10 +24,10 @@ class LoggingTestFilter : public Http::PassThroughFilter {
 public:
   LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name,
                     bool expect_stats, bool expect_envoy_grpc_specific_stats,
-                    bool expect_response_bytes)
+                    bool expect_response_bytes, const google::protobuf::Struct& filter_metadata)
       : logging_id_(logging_id), expected_cluster_name_(cluster_name), expect_stats_(expect_stats),
         expect_envoy_grpc_specific_stats_(expect_envoy_grpc_specific_stats),
-        expect_response_bytes_(expect_response_bytes) {}
+        expect_response_bytes_(expect_response_bytes), filter_metadata_(filter_metadata) {}
   void encodeComplete() override {
     ASSERT(decoder_callbacks_ != nullptr);
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
@@ -40,6 +40,14 @@ public:
 
     const ExtAuthz::ExtAuthzLoggingInfo* ext_authz_logging_info =
         filter_state->getDataReadOnly<ExtAuthz::ExtAuthzLoggingInfo>(logging_id_);
+
+    ASSERT_EQ(ext_authz_logging_info->filterMetadata().has_value(), filter_metadata_.has_value());
+    if (filter_metadata_.has_value()) {
+      // TODO: Is there a better way to do deep comparison of protos?
+      EXPECT_EQ(ext_authz_logging_info->filterMetadata()->DebugString(),
+                filter_metadata_->DebugString());
+    }
+
     EXPECT_GT(ext_authz_logging_info->latency().count(), 0);
     if (expect_envoy_grpc_specific_stats_) {
       // If the stats exist a request should always have been sent.
@@ -62,6 +70,7 @@ private:
   const bool expect_stats_;
   const bool expect_envoy_grpc_specific_stats_;
   const bool expect_response_bytes_;
+  const absl::optional<google::protobuf::Struct> filter_metadata_;
 };
 
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
@@ -76,7 +85,7 @@ public:
       callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(
           proto_config.logging_id(), proto_config.upstream_cluster_name(),
           proto_config.expect_stats(), proto_config.expect_envoy_grpc_specific_stats(),
-          proto_config.expect_response_bytes()));
+          proto_config.expect_response_bytes(), proto_config.filter_metadata()));
     };
   }
 };
