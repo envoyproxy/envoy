@@ -112,7 +112,8 @@ public:
     virtual ~OrcaLoadReportCallbacks() = default;
     // Invoked when a new orca report is received for this LB context.
     virtual absl::Status
-    onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report) PURE;
+    onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                     const HostDescription& host) PURE;
   };
 
   /**
