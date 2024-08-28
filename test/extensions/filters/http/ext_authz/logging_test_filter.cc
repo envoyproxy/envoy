@@ -24,7 +24,7 @@ class LoggingTestFilter : public Http::PassThroughFilter {
 public:
   LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name,
                     bool expect_stats, bool expect_envoy_grpc_specific_stats,
-                    bool expect_response_bytes, const google::protobuf::Struct& filter_metadata)
+                    bool expect_response_bytes, const ProtobufWkt::Struct& filter_metadata)
       : logging_id_(logging_id), expected_cluster_name_(cluster_name), expect_stats_(expect_stats),
         expect_envoy_grpc_specific_stats_(expect_envoy_grpc_specific_stats),
         expect_response_bytes_(expect_response_bytes), filter_metadata_(filter_metadata) {}
@@ -70,7 +70,7 @@ private:
   const bool expect_stats_;
   const bool expect_envoy_grpc_specific_stats_;
   const bool expect_response_bytes_;
-  const absl::optional<google::protobuf::Struct> filter_metadata_;
+  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
 };
 
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
