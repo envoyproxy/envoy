@@ -1487,6 +1487,7 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
 
   EXPECT_CALL(stream_encoder_, encodeData(_, _)).Times(0);
   stream->sendData(*body, true);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
@@ -1527,6 +1528,7 @@ TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
 
   EXPECT_CALL(stream_encoder_, encodeTrailers(_)).Times(0);
   stream->sendTrailers(trailers);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 // Validate behavior when the stream's onHeaders() callback performs a stream
