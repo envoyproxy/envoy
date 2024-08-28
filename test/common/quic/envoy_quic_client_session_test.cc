@@ -100,13 +100,16 @@ public:
         self_addr_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
             54321)),
-        peer_socket_(createListenSocket(peer_addr_)),
+        peer_socket_(std::make_unique<Network::UdpListenSocket>(peer_addr_, /*options=*/nullptr,
+                                                                /*bind=*/true)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}) {
+    // After binding the listen peer socket, set the bound IP address of the peer.
+    peer_addr_ = peer_socket_->connectionInfoProvider().localAddress();
     http3_options_.mutable_quic_protocol_options()
         ->mutable_num_timeouts_to_trigger_port_migration()
         ->set_value(1);
@@ -158,13 +161,6 @@ public:
       envoy_quic_session_->close(Network::ConnectionCloseType::NoFlush);
     }
     peer_socket_->close();
-  }
-
-  Network::UdpListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr& addr) {
-    auto socket =
-        std::make_unique<Network::UdpListenSocket>(addr, /*options=*/nullptr, /*bind=*/true);
-    addr = socket->connectionInfoProvider().localAddress();
-    return socket;
   }
 
   EnvoyQuicClientStream& sendGetRequest(Http::ResponseDecoder& response_decoder,

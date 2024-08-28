@@ -181,11 +181,17 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const bool prefer_gro) {
   ASSERT(peer_addr != nullptr);
+  const bool should_connect =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_connect_client_udp_sockets");
   size_t max_addresses_cache_size =
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
           ? 4u
           : 0u;
+
+  if (local_addr == nullptr && !should_connect) {
+    local_addr = getLoopbackAddress(peer_addr->ip()->version());
+  }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram,
       // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
@@ -219,11 +225,13 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     connection_socket->bind(local_addr);
     ASSERT(local_addr->ip());
   }
-  if (auto result = connection_socket->connect(peer_addr); result.return_value_ == -1) {
-    connection_socket->close();
-    ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
-                   errorDetails(result.errno_));
-    return connection_socket;
+  if (should_connect) {
+    if (auto result = connection_socket->connect(peer_addr); result.return_value_ == -1) {
+      connection_socket->close();
+      ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
+                     errorDetails(result.errno_));
+      return connection_socket;
+    }
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
