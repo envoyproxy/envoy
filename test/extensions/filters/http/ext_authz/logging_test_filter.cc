@@ -34,18 +34,25 @@ public:
         decoder_callbacks_->streamInfo().filterState();
 
     ASSERT_EQ(filter_state->hasData<ExtAuthz::ExtAuthzLoggingInfo>(logging_id_), expect_stats_);
-    if (expect_stats_) {
-      const ExtAuthz::ExtAuthzLoggingInfo* ext_authz_logging_info =
-          filter_state->getDataReadOnly<ExtAuthz::ExtAuthzLoggingInfo>(logging_id_);
-      EXPECT_GT(ext_authz_logging_info->latency().count(), 0);
-      if (expect_envoy_grpc_specific_stats_) {
-        EXPECT_GT(ext_authz_logging_info->bytesSent(), 0);
-        if (expect_response_bytes_) {
-          EXPECT_GT(ext_authz_logging_info->bytesReceived(), 0);
-        }
-        ASSERT_NE(ext_authz_logging_info->upstreamHost(), nullptr);
-        EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
+    if (!expect_stats_) {
+      return;
+    }
+
+    const ExtAuthz::ExtAuthzLoggingInfo* ext_authz_logging_info =
+        filter_state->getDataReadOnly<ExtAuthz::ExtAuthzLoggingInfo>(logging_id_);
+    EXPECT_GT(ext_authz_logging_info->latency().count(), 0);
+    if (expect_envoy_grpc_specific_stats_) {
+      // If the stats exist a request should always have been sent.
+      EXPECT_GT(ext_authz_logging_info->bytesSent(), 0);
+
+      // A response may or may not have been received depending on the test.
+      if (expect_response_bytes_) {
+        EXPECT_GT(ext_authz_logging_info->bytesReceived(), 0);
+      } else {
+        EXPECT_EQ(ext_authz_logging_info->bytesReceived(), 0);
       }
+      ASSERT_NE(ext_authz_logging_info->upstreamHost(), nullptr);
+      EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
     }
   }
 

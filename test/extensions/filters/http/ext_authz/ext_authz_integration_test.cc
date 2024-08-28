@@ -35,8 +35,10 @@ struct GrpcInitializeConfigOpts {
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
-  bool emit_filter_state_stats = false;
-  // Only effective if emit_filter_state_stats = true.
+  // In some tests a request is never sent. If a request is never sent, stats are not set. In those
+  // tests, we need to be able to override this to false.
+  absl::optional<bool> expect_stats_override;
+  // In timeout tests we expect zero response bytes.
   bool stats_expect_response_bytes = true;
 };
 
@@ -54,7 +56,7 @@ class ExtAuthzGrpcIntegrationTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
       public testing::TestWithParam<
-          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>> {
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool, bool>> {
 
 public:
   ExtAuthzGrpcIntegrationTest()
@@ -62,12 +64,13 @@ public:
 
   static std::string testParamsToString(
       const ::testing::TestParamInfo<
-          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>>& p) {
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool, bool>>& p) {
     return fmt::format(
-        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(std::get<0>(p.param))),
+        "{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(std::get<0>(p.param))),
         std::get<1>(std::get<0>(p.param)) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
                                                                           : "EnvoyGrpc",
-        std::get<1>(p.param) ? "RawHeaders" : "LegacyHeaders");
+        std::get<1>(p.param) ? "RawHeaders" : "LegacyHeaders",
+        std::get<2>(p.param) ? "EmitFilterStateStats" : "DoNotEmitFilterStateStats");
   }
 
   // BaseGrpcClientIntegrationParamTest
@@ -78,6 +81,8 @@ public:
   Grpc::ClientType clientType() const override { return std::get<1>(std::get<0>(GetParam())); }
 
   bool encodeRawHeaders() const { return std::get<1>(GetParam()); }
+
+  bool emitFilterStateStats() const { return std::get<2>(GetParam()); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -125,7 +130,7 @@ public:
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
-      proto_config_.set_emit_filter_state_stats(opts.emit_filter_state_stats);
+      proto_config_.set_emit_filter_state_stats(emitFilterStateStats());
 
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
@@ -149,13 +154,13 @@ public:
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
 
-      if (opts.emit_filter_state_stats) {
+      if (emitFilterStateStats()) {
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id("envoy.filters.http.ext_authz");
         logging_filter_config.set_upstream_cluster_name("ext_authz_cluster");
-        logging_filter_config.set_expect_stats(true);
-        logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
-                                                                   Grpc::ClientType::EnvoyGrpc);
+        logging_filter_config.set_expect_stats(opts.expect_stats_override.value_or(true));
+        logging_filter_config.set_expect_envoy_grpc_specific_stats(
+            clientType() == Grpc::ClientType::EnvoyGrpc);
         logging_filter_config.set_expect_response_bytes(opts.stats_expect_response_bytes);
 
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
@@ -623,6 +628,8 @@ attributes:
   void expectFilterDisableCheck(bool deny_at_disable, bool disable_with_metadata,
                                 const std::string& expected_status) {
     GrpcInitializeConfigOpts opts;
+    // Request is never sent; stats will not be emitted.
+    opts.expect_stats_override = false;
     opts.disable_with_metadata = disable_with_metadata;
     initializeConfig(opts);
     setDenyAtDisableRuntimeConfig(deny_at_disable, disable_with_metadata);
@@ -959,7 +966,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
+                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool(),
+                                          testing::Bool()),
                          ExtAuthzGrpcIntegrationTest::testParamsToString);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
@@ -1079,56 +1087,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
   cleanup();
 }
 
-TEST_P(ExtAuthzGrpcIntegrationTest, EmitFilterStateStats) {
-  // Set up ext_authz filter.
-  GrpcInitializeConfigOpts opts;
-  opts.emit_filter_state_stats = true;
-  initializeConfig(opts);
-
-  // Use h1, set up the test.
-  setDownstreamProtocol(Http::CodecType::HTTP1);
-  HttpIntegrationTest::initialize();
-
-  // Start a client connection and request.
-  initiateClientConnection(0);
-
-  // Wait for the ext_authz request as a result of the client request.
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
-
-  // Send back an ext_authz response with response_headers_to_add set.
-  sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-      Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{}, Headers{}, Headers{});
-
-  // Wait for the upstream response.
-  waitForSuccessfulUpstreamResponse("200");
-
-  cleanup();
-}
-
-TEST_P(ExtAuthzGrpcIntegrationTest, EmitFilterStateStatsTimeout) {
-  // Set up ext_authz filter.
-  GrpcInitializeConfigOpts opts;
-  opts.emit_filter_state_stats = true;
-  opts.stats_expect_response_bytes = false;
-  opts.timeout_ms = 1;
-  initializeConfig(opts);
-
-  // Use h1, set up the test.
-  setDownstreamProtocol(Http::CodecType::HTTP1);
-  HttpIntegrationTest::initialize();
-
-  // Start a client connection and request.
-  initiateClientConnection(0);
-
-  // Do not sendExtAuthzResponse(). Envoy should reject the request after 1 ms.
-  ASSERT_TRUE(response_->waitForEndStream());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
-
-  cleanup();
-}
-
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   // Set up ext_authz filter.
   initializeConfig();
@@ -1177,6 +1135,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   GrpcInitializeConfigOpts opts;
+  opts.stats_expect_response_bytes = false;
   opts.failure_mode_allow = false;
   opts.timeout_ms = 1;
   initializeConfig(opts);
@@ -1254,6 +1213,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   GrpcInitializeConfigOpts init_opts;
+  init_opts.stats_expect_response_bytes = false;
   init_opts.failure_mode_allow = true;
   init_opts.timeout_ms = 1;
   initializeConfig(init_opts);
