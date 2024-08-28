@@ -3985,7 +3985,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -4051,7 +4051,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -4139,7 +4139,7 @@ TEST_F(HttpFilterTest, HeaderMutationInBodyResp) {
   request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -4219,7 +4219,7 @@ TEST_F(HttpFilterTest, HeaderRespWithStatusContinueAndReplace) {
   request_headers_.setMethod("POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -4296,13 +4296,14 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   // Header response arrives
   auto req_response = std::make_unique<ProcessingResponse>();
   (void )req_response->mutable_request_headers();
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
   stream_callbacks_->onReceiveMessage(std::move(req_response));
 
   // Data response arrives
   for (int i = 0; i < 5; i++) {
     processRequestBody(absl::nullopt, false);
   }
-  processRequestBody(absl::nullopt, true);
+  processRequestBody(absl::nullopt, false);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");

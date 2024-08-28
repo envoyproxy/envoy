@@ -154,8 +154,6 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
-  absl::Status
-  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
   absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
   absl::Status
@@ -275,6 +273,9 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
+  void sendBufferedDataInStreamedMode(bool end_stream);
+  absl::Status
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void clearStreamingChunk() { chunk_queue_.clear(); }
 };
 

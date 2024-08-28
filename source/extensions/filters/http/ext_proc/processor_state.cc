@@ -81,6 +81,25 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
+void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
+  // Process the data being buffered in streaming mode.
+  // Move the current buffer into the queue for remote processing and clear the buffered data.
+  if (hasBufferedData()) {
+    Buffer::OwnedImpl buffered_chunk;
+    modifyBufferedData(
+        [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+    ENVOY_LOG(debug, "Sending a chunk of buffered data ({})", buffered_chunk.length());
+    // Need to first enqueue the data into the chunk queue before sending.
+    auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
+    enqueueStreamingChunk(buffered_chunk, end_stream);
+    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
+  }
+  if (queueBelowLowLimit()) {
+    clearWatermark();
+  }
+  continueIfNecessary();
+}
+
 absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response) {
   ENVOY_LOG(debug, "Applying header mutations");
   const auto mut_status = MutationUtils::applyHeaderMutations(
@@ -110,7 +129,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       onFinishProcessorCall(Grpc::Status::Ok);
     } else {
-      // STREAMED body mode and body already sent
+      // StreamedBodyCallback state. There is pending body response.
       onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
     }
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
@@ -145,17 +164,24 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // Fall through if there was never a body in the first place.
         ENVOY_LOG(debug, "The message had no body");
       } else if (complete_body_available_ && body_mode_ != ProcessingMode::NONE) {
-        // If we get here, then all the body data came in before the header message
-        // was complete, and the server wants the body. It doesn't matter whether the
-        // processing mode is buffered, streamed, or partially buffered.
-        if (bufferedData()) {
-          // Get here, no_body_ = false, and complete_body_available_ = true, the end_stream
-          // flag of decodeData() can be determined by whether the trailers are received.
-          // Also, bufferedData() is not nullptr means decodeData() is called, even though
-          // the data can be an empty chunk.
-          auto req = filter_.setupBodyChunk(*this, *bufferedData(), !trailers_available_);
-          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
-          clearWatermark();
+        if (callback_state_ != CallbackState::StreamedBodyCallback) {
+          // If we get here, then all the body data came in before the header message
+          // was complete, and the server wants the body. It doesn't matter whether the
+          // processing mode is buffered, streamed, or partially buffered.
+          if (bufferedData()) {
+            // Get here, no_body_ = false, and complete_body_available_ = true, the end_stream
+            // flag of decodeData() can be determined by whether the trailers are received.
+            // Also, bufferedData() is not nullptr means decodeData() is called, even though
+            // the data can be an empty chunk.
+            auto req = filter_.setupBodyChunk(*this, *bufferedData(), !trailers_available_);
+            filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+            clearWatermark();
+            return absl::OkStatus();
+          }
+        } else {
+          // StreamedBodyCallback state. There is pending body response.
+          // Check whether there is buffered data. If there is, send them.
+          sendBufferedDataInStreamedMode(!trailers_available_);
           return absl::OkStatus();
         }
       } else if (body_mode_ == ProcessingMode::BUFFERED) {
@@ -165,23 +191,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         clearWatermark();
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::STREAMED) {
-        if (hasBufferedData()) {
-          // We now know that we need to process what we have buffered in streaming mode.
-          // Move the current buffer into the queue for remote processing and clear the
-          // buffered data.
-          Buffer::OwnedImpl buffered_chunk;
-          modifyBufferedData(
-              [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
-          ENVOY_LOG(debug, "Sending first chunk using buffered data ({})", buffered_chunk.length());
-          // Need to first enqueue the data into the chunk queue before sending.
-          auto req = filter_.setupBodyChunk(*this, buffered_chunk, false);
-          enqueueStreamingChunk(buffered_chunk, false);
-          filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
-        }
-        if (queueBelowLowLimit()) {
-          clearWatermark();
-        }
-        continueIfNecessary();
+        sendBufferedDataInStreamedMode(false);
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
         if (hasBufferedData()) {
@@ -355,7 +365,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       filter_.sendTrailers(*this, *trailers_);
       return absl::OkStatus();
     }
-
     if (should_continue) {
       continueIfNecessary();
     }
