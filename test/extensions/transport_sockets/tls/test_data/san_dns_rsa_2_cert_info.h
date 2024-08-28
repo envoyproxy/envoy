@@ -2,9 +2,9 @@
 
 // NOLINT(namespace-envoy)
 constexpr char TEST_SAN_DNS_RSA_2_CERT_256_HASH[] =
-    "90ca80781b0e54ae256d7c427c858ec1a32167a1dfbafbebe1c76831e1136ea4";
-constexpr char TEST_SAN_DNS_RSA_2_CERT_1_HASH[] = "2e876ac711e47b895bcfde70412ff15b83eed962";
-constexpr char TEST_SAN_DNS_RSA_2_CERT_SPKI[] = "SHPkbABvYY0s3Xa2c5hwPYD+0e2LVvH5Q3SwZ1Gj6Tw=";
-constexpr char TEST_SAN_DNS_RSA_2_CERT_SERIAL[] = "377896c1aa5da1318c704221ec1f772a4fcb4837";
-constexpr char TEST_SAN_DNS_RSA_2_CERT_NOT_BEFORE[] = "Jul 22 12:35:03 2022 GMT";
-constexpr char TEST_SAN_DNS_RSA_2_CERT_NOT_AFTER[] = "Jul 21 12:35:03 2024 GMT";
+    "3a4fcd2fcbc9af0d1f7fcb71b682b0d44eadcd2fa845db5f9d6429b2a2ce6590";
+constexpr char TEST_SAN_DNS_RSA_2_CERT_1_HASH[] = "86f6d45bcd0c692737298b24bc4d3cf8ba5d83da";
+constexpr char TEST_SAN_DNS_RSA_2_CERT_SPKI[] = "HbdEAowF6vi5yQ7veTwy5AUB2T2YpFo2m6WeIPSVqo8=";
+constexpr char TEST_SAN_DNS_RSA_2_CERT_SERIAL[] = "8aa2cdb4fc21cbc5";
+constexpr char TEST_SAN_DNS_RSA_2_CERT_NOT_BEFORE[] = "Aug 28 17:18:46 2024 GMT";
+constexpr char TEST_SAN_DNS_RSA_2_CERT_NOT_AFTER[] = "Aug 28 17:18:46 2026 GMT";
