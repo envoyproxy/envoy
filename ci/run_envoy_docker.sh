@@ -92,6 +92,11 @@ VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
 
+if [[ -n "$MOUNT_GPG_HOME" ]]; then
+    VOLUMES+=(
+        -v "${HOME}/.gnupg:${BUILD_DIR_MOUNT_DEST}/.gnupg")
+fi
+
 if ! is_windows; then
     export BUILD_DIR="${BUILD_DIR_MOUNT_DEST}"
 fi
