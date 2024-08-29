@@ -163,7 +163,9 @@ TEST_F(JsonLoaderTest, Basic) {
       if (key == "1") {
         EXPECT_EQ("111", value.getString("11"));
         EXPECT_EQ("111", absl::get<std::string>(getValidValue(value, "11")));
-        EXPECT_EQ("no_value_and_default", value.getString("unknown_key", "no_value_and_default"));
+
+        EXPECT_EQ("no_value_and_default", value.getString("unknown_key", "no_value_and_default"))
+
       } else {
         EXPECT_EQ("222", value.getString("22"));
         EXPECT_EQ("222", absl::get<std::string>(getValidValue(value, "22")));
