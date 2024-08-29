@@ -172,7 +172,7 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
 }
 
@@ -208,7 +208,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
         .WillOnce([&context](Http::StreamFilterSharedPtr filter) {
           context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);
         });
-    EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+    EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
     cb(filter_callback);
   }
   // Check if the context still holds a valid Wasm even after the factory is destroyed.
@@ -242,7 +242,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
 }
 
@@ -292,7 +292,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
 }
 
@@ -318,7 +318,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
 }
 
@@ -385,7 +385,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
 }
 
@@ -449,7 +449,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
 
   cb(filter_callback);
   dispatcher_.clearDeferredDeleteList();
@@ -572,7 +572,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
 
   cb(filter_callback);
 
@@ -639,7 +639,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   Http::MockFilterChainFactoryCallbacks filter_callback2;
   EXPECT_CALL(filter_callback2, addStreamFilter(_));
-  EXPECT_CALL(filter_callback2, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback2, prependAccessLogHandler(_));
 
   cb2(filter_callback2);
 
@@ -847,7 +847,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
 }
 
@@ -900,7 +900,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
       .WillOnce(Invoke([&context](Http::StreamFilterSharedPtr filter) {
         context = std::static_pointer_cast<Extensions::Common::Wasm::Context>(filter);
       }));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  EXPECT_CALL(filter_callback, prependAccessLogHandler(_));
   cb(filter_callback);
   EXPECT_EQ(context->wasm(), nullptr);
   EXPECT_TRUE(context->isFailed());
