@@ -96,7 +96,6 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   if (queueBelowLowLimit()) {
     clearWatermark();
   }
-  continueIfNecessary();
 }
 
 absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response) {
@@ -191,6 +190,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::STREAMED) {
         sendBufferedDataInStreamedMode(false);
+        continueIfNecessary();
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
         if (hasBufferedData()) {
