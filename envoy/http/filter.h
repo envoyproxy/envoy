@@ -1249,7 +1249,8 @@ public:
 
   /**
    * Prepend an access log handler that is called when the stream is destroyed.
-   * @param handler supplies the handler to add.
+   * @param handler supplies the handler to add. Currently used specifically for
+   * WASM filter.
    */
   virtual void prependAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 
