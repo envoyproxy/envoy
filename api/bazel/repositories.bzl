@@ -62,10 +62,6 @@ def api_dependencies():
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
     external_http_archive(
-        name = "rules_proto_grpc",
-    )
-
-    external_http_archive(
         name = "envoy_toolshed",
     )
 

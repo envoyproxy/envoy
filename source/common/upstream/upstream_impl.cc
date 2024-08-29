@@ -42,6 +42,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/happy_eyeballs_connection_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
@@ -124,7 +125,7 @@ parseExtensionProtocolOptions(
   for (const auto& it : config.typed_extension_protocol_options()) {
     auto& name = it.first;
     auto object_or_error = createProtocolOptionsConfig(name, it.second, factory_context);
-    RETURN_IF_STATUS_NOT_OK(object_or_error);
+    RETURN_IF_NOT_OK_REF(object_or_error.status());
     if (object_or_error.value() != nullptr) {
       options[name] = std::move(object_or_error.value());
     }
@@ -235,7 +236,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(bind_config->source_address());
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       upstream_local_address.address_ = address_or_error.value();
     }
     upstream_local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
@@ -251,7 +252,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
       UpstreamLocalAddress extra_upstream_local_address;
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(extra_source_address.address());
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       extra_upstream_local_address.address_ = address_or_error.value();
 
       extra_upstream_local_address.socket_options_ =
@@ -275,7 +276,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
       UpstreamLocalAddress additional_upstream_local_address;
       auto address_or_error =
           ::Envoy::Network::Address::resolveProtoSocketAddress(additional_source_address);
-      RETURN_IF_STATUS_NOT_OK(address_or_error);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
       additional_upstream_local_address.address_ = address_or_error.value();
       additional_upstream_local_address.socket_options_ =
           std::make_shared<::Envoy::Network::ConnectionSocket::Options>();
@@ -373,12 +374,26 @@ createUpstreamLocalAddressSelector(
                                                      envoy::config::core::v3::BindConfig{})),
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{})));
-  RETURN_IF_STATUS_NOT_OK(config_or_error);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
   auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
       config_or_error.value(), cluster_name);
-  RETURN_IF_STATUS_NOT_OK(selector_or_error);
+  RETURN_IF_NOT_OK_REF(selector_or_error.status());
   return selector_or_error.value();
 }
+
+class LoadBalancerFactoryContextImpl : public Upstream::LoadBalancerFactoryContext {
+public:
+  explicit LoadBalancerFactoryContextImpl(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : server_context_(server_context) {}
+
+  Event::Dispatcher& mainThreadDispatcher() override {
+    return server_context_.mainThreadDispatcher();
+  }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+};
 
 } // namespace
 
@@ -521,6 +536,54 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
                           transport_socket_options, shared_from_this());
 }
 
+absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
+    const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    HostDescriptionConstSharedPtr host) {
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    return transport_socket_options->http11ProxyInfo()->proxy_address;
+  }
+
+  // See if host metadata contains a proxy address and only check locality metadata if host
+  // metadata did not have the relevant key.
+  for (const auto& metadata : {host->metadata(), host->localityMetadata()}) {
+    if (metadata == nullptr) {
+      continue;
+    }
+
+    auto addr_it = metadata->typed_filter_metadata().find(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
+    if (addr_it == metadata->typed_filter_metadata().end()) {
+      continue;
+    }
+
+    // Parse an address from the metadata.
+    envoy::config::core::v3::Address proxy_addr;
+    auto status = MessageUtil::unpackTo(addr_it->second, proxy_addr);
+    if (!status.ok()) {
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to parse proto from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
+      return absl::nullopt;
+    }
+
+    // Resolve the parsed address proto.
+    auto resolve_status = Network::Address::resolveProtoAddress(proxy_addr);
+    if (!resolve_status.ok()) {
+      ENVOY_LOG_EVERY_POW_2(
+          error, "failed to resolve address from endpoint/locality metadata field {}, host={}",
+          Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR,
+          host->hostname());
+      return absl::nullopt;
+    }
+
+    // We successfully resolved, so return the instance ptr.
+    return resolve_status.value();
+  }
+
+  return absl::nullopt;
+}
+
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
@@ -531,17 +594,20 @@ Host::CreateConnectionData HostImplBase::createConnection(
     HostDescriptionConstSharedPtr host) {
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
+  absl::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
+      maybeGetProxyRedirectAddress(transport_socket_options, host);
+
   Network::ClientConnectionPtr connection;
-  // If the transport socket options indicate the connection should be
-  // redirected to a proxy, create the TCP connection to the proxy's address not
-  // the host's address.
-  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+  // If the transport socket options or endpoint/locality metadata indicate the connection should
+  // be redirected to a proxy, create the TCP connection to the proxy's address not the host's
+  // address.
+  if (proxy_address.has_value()) {
     auto upstream_local_address =
         source_address_selector->getUpstreamLocalAddress(address, options);
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy at {}",
-              transport_socket_options->http11ProxyInfo()->proxy_address->asString());
+              proxy_address.value()->asString());
     connection = dispatcher.createClientConnection(
-        transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
+        proxy_address.value(), upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
@@ -550,7 +616,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = cluster.happyEyeballsConfig();
+        happy_eyeballs_config = *cluster.happyEyeballsConfig();
       } else {
         envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
         default_config.set_first_address_family_version(
@@ -981,13 +1047,14 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
           config.has_http2_protocol_options(), validation_visitor);
-  RETURN_IF_STATUS_NOT_OK(options_or_error);
+  RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
@@ -1030,12 +1097,13 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+  return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-    const ClusterProto& cluster, ProtobufMessage::ValidationVisitor& visitor) {
+    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor) {
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
   // In this case the subset load balancer should not be used.
@@ -1043,12 +1111,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(cluster, visitor)};
+      return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
     }
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(lb_factory_context, cluster, visitor);
 }
 
 using ProtocolOptionsHashMap =
@@ -1134,6 +1202,17 @@ ClusterInfoImpl::ClusterInfoImpl(
       network_filter_config_provider_manager_(
           createSingletonUpstreamNetworkFilterConfigProviderManager(server_context)),
       upstream_context_(server_context, init_manager, *stats_scope_),
+      happy_eyeballs_config_(
+          config.upstream_connection_options().has_happy_eyeballs_config()
+              ? std::make_unique<
+                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
+                    config.upstream_connection_options().happy_eyeballs_config())
+              : nullptr),
+      lrs_report_metric_names_(!config.lrs_report_endpoint_metrics().empty()
+                                   ? std::make_unique<Envoy::Orca::LrsReportMetricNames>(
+                                         config.lrs_report_endpoint_metrics().begin(),
+                                         config.lrs_report_endpoint_metrics().end())
+                                   : nullptr),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1150,13 +1229,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api), has_configured_http_filters_(false),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
-                          config.track_cluster_stats().per_endpoint_stats()),
-      happy_eyeballs_config_(
-          config.upstream_connection_options().has_happy_eyeballs_config()
-              ? absl::make_optional<
-                    envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
-                    config.upstream_connection_options().happy_eyeballs_config())
-              : absl::nullopt) {
+                          config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throwEnvoyExceptionOrPanic(
@@ -1188,9 +1261,10 @@ ClusterInfoImpl::ClusterInfoImpl(
   } else {
     // If load_balancing_policy is not set, we will try to convert legacy lb_policy
     // to load_balancing_policy and use it.
+    LoadBalancerFactoryContextImpl lb_factory_context(server_context);
 
     auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-        config, server_context.messageValidationVisitor());
+        lb_factory_context, config, server_context.messageValidationVisitor());
 
     if (!lb_pair.ok()) {
       throwEnvoyExceptionOrPanic(std::string(lb_pair.status().message()));
@@ -1221,8 +1295,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     optional_timeouts_.set<OptionalTimeoutNames::IdleTimeout>(*idle_timeout);
   }
 
-  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating that
-  // no timeout should be used.
+  // Use default (10m) or configured `tcp_pool_idle_timeout`, unless it's set to 0, indicating
+  // that no timeout should be used.
   absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout(std::chrono::minutes(10));
   if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
     tcp_pool_idle_timeout = tcp_protocol_options_->idleTimeout();
@@ -1357,13 +1431,14 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
+      LoadBalancerFactoryContextImpl lb_factory_context(context);
       auto proto_message = factory->createEmptyConfigProto();
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              context.messageValidationVisitor(), *proto_message);
 
       load_balancer_factory_ = factory;
-      load_balancer_config_ =
-          factory->loadConfig(*proto_message, context.messageValidationVisitor());
+      load_balancer_config_ = factory->loadConfig(lb_factory_context, *proto_message,
+                                                  context.messageValidationVisitor());
 
       break;
     }
@@ -1722,7 +1797,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   default:
     return absl::InvalidArgumentError(fmt::format(
         "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
-        drop_percentage.denominator()));
+        static_cast<int>(drop_percentage.denominator())));
   }
 
   // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.

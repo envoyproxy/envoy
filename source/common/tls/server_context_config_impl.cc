@@ -9,9 +9,11 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/common/tls/ssl_handshaker.h"
 
 #include "openssl/ssl.h"
@@ -59,9 +61,9 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
       SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
     return nullptr;
   default:
-    creation_status =
-        absl::InvalidArgumentError(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
-                                               config.session_ticket_keys_type_case()));
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Unexpected case for oneof session_ticket_keys: {}",
+                    static_cast<int>(config.session_ticket_keys_type_case())));
     return nullptr;
   }
 }
@@ -101,10 +103,10 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES =
 
 absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context, bool for_quic) {
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(
-      new ServerContextConfigImpl(config, secret_provider_context, creation_status));
+      new ServerContextConfigImpl(config, secret_provider_context, creation_status, for_quic));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -112,7 +114,7 @@ absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status)
+    absl::Status& creation_status, bool for_quic)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context, creation_status),
       require_client_certificate_(
@@ -123,7 +125,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
       disable_stateful_session_resumption_(config.disable_stateful_session_resumption()),
       full_scan_certs_on_sni_mismatch_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, full_scan_certs_on_sni_mismatch, false)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, full_scan_certs_on_sni_mismatch, false)),
+      prefer_client_ciphers_(config.prefer_client_ciphers()) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
@@ -155,6 +158,25 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     session_timeout_ =
         std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
+
+  if (config.common_tls_context().has_custom_tls_certificate_selector()) {
+    // If a custom tls context provider is configured, derive the factory from the config.
+    const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
+    Ssl::TlsCertificateSelectorConfigFactory* provider_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
+            provider_config);
+    tls_certificate_selector_factory_ = provider_factory->createTlsCertificateSelectorFactory(
+        provider_config.typed_config(), factory_context.serverFactoryContext(),
+        factory_context.messageValidationVisitor(), creation_status, for_quic);
+    return;
+  }
+
+  auto factory =
+      TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
+  const ProtobufWkt::Any any;
+  tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
+      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
+      creation_status, for_quic);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
@@ -227,6 +249,13 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+Ssl::TlsCertificateSelectorFactory ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
+  if (!tls_certificate_selector_factory_) {
+    IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
+  }
+  return tls_certificate_selector_factory_;
 }
 
 } // namespace Tls

@@ -1799,7 +1799,7 @@ bool ConnectionImpl::Http2Visitor::SendDataFrame(Http2StreamId stream_id,
 
 bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t length,
                                                  uint8_t type, uint8_t flags) {
-  ENVOY_CONN_LOG(debug, "Http2Visitor::OnFrameHeader({}, {}, {}, {})", connection_->connection_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor::OnFrameHeader({}, {}, {}, {})", connection_->connection_,
                  stream_id, length, int(type), int(flags));
 
   if (type == OGHTTP2_CONTINUATION_FRAME_TYPE) {
@@ -1843,7 +1843,7 @@ ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
 }
 
 bool ConnectionImpl::Http2Visitor::OnEndHeadersForStream(Http2StreamId stream_id) {
-  ENVOY_CONN_LOG(debug, "Http2Visitor::OnEndHeadersForStream({})", connection_->connection_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor::OnEndHeadersForStream({})", connection_->connection_,
                  stream_id);
   Status status = connection_->onHeaders(stream_id, current_frame_.length, current_frame_.flags);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
@@ -1851,12 +1851,12 @@ bool ConnectionImpl::Http2Visitor::OnEndHeadersForStream(Http2StreamId stream_id
 
 bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
                                                         size_t payload_length) {
-  ENVOY_CONN_LOG(debug, "Http2Visitor::OnBeginDataForStream({}, {})", connection_->connection_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor::OnBeginDataForStream({}, {})", connection_->connection_,
                  stream_id, payload_length);
   remaining_data_payload_ = payload_length;
   padding_length_ = 0;
   if (remaining_data_payload_ == 0 && (current_frame_.flags & FLAG_END_STREAM) == 0) {
-    ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
+    ENVOY_CONN_LOG(trace, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
     Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
@@ -1873,13 +1873,13 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
   padding_length_ = padding_length;
   remaining_data_payload_ -= padding_length;
   if (remaining_data_payload_ == 0 && (current_frame_.flags & FLAG_END_STREAM) == 0) {
-    ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
+    ENVOY_CONN_LOG(trace, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
     Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
                  connection_->connection_, remaining_data_payload_,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
@@ -1892,24 +1892,24 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
   remaining_data_payload_ -= data.size();
   if (result == 0 && remaining_data_payload_ == 0 &&
       (current_frame_.flags & FLAG_END_STREAM) == 0) {
-    ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
+    ENVOY_CONN_LOG(trace, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
     Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
                  connection_->connection_, remaining_data_payload_,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return result == 0;
 }
 
 bool ConnectionImpl::Http2Visitor::OnEndStream(Http2StreamId stream_id) {
-  ENVOY_CONN_LOG(debug, "Http2Visitor::OnEndStream({})", connection_->connection_, stream_id);
+  ENVOY_CONN_LOG(trace, "Http2Visitor::OnEndStream({})", connection_->connection_, stream_id);
   if (current_frame_.type == OGHTTP2_DATA_FRAME_TYPE) {
     // `onBeginData` is invoked here to ensure that the connection has successfully validated and
     // processed the entire DATA frame.
-    ENVOY_CONN_LOG(debug, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
+    ENVOY_CONN_LOG(trace, "Http2Visitor dispatching DATA for stream {}", connection_->connection_,
                    stream_id);
     Status status = connection_->onBeginData(stream_id, current_frame_.length, current_frame_.flags,
                                              padding_length_);
@@ -1926,7 +1926,7 @@ bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
   Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   if (stream_close_listener_) {
-    ENVOY_CONN_LOG(debug, "Http2Visitor invoking stream close listener for {}",
+    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for {}",
                    connection_->connection_, stream_id);
     stream_close_listener_(stream_id);
   }

@@ -212,6 +212,34 @@ TEST_P(ClientTest, BasicStreamHeaders) {
   ASSERT_EQ(callbacks_called.on_complete_calls_, 1);
 }
 
+TEST_P(ClientTest, BasicStreamHeadersIdempotent) {
+  // Create a stream, and set up request_decoder_ and response_encoder_
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  // Send request headers.
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  expected_headers.addCopy("x-envoy-mobile-cluster", "base_clear");
+  expected_headers.addCopy("x-forwarded-proto", "https");
+  expected_headers.addCopy("x-envoy-retry-on", "http3-post-connect-failure");
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), /* end_stream= */ true,
+                           /* idempotent= */ true);
+
+  // Encode response headers.
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  ASSERT_EQ(callbacks_called.on_headers_calls_, 1);
+  // Ensure that the callbacks on the EnvoyStreamCallbacks were called.
+  ASSERT_EQ(callbacks_called.on_complete_calls_, 1);
+}
+
 TEST_P(ClientTest, BasicStreamData) {
   StreamCallbacksCalled callbacks_called;
   callbacks_called.end_stream_with_headers_ = false;

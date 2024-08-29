@@ -59,6 +59,23 @@ private:
 class HttpUpstream;
 class CombinedUpstream;
 
+// This class is specific to TCP proxy connection pool and enables TCP proxying mode
+// for HTTP upstreams. This is currently only needed for HTTP/1 client codec that half closes
+// upstream network connection after encoding end_stream in TCP proxy (i.e. via CONNECT).
+class RouterUpstreamRequest : public Router::UpstreamRequest {
+public:
+  using Router::UpstreamRequest::UpstreamRequest;
+
+  void onPoolReady(std::unique_ptr<Router::GenericUpstream>&& upstream,
+                   Upstream::HostDescriptionConstSharedPtr host,
+                   const Network::ConnectionInfoProvider& address_provider,
+                   StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) override {
+    upstream->enableTcpTunneling();
+    Router::UpstreamRequest::onPoolReady(std::move(upstream), host, address_provider, info,
+                                         protocol);
+  }
+};
+
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -67,7 +84,6 @@ public:
                Http::StreamDecoderFilterCallbacks&, Http::CodecType type,
                StreamInfo::StreamInfo& downstream_info);
 
-  using RouterUpstreamRequest = Router::UpstreamRequest;
   using RouterUpstreamRequestPtr = std::unique_ptr<RouterUpstreamRequest>;
   ~HttpConnPool() override;
 

@@ -672,8 +672,8 @@ public:
               EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv6());
               break;
             case AddressType::Both:
-              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv4());
-              EXPECT_NE(nullptr, response.back().addrInfo().address_->ip()->ipv6());
+              EXPECT_NE(nullptr, response.back().addrInfo().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv6());
               break;
             default:
               PANIC("reached unexpected code");

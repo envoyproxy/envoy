@@ -82,8 +82,22 @@ envoy_extension_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "external_auth_test",
+    srcs = ["external_auth_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    deps = [
+        ":redis_mocks",
+        "//source/extensions/filters/network/redis_proxy:external_auth_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -100,6 +114,7 @@ envoy_cc_mock(
         "//source/extensions/filters/network/common/redis:fault_interface",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
+        "//source/extensions/filters/network/redis_proxy:external_auth_lib",
         "//source/extensions/filters/network/redis_proxy:router_interface",
         "//test/test_common:printers_lib",
     ],
@@ -148,6 +163,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
@@ -169,6 +185,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/integration:integration_lib",
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
     ],
 )
 

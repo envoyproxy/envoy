@@ -6,6 +6,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 
 #include "test/test_common/utility.h"
 
@@ -64,16 +65,13 @@ bool socketAddressesEqual(
 
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
-  engine_builder
-#ifdef ENVOY_ENABLE_QUIC
-      .setHttp3ConnectionOptions("5RTO")
+  engine_builder.setHttp3ConnectionOptions("5RTO")
       .setHttp3ClientConnectionOptions("MPQC")
       .addQuicHint("www.abc.com", 443)
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
       .addQuicCanonicalSuffix(".xyz.com")
       .enablePortMigration(true)
-#endif
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
@@ -101,7 +99,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
-#ifdef ENVOY_ENABLE_QUIC
       "connection_options: \"5RTO\"",
       "client_connection_options: \"MPQC\"",
       "hostname: \"www.abc.com\"",
@@ -110,7 +107,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "canonical_suffixes: \".xyz.com\"",
       "num_timeouts_to_trigger_port_migration { value: 4 }",
       "idle_network_timeout { seconds: 30 }",
-#endif
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
       "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
@@ -191,13 +187,11 @@ TEST(TestConfig, SetSocketTag) {
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("http.socket_tag.SocketTag"));
 }
 
-#ifdef ENVOY_ENABLE_QUIC
 TEST(TestConfig, SetAltSvcCache) {
   EngineBuilder engine_builder;
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("alternate_protocols_cache"));
 }
-#endif
 
 TEST(TestConfig, StreamIdleTimeout) {
   EngineBuilder engine_builder;
@@ -311,27 +305,16 @@ TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-#ifdef ENVOY_ENABLE_QUIC
   EXPECT_THAT(bootstrap->ShortDebugString(),
               HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
-#endif
-#ifndef ENVOY_ENABLE_QUIC
-  EXPECT_THAT(
-      bootstrap->ShortDebugString(),
-      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
-#endif
-
-#ifdef ENVOY_ENABLE_QUIC
   engine_builder.enableHttp3(false);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(
       bootstrap->ShortDebugString(),
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
-#endif
 }
 
-#ifdef ENVOY_ENABLE_QUIC
-TEST(TestConfig, SocketReceiveBufferSize) {
+TEST(TestConfig, UdpSocketReceiveBufferSize) {
   EngineBuilder engine_builder;
   engine_builder.enableHttp3(true);
 
@@ -358,9 +341,40 @@ TEST(TestConfig, SocketReceiveBufferSize) {
   // When using an H3 cluster, the UDP receive buffer size option should always be set.
   ASSERT_THAT(rcv_buf_option, NotNull());
   EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(rcv_buf_option->type().has_datagram());
   EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
 }
-#endif
+
+TEST(TestConfig, UdpSocketSendBufferSize) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* snd_buf_option = nullptr;
+  for (const SocketOption& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == SO_SNDBUF) {
+      snd_buf_option = &sock_opt;
+      break;
+    }
+  }
+
+  // When using an H3 cluster, the UDP send buffer size option should always be set.
+  ASSERT_THAT(snd_buf_option, NotNull());
+  EXPECT_EQ(snd_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(snd_buf_option->type().has_datagram());
+  EXPECT_EQ(snd_buf_option->int_value(), 1452 * 20);
+}
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
@@ -396,8 +410,35 @@ private:
   mutable int count_ = 0;
 };
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
 TEST(TestConfig, AddNativeFilters) {
+  EngineBuilder engine_builder;
+
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
+
+  envoy::extensions::filters::http::buffer::v3::Buffer buffer;
+  buffer.mutable_max_request_bytes()->set_value(5242880);
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
+  std::string serialized_buffer;
+  buffer.SerializeToString(&serialized_buffer);
+  typed_config.set_value(serialized_buffer);
+
+  engine_builder.addNativeFilter(filter_name1, typed_config);
+  engine_builder.addNativeFilter(filter_name2, typed_config);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string hcm_config =
+      bootstrap->static_resources().listeners(0).api_listener().DebugString();
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name1));
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name2));
+  EXPECT_THAT(hcm_config,
+              HasSubstr("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer"));
+  EXPECT_THAT(hcm_config, HasSubstr(std::to_string(5242880)));
+}
+
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+TEST(TestConfig, AddTextProtoNativeFilters) {
   EngineBuilder engine_builder;
 
   std::string filter_name1 = "envoy.filters.http.buffer1";

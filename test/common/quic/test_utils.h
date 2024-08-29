@@ -97,14 +97,16 @@ public:
   MockEnvoyQuicSession(const quic::QuicConfig& config,
                        const quic::ParsedQuicVersionVector& supported_versions,
                        EnvoyQuicServerConnection* connection, Event::Dispatcher& dispatcher,
-                       uint32_t send_buffer_limit)
+                       uint32_t send_buffer_limit, QuicStatNames& quic_stat_names,
+                       Stats::Scope& scope)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
         QuicFilterManagerConnectionImpl(
             *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
                 connection->connectionSocket()->connectionInfoProviderSharedPtr(),
-                StreamInfo::FilterState::LifeSpan::Connection)),
+                StreamInfo::FilterState::LifeSpan::Connection),
+            quic_stat_names, scope),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -275,7 +277,8 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header)
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
-                                                            quic::HuffmanEncoding::kEnabled);
+                                                            quic::HuffmanEncoding::kEnabled,
+                                                            quic::CookieCrumbling::kEnabled);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.

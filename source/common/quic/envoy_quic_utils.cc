@@ -56,8 +56,8 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
   return quic::QuicSocketAddress(ss);
 }
 
-spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
-  spdy::Http2HeaderBlock header_block;
+quiche::HttpHeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
+  quiche::HttpHeaderBlock header_block;
   headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // The key-value pairs are copied.
     header_block.AppendValueOrAddHeader(header.key().getStringView(),
@@ -90,6 +90,10 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::RemoteReset:
     IS_ENVOY_BUG("Remote reset shouldn't be initiated by self.");
+    break;
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
+    break;
   }
 
   ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));

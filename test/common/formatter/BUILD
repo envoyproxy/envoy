@@ -29,6 +29,7 @@ envoy_cc_fuzz_test(
     ],
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//test/fuzz:utility_lib",
     ],
@@ -50,6 +51,7 @@ envoy_cc_test(
     deps = [
         ":command_extension_lib",
         "//source/common/common:utility_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
@@ -76,6 +78,7 @@ envoy_cc_test(
     srcs = ["substitution_format_string_test.cc"],
     deps = [
         ":command_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -93,6 +96,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",

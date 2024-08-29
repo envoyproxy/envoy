@@ -61,9 +61,7 @@ public:
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls,
-                                                   {context, context.messageValidationVisitor()}),
-        alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
+        alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()),
         server_(server) {}
 
   // Upstream::ClusterManagerFactory
@@ -104,8 +102,7 @@ protected:
   Ssl::ContextManager& ssl_context_manager_;
   Secret::SecretManager& secret_manager_;
   Quic::QuicStatNames& quic_stat_names_;
-  Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
-  Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
+  Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
   Server::Instance& server_;
 };
 

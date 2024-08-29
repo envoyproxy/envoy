@@ -34,6 +34,8 @@ open class EngineBuilder() {
   private var dnsPreresolveHostnames = listOf<String>()
   private var enableDNSCache = false
   private var dnsCacheSaveIntervalSeconds = 1
+  // null means the DNS resolver will try indefinitely until it succeeds.
+  private var dnsNumRetries: Int? = null
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
   internal var useCares = false
@@ -139,6 +141,18 @@ open class EngineBuilder() {
    */
   fun addDNSPreresolveHostnames(dnsPreresolveHostnames: List<String>): EngineBuilder {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames
+    return this
+  }
+
+  /**
+   * Specifies the number of retries before the resolver gives up. If not specified, the resolver
+   * will retry indefinitely until it succeeds or the DNS query times out.
+   *
+   * @param dnsNumRetries the number of retries
+   * @return this builder
+   */
+  fun setDnsNumRetries(dnsNumRetries: Int): EngineBuilder {
+    this.dnsNumRetries = dnsNumRetries
     return this
   }
 
@@ -526,6 +540,7 @@ open class EngineBuilder() {
         dnsPreresolveHostnames,
         enableDNSCache,
         dnsCacheSaveIntervalSeconds,
+        dnsNumRetries ?: -1,
         enableDrainPostDnsRefresh,
         enableHttp3,
         useCares,

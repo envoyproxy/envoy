@@ -104,13 +104,14 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    shard_count = 2,
+    shard_count = 4,
     tags = [
         "cpu:3",
         "skip_on_windows",
     ],
     deps = [
         ":test_utils",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/rate_limit_quota",
         "//source/extensions/filters/http/rate_limit_quota:config",

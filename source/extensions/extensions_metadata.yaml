@@ -498,6 +498,13 @@ envoy.filters.http.original_src:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.original_src.v3.OriginalSrc
+envoy.filters.http.proto_message_extraction:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig
 envoy.filters.http.ratelimit:
   categories:
   - envoy.filters.http
@@ -1070,7 +1077,7 @@ envoy.request_id.uuid:
   status: stable
   type_urls:
   - envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
-envoy.resource_monitors.downstream_connections:
+envoy.resource_monitors.global_downstream_max_connections:
   categories:
   - envoy.resource_monitors
   security_posture: data_plane_agnostic
@@ -1201,13 +1208,6 @@ envoy.tracers.datadog:
   status: stable
   type_urls:
   - envoy.config.trace.v3.DatadogConfig
-envoy.tracers.dynamic_ot:
-  categories:
-  - envoy.tracers
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.trace.v3.DynamicOtConfig
 envoy.tracers.opencensus:
   categories:
   - envoy.tracers
@@ -1572,6 +1572,13 @@ envoy.matching.inputs.filter_state:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+envoy.matching.inputs.dynamic_metadata:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput
 envoy.matching.inputs.uri_san:
   categories:
   - envoy.matching.http.input
@@ -1604,6 +1611,13 @@ envoy.matching.custom_matchers.trie_matcher:
   status: stable
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.matching.matchers.metadata_matcher:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.metadata.v3.Metadata
 envoy.load_balancing_policies.least_request:
   categories:
   - envoy.load_balancing_policies
@@ -1785,3 +1799,31 @@ envoy.quic.connection_debug_visitor.basic:
   status: alpha
   type_urls:
   - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig
+envoy.filters.network.generic_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.v3.GenericProxy
+envoy.filters.generic.router:
+  categories:
+  - envoy.generic_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.router.v3.Router
+envoy.generic_proxy.codecs.dubbo:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
+envoy.generic_proxy.codecs.http1:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.http1.v3.Http1CodecConfig

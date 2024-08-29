@@ -12,7 +12,7 @@ parameters:
   type: object
   default:
   - env
-  - linux_x64
+  - prechecks
 - name: concurrencyChecks
   displayName: "Check concurrency"
   type: number
@@ -47,51 +47,23 @@ stages:
 - stage: prechecks
   displayName: Prechecks
   dependsOn: ["env"]
+  variables:
+    PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
   jobs:
   - template: stage/prechecks.yml
     parameters:
       concurrencyPrechecks: ${{ parameters.concurrencyPrechecks }}
       cacheTestResults: ${{ parameters.cacheTestResults }}
       authGCP: $(GcpServiceAccountKey)
+      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
+      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
+      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
       authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
       authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
+      publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
       runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
-
-- stage: linux_x64
-  displayName: Linux x64
-  dependsOn: ${{ parameters.buildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
-  jobs:
-  - template: stage/linux.yml
-    parameters:
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      bazelConfigRBE: --config=remote-ci --config=rbe-google --jobs=200
-      pool: envoy-x64-large
-      # these are parsed differently and _must_ be expressed in this way
-      runBuild: variables['RUN_BUILD']
-      runTests: $(RUN_TESTS)
-
-- stage: linux_arm64
-  displayName: Linux arm64
-  dependsOn: ${{ parameters.buildStageDeps }}
-  variables:
-    RUN_BUILD: $[stageDependencies.env.repo.outputs['run.build']]
-    RUN_TESTS: $[stageDependencies.env.repo.outputs['run.releaseTests']]
-  jobs:
-  - template: stage/linux.yml
-    parameters:
-      cacheTestResults: ${{ parameters.cacheTestResults }}
-      rbe: false
-      artifactSuffix: .arm64
-      timeoutBuild: 180
-      pool: envoy-arm-large
-      runBuild: variables['RUN_BUILD']
-      runTests: $(RUN_TESTS)
-      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: check
   displayName: Checks (Linux x64)
@@ -107,41 +79,3 @@ stages:
       authGCP: $(GcpServiceAccountKey)
       bucketGCP: $(GcsArtifactBucket)
       runChecks: variables['RUN_CHECKS']
-
-- stage: publish
-  displayName: Publish
-  dependsOn: ["env", "linux_x64", "linux_arm64"]
-  variables:
-    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
-    RUN_PACKAGING: $[stageDependencies.env.repo.outputs['run.packaging']]
-    PUBLISH_GITHUB_RELEASE: $[stageDependencies.env.repo.outputs['publish.githubRelease']]
-    PUBLISH_DOCKERHUB: $[stageDependencies.env.repo.outputs['publish.dockerhub']]
-  jobs:
-  - template: stage/publish.yml
-    parameters:
-      authDockerUser: $(DockerUsername)
-      authDockerPassword: $(DockerPassword)
-      authGCP: $(GcpServiceAccountKey)
-      authGithubWorkflow: $(GitHubPublicRepoWorkflowKey)
-      authGithubWorkflowAppId: $(GitHubPublicRepoWorkflowAppId)
-      authGithubWorkflowInstallId: $(GitHubPublicRepoWorkflowInstallId)
-      authGPGPassphrase: $(MaintainerGPGKeyPassphrase)
-      authGPGKey: $(MaintainerGPGKeySecureFileDownloadPath)
-      authGPGPath: $(MaintainerGPGKey.secureFilePath)
-      bucketGCP: $(GcsArtifactBucket)
-      timeoutDockerBuild: ${{ parameters.timeoutDockerBuild }}
-      timeoutDockerPublish: ${{ parameters.timeoutDockerPublish }}
-      runDocker: variables['RUN_DOCKER']
-      runPackaging: variables['RUN_PACKAGING']
-      publishDockerhub: variables['PUBLISH_DOCKERHUB']
-      publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
-
-- stage: verify
-  displayName: Verify
-  dependsOn: ["env", "publish"]
-  variables:
-    RUN_DOCKER: $[stageDependencies.env.repo.outputs['run.docker']]
-  jobs:
-  - template: stage/verify.yml
-    parameters:
-      authGCP: $(GcpServiceAccountKey)

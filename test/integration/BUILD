@@ -347,6 +347,7 @@ envoy_cc_test_binary(
         "abseil_symbolize",
     ],
     deps = [
+        ":common_extensions_lib",
         "//source/common/http:rds_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -369,6 +370,7 @@ envoy_cc_test_binary(
     ],
     linkstatic = envoy_select_linkstatic(),
     deps = [
+        ":common_extensions_lib",
         "//source/exe:main_common_lib",
         "//source/exe:platform_impl_lib",
         "//source/exe:process_wide_lib",
@@ -390,7 +392,7 @@ envoy_sh_test(
     data = [
         "test_utility.sh",
         "//test/config/integration:server_config_files",
-        "//tools:socket_passing",
+        "//tools/socket_passing",
     ],
     # Hot restart does not apply on Windows, skipping
     tags = ["skip_on_windows"],
@@ -538,6 +540,7 @@ envoy_cc_test(
         "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
@@ -778,6 +781,7 @@ envoy_cc_test(
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
         "//test/integration/filters:metadata_control_filter_lib",
+        "//test/integration/filters:non_terminal_encoding_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:remove_response_headers_lib",
         "//test/integration/filters:reset_stream_filter_config_lib",
@@ -1117,6 +1121,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "common_extensions_lib",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:rds_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/extensions/clusters/eds:eds_lib",

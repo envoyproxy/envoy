@@ -91,7 +91,7 @@ void ActiveStreamFilterBase::commonContinue() {
   // future.
   if (!headers_continued_) {
     headers_continued_ = true;
-    doHeaders(complete() && !bufferedData() && !hasTrailers());
+    doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
   }
 
   doMetadata();
@@ -102,7 +102,7 @@ void ActiveStreamFilterBase::commonContinue() {
   // on doData() to do so.
   const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
-    doData(complete() && !had_trailers_before_data);
+    doData(observedEndStream() && !had_trailers_before_data);
   }
 
   if (had_trailers_before_data) {
@@ -197,7 +197,7 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (complete() && !hasTrailers() && !bufferedData() &&
+    } else if (observedEndStream() && !hasTrailers() && !bufferedData() &&
                // If the stream is destroyed, no need to handle the data buffer or trailers.
                // This can occur if the filter calls sendLocalReply.
                !parent_.state_.destroyed_) {
@@ -281,32 +281,7 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
   if (current_route == nullptr) {
     return nullptr;
   }
-
-  auto* result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
-
-  /**
-   * If:
-   * 1. no per filter config is found for the filter config name.
-   * 2. filter config name is different from the filter canonical name.
-   * 3. downgrade feature is not disabled.
-   * we fallback to use the filter canonical name.
-   */
-  if (result == nullptr && !parent_.no_downgrade_to_canonical_name_ &&
-      filter_context_.filter_name != filter_context_.config_name) {
-    // Fallback to use filter canonical name.
-    result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
-
-    if (result != nullptr) {
-      ENVOY_LOG_FIRST_N(
-          warn, 10,
-          "No per filter config is found by filter config name \"{}\" and fallback to use "
-          "filter canonical name \"{}\". This is deprecated and will be forbidden very "
-          "soon. Please use the filter config name to index per filter config. See "
-          "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
-          filter_context_.config_name, filter_context_.filter_name);
-    }
-  }
-  return result;
+  return current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 }
 
 void ActiveStreamFilterBase::traversePerFilterConfig(
@@ -316,30 +291,9 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
     return;
   }
 
-  bool handled = false;
   current_route->traversePerFilterConfig(
       filter_context_.config_name,
-      [&handled, &cb](const Router::RouteSpecificFilterConfig& config) {
-        handled = true;
-        cb(config);
-      });
-
-  if (handled || parent_.no_downgrade_to_canonical_name_ ||
-      filter_context_.filter_name == filter_context_.config_name) {
-    return;
-  }
-
-  current_route->traversePerFilterConfig(
-      filter_context_.filter_name, [&cb, this](const Router::RouteSpecificFilterConfig& config) {
-        ENVOY_LOG_FIRST_N(
-            warn, 10,
-            "No per filter config is found by filter config name \"{}\" and fallback to use "
-            "filter canonical name \"{}\". This is deprecated and will be forbidden very "
-            "soon. Please use the filter config name to index per filter config. See "
-            "https://github.com/envoyproxy/envoy/issues/29461 for more detail.",
-            filter_context_.config_name, filter_context_.filter_name);
-        cb(config);
-      });
+      [&cb](const Router::RouteSpecificFilterConfig& config) { cb(config); });
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
@@ -393,13 +347,13 @@ bool ActiveStreamDecoderFilter::canContinue() {
   // continue to further filters. A concrete example of this is a filter buffering data, the
   // last data frame comes in and the filter continues, but the final buffering takes the stream
   // over the high watermark such that a 413 is returned.
-  return !parent_.state_.local_complete_;
+  return !parent_.stopDecoderFilterChain();
 }
 
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent.
-  return !parent_.state_.remote_encode_complete_ && !parent_.state_.encoder_filter_chain_aborted_;
+  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.state_.encoder_filter_chain_aborted_;
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -415,7 +369,7 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::complete() { return parent_.remoteDecodeComplete(); }
+bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -512,19 +466,33 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
   }
 }
 
+void ActiveStreamDecoderFilter::stopDecodingIfNonTerminalFilterEncodedEndStream(
+    bool encoded_end_stream) {
+  // Encoding end_stream by a non-terminal filters (i.e. cache filter) always causes the decoding to
+  // be stopped even if independent half-close is enabled. For simplicity, independent half-close is
+  // allowed only when the terminal (router) filter is encoding the response.
+  if (encoded_end_stream && !parent_.isTerminalDecoderFilter(*this) &&
+      !parent_.state_.decoder_filter_chain_complete_) {
+    parent_.state_.decoder_filter_chain_aborted_ = true;
+  }
+}
+
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
+  stopDecodingIfNonTerminalFilterEncodedEndStream(end_stream);
   parent_.streamInfo().setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  stopDecodingIfNonTerminalFilterEncodedEndStream(end_stream);
   parent_.encodeData(nullptr, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
+  stopDecodingIfNonTerminalFilterEncodedEndStream(true);
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
 }
@@ -572,6 +540,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
+  bool terminal_filter_decoded_end_stream = false;
+  ASSERT(!state_.decoder_filter_chain_complete_ || entry == decoder_filters_.end() ||
+         (*entry)->end_stream_);
 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
@@ -603,7 +574,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
-    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
+    ENVOY_BUG(!continue_iteration || !stopDecoderFilterChain(),
               fmt::format(
                   "filter={} did not return StopAll or StopIteration after sending a local reply.",
                   (*entry)->filter_context_.config_name));
@@ -614,7 +585,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     }
 
     // Skip processing metadata after sending local reply
-    if (state_.local_complete_ && std::next(entry) != decoder_filters_.end()) {
+    if (stopDecoderFilterChain() && std::next(entry) != decoder_filters_.end()) {
       maybeContinueDecoding(continue_data_entry);
       return;
     }
@@ -645,6 +616,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
+    // The decoder filter chain is finished here if the following is true:
+    // 1. the last filter has observed the end_stream AND
+    // 2. no filter, including the last filter, has injected body during header iteration.
+    // If body was injected the end_stream will be processed in the `decodeData()` method below.
+    const bool no_body_was_injected = continue_data_entry == decoder_filters_.end();
+    terminal_filter_decoded_end_stream =
+        (std::next(entry) == decoder_filters_.end() && (*entry)->end_stream_) &&
+        no_body_was_injected;
   }
 
   maybeContinueDecoding(continue_data_entry);
@@ -652,6 +631,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   if (end_stream) {
     disarmRequestTimeout();
   }
+  maybeEndDecode(terminal_filter_decoded_end_stream);
 }
 
 void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data,
@@ -662,7 +642,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
-  if (state_.local_complete_) {
+  if (stopDecoderFilterChain()) {
     return;
   }
 
@@ -671,6 +651,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, filter_iteration_start_state);
+  bool terminal_filter_decoded_end_stream = false;
+  ASSERT(!state_.decoder_filter_chain_complete_ || entry == decoder_filters_.end() ||
+         (*entry)->end_stream_);
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame types, return now.
@@ -748,6 +731,14 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       trailers_added_entry = entry;
     }
 
+    // The decoder filter chain is finished here if the following is true:
+    // 1. the last filter has observed the end_stream AND
+    // 2. no filter, including the last filter, has injected trailers during header iteration.
+    //    NOTE: end_stream is set to false above if a filter injected trailers.
+    // If trailers were injected the end_stream will be processed in the `decodeTrailers()` method
+    // below.
+    terminal_filter_decoded_end_stream = end_stream && std::next(entry) == decoder_filters_.end();
+
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
@@ -766,6 +757,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   if (end_stream) {
     disarmRequestTimeout();
   }
+  maybeEndDecode(terminal_filter_decoded_end_stream);
 }
 
 RequestTrailerMap& FilterManager::addDecodedTrailers() {
@@ -801,14 +793,17 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
 MetadataMapVector& FilterManager::addDecodedMetadata() { return *getRequestMetadataMapVector(); }
 
 void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers) {
-  // See decodeData() above for why we check local_complete_ here.
-  if (state_.local_complete_) {
+  // If a response is complete or a reset has been sent, filters do not care about further body
+  // data. Just drop it.
+  if (stopDecoderFilterChain()) {
     return;
   }
 
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
+  bool terminal_filter_reached = false;
+  ASSERT(!state_.decoder_filter_chain_complete_ || entry == decoder_filters_.end());
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
@@ -832,12 +827,15 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     }
 
     processNewlyAddedMetadata();
+    // Check if the last filter has processed trailers
+    terminal_filter_reached = std::next(entry) == decoder_filters_.end();
 
-    if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
+    if (!(*entry)->commonHandleAfterTrailersCallback(status) && !terminal_filter_reached) {
       return;
     }
   }
   disarmRequestTimeout();
+  maybeEndDecode(terminal_filter_reached);
 }
 
 void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map) {
@@ -904,13 +902,19 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
   ENVOY_STREAM_LOG(trace, "commonEncodePrefix end_stream: {}, isHalfCloseEnabled: {}", *this,
                    end_stream, filter_manager_callbacks_.isHalfCloseEnabled());
   if (filter == nullptr) {
-    // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
-    // should not set the local_complete_ flag to true when end_stream is true.
-    // setting local_complete_ to true will cause any data sent in the upstream direction to be
-    // dropped.
-    if (end_stream && !filter_manager_callbacks_.isHalfCloseEnabled()) {
-      ASSERT(!state_.local_complete_);
-      state_.local_complete_ = true;
+    if (end_stream) {
+      ASSERT(!state_.observed_encode_end_stream_);
+      state_.observed_encode_end_stream_ = true;
+
+      // When half close semantics are disabled, receiving end stream from the upstream causes
+      // decoder filter to stop, as neither filters nor upstream is interested in downstream data.
+      // half close is enabled in case tcp proxying is done with http1 encoder. In this case, we
+      // should not stop decoder filter chain when end_stream is true, as it will cause any data
+      // sent in the upstream direction to be
+      // dropped.
+      if (!filter_manager_callbacks_.isHalfCloseEnabled()) {
+        state_.decoder_filter_chain_aborted_ = true;
+      }
     }
     return encoder_filters_.begin();
   }
@@ -965,6 +969,10 @@ void DownstreamFilterManager::sendLocalReply(
     state_.decoder_filter_chain_aborted_ = true;
   } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
     state_.encoder_filter_chain_aborted_ = true;
+  }
+  // When independent half-close is enabled local reply always stops decoder filter chain.
+  if (filter_manager_callbacks_.isHalfCloseEnabled()) {
+    state_.decoder_filter_chain_aborted_ = true;
   }
 
   streamInfo().setResponseCodeDetails(details);
@@ -1486,8 +1494,70 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
-    ASSERT(!state_.remote_encode_complete_);
-    state_.remote_encode_complete_ = true;
+    ASSERT(!state_.encoder_filter_chain_complete_);
+    state_.encoder_filter_chain_complete_ = true;
+    if (filter_manager_callbacks_.isHalfCloseEnabled()) {
+      // If independent half close is enabled the stream is closed when both decoder and encoder
+      // filter chains has completed or were aborted.
+      checkAndCloseStreamIfFullyClosed();
+    } else {
+      // Otherwise encoding end_stream always closes the stream (and resets it if request was not
+      // complete yet).
+      filter_manager_callbacks_.endStream();
+    }
+  }
+}
+
+void FilterManager::maybeEndDecode(bool terminal_filter_decoded_end_stream) {
+  if (terminal_filter_decoded_end_stream) {
+    ASSERT(!state_.decoder_filter_chain_complete_);
+    state_.decoder_filter_chain_complete_ = true;
+    // If the decoder filter chain was aborted (i.e. due to local reply)
+    // we rely on the encoding of end_stream to close the stream.
+    if (filter_manager_callbacks_.isHalfCloseEnabled() && !stopDecoderFilterChain()) {
+      checkAndCloseStreamIfFullyClosed();
+    }
+  }
+}
+
+void FilterManager::checkAndCloseStreamIfFullyClosed() {
+  ASSERT(filter_manager_callbacks_.isHalfCloseEnabled());
+  // When the independent half close is enabled the stream is always closed on error responses
+  // from the server.
+  if (filter_manager_callbacks_.responseHeaders().has_value()) {
+    const uint64_t response_status =
+        Http::Utility::getResponseStatus(filter_manager_callbacks_.responseHeaders().ref());
+    const bool error_response =
+        !(Http::CodeUtility::is2xx(response_status) || Http::CodeUtility::is1xx(response_status));
+    // Abort the decoder filter if it has not yet been completed.
+    if (error_response && !state_.decoder_filter_chain_complete_) {
+      state_.decoder_filter_chain_aborted_ = true;
+    }
+  }
+
+  // Handle the case where the end_stream was received from both downstream client and upstream
+  // server but a decoder filter added either request body or trailers AND paused decoder filter
+  // chain iteration. This case is currently handled the same way as if independent half-close is
+  // disabled, i.e. proxying is stopped as soon as encoding has finished.
+  // TODO(yanavlasov): to support this case the codec needs to notify HCM that it has closed its low
+  // level stream
+  //                   to avoid use-after-free when HCM cleans-up its ActiveStream
+  const bool downstream_client_sent_end_stream = decoderObservedEndStream();
+  const bool decoder_filter_chain_paused =
+      !state_.decoder_filter_chain_complete_ && !state_.decoder_filter_chain_aborted_;
+  if (state_.encoder_filter_chain_complete_ && downstream_client_sent_end_stream &&
+      decoder_filter_chain_paused) {
+    state_.decoder_filter_chain_aborted_ = true;
+  }
+
+  // If independent half close is enabled then close the stream when
+  // 1. Both encoder and decoder filter chains has completed.
+  // 2. Encoder filter chain has completed and decoder filter chain was aborted (i.e. local reply).
+  // There is no need to check for aborted encoder filter chain as the filter will either be
+  // completed or stream is reset.
+  if (state_.encoder_filter_chain_complete_ &&
+      (state_.decoder_filter_chain_complete_ || state_.decoder_filter_chain_aborted_)) {
+    ENVOY_STREAM_LOG(trace, "closing stream", *this);
     filter_manager_callbacks_.endStream();
   }
 }
@@ -1563,12 +1633,17 @@ bool FilterManager::createFilterChain() {
     }
   }
 
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
+  FilterChainOptionsImpl options(
+      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
+
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
 
     if (filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this)) {
+                                                       upgrade_map, *this, options)) {
       filter_manager_callbacks_.upgradeFilterChainCreated();
       return true;
     } else {
@@ -1578,10 +1653,6 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
-  // to set valid initial route only when the downstream callbacks is available.
-  FilterChainOptionsImpl options(
-      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
   filter_chain_factory_.createFilterChain(*this, false, options);
   return !upgrade_rejected;
 }
@@ -1625,7 +1696,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view.
-  if (!complete()) {
+  if (!observedEndStream()) {
     return false;
   }
 
@@ -1670,7 +1741,9 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
-bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }
+bool ActiveStreamEncoderFilter::observedEndStream() {
+  return parent_.state_.observed_encode_end_stream_;
+}
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
@@ -1790,18 +1863,19 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
 
 void FilterManager::resetStream(StreamResetReason reason,
                                 absl::string_view transport_failure_reason) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.abort_filter_chain_on_stream_reset")) {
-    // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
-    // are running.
-    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
-      state_.decoder_filter_chain_aborted_ = true;
-    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
-      state_.encoder_filter_chain_aborted_ = true;
-    }
+  // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
+  // are running.
+  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    state_.decoder_filter_chain_aborted_ = true;
+  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+    state_.encoder_filter_chain_aborted_ = true;
   }
 
   filter_manager_callbacks_.resetStream(reason, transport_failure_reason);
+}
+
+bool FilterManager::isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const {
+  return !decoder_filters_.empty() && decoder_filters_.back().get() == &filter;
 }
 
 void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,

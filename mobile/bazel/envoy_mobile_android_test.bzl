@@ -1,4 +1,4 @@
-load("@build_bazel_rules_android//android:rules.bzl", "android_library", "android_local_test")
+load("@build_bazel_rules_android//android:rules.bzl", "android_local_test")
 load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
 load("//bazel:envoy_mobile_android_jni.bzl", "native_lib_name")
 
@@ -23,7 +23,7 @@ def _contains_all(srcs, extension):
     return True
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], repository = "", exec_properties = {}):
+def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps = [], native_deps = [], repository = "", exec_properties = {}, **kwargs):
     dependencies = deps + [
         "@maven//:androidx_annotation_annotation",
         "@maven//:androidx_test_core",
@@ -54,6 +54,7 @@ def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps
             test_class = test_class,
             jvm_flags = jvm_flags(native_lib_name),
             exec_properties = exec_properties,
+            **kwargs
         )
     elif _contains_all(srcs, ".kt"):
         kt_android_local_test(
@@ -66,6 +67,7 @@ def envoy_mobile_android_test(name, srcs, test_class, native_lib_name = "", deps
             test_class = test_class,
             jvm_flags = jvm_flags(native_lib_name),
             exec_properties = exec_properties,
+            **kwargs
         )
     else:
         fail("Mixing Java and Kotlin in 'srcs' is not supported.")

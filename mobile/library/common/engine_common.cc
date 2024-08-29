@@ -59,7 +59,7 @@ class ServerLite : public Server::InstanceBase {
 public:
   using Server::InstanceBase::InstanceBase;
   void maybeCreateHeapShrinker() override {}
-  std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
+  absl::StatusOr<std::unique_ptr<Envoy::Server::OverloadManager>> createOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
   std::unique_ptr<Envoy::Server::OverloadManager> createNullOverloadManager() override {

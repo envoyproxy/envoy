@@ -181,6 +181,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:http_server_properties_cache_interface",
         "//envoy/init:manager_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:drain_decision_interface",

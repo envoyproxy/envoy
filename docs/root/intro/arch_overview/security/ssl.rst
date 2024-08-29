@@ -154,9 +154,8 @@ Certificate selection rules:
   :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
   is introduced to determine if we continue full scan on SNI mismatch when the client provides SNI. SNI mismatch contains two cases in this context, one is there is no cert that matches to SNI,
   another one is there are certs matches to SNI while OCSP policy fails on those certs. The :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-  defaults to false, so full scan is disabled by default. The runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch``
-  can be used to override the default value of :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`.
-  If full scan is enabled, it will look for the cert from the whole cert list on SNI mismatch, this could be a problem for a potential DoS attack because of O(n) complexity.
+  defaults to false, so full scan is disabled by default. If full scan is enabled, it will look for the cert from the whole cert list on SNI mismatch,
+  this could be a problem for a potential DoS attack because of O(n) complexity.
 
 
 Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts

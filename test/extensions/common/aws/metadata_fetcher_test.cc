@@ -77,6 +77,20 @@ MATCHER_P(OptionsHasRetryPolicy, policyMatcher, "") {
 class MetadataFetcherTest : public testing::Test {
 public:
   void setupFetcher() {
+
+    mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"cluster_name"});
+    fetcher_ = MetadataFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
+                                       "cluster_name");
+    EXPECT_TRUE(fetcher_ != nullptr);
+  }
+
+  void setupFetcherShutDown() {
+    ON_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+        .WillByDefault(Return(nullptr));
+    ON_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_, isShutdown())
+        .WillByDefault(Return(true));
+
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"cluster_name"});
     fetcher_ = MetadataFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
@@ -97,6 +111,18 @@ TEST_F(MetadataFetcherTest, TestGetSuccess) {
   MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200", body);
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(std::move(body)));
+  EXPECT_CALL(receiver, onMetadataError(_)).Times(0);
+
+  // Act
+  fetcher_->fetch(message, parent_span_, receiver);
+}
+
+TEST_F(MetadataFetcherTest, TestClusterShutdown) {
+  // Setup
+  setupFetcherShutDown();
+  Http::RequestMessageImpl message;
+  MockMetadataReceiver receiver;
+  EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
   EXPECT_CALL(receiver, onMetadataError(_)).Times(0);
 
   // Act

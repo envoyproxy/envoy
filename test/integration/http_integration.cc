@@ -842,7 +842,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
               "details=\"upstream_reset_before_response_started{connection_termination|QUIC_NO_"
-              "ERROR|Closed_by_application}; UC\"");
+              "ERROR|FROM_PEER|Closed_by_application}; UC\"");
   } else {
     EXPECT_EQ(response->headers().getProxyStatusValue(),
               "envoy; error=connection_terminated; "
@@ -939,7 +939,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   EXPECT_EQ(512U, response->body().size());
 }
 
-void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
+void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete(uint32_t status_code) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -947,6 +947,9 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  if (status_code != 0) {
+    default_response_headers_.setStatus(status_code);
+  }
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -969,7 +972,8 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(status_code != 0 ? absl::StrCat(status_code) : "200",
+            response->headers().getStatusValue());
   EXPECT_EQ(512U, response->body().size());
 }
 

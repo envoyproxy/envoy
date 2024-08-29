@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "downstream_connections_monitor_test",
     srcs = ["downstream_connections_monitor_test.cc"],
-    extension_names = ["envoy.resource_monitors.downstream_connections"],
+    extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
     external_deps = ["abseil_optional"],
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
@@ -26,7 +26,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_names = ["envoy.resource_monitors.downstream_connections"],
+    extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
     deps = [
         "//envoy/registry",
         "//source/extensions/resource_monitors/downstream_connections:config",

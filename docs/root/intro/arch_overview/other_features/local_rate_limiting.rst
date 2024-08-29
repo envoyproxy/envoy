@@ -5,7 +5,7 @@ Local rate limiting
 
 Envoy supports local (non-distributed) rate limiting of L4 connections via the
 :ref:`local rate limit listener filter <config_listener_filters_local_rate_limit>` and :ref:`local rate limit network filter <config_network_filters_local_rate_limit>`.
-The difference is `local rate limit listener filter <config_listener_filters_local_rate_limit>` processes the sockets before TLS handshake and filter chain matching.
+The difference is :ref:`local rate limit listener filter <config_listener_filters_local_rate_limit>` processes the sockets before TLS handshake and filter chain matching.
 
 Envoy additionally supports local rate limiting of HTTP requests via the
 :ref:`HTTP local rate limit filter <config_http_filters_local_rate_limit>`. This can

@@ -15,6 +15,15 @@ parameters:
 - name: authGCP
   type: string
   default: ""
+- name: authGithubWorkflow
+  type: string
+  default: ""
+- name: authGithubWorkflowAppId
+  type: string
+  default: ""
+- name: authGithubWorkflowInstallId
+  type: string
+  default: ""
 - name: authGPGPassphrase
   type: string
   default: ""
@@ -25,6 +34,20 @@ parameters:
   type: string
   default: ""
 
+- name: runBuild
+  displayName: "Run build"
+  type: string
+  default: true
+- name: runPrechecks
+  displayName: "Run prechecks"
+  type: string
+  default: true
+
+- name: publishGithubRelease
+  displayName: "Publish Github release"
+  type: string
+  default: false
+
 # Timeout/s
 - name: timeoutPrechecks
   type: number
@@ -32,10 +55,10 @@ parameters:
   # a lot of change - eg protobuf changed, or a primitve proto changed.
   default: 40
 
-- name: runPrechecks
-  displayName: "Run prechecks"
+- name: bazelConfigRBE
   type: string
-  default: true
+  default: --config=remote-ci --config=rbe-google --jobs=$(RbeJobs)
+
 
 jobs:
 - job: prechecks
@@ -53,17 +76,21 @@ jobs:
     matrix:
       format:
         CI_TARGET: "format"
+        CI_CACHE: format
       protobuf:
         CI_TARGET: "check_and_fix_proto_format"
+        CI_CACHE: check_and_fix_proto_format
       ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
         publishing:
           CI_TARGET: docs
+          CI_CACHE: docs
+
   steps:
   - template: ../ci.yml
     parameters:
       bazelBuildExtraOptions: --config=docs-ci
       ciTarget: $(CI_TARGET)
-      cacheName: $(CI_TARGET)
+      cacheName: $(CI_CACHE)
       cacheTestResults: ${{ parameters.cacheTestResults }}
       cacheVersion: $(cacheKeyBazel)
       publishEnvoy: false
@@ -157,9 +184,47 @@ jobs:
           GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
         condition: eq(variables['CI_TARGET'], 'docs')
 
+- job: precheck_release_x64
+  displayName: Precheck release (x64)
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runBuild }}, 'true'))
+  timeoutInMinutes: 180
+  pool: envoy-x64-large
+  steps:
+  - template: ../ci.yml
+    parameters:
+      artifactName: release
+      ciTarget: release.test_only
+      cacheName: release-test-only
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      cacheVersion: $(cacheKeyBazel)
+      rbe: true
+
+- job: precheck_release_arm64
+  displayName: Precheck release (arm64)
+  condition: |
+    and(not(canceled()),
+        eq(${{ parameters.runBuild }}, 'true'))
+  timeoutInMinutes: 180
+  pool: envoy-arm-large
+  steps:
+  - template: ../ci.yml
+    parameters:
+      artifactName: release
+      ciTarget: release.test_only
+      cacheName: release-test-only
+      bazelConfigRBE: ${{ parameters.bazelConfigRBE }}
+      bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      cacheTestResults: ${{ parameters.cacheTestResults }}
+      cacheVersion: $(cacheKeyBazel)
+      artifactSuffix: .arm64
+      rbe: false
+
 - job: prechecked
   displayName: Prechecked
-  dependsOn: ["prechecks"]
+  dependsOn: ["prechecks", "precheck_release_arm64", "precheck_release_x64"]
   pool:
     vmImage: $(agentUbuntu)
   # This condition ensures that this (required) job passes if all of
@@ -168,9 +233,51 @@ jobs:
   #  https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
   condition: |
     and(
-      eq(variables['Build.Reason'], 'PullRequest'),
-      in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+      in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.precheck_release_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.precheck_release_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
-  - checkout: none
+  - task: DownloadSecureFile@1
+    name: WorkflowTriggerKey
+    displayName: 'Download workflow trigger key'
+    inputs:
+      secureFile: '${{ parameters.authGithubWorkflow }}'
   - bash: |
-      echo "Prechecked"
+      set -e
+      KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
+      echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
+    name: key
+  - template: ../ci.yml
+    parameters:
+      ciTarget: verify.trigger
+      cacheName: verify-trigger
+      authGithub: "$(key.value)"
+      cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
+      env:
+        ENVOY_REPO: $(Build.Repository.Name)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranch)"
+          ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
+          ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
+        ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranchName)"
+          ENVOY_BRANCH: "$(Build.SourceBranch)"
+        # github auth
+        GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
+        GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
+        # rbe env
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - bash: |
+          set -e
+          if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+              DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+          else
+              DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+          fi
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
+          mkdir -p $(Build.StagingDirectory)/release.signed
+          mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+        displayName: Fetch signed release

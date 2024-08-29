@@ -227,6 +227,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",

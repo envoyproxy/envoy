@@ -7,6 +7,7 @@
 
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "fmt/printf.h"
 
@@ -22,6 +23,7 @@ std::string rbac_config;
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
+      public Event::TestUsingSimulatedTime,
       public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
@@ -131,6 +133,36 @@ typed_config:
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDenied) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+  delay_deny: 5s
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {

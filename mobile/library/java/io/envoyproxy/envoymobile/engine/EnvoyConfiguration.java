@@ -34,6 +34,7 @@ public class EnvoyConfiguration {
   public final List<String> dnsPreresolveHostnames;
   public final Boolean enableDNSCache;
   public final Integer dnsCacheSaveIntervalSeconds;
+  public final int dnsNumRetries;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
   public final Boolean useCares;
@@ -85,6 +86,8 @@ public class EnvoyConfiguration {
    * @param enableDNSCache                                whether to enable DNS cache.
    * @param dnsCacheSaveIntervalSeconds                   the interval at which to save results to
    *     the configured key value store.
+   * @param dnsNumRetries                                 the number of retries before the DNS
+   *     resolver gives up
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
@@ -130,8 +133,8 @@ public class EnvoyConfiguration {
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
       int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
       List<String> dnsPreresolveHostnames, boolean enableDNSCache, int dnsCacheSaveIntervalSeconds,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares, boolean useGro,
-      String http3ConnectionOptions, String http3ClientConnectionOptions,
+      int dnsNumRetries, boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
+      boolean useGro, String http3ConnectionOptions, String http3ClientConnectionOptions,
       Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
       boolean enablePortMigration, boolean enableSocketTagging, boolean enableInterfaceBinding,
@@ -153,6 +156,7 @@ public class EnvoyConfiguration {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.enableDNSCache = enableDNSCache;
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
+    this.dnsNumRetries = dnsNumRetries;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.useCares = useCares;
@@ -215,13 +219,14 @@ public class EnvoyConfiguration {
     return JniLibrary.createBootstrap(
         connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
-        enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        useCares, useGro, http3ConnectionOptions, http3ClientConnectionOptions, quicHints,
-        quicSuffixes, enableGzipDecompression, enableBrotliDecompression, enablePortMigration,
-        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
-        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards);
+        enableDNSCache, dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh,
+        enableHttp3, useCares, useGro, http3ConnectionOptions, http3ClientConnectionOptions,
+        quicHints, quicSuffixes, enableGzipDecompression, enableBrotliDecompression,
+        enablePortMigration, enableSocketTagging, enableInterfaceBinding,
+        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+        maxConnectionsPerHost, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
+        appId, enforceTrustChainVerification, filterChain, enablePlatformCertificatesValidation,
+        upstreamTlsSni, runtimeGuards);
   }
 
   static class ConfigurationException extends RuntimeException {

@@ -118,7 +118,7 @@ TEST_F(IoUringSocketHandleTest, RecvmsgNotSupported) {
   Buffer::OwnedImpl write_buffer;
   auto slice = write_buffer.frontSlice();
   IoHandle::RecvMsgOutput output(0, nullptr);
-  EXPECT_THAT(impl.recvmsg(&slice, 0, 0, output).err_->getErrorCode(),
+  EXPECT_THAT(impl.recvmsg(&slice, 0, 0, {}, output).err_->getErrorCode(),
               Api::IoError::IoErrorCode::NoSupport);
 }
 
@@ -128,7 +128,7 @@ TEST_F(IoUringSocketHandleTest, RecvmmsgNotSupported) {
   Buffer::OwnedImpl write_buffer;
   RawSliceArrays array(0, absl::FixedArray<Buffer::RawSlice>(0));
   IoHandle::RecvMsgOutput output(0, nullptr);
-  EXPECT_THAT(impl.recvmmsg(array, 0, output).err_->getErrorCode(),
+  EXPECT_THAT(impl.recvmmsg(array, 0, {}, output).err_->getErrorCode(),
               Api::IoError::IoErrorCode::NoSupport);
 }
 

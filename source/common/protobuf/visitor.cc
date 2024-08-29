@@ -31,11 +31,11 @@ absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::M
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
     } else if (message.GetTypeName() == "xds.type.v3.TypedStruct") {
       auto output_or_error = Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);
-      RETURN_IF_STATUS_NOT_OK(output_or_error);
+      RETURN_IF_NOT_OK_REF(output_or_error.status());
       std::tie(inner_message, target_type_url) = std::move(output_or_error.value());
     } else if (message.GetTypeName() == "udpa.type.v1.TypedStruct") {
       auto output_or_error = Helper::convertTypedStruct<udpa::type::v1::TypedStruct>(message);
-      RETURN_IF_STATUS_NOT_OK(output_or_error);
+      RETURN_IF_NOT_OK_REF(output_or_error.status());
       std::tie(inner_message, target_type_url) = std::move(output_or_error.value());
     }
 

@@ -17,6 +17,7 @@ envoy_cc_test_binary(
         "abseil_symbolize",
     ],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",

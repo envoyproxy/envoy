@@ -10,6 +10,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -23,6 +24,7 @@ const auto LdsTypeUrl = Config::getTypeUrl<envoy::config::listener::v3::Listener
 
 // Tests the use of Envoy with a primary and failover sources.
 class XdsFailoverAdsIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
+                                      public Event::TestUsingSimulatedTime,
                                       public HttpIntegrationTest {
 public:
   XdsFailoverAdsIntegrationTest()
@@ -71,6 +73,25 @@ public:
       san_matcher->mutable_matcher()->set_suffix("lyft.com");
       san_matcher->set_san_type(
           envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+      if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+        // Set smaller retry limits to make it the time to wait
+        // more predictable.
+        auto* envoy_grpc = grpc_service->mutable_envoy_grpc();
+        envoy_grpc->mutable_retry_policy()
+            ->mutable_retry_back_off()
+            ->mutable_base_interval()
+            ->set_nanos(900 * 1e6);
+        envoy_grpc->mutable_retry_policy()
+            ->mutable_retry_back_off()
+            ->mutable_max_interval()
+            ->set_seconds(1);
+      } else {
+        // clientType() == Grpc::ClientType::GoogleGrpc.
+        auto* google_grpc = grpc_service->mutable_google_grpc();
+        auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+        ssl_creds->mutable_root_certs()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      }
       if (clientType() == Grpc::ClientType::GoogleGrpc) {
         auto* google_grpc = grpc_service->mutable_google_grpc();
         auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
@@ -126,7 +147,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
       auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          tls_context, factory_context_);
+          tls_context, factory_context_, false);
       // upstream_stats_store_ should have been initialized be prior call to
       // BaseIntegrationTest::createXdsUpstream().
       ASSERT(upstream_stats_store_ != nullptr);
@@ -136,14 +157,6 @@ public:
       addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     }
     failover_xds_upstream_ = fake_upstreams_.back().get();
-  }
-
-  void initializeFailoverXdsStream() {
-    if (failover_xds_stream_ == nullptr) {
-      auto result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
-      RELEASE_ASSERT(result, result.message());
-      failover_xds_stream_->startGrpcStream();
-    }
   }
 
   void createXdsUpstream() override {
@@ -170,11 +183,38 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
+  // Waits for a failover source connected and immediately disconnects.
+  void failoverConnectionFailure() {
+    AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+  }
+
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name) {
     return ConfigHelper::buildClusterLoadAssignment(
         name, Network::Test::getLoopbackAddressString(ipVersion()),
         fake_upstreams_[0]->localAddress()->ip()->port());
+  }
+
+  void waitForPrimaryXdsRetryTimer(uint32_t expected_failures = 1, uint32_t seconds = 1) {
+    // When a gRPC stream is closed, first the onEstablishmentFailure() callbacks are
+    // called and retry timer is added after. To make the test (current) thread
+    // increase the simulated time *after* the retry timer is added is done as
+    // follows:
+    // 1. The test thread waits for the CDS update_failure counter update which
+    // will occur as part of the onEstablishmentFailure() callbacks.
+    // 2. The test thread will install a barrier notification in Envoy's main
+    // thread dispatcher. This will be called after the main thread finishes the
+    // current invocation of gRPC stream closure piece of code that will also
+    // enable the retry timer.
+    // 3. The test thread will increase the simulated time.
+    test_server_->waitForCounterGe("cluster_manager.cds.update_failure", expected_failures);
+    absl::Notification notification;
+    test_server_->server().dispatcher().post([&]() { notification.Notify(); });
+    notification.WaitForNotification();
+    timeSystem().advanceTimeWait(std::chrono::seconds(seconds));
   }
 
   void makeSingleRequest() {
@@ -269,6 +309,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverBasic) {
 
   // Ensure basic flow using the primary (when failover is not defined) works.
   validateAllXdsResponsesAndDataplaneRequest(xds_stream_.get());
+
+  EXPECT_EQ(1, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validate that when there's failover defined and the primary is available,
@@ -296,15 +338,24 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverNotAttemptedWhenPrimaryAvailable) 
 
 // Validates that when there's a failover defined, and the primary isn't responding,
 // then Envoy will use the failover, and will receive a valid config.
-TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryNotResponding) {
+TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryNotResponding) {
   initialize();
 
   // Expect a connection to the primary. Reject the connection immediately.
   primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  waitForPrimaryXdsRetryTimer();
 
   // Expect another connection attempt to the primary. Reject the stream (gRPC failure) immediately.
   // As this is a 2nd consecutive failure, it will trigger failover.
   primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+  // The CDS request fails when the primary disconnects.
+  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -320,7 +371,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryNotResponding) {
 
 // Validates that when there's a failover defined, and the primary returns a
 // gRPC failure, then Envoy will use the failover, and will receive a valid config.
-TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailure) {
+TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailure) {
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -337,6 +388,16 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailure) {
   RELEASE_ASSERT(result, result.message());
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
+  // When EnvoyGrpc is used, the connection will be terminated.
+  // When GoogleGrpc is used, only the stream will be terminated.
+  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  }
+
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  waitForPrimaryXdsRetryTimer();
+
   // Second attempt to the primary.
   // When using GoogleGrpc the same connection is reused, whereas for EnvoyGrpc
   // a new connection will be established.
@@ -344,9 +405,18 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailure) {
     result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
   }
+
   result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
   RELEASE_ASSERT(result, result.message());
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // When EnvoyGrpc is used, the connection will be terminated.
+  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  }
+
+  // The CDS request fails when the primary disconnects.
+  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
 
   ASSERT(failover_xds_connection_ == nullptr);
   result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -363,7 +433,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailure) {
 // Validates that when there's a failover defined, and the primary returns a
 // gRPC failure after sending headers, then Envoy will use the failover, and will receive a valid
 // config.
-TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailureAfterHeaders) {
+TEST_P(XdsFailoverAdsIntegrationTest, StartupPrimaryGrpcFailureAfterHeaders) {
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -381,12 +451,19 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailureAfterHea
   xds_stream_->startGrpcStream();
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  waitForPrimaryXdsRetryTimer();
+
   // Second attempt to the primary, reusing stream as headers were previously
   // sent.
   result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
   RELEASE_ASSERT(result, result.message());
   xds_stream_->startGrpcStream();
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  // The CDS request fails when the primary disconnects.
+  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
 
   ASSERT(failover_xds_connection_ == nullptr);
   result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -398,10 +475,15 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_StartupPrimaryGrpcFailureAfterHea
 
   // Ensure basic flow using the failover source works.
   validateAllXdsResponsesAndDataplaneRequest(failover_xds_stream_.get());
+
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
 }
 
 // Validate that once primary answers, failover will not be used, even after disconnecting.
-TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoFailoverUseAfterPrimaryResponse) {
+TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
+  // These tests are not executed with GoogleGrpc because they are flaky due to
+  // the large timeout values for retries.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -430,6 +512,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoFailoverUseAfterPrimaryResponse
   // Now disconnect the primary.
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
+  // CDS was successful, but EDS will fail. After that add a notification to the
+  // main thread to ensure that the retry timer kicks in.
+  test_server_->waitForCounterGe("cluster.cluster_0.update_failure", 1);
+  absl::Notification notification;
+  test_server_->server().dispatcher().post([&]() { notification.Notify(); });
+  notification.WaitForNotification();
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
   // In this case (received a response), both EnvoyGrpc and GoogleGrpc keep the connection open.
   result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
   RELEASE_ASSERT(result, result.message());
@@ -439,50 +529,55 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoFailoverUseAfterPrimaryResponse
   // Ensure that Envoy still attempts to connect to the primary,
   // and keep disconnecting a few times and validate that the failover
   // connection isn't attempted.
-  for (int i = 3; i < 5; ++i) {
+  for (int i = 1; i < 5; ++i) {
+    // In EnvoyGrpc, the CDS request fails when the primary disconnects. After that
+    // fetch the config dump to ensure that the retry timer kicks in.
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+    waitForPrimaryXdsRetryTimer(i);
+
     // EnvoyGrpc will disconnect if the gRPC stream is immediately closed (as
     // done above).
-    if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-      result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
-      RELEASE_ASSERT(result, result.message());
-    }
+    result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     // Immediately fail the connection.
     xds_stream_->finishGrpcStream(Grpc::Status::Internal);
   }
 
-  // When GoogleGrpc is used, a connection to the failover_xds_upstream will be
-  // attempted, but no stream will be created. When EnvoyGrpc is used, no
-  // connection to the failover will be attempted.
-  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-    // A failover connection should not be attempted, so a failure is expected here.
-    // Setting smaller timeout to avoid long execution times.
-    EXPECT_FALSE(failover_xds_upstream_->waitForHttpConnection(
-        *dispatcher_, failover_xds_connection_, std::chrono::seconds(1)));
-  } else {
-    result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    EXPECT_FALSE(failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_,
-                                                            std::chrono::seconds(1)));
-  }
+  // When EnvoyGrpc is used, no new connection to the failover will be attempted.
+  EXPECT_FALSE(failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_,
+                                                             std::chrono::seconds(1)));
+
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  waitForPrimaryXdsRetryTimer(5);
 
   // Allow a connection to the primary.
   // Expect a connection to the primary when using EnvoyGrpc.
   // In case GoogleGrpc is used the current connection will be reused (new stream).
-  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-    result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-  }
+  result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
+  RELEASE_ASSERT(result, result.message());
   result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
   xds_stream_->startGrpcStream();
 
-  // The rest will be a normal primary source xDS back and forth.
-  validateAllXdsResponsesAndDataplaneRequest(xds_stream_.get());
+  // Validate that just the initial requests are sent to the primary.
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "1", {}, {}, {}, true,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      xds_stream_.get()));
+  EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"cluster_0"}, {"cluster_0"}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      xds_stream_.get()));
+
+  EXPECT_EQ(1, test_server_->gauge("control_plane.connected_state")->value());
 }
 
-// Validate that once failover answers, primary will not be used, even after disconnecting.
-TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoPrimaryUseAfterFailoverResponse) {
+// Validate that once failover responds, and then disconnects, primary will be attempted.
+TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconnect) {
+  // These tests are not executed with GoogleGrpc because they are flaky due to
+  // the large timeout values for retries.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
 #ifdef ENVOY_ENABLE_UHV
   // With UHV the finishGrpcStream() isn't detected as invalid frame because of
   // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
@@ -495,9 +590,17 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoPrimaryUseAfterFailoverResponse
   // 2 consecutive primary failures.
   // Expect a connection to the primary. Reject the connection immediately.
   primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
   // Expect another connection attempt to the primary. Reject the stream (gRPC failure) immediately.
   // As this is a 2nd consecutive failure, it will trigger failover.
+  waitForPrimaryXdsRetryTimer();
   primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+  // The CDS request fails when the primary disconnects.
+  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
 
   AssertionResult result =
       failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
@@ -512,64 +615,295 @@ TEST_P(XdsFailoverAdsIntegrationTest, DISABLED_NoPrimaryUseAfterFailoverResponse
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      CdsTypeUrl, {ConfigHelper::buildCluster("cluster_0")},
-      {ConfigHelper::buildCluster("cluster_0")}, {}, "1", {}, failover_xds_stream_.get());
+      CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_0")},
+      {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
+      failover_xds_stream_.get());
+  // Wait for an EDS request, and send its response.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  EXPECT_TRUE(compareDiscoveryRequest(
+      EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
+      {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
+      failover_xds_stream_.get());
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
 
-  // Envoy has received a CDS response, it means the primary is available.
-  // Now disconnect the primary.
+  // Envoy has received CDS and EDS responses, it means the failover is available.
+  // Now disconnect the failover source.
   failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
-  // In this case (received a response), both EnvoyGrpc and GoogleGrpc keep the connection open.
+  // CDS and EDS were successful, but LDS will fail. After that add a notification to the
+  // main thread to ensure that the retry timer kicks in.
+  test_server_->waitForCounterGe("listener_manager.lds.update_failure", 1);
+  absl::Notification notification;
+  test_server_->server().dispatcher().post([&]() { notification.Notify(); });
+  notification.WaitForNotification();
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  // The failover disconnected, so the next step is trying to connect to the
+  // primary. First ensure that the failover isn't being attempted, and then let
+  // the connection to the primary succeed.
+  EXPECT_FALSE(failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_,
+                                                             std::chrono::seconds(5)));
+  EXPECT_TRUE(xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_));
+
+  // Allow receiving config from the primary.
+  result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+  xds_stream_->startGrpcStream();
+
+  // Ensure basic flow with primary works. Validate that the
+  // initial_resource_versions for delta-xDS is empty.
+  const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      OptRef(empty_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"failover_cluster_0"},
+                                      {"failover_cluster_0"}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      OptRef(empty_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(LdsTypeUrl, "", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      OptRef(empty_initial_resource_versions_map)));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      CdsTypeUrl, {ConfigHelper::buildCluster("primary_cluster_0")},
+      {ConfigHelper::buildCluster("primary_cluster_0")}, {}, "primary1", {}, xds_stream_.get());
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.primary_cluster_0.warming_state", 1);
+
+  // Expect an updated failover EDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"primary_cluster_0"}, {"primary_cluster_0"},
+                                      {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      xds_stream_.get()));
+  EXPECT_EQ(1, test_server_->gauge("control_plane.connected_state")->value());
+}
+
+// Validates that if failover is used, and then disconnected, and the primary
+// still doesn't respond, failover will be attempted with the correct
+// initial_resource_versions.
+TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconnect) {
+  // These tests are not executed with GoogleGrpc because they are flaky due to
+  // the large timeout values for retries.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+#ifdef ENVOY_ENABLE_UHV
+  // With UHV the finishGrpcStream() isn't detected as invalid frame because of
+  // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
+  // is also enabled.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  initialize();
+
+  // 2 consecutive primary failures.
+  // Expect a connection to the primary. Reject the connection immediately.
+  primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  // Expect another connection attempt to the primary. Reject the stream (gRPC failure) immediately.
+  // As this is a 2nd consecutive failure, it will trigger failover.
+  waitForPrimaryXdsRetryTimer();
+  primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+  // The CDS request fails when the primary disconnects.
+  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+
+  AssertionResult result =
+      failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  // Failover is healthy, start the ADS gRPC stream.
   result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
   RELEASE_ASSERT(result, result.message());
-  // Immediately fail the connection.
-  failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
-
-  // Ensure that Envoy still attempts to connect to the primary,
-  // and keep disconnecting a few times and validate that the failover
-  // connection isn't attempted.
-  for (int i = 3; i < 5; ++i) {
-    // EnvoyGrpc will disconnect if the gRPC stream is immediately closed (as
-    // done above).
-    if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-      result =
-          failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
-      RELEASE_ASSERT(result, result.message());
-    }
-    result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    // Immediately fail the connection.
-    failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
-  }
-
-  // When GoogleGrpc is used, a connection to the (primary) xds_upstream will be
-  // attempted, but no stream will be created. When EnvoyGrpc is used, no
-  // connection to the primary will be attempted.
-  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-    // A primary connection should not be attempted, so a failure is expected here.
-    // Setting smaller timeout to avoid long execution times.
-    EXPECT_FALSE(xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_,
-                                                      std::chrono::seconds(1)));
-  } else {
-    result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    EXPECT_FALSE(
-        xds_connection_->waitForNewStream(*dispatcher_, xds_stream_, std::chrono::seconds(1)));
-  }
-
-  // Allow a connection to the failover.
-  // Expect a connection to the failover when using EnvoyGrpc.
-  // In case GoogleGrpc is used the current connection will be reused (new stream).
-  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-    result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-  }
-  result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
   failover_xds_stream_->startGrpcStream();
 
-  // The rest will be a normal failover source xDS back and forth.
-  validateAllXdsResponsesAndDataplaneRequest(failover_xds_stream_.get());
+  // Ensure basic flow with failover works.
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_0")},
+      {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
+      failover_xds_stream_.get());
+  // Wait for an EDS request, and send its response.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  EXPECT_TRUE(compareDiscoveryRequest(
+      EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
+      {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
+      failover_xds_stream_.get());
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+
+  // Envoy has received CDS and EDS responses, it means the failover is available.
+  // Now disconnect the failover.
+  failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+  EXPECT_TRUE(failover_xds_connection_->close());
+  ASSERT_TRUE(failover_xds_connection_->waitForDisconnect());
+
+  // Wait longer due to the fixed 5 seconds failover.
+  waitForPrimaryXdsRetryTimer(3, 5);
+
+  // The failover disconnected, so the next step is trying to connect to the
+  // primary source. Disconnect the primary source immediately.
+  primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+  // Expect a connection to the failover source to be attempted.
+  result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Failover is healthy, start the ADS gRPC stream.
+  result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  failover_xds_stream_->startGrpcStream();
+
+  // Ensure basic flow with failover after it was connected to failover is
+  // preserved. The initial resource versions of LDS will be empty, because no
+  // LDS response was previously sent.
+  const absl::flat_hash_map<std::string, std::string> cds_eds_initial_resource_versions_map{
+      {"failover_cluster_0", "failover1"}};
+  const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
+  EXPECT_TRUE(compareDiscoveryRequest(
+      CdsTypeUrl, "", {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+      failover_xds_stream_.get(), OptRef(cds_eds_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get(),
+      OptRef(cds_eds_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      LdsTypeUrl, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+      failover_xds_stream_.get(), OptRef(empty_initial_resource_versions_map)));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_1")},
+      {ConfigHelper::buildCluster("failover_cluster_1")}, {}, "failover2", {},
+      failover_xds_stream_.get());
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_1.warming_state", 1);
+
+  // Expect an updated failover EDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      EdsTypeUrl, "", {"failover_cluster_1"}, {"failover_cluster_1"}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
+}
+
+// Validate that once failover responds, and then disconnects, Envoy
+// will alternate between the primary and failover sources (multiple times) if
+// both are not responding.
+TEST_P(XdsFailoverAdsIntegrationTest,
+       PrimaryAndFailoverAttemptsAfterFailoverResponseAndDisconnect) {
+  // These tests are not executed with GoogleGrpc because they are flaky due to
+  // the large timeout values for retries.
+  SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
+#ifdef ENVOY_ENABLE_UHV
+  // With UHV the finishGrpcStream() isn't detected as invalid frame because of
+  // no ":status" header, unless "envoy.reloadable_features.enable_universal_header_validator"
+  // is also enabled.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  initialize();
+
+  // 2 consecutive primary failures.
+  // Expect a connection to the primary. Reject the connection immediately.
+  primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  // Expect another connection attempt to the primary. Reject the stream (gRPC failure) immediately.
+  // As this is a 2nd consecutive failure, it will trigger failover.
+  waitForPrimaryXdsRetryTimer();
+  primaryConnectionFailure();
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+  // The CDS request fails when the primary disconnects.
+  test_server_->waitForCounterGe("cluster_manager.cds.update_failure", 2);
+
+  AssertionResult result =
+      failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  // Failover is healthy, start the ADS gRPC stream.
+  result = failover_xds_connection_->waitForNewStream(*dispatcher_, failover_xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  failover_xds_stream_->startGrpcStream();
+
+  // Ensure basic flow with failover works.
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_0")},
+      {ConfigHelper::buildCluster("failover_cluster_0")}, {}, "failover1", {},
+      failover_xds_stream_.get());
+  // Wait for an EDS request, and send its response.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 1);
+  EXPECT_TRUE(compareDiscoveryRequest(
+      EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      EdsTypeUrl, {buildClusterLoadAssignment("failover_cluster_0")},
+      {buildClusterLoadAssignment("failover_cluster_0")}, {}, "failover1", {},
+      failover_xds_stream_.get());
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeEq("cluster.failover_cluster_0.warming_state", 0);
+  EXPECT_EQ(2, test_server_->gauge("control_plane.connected_state")->value());
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      failover_xds_stream_.get()));
+
+  // Envoy has received CDS and EDS responses, it means the failover is available.
+  // Now disconnect the failover source.
+  failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+  EXPECT_TRUE(failover_xds_connection_->close());
+  ASSERT_TRUE(failover_xds_connection_->waitForDisconnect());
+
+  // Ensure Envoy alternates between primary and failover.
+  // Up to this step there were 3 CDS update failures. In each iteration of the
+  // next loop there are going to be 2 failures (one for primary and another for
+  // failover).
+  for (int i = 1; i < 3; ++i) {
+    // Wait longer due to the fixed 5 seconds failover .
+    waitForPrimaryXdsRetryTimer(2 * i + 1, 5);
+
+    // The failover disconnected, so the next step is trying to connect to the
+    // primary source. Disconnect the primary source immediately.
+    primaryConnectionFailure();
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+
+    // Expect a connection to the failover source to be attempted. Disconnect
+    // immediately.
+    result = failover_xds_upstream_->waitForHttpConnection(*dispatcher_, failover_xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = failover_xds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    ASSERT_TRUE(failover_xds_connection_->waitForDisconnect());
+  }
 }
 } // namespace Envoy

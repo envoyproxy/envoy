@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network:well_known_names",

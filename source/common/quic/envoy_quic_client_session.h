@@ -59,8 +59,6 @@ public:
   void OnCanWrite() override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
-  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
-                               quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
@@ -118,9 +116,7 @@ private:
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
-  QuicStatNames& quic_stat_names_;
   OptRef<Http::HttpServerPropertiesCache> rtt_cache_;
-  Stats::Scope& scope_;
   bool disable_keepalive_{false};
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   OptRef<QuicTransportSocketFactoryBase> transport_socket_factory_;

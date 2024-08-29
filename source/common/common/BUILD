@@ -476,6 +476,7 @@ envoy_cc_library(
         "//envoy/common:interval_set_interface",
         "//envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
+        "@com_googlesource_code_re2//:re2",
     ],
 )
 
