@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -59,8 +58,6 @@ public:
     return enforcement_type_;
   }
 
-  std::chrono::milliseconds delayDenyMs() const { return delay_deny_ms_; }
-
 private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
@@ -69,7 +66,6 @@ private:
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
   const envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcement_type_;
-  std::chrono::milliseconds delay_deny_ms_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =
@@ -79,7 +75,6 @@ using RoleBasedAccessControlFilterConfigSharedPtr =
  * Implementation of a basic RBAC network filter.
  */
 class RoleBasedAccessControlFilter : public Network::ReadFilter,
-                                     public Network::ConnectionCallbacks,
                                      public Logger::Loggable<Logger::Id::rbac> {
 
 public:
@@ -92,13 +87,7 @@ public:
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; };
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
-    callbacks_->connection().addConnectionCallbacks(*this);
   }
-
-  // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
 
   void setDynamicMetadata(std::string shadow_engine_result, std::string shadow_policy_id);
 
@@ -109,10 +98,6 @@ private:
   EngineResult shadow_engine_result_{Unknown};
 
   Result checkEngine(Filters::Common::RBAC::EnforcementMode mode);
-  void closeConnection();
-  void resetTimerState();
-  Event::TimerPtr delay_timer_{nullptr};
-  bool is_delay_denied_{false};
 };
 
 } // namespace RBACFilter
