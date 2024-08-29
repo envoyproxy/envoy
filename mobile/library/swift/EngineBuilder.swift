@@ -2,6 +2,7 @@
 import Foundation
 
 /// Builder used for creating and running a new Engine instance.
+// swiftlint:disable:next type_body_length
 @objcMembers
 open class EngineBuilder: NSObject {
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
@@ -566,6 +567,7 @@ open class EngineBuilder: NSObject {
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
+      dnsNumRetries: self.dnsNumRetries,
       enableHttp3: self.enableHttp3,
       quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
       quicCanonicalSuffixes: self.quicCanonicalSuffixes,
