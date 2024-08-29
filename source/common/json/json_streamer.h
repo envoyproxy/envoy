@@ -38,6 +38,34 @@ namespace Json {
 #define ASSERT_LEVELS_EMPTY ASSERT(this->levels_.empty())
 #endif
 
+class Constants {
+public:
+  // Constants for common JSON values.
+  static constexpr absl::string_view True = R"(true)";
+  static constexpr absl::string_view False = R"(false)";
+  static constexpr absl::string_view Null = R"(null)";
+
+  // Constants for JSON delimiters.
+  static constexpr absl::string_view MapBeg = R"({)";
+  static constexpr absl::string_view MapEnd = R"(})";
+  static constexpr absl::string_view ArrayBeg = R"([)";
+  static constexpr absl::string_view ArrayEnd = R"(])";
+  static constexpr absl::string_view Quote = R"(")";
+  static constexpr absl::string_view Comma = R"(,)";
+};
+
+// Simple abstraction that provide a output buffer for streaming JSON output.
+class BufferOutput {
+public:
+  void add(absl::string_view a) { buffer_.addFragments({a}); }
+  void add(absl::string_view a, absl::string_view b, absl::string_view c) {
+    buffer_.addFragments({a, b, c});
+  }
+
+  explicit BufferOutput(Buffer::Instance& output) : buffer_(output) {}
+  Buffer::Instance& buffer_;
+};
+
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
  * JSON structure with an image of what you want to serialize, or using a
@@ -143,7 +171,7 @@ public:
     void addString(absl::string_view str) {
       ASSERT_THIS_IS_TOP_LEVEL;
       nextField();
-      streamer_.addSanitized("\"", str, "\"");
+      streamer_.addSanitized(Constants::Quote, str, Constants::Quote);
     }
 
     /**
@@ -167,7 +195,7 @@ public:
       if (is_first_) {
         is_first_ = false;
       } else {
-        streamer_.addConstantString(",");
+        streamer_.addConstantString(Constants::Comma);
       }
     }
 
@@ -229,7 +257,7 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    Map(Streamer& streamer) : Level(streamer, "{", "}") {}
+    Map(Streamer& streamer) : Level(streamer, Constants::MapBeg, Constants::MapEnd) {}
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
@@ -244,7 +272,7 @@ public:
       ASSERT_THIS_IS_TOP_LEVEL;
       ASSERT(!expecting_value_);
       nextField();
-      this->streamer_.addSanitized(R"(")", key, R"(":)");
+      this->streamer_.addSanitized(Constants::Quote, key, R"(":)");
       expecting_value_ = true;
     }
 
@@ -280,7 +308,7 @@ public:
    */
   class Array : public Level {
   public:
-    Array(Streamer& streamer) : Level(streamer, "[", "]") {}
+    Array(Streamer& streamer) : Level(streamer, Constants::ArrayBeg, Constants::ArrayEnd) {}
     using Entries = absl::Span<const Value>;
 
     /**
@@ -332,7 +360,11 @@ private:
    */
   void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix) {
     absl::string_view sanitized = Json::sanitize(sanitize_buffer_, token);
-    response_.addFragments({prefix, sanitized, suffix});
+    response_.add(prefix, sanitized, suffix);
+  }
+
+  void addString(absl::string_view str) {
+    response_.add(Constants::Quote, Json::sanitize(sanitize_buffer_, str), Constants::Quote);
   }
 
   /**
@@ -340,24 +372,24 @@ private:
    */
   void addNumber(double d) {
     if (std::isnan(d)) {
-      response_.addFragments({"null"});
+      response_.add(Constants::Null);
     } else {
-      Buffer::Util::serializeDouble(d, response_);
+      Buffer::Util::serializeDouble(d, response_.buffer_);
     }
   }
-  void addNumber(uint64_t u) { response_.addFragments({absl::StrCat(u)}); }
-  void addNumber(int64_t i) { response_.addFragments({absl::StrCat(i)}); }
+  void addNumber(uint64_t u) { response_.add(absl::StrCat(u)); }
+  void addNumber(int64_t i) { response_.add(absl::StrCat(i)); }
 
   /**
    * Serializes a bool to the output stream.
    */
-  void addBool(bool b) { response_.addFragments({b ? "true" : "false"}); }
+  void addBool(bool b) { response_.add(b ? Constants::True : Constants::False); }
 
   /**
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) { response_.addFragments({str}); }
+  void addConstantString(absl::string_view str) { response_.add(str); }
 
 #ifndef NDEBUG
   /**
@@ -380,7 +412,7 @@ private:
 
 #endif
 
-  Buffer::Instance& response_;
+  BufferOutput response_;
   std::string sanitize_buffer_;
 
 #ifndef NDEBUG
