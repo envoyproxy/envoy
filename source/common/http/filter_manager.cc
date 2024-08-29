@@ -1339,7 +1339,8 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
   // TODO(soya3129): update stats with metadata.
 
   // Now encode metadata via the codec.
-  if (!metadata_map_ptr->empty()) {
+  if (!metadata_map_ptr->empty() && !state_.encoder_filter_chain_complete_ &&
+      !state_.encoder_filter_chain_aborted_) {
     filter_manager_callbacks_.encodeMetadata(std::move(metadata_map_ptr));
   }
 }
