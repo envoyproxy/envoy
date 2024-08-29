@@ -353,7 +353,7 @@ bool ActiveStreamDecoderFilter::canContinue() {
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent.
-  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.state_.encoder_filter_chain_aborted_;
+  return !parent_.stopEncoderFilterChain();
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -1328,9 +1328,14 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status),
                      *metadata_map_ptr);
 
-    if (status == FilterMetadataStatus::StopIterationForLocalReply) {
-      // In case of a local reply, we do not continue encoding metadata. Metadata is not sent on to
-      // the client.
+    // if (status == FilterMetadataStatus::StopIterationForLocalReply) {
+    //   // In case of a local reply, we do not continue encoding metadata. Metadata is not sent on
+    //   to
+    //   // the client.
+    //   return;
+    // }
+
+    if (stopEncoderFilterChain()) {
       return;
     }
 
@@ -1347,8 +1352,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
   // TODO(soya3129): update stats with metadata.
 
   // Now encode metadata via the codec.
-  if (!metadata_map_ptr->empty() && !state_.encoder_filter_chain_complete_ &&
-      !state_.encoder_filter_chain_aborted_) {
+  if (!metadata_map_ptr->empty() && !stopEncoderFilterChain()) {
     filter_manager_callbacks_.encodeMetadata(std::move(metadata_map_ptr));
   }
 }
