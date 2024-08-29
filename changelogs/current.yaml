@@ -58,7 +58,8 @@ minor_behavior_changes:
 - area: ext_proc
   change: |
     Added support for
-    :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
+    :ref:`send_body_without_waiting_for_header_response
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`.
 - area: http
   change: |
     Modified the authority header value validator to allow the same characters as oghttp2
