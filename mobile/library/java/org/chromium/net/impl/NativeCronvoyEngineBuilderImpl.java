@@ -264,8 +264,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return new EnvoyConfiguration(
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
-        mDnsPreresolveHostnames, mEnableDNSCache, mDnsNumRetries.orElse(-1),
-        mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro,
+        mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
+        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro,
         quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
         quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(),
         mEnableSocketTag, mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,

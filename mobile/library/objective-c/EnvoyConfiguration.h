@@ -60,6 +60,7 @@ NS_ASSUME_NONNULL_BEGIN
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
+                                    dnsNumRetries:(NSInteger)dnsNumRetries
                                       enableHttp3:(BOOL)enableHttp3
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                             quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
