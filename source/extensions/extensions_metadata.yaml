@@ -1077,7 +1077,7 @@ envoy.request_id.uuid:
   status: stable
   type_urls:
   - envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
-  envoy.resource_monitors.cpu_utilization:
+envoy.resource_monitors.cpu_utilization:
   categories:
   - envoy.resource_monitors
   security_posture: data_plane_agnostic
