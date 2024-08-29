@@ -93,6 +93,13 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
+  if (trailers.empty()) {
+    ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
+    // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeData(empty_buffer, true);
+    return;
+  }
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
 }

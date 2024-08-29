@@ -816,6 +816,7 @@ envoy_cc_test_library(
         "//test/integration/filters:metadata_control_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/integration/filters:remove_response_headers_lib",
+        "//test/integration/filters:remove_response_trailers_lib",
         "//test/integration/filters:stop_iteration_headers_inject_body",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
