@@ -106,18 +106,27 @@ public:
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
   envoy_status_t setProxySettings(const char* host, const uint16_t port);
   envoy_status_t resetConnectivityState();
+  /** Sets the preferred network. */
+  void setPreferredNetwork(NetworkType network);
+
   /**
-   * This function does the following on a network change event (such as switching from WiFI to
-   * cellular, WIFi A to WiFI B, etc.).
+   * This function does the following when the network is available.
    *
-   * - Sets the preferred network.
    * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
    *   `setIpVersionToRemove` in the DNS cache implementation to remove the IPv6 addresses from
    *   the DNS response in the subsequent DNS resolutions.
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    * - Optionally (if configured) clear HTTP/3 broken status.
    */
-  envoy_status_t setPreferredNetwork(NetworkType network);
+  void onNetworkAvailable();
+
+  /**
+   * This functions does the following on network unavailable.
+   *
+   * - Cancel the DNS pending queries.
+   * - Stop the DNS timeout and refresh timers.
+   */
+  void onNetworkUnavailable();
 
   /**
    * Increment a counter with a given string of elements and by the given count.

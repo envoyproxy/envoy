@@ -337,6 +337,27 @@ void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersi
   ip_version_to_remove_ = ip_version;
 }
 
+void DnsCacheImpl::stop() {
+  ENVOY_LOG(debug, "stopping DNS cache");
+  // Tell the underlying resolver to reset itself since we likely just went through a network
+  // transition and parameters may have changed.
+  resolver_->resetNetworking();
+
+  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  for (auto& primary_host : primary_hosts_) {
+    if (primary_host.second->active_query_ != nullptr) {
+      primary_host.second->active_query_->cancel(
+          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      primary_host.second->active_query_ = nullptr;
+      primary_host.second->timeout_timer_->disableTimer();
+    }
+
+    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    primary_host.second->refresh_timer_->disableTimer();
+    ENVOY_LOG_EVENT(debug, "stop_host", "stop host='{}'", primary_host.first);
+  }
+}
+
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}' timeout='{}'",
             host, host_info.host_info_->resolvedHost(), host_info.port_, timeout_interval_.count());

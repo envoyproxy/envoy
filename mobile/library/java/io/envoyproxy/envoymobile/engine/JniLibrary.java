@@ -227,10 +227,19 @@ public class JniLibrary {
    * streams. Note that this state is shared by all engines.
    *
    * @param engine  Handle to the engine whose preferred network will be set.
-   * @param network the network to be preferred for new streams.
-   * @return The resulting status of the operation.
+   * @param networkType the network type to be preferred for new streams.
    */
-  protected static native int setPreferredNetwork(long engine, int network);
+  protected static native void setPreferredNetwork(long engine, int networkType);
+
+  /**
+   * A callback into the Envoy Engine when the network is available.
+   */
+  protected static native void onNetworkAvailable(long engine);
+
+  /**
+   * A callback into the Envoy Engine when the network is unavailable.
+   */
+  protected static native void onNetworkUnavailable(long engine);
 
   /**
    * Update the proxy settings.

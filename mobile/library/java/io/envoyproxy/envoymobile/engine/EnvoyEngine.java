@@ -71,6 +71,16 @@ public interface EnvoyEngine {
   void setPreferredNetwork(EnvoyNetworkType network);
 
   /**
+   * A callback into the Envoy Engine when the network is available.
+   */
+  void onNetworkAvailable();
+
+  /**
+   * A callback into the Envoy Engine when the network is unavailable.
+   */
+  void onNetworkUnavailable();
+
+  /**
    * Update proxy settings.
    *
    * @param host The proxy host defined as a hostname or an IP address. Android

@@ -1334,12 +1334,26 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* 
   return reinterpret_cast<Envoy::InternalEngine*>(engine)->resetConnectivityState();
 }
 
-extern "C" JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*env*/,
                                                                      jclass, // class
-                                                                     jlong engine, jint network) {
-  return reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
-      static_cast<Envoy::NetworkType>(network));
+                                                                     jlong engine,
+                                                                     jint network_type) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
+      static_cast<Envoy::NetworkType>(network_type));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkAvailable(JNIEnv* /*env*/,
+                                                                    jclass, // class
+                                                                    jlong engine) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkAvailable();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkUnavailable(JNIEnv*, jclass,
+                                                                      jlong engine) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkUnavailable();
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(

@@ -42,6 +42,10 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun setPreferredNetwork(network: EnvoyNetworkType) = Unit
 
+  override fun onNetworkAvailable() = Unit
+
+  override fun onNetworkUnavailable() = Unit
+
   override fun setProxySettings(host: String, port: Int) = Unit
 
   override fun setLogLevel(level: EnvoyEngine.LogLevel) = Unit

@@ -288,7 +288,9 @@ public class CronetHttp3Test {
     assertTrue(preStats.contains("cluster.base.upstream_cx_http3_total: 1"));
 
     // This should change QUIC brokenness to "failed recently".
+    cronvoyEngine.getEnvoyEngine().onNetworkUnavailable();
     cronvoyEngine.getEnvoyEngine().setPreferredNetwork(EnvoyNetworkType.WLAN);
+    cronvoyEngine.getEnvoyEngine().onNetworkAvailable();
 
     // The next request may go out over HTTP/2 or HTTP/3 (depends on who wins the race)
     // but HTTP/3 will be tried.
