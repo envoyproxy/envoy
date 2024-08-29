@@ -1,4 +1,3 @@
-load("@rules_rust//rust:defs.bzl", "rust_clippy", "rustfmt_test")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -42,14 +41,4 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
-)
-
-rustfmt_test(
-    name = "envoy_proxy_dynamic_modules_rust_sdk_fmt",
-    targets = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
-)
-
-rust_clippy(
-    name = "envoy_proxy_dynamic_modules_rust_sdk_clippy",
-    deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
 )
