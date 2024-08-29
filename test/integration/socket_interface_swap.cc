@@ -3,10 +3,8 @@
 namespace Envoy {
 
 SocketInterfaceSwap::SocketInterfaceSwap(Network::Socket::Type socket_type)
-    : write_matcher_(std::make_shared<IoHandleMatcher>(socket_type)) {
-  Envoy::Network::SocketInterfaceSingleton::clear();
-  test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
-      std::make_unique<Envoy::Network::TestSocketInterface>(
+    : write_matcher_(std::make_shared<IoHandleMatcher>(socket_type)),
+      test_socket_interface_loader_(std::make_unique<Envoy::Network::TestSocketInterface>(
           [write_matcher = write_matcher_](Envoy::Network::TestIoSocketHandle* io_handle)
               -> absl::optional<Api::IoCallUint64Result> {
             Api::IoErrorPtr error_override = write_matcher->returnConnectOverride(io_handle);
@@ -28,8 +26,7 @@ SocketInterfaceSwap::SocketInterfaceSwap(Network::Socket::Type socket_type)
           },
           [write_matcher = write_matcher_](Network::IoHandle::RecvMsgOutput& output) {
             write_matcher->readOverride(output);
-          }));
-}
+          })) {}
 
 void SocketInterfaceSwap::IoHandleMatcher::setResumeWrites() {
   absl::MutexLock lock(&mutex_);

@@ -65,7 +65,8 @@ public:
                                       const Http::RequestHeaderMap& original_request,
                                       bool& disable_early_data) override;
   RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason, Http3Used http3_used,
-                               DoRetryResetCallback callback) override;
+                               DoRetryResetCallback callback,
+                               bool upstream_request_started) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
@@ -112,7 +113,8 @@ private:
   // disable_http3: populated to tell the caller whether to disable http3 or not when the return
   // value indicates retry.
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    Http3Used http3_used, bool& disable_http3);
+                                    Http3Used http3_used, bool& disable_http3,
+                                    bool upstream_request_started);
   RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;

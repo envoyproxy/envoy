@@ -54,6 +54,7 @@ public:
     EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(*factory_));
     EXPECT_CALL(mockHost().cluster_, connectTimeout())
         .WillRepeatedly(Return(std::chrono::milliseconds(10000)));
+    ON_CALL(mockHost(), addressListOrNull).WillByDefault(testing::Return(address_list_));
     new Event::MockSchedulableCallback(&dispatcher_);
     Network::ConnectionSocket::OptionsSharedPtr options =
         std::make_shared<Network::Socket::Options>();
@@ -64,12 +65,15 @@ public:
               return Upstream::UpstreamLocalAddress({nullptr, nullptr});
             }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
-    pool_ = allocateConnPool(
-        dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
+    pool_ =
+        allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                         transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+                         makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
+                         quic_info_, happy_eyeballs_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
+
+  void createNewStream();
 
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
@@ -80,6 +84,10 @@ public:
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_ =
       *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
+  std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_{
+      new Upstream::HostDescription::AddressVector{
+          *Network::Utility::resolveUrl("tcp://127.0.0.1:3000"),
+          *Network::Utility::resolveUrl("tcp://[::]:3000")}};
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   Ssl::ClientContextSharedPtr ssl_context_{new Ssl::MockClientContext()};
@@ -90,6 +98,7 @@ public:
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   absl::Status creation_status_;
+  bool happy_eyeballs_ = false;
 };
 
 class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {
@@ -160,7 +169,8 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
             nullptr);
 }
 
-TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
+void Http3ConnPoolImplTest::createNewStream() {
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
   initialize();
 
   MockResponseDecoder decoder;
@@ -169,13 +179,18 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
   std::shared_ptr<Network::MockSocketOption> cluster_socket_option{new Network::MockSocketOption()};
   mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
   EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_))
-      .WillOnce(Invoke(
-          [&](const Network::Address::InstanceConstSharedPtr&) -> Upstream::UpstreamLocalAddress {
-            Network::ConnectionSocket::OptionsSharedPtr options =
-                std::make_shared<Network::ConnectionSocket::Options>();
-            Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
-            return Upstream::UpstreamLocalAddress({nullptr, options});
-          }));
+      .WillOnce(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
+                           -> Upstream::UpstreamLocalAddress {
+        if (happy_eyeballs_ && address_list_->size() == 2) {
+          EXPECT_EQ(address, (*address_list_)[1]);
+        } else {
+          EXPECT_EQ(address, test_address_);
+        }
+        Network::ConnectionSocket::OptionsSharedPtr options =
+            std::make_shared<Network::ConnectionSocket::Options>();
+        Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
+        return Upstream::UpstreamLocalAddress({nullptr, options});
+      }));
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
@@ -194,6 +209,19 @@ TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
   pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
+}
+
+TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) { createNewStream(); }
+
+TEST_F(Http3ConnPoolImplTest, CreationAndNewHappyEyeballsStream) {
+  happy_eyeballs_ = true;
+  createNewStream();
+}
+
+TEST_F(Http3ConnPoolImplTest, CreationAndFailHappyEyeballs) {
+  address_list_->pop_back();
+  happy_eyeballs_ = true;
+  createNewStream();
 }
 
 TEST_F(Http3ConnPoolImplTest, NewAndCancelStreamBeforeConnect) {

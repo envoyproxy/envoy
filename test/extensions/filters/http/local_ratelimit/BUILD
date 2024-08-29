@@ -16,10 +16,15 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/http/local_ratelimit:local_ratelimit_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
     ],
 )

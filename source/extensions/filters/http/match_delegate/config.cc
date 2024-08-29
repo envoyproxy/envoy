@@ -121,7 +121,7 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
 
   if (match_tree_evaluated_ && match_result.result_) {
     const auto result = match_result.result_();
-    if (SkipAction().typeUrl() == result->typeUrl()) {
+    if ((result == nullptr) || (SkipAction().typeUrl() == result->typeUrl())) {
       skip_filter_ = true;
     } else {
       ASSERT(base_filter_ != nullptr);
@@ -312,7 +312,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), validation, factory);
   auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, prefix, context);
-  RETURN_IF_STATUS_NOT_OK(filter_factory_or_error);
+  RETURN_IF_NOT_OK_REF(filter_factory_or_error.status());
   auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());

@@ -23,17 +23,13 @@ public:
     options2_.mutable_max_entries()->set_value(max_entries2_);
   }
   void initialize() {
-    AlternateProtocolsData data(context_.server_factory_context_,
-                                context_.messageValidationVisitor());
-    factory_ = std::make_unique<Http::HttpServerPropertiesCacheManagerFactoryImpl>(
-        singleton_manager_, tls_, data);
-    manager_ = factory_->get();
+    manager_ = std::make_unique<HttpServerPropertiesCacheManagerImpl>(
+        context_.server_factory_context_, context_.messageValidationVisitor(), tls_);
   }
 
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<Http::HttpServerPropertiesCacheManagerFactoryImpl> factory_;
   HttpServerPropertiesCacheManagerSharedPtr manager_;
   const std::string name1_ = "name1";
   const std::string name2_ = "name2";
@@ -44,13 +40,6 @@ public:
   envoy::config::core::v3::AlternateProtocolsCacheOptions options1_;
   envoy::config::core::v3::AlternateProtocolsCacheOptions options2_;
 };
-
-TEST_F(HttpServerPropertiesCacheManagerTest, FactoryGet) {
-  initialize();
-
-  EXPECT_NE(nullptr, manager_);
-  EXPECT_EQ(manager_, factory_->get());
-}
 
 TEST_F(HttpServerPropertiesCacheManagerTest, GetCache) {
   initialize();
@@ -105,6 +94,15 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForDifferentOptions) {
   HttpServerPropertiesCacheSharedPtr cache2 = manager_->getCache(options2_, dispatcher_);
   EXPECT_NE(nullptr, cache2);
   EXPECT_NE(cache1, cache2);
+
+  int num_caches = 0;
+  Http::HttpServerPropertiesCacheManager::CacheFn count_caches =
+      [&](Http::HttpServerPropertiesCache& cache) {
+        EXPECT_TRUE(&cache == cache1.get() || &cache == cache2.get());
+        ++num_caches;
+      };
+  manager_->forEachThreadLocalCache(count_caches);
+  EXPECT_EQ(num_caches, 2);
 }
 
 TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheForConflictingOptions) {

@@ -17,8 +17,7 @@ namespace Singleton {
  */
 class ManagerImpl : public Manager, NonCopyable {
 public:
-  explicit ManagerImpl(Thread::ThreadFactory& thread_factory)
-      : thread_factory_(thread_factory), run_tid_(thread_factory.currentThreadId()) {}
+  ManagerImpl() = default;
 
   // Singleton::Manager
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb, bool pin) override;
@@ -26,9 +25,6 @@ public:
 private:
   absl::node_hash_map<std::string, std::weak_ptr<Instance>> singletons_;
   std::vector<InstanceSharedPtr> pinned_singletons_;
-
-  Thread::ThreadFactory& thread_factory_;
-  const Thread::ThreadId run_tid_;
 };
 
 } // namespace Singleton

@@ -145,19 +145,57 @@ private:
   std::unique_ptr<Filters::Common::MutationRules::Checker> rule_checker_;
 };
 
+class ThreadLocalStreamManager;
+// Default value is 5000 milliseconds (5 seconds)
+inline constexpr uint32_t DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS = 5000;
+
+// Deferred deletable stream wrapper.
+struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
+  explicit DeferredDeletableStream(ExternalProcessorStreamPtr stream,
+                                   ThreadLocalStreamManager& stream_manager,
+                                   const ExtProcFilterStats& stat,
+                                   const std::chrono::milliseconds& timeout)
+      : stream_(std::move(stream)), parent(stream_manager), stats(stat),
+        deferred_close_timeout(timeout) {}
+
+  void deferredClose(Envoy::Event::Dispatcher& dispatcher);
+  void closeStreamOnTimer();
+
+  ExternalProcessorStreamPtr stream_;
+  ThreadLocalStreamManager& parent;
+  ExtProcFilterStats stats;
+  Event::TimerPtr derferred_close_timer;
+  const std::chrono::milliseconds deferred_close_timeout;
+};
+
+using DeferredDeletableStreamPtr = std::unique_ptr<DeferredDeletableStream>;
+
 class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
-  // Store the ExternalProcessorStreamPtr in the map and return its raw pointer.
-  ExternalProcessorStream* store(Filter* filter, ExternalProcessorStreamPtr stream) {
-    stream_manager_[filter] = std::move(stream);
-    return stream_manager_[filter].get();
+  // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
+  // pointer of ExternalProcessorStream.
+  ExternalProcessorStream* store(ExternalProcessorStreamPtr stream, const ExtProcFilterStats& stat,
+                                 const std::chrono::milliseconds& timeout) {
+    auto deferred_stream =
+        std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat, timeout);
+    ExternalProcessorStream* raw_stream = deferred_stream->stream_.get();
+    stream_manager_[raw_stream] = std::move(deferred_stream);
+    return stream_manager_[raw_stream]->stream_.get();
   }
 
-  void erase(Filter* filter) { stream_manager_.erase(filter); }
+  void erase(ExternalProcessorStream* stream) { stream_manager_.erase(stream); }
+  void deferredErase(ExternalProcessorStream* stream, Envoy::Event::Dispatcher& dispatcher) {
+    auto it = stream_manager_.find(stream);
+    if (it == stream_manager_.end()) {
+      return;
+    }
+
+    it->second->deferredClose(dispatcher);
+  }
 
 private:
-  // Map of ExternalProcessorStreamPtrs with filter pointer as key.
-  absl::flat_hash_map<Filter*, ExternalProcessorStreamPtr> stream_manager_;
+  // Map of DeferredDeletableStreamPtrs with ExternalProcessorStream pointer as key.
+  absl::flat_hash_map<ExternalProcessorStream*, DeferredDeletableStreamPtr> stream_manager_;
 };
 
 class FilterConfig {
@@ -167,49 +205,13 @@ public:
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix, bool is_upstream,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
-               Server::Configuration::CommonFactoryContext& context)
-      : failure_mode_allow_(config.failure_mode_allow()),
-        route_cache_action_(config.route_cache_action()), message_timeout_(message_timeout),
-        max_message_timeout_ms_(max_message_timeout_ms),
-        stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()),
-        mutation_checker_(config.mutation_rules(), context.regexEngine()),
-        filter_metadata_(config.filter_metadata()),
-        allow_mode_override_(config.allow_mode_override()),
-        disable_immediate_response_(config.disable_immediate_response()),
-        allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
-        disallowed_headers_(
-            initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
-        is_upstream_(is_upstream),
-        untyped_forwarding_namespaces_(
-            config.metadata_options().forwarding_namespaces().untyped().begin(),
-            config.metadata_options().forwarding_namespaces().untyped().end()),
-        typed_forwarding_namespaces_(
-            config.metadata_options().forwarding_namespaces().typed().begin(),
-            config.metadata_options().forwarding_namespaces().typed().end()),
-        untyped_receiving_namespaces_(
-            config.metadata_options().receiving_namespaces().untyped().begin(),
-            config.metadata_options().receiving_namespaces().untyped().end()),
-        expression_manager_(builder, context.localInfo(), config.request_attributes(),
-                            config.response_attributes()),
-        immediate_mutation_checker_(context.regexEngine()),
-        thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-    if (config.disable_clear_route_cache() &&
-        (route_cache_action_ !=
-         envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
-      ExceptionUtil::throwEnvoyException("disable_clear_route_cache and route_cache_action can not "
-                                         "be set to none-default at the same time.");
-    }
-    if (config.disable_clear_route_cache()) {
-      route_cache_action_ =
-          envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
-    }
-    thread_local_stream_manager_slot_->set(
-        [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
-  }
+               Server::Configuration::CommonFactoryContext& context);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
+  bool observabilityMode() const { return observability_mode_; }
+
+  const std::chrono::milliseconds& deferredCloseTimeout() const { return deferred_close_timeout_; }
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
@@ -270,8 +272,10 @@ private:
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
   const bool failure_mode_allow_;
+  const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
       route_cache_action_;
+  const std::chrono::milliseconds deferred_close_timeout_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
 
@@ -398,6 +402,12 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
+  void encodeComplete() override {
+    if (config_->observabilityMode()) {
+      logGrpcStreamInfo();
+    }
+  }
+
   // ExternalProcessorCallbacks
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
@@ -413,7 +423,8 @@ public:
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
 
-  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
+                    bool observability_mode = false);
   bool inHeaderProcessState() {
     return (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
             encoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback);
@@ -446,6 +457,17 @@ private:
                           envoy::service::ext_proc::v3::ProcessingRequest& req);
   void addAttributes(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest& req);
 
+  Http::FilterHeadersStatus
+  sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
+                                 bool end_stream);
+  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
+                                                     bool end_stream);
+  void deferredCloseStream();
+
+  envoy::service::ext_proc::v3::ProcessingRequest
+  buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
+                     bool end_stream, bool observability_mode);
+
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
@@ -476,6 +498,8 @@ private:
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
+  Http::StreamFilterCallbacks* filter_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 };
 
 extern std::string responseCaseToString(

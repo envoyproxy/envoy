@@ -57,12 +57,36 @@ public:
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::RawSlice saved_cmsg) override {
+    last_local_address_ = local_address;
+    last_peer_address_ = peer_address;
+    EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
+                                             receive_time, tos, saved_cmsg);
+    ++num_packets_received_;
+  }
+
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes ietf_error,
                const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
 
+  Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
+    return last_local_address_;
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastPeerAddress() const { return last_peer_address_; }
+
+  uint32_t packetsReceived() const { return num_packets_received_; }
+
   using EnvoyQuicClientConnection::connectionStats;
+
+private:
+  Network::Address::InstanceConstSharedPtr last_local_address_;
+  Network::Address::InstanceConstSharedPtr last_peer_address_;
+  uint32_t num_packets_received_{0};
 };
 
 class EnvoyQuicClientSessionTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
@@ -255,7 +279,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   quic::QuicStreamId stream_id = stream.id();
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream_id,
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ProtocolError, _));
   envoy_quic_session_->OnRstStream(rst1);
 
   EXPECT_EQ(
@@ -271,7 +295,7 @@ TEST_P(EnvoyQuicClientSessionTest, SendResetFrame) {
 
   // IETF bi-directional stream.
   quic::QuicStreamId stream_id = stream.id();
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ProtocolError, _));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   envoy_quic_session_->ResetStream(stream_id, quic::QUIC_ERROR_PROCESSING_STREAM);
 
@@ -451,14 +475,14 @@ TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
     auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                       stateless_reset_packet->length());
     quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                    time_system_.monotonicTime(), /*tos=*/0);
+                                    time_system_.monotonicTime(), /*tos=*/0, /*saved_cmsg=*/{});
   }
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .Times(0);
   auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                     stateless_reset_packet->length());
   quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                  time_system_.monotonicTime(), /*tos=*/0);
+                                  time_system_.monotonicTime(), /*tos=*/0, /*saved_cmsg=*/{});
 }
 
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.
@@ -572,6 +596,43 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
     // received with ECN marks.
     EXPECT_GT(stats.num_ecn_marks_received.ect1, 0);
   }
+}
+
+TEST_P(EnvoyQuicClientSessionTest, UseSocketAddressCache) {
+  envoy_quic_session_->connect();
+  // The first six bytes of a server hello, which is enough for the client to
+  // process the packet successfully.
+  char server_hello[] = {
+      0x02, 0x00, 0x00, 0x56, 0x03, 0x03,
+  };
+  auto packet = absl::WrapUnique<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
+      quic_connection_->client_connection_id(), quic_connection_->connection_id(),
+      /*version_flag=*/true, /*reset_flag=*/false, /*packet_number=*/1,
+      std::string(server_hello, sizeof(server_hello)), /*full_padding=*/false,
+      quic::CONNECTION_ID_PRESENT, quic::CONNECTION_ID_PRESENT, quic::PACKET_1BYTE_PACKET_NUMBER,
+      &quic_version_, quic::Perspective::IS_SERVER));
+
+  Buffer::RawSlice slice;
+  slice.mem_ = const_cast<char*>(packet->data());
+  slice.len_ = packet->length();
+
+  // Send the same packet twice and ensure both times processPacket() gets the same address
+  // instances.
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+  while (quic_connection_->packetsReceived() < 1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  Network::Address::InstanceConstSharedPtr last_peer_address =
+      quic_connection_->getLastPeerAddress();
+  Network::Address::InstanceConstSharedPtr last_local_address =
+      quic_connection_->getLastLocalAddress();
+
+  peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
+  while (quic_connection_->packetsReceived() < 2) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_EQ(last_local_address.get(), quic_connection_->getLastLocalAddress().get());
+  EXPECT_EQ(last_peer_address.get(), quic_connection_->getLastPeerAddress().get());
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {

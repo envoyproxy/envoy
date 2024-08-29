@@ -212,6 +212,34 @@ TEST_P(ClientTest, BasicStreamHeaders) {
   ASSERT_EQ(callbacks_called.on_complete_calls_, 1);
 }
 
+TEST_P(ClientTest, BasicStreamHeadersIdempotent) {
+  // Create a stream, and set up request_decoder_ and response_encoder_
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  // Send request headers.
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  expected_headers.addCopy("x-envoy-mobile-cluster", "base_clear");
+  expected_headers.addCopy("x-forwarded-proto", "https");
+  expected_headers.addCopy("x-envoy-retry-on", "http3-post-connect-failure");
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), /* end_stream= */ true,
+                           /* idempotent= */ true);
+
+  // Encode response headers.
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  ASSERT_EQ(callbacks_called.on_headers_calls_, 1);
+  // Ensure that the callbacks on the EnvoyStreamCallbacks were called.
+  ASSERT_EQ(callbacks_called.on_complete_calls_, 1);
+}
+
 TEST_P(ClientTest, BasicStreamData) {
   StreamCallbacksCalled callbacks_called;
   callbacks_called.end_stream_with_headers_ = false;
@@ -477,8 +505,8 @@ TEST_P(ClientTest, EnvoyLocalError) {
   stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code_, ENVOY_CONNECTION_FAILURE);
-    EXPECT_THAT(error.message_, Eq("RESPONSE_CODE: 503|ERROR_CODE: 2|RESPONSE_FLAGS: "
-                                   "4,26|PROTOCOL: 3|DETAILS: failed miserably"));
+    EXPECT_THAT(error.message_, Eq("rc: 503|ec: 2|rsp_flags: "
+                                   "4,26|http: 3|det: failed miserably"));
     EXPECT_EQ(error.attempt_count_, 123);
     callbacks_called.on_error_calls_++;
   };
@@ -556,7 +584,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   stream_callbacks.on_error_ = [&](const EnvoyError& error, envoy_stream_intel,
                                    envoy_final_stream_intel) -> void {
     EXPECT_EQ(error.error_code_, ENVOY_STREAM_RESET);
-    EXPECT_THAT(error.message_, ContainsRegex("ERROR_CODE: 1"));
+    EXPECT_THAT(error.message_, ContainsRegex("ec: 1"));
     EXPECT_EQ(error.attempt_count_, 0);
     callbacks_called.on_error_calls_++;
   };

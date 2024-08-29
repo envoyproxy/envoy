@@ -11,8 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-using HttpExtensionConfigProviderSharedPtr = std::shared_ptr<
-    Config::DynamicExtensionConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>;
+using HttpExtensionConfigProviderSharedPtr =
+    std::shared_ptr<Config::DynamicExtensionConfigProvider<Envoy::Filter::HttpFilterFactoryCb>>;
 
 class ExecuteFilterAction
     : public Matcher::ActionBase<
@@ -45,7 +45,18 @@ public:
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 
+  // Rolling the dice to decide whether the action will be sampled.
+  // By default, if sample_percent is not specified, then it is sampled.
+  bool isSampled(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Envoy::Runtime::Loader& runtime);
+
 private:
+  Matcher::ActionFactoryCb createActionFactoryCbCommon(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
+      bool is_downstream);
+
   template <class FactoryCtx, class FilterCfgProviderMgr>
   Matcher::ActionFactoryCb createDynamicActionFactoryCbTyped(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
@@ -60,16 +71,21 @@ private:
         provider_manager->createDynamicFilterConfigProvider(
             config_discovery, name, server_factory_context, factory_context,
             server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
-    return [provider = std::move(provider), n = std::move(name)]() -> Matcher::ActionPtr {
-      auto config_value = provider->config();
-      if (config_value.has_value()) {
-        auto factory_cb = config_value.value().get().factory_cb;
-        return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-      }
-      // There is no dynamic config available. Apply missing config filter.
-      auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
-      return std::make_unique<ExecuteFilterAction>(factory_cb, n);
-    };
+
+    Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+    return
+        [provider = std::move(provider), n = std::move(name),
+         composite_action = std::move(composite_action), &runtime, this]() -> Matcher::ActionPtr {
+          if (!isSampled(composite_action, runtime)) {
+            return nullptr;
+          }
+
+          if (auto config_value = provider->config(); config_value.has_value()) {
+            return std::make_unique<ExecuteFilterAction>(config_value.ref(), n);
+          }
+          // There is no dynamic config available. Apply missing config filter.
+          return std::make_unique<ExecuteFilterAction>(Envoy::Http::MissingConfigFilterFactory, n);
+        };
   }
 
   Matcher::ActionFactoryCb createDynamicActionFactoryCbDownstream(

@@ -127,18 +127,18 @@ public:
     destructor_callback_.reset();
   }
 
-  void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) override {
-    ASSERT(!watermark_callbacks_);
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) override {
+    ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
+      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
     }
   }
 
   void removeWatermarkCallbacks() override {
-    ASSERT(watermark_callbacks_);
+    ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
+      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
     watermark_callbacks_.reset();
   }
@@ -150,6 +150,7 @@ public:
   void reset() override;
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
 protected:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
@@ -157,13 +158,12 @@ protected:
 
   bool remoteClosed() { return remote_closed_; }
   void closeLocal(bool end_stream);
-  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
   // Callback to listen for stream destruction.
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
-  absl::optional<std::reference_wrapper<DecoderFilterWatermarkCallbacks>> watermark_callbacks_;
+  absl::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
 
@@ -231,14 +231,14 @@ private:
   void onDecoderFilterAboveWriteBufferHighWatermark() override {
     ++high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
+      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
     }
   }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
     ASSERT(high_watermark_calls_ != 0);
     --high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
+      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}

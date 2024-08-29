@@ -19,8 +19,8 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -711,8 +711,8 @@ public:
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
 
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+        tls_context, factory_context_, false);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
                std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),

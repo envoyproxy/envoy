@@ -25,6 +25,8 @@ public:
 
   int clusterFunctionRef() { return lua_state_.getGlobalRef(cluster_function_slot_); }
 
+  void runtimeGC() { lua_state_.runtimeGC(); }
+
 private:
   uint64_t cluster_function_slot_{};
 
@@ -57,6 +59,11 @@ public:
   RouteHandleWrapper(const Http::HeaderMap& headers) : headers_(headers) {}
 
   static ExportedFunctions exportedFunctions() { return {{"headers", static_luaHeaders}}; }
+
+  // All embedded references should be reset when the object is marked dead. This is to ensure that
+  // we won't do the resetting in the destructor, which may be called after the referenced
+  // coroutine's lua_State is closed. And if that happens, the resetting will cause a crash.
+  void onMarkDead() override { headers_wrapper_.reset(); }
 
 private:
   /**

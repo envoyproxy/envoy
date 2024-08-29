@@ -27,6 +27,7 @@ envoy_cc_test_library(
         ":route_fuzz_proto_cc_proto",
         "//envoy/common:hashable_interface",
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
@@ -389,6 +390,7 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
@@ -457,6 +459,7 @@ envoy_cc_test(
     srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
         "//source/common/router:header_parser_lib",
@@ -490,6 +493,7 @@ envoy_cc_test(
     deps = [
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
         "//test/test_common:test_runtime_lib",

@@ -11,7 +11,9 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "source/common/http/utility.h"
+#include "source/common/http/http_option_limits.h"
+
+#include "absl/strings/string_view.h"
 
 #define OVERRIDDEN_RELOADABLE_FLAGS(KEY_VALUE_PAIR)                                                \
   /* Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by       \
@@ -41,7 +43,7 @@
 namespace quiche {
 
 inline constexpr absl::string_view EnvoyQuicheReloadableFlagPrefix =
-    "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
+    "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_";
 
 inline constexpr absl::string_view EnvoyFeaturePrefix = "envoy.reloadable_features.";
 

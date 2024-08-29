@@ -168,7 +168,7 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
   }
   auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->wasm()->sharedThis()), root_context,
                    context_id = context->id(),
-                   token](Envoy::Network::DnsResolver::ResolutionStatus status,
+                   token](Envoy::Network::DnsResolver::ResolutionStatus status, absl::string_view,
                           std::list<Envoy::Network::DnsResponse>&& response) {
     auto wasm = weak_wasm.lock();
     if (!wasm) {

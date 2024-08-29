@@ -36,6 +36,7 @@ envoy_cc_test_library(
     srcs = envoy_select_admin_functionality(["admin_instance.cc"]),
     hdrs = envoy_select_admin_functionality(["admin_instance.h"]),
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/server:configuration_lib",
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -53,6 +54,7 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//envoy/json:json_object_interface",
         "//envoy/runtime:runtime_interface",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",

@@ -61,7 +61,7 @@ DEFINE_PROTO_FUZZER(
   // default time system in GlobalTimeSystem.
   dispatcher.time_system_ = std::make_unique<Event::SimulatedTimeSystem>();
   Stats::IsolatedStoreImpl stats_store;
-  Singleton::ManagerImpl singleton_manager(Thread::threadFactoryForTest());
+  Singleton::ManagerImpl singleton_manager;
   static NiceMock<Runtime::MockLoader> runtime;
   Event::MockTimer* fill_timer = new Event::MockTimer(&dispatcher);
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =

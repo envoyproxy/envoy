@@ -36,7 +36,7 @@ public:
 
   void setup(std::string response_filename) {
     auto der_response = readFile(response_filename);
-    response_ = OcspResponseWrapper::create(der_response, time_system_).value();
+    response_ = OcspResponseWrapperImpl::create(der_response, time_system_).value();
     EXPECT_EQ(response_->rawBytes(), der_response);
   }
 
@@ -51,7 +51,7 @@ public:
 
 protected:
   Event::SimulatedTimeSystem time_system_;
-  OcspResponseWrapperPtr response_;
+  std::unique_ptr<OcspResponseWrapperImpl> response_;
 };
 
 TEST_F(OcspFullResponseParsingTest, GoodCertTest) {
@@ -107,7 +107,7 @@ TEST_F(OcspFullResponseParsingTest, ResponderIdKeyHashTest) {
 
 TEST_F(OcspFullResponseParsingTest, MultiCertResponseTest) {
   auto resp_bytes = readFile("multiple_cert_ocsp_resp.der");
-  EXPECT_EQ(OcspResponseWrapper::create(resp_bytes, time_system_).status().message(),
+  EXPECT_EQ(OcspResponseWrapperImpl::create(resp_bytes, time_system_).status().message(),
             "OCSP Response must be for one certificate only");
 }
 
@@ -119,7 +119,7 @@ TEST_F(OcspFullResponseParsingTest, UnsuccessfulResponseTest) {
       0xau, 1, 2,
       // no response bytes
   };
-  EXPECT_EQ(OcspResponseWrapper::create(data, time_system_).status().message(),
+  EXPECT_EQ(OcspResponseWrapperImpl::create(data, time_system_).status().message(),
             "OCSP response was unsuccessful");
 }
 
@@ -131,7 +131,7 @@ TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
       0xau, 1, 0,
       // no response bytes
   };
-  EXPECT_EQ(OcspResponseWrapper::create(data, time_system_).status().message(),
+  EXPECT_EQ(OcspResponseWrapperImpl::create(data, time_system_).status().message(),
             "OCSP response has no body");
 }
 
@@ -140,7 +140,7 @@ TEST_F(OcspFullResponseParsingTest, OnlyOneResponseInByteStringTest) {
   auto resp2_bytes = readFile("revoked_ocsp_resp.der");
   resp_bytes.insert(resp_bytes.end(), resp2_bytes.begin(), resp2_bytes.end());
 
-  EXPECT_EQ(OcspResponseWrapper::create(resp_bytes, time_system_).status().message(),
+  EXPECT_EQ(OcspResponseWrapperImpl::create(resp_bytes, time_system_).status().message(),
             "Data contained more than a single OCSP response");
 }
 
@@ -148,7 +148,7 @@ TEST_F(OcspFullResponseParsingTest, ParseOcspResponseWrongTagTest) {
   auto resp_bytes = readFile("good_ocsp_resp.der");
   // Change the SEQUENCE tag to an `OCTETSTRING` tag
   resp_bytes[0] = 0x4u;
-  EXPECT_EQ(OcspResponseWrapper::create(resp_bytes, time_system_).status().message(),
+  EXPECT_EQ(OcspResponseWrapperImpl::create(resp_bytes, time_system_).status().message(),
             "OCSP Response is not a well-formed ASN.1 SEQUENCE");
 }
 

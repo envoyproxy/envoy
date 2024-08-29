@@ -39,6 +39,9 @@ public:
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), ());
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks&));
+  MOCK_METHOD(void, removeWatermarkCallbacks, ());
 };
 
 template <class ResponseType> using ResponseTypePtr = std::unique_ptr<ResponseType>;

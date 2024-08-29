@@ -58,7 +58,7 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const auto& google_async_tag = *reinterpret_cast<GoogleAsyncTag*>(tag);
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
-    ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
+    ENVOY_LOG(trace, "completionThread CQ event {} {}", static_cast<int>(op), ok);
     Thread::LockGuard lock(stream.completed_ops_lock_);
 
     // It's an invariant that there must only be one pending post for arbitrary
@@ -169,7 +169,26 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
       options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
                                              Network::ConnectionInfoProviderSharedPtr{},
-                                             StreamInfo::FilterState::LifeSpan::FilterChain) {}
+                                             StreamInfo::FilterState::LifeSpan::FilterChain) {
+  // TODO(cainelli): add a common library for tracing tags between gRPC implementations.
+  if (options.parent_span_ != nullptr) {
+    const std::string child_span_name =
+        options.child_span_name_.empty()
+            ? absl::StrCat("async ", service_full_name, ".", method_name, " egress")
+            : options.child_span_name_;
+    current_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
+                                                     parent.timeSource().systemTime());
+    current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
+    current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
+    current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+  } else {
+    current_span_ = std::make_unique<Tracing::NullSpan>();
+  }
+
+  if (options.sampled_.has_value()) {
+    current_span_->setSampled(options.sampled_.value());
+  }
+}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -194,6 +213,13 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   // request headers should not be stored in stream_info.
   // Maybe put it to parent_context?
   parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
+  Tracing::HttpTraceContext trace_context(*initial_metadata);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
     ctxt_.AddMetadata(std::string(header.key().getStringView()),
@@ -226,6 +252,11 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(grpc_status));
+  if (grpc_status != Status::WellKnownGrpcStatus::Ok) {
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+  current_span_->finishSpan();
   callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
                                                          : Http::ResponseTrailerMapImpl::create());
   callbacks_.onRemoteClose(grpc_status, message);
@@ -241,6 +272,9 @@ void GoogleAsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool e
 
 void GoogleAsyncStreamImpl::closeStream() {
   // Empty EOS write queued.
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  current_span_->finishSpan();
+
   write_pending_queue_.emplace();
   writeQueued();
 }
@@ -302,7 +336,8 @@ void GoogleAsyncStreamImpl::onCompletedOps() {
 }
 
 void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, bool ok) {
-  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", op, ok, inflight_tags_);
+  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", static_cast<int>(op), ok,
+            inflight_tags_);
   ASSERT(inflight_tags_ > 0);
   --inflight_tags_;
   if (draining_cq_) {
@@ -380,7 +415,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
-    ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
+    ENVOY_LOG(debug, "Finish with grpc-status code {}", static_cast<int>(status_.error_code()));
     Http::ResponseTrailerMapPtr trailing_metadata = Http::ResponseTrailerMapImpl::create();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
     notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),

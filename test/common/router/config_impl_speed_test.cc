@@ -93,14 +93,15 @@ static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierC
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
-  ConfigImpl config(genRouteConfig(state, match_type), factory_context,
-                    ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config =
+      *ConfigImpl::create(genRouteConfig(state, match_type), factory_context,
+                          ProtobufMessage::getNullValidationVisitor(), true);
 
   for (auto _ : state) { // NOLINT
     // Do the actual timing here.
     // Single request that will match the last route in the config.
     int last_route_num = state.range(0) - 1;
-    config.route(genRequestHeaders(last_route_num), stream_info, 0);
+    config->route(genRequestHeaders(last_route_num), stream_info, 0);
   }
 }
 

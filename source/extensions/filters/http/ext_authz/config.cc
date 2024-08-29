@@ -20,17 +20,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.scope(), stats_prefix, server_context);
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  const auto filter_config = std::make_shared<FilterConfig>(proto_config, server_context.scope(),
+                                                            stats_prefix, server_context);
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
-
   if (proto_config.has_http_service()) {
     // Raw HTTP client.
     const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(),
@@ -48,24 +45,21 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     // gRPC client.
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-
     THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
-    callback = [&context, filter_config, timeout_ms,
+    callback = [&server_context, filter_config, timeout_ms,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client_or_error =
-          context.serverFactoryContext()
-              .clusterManager()
-              .grpcAsyncClientManager()
-              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+      auto client_or_error = server_context.clusterManager()
+                                 .grpcAsyncClientManager()
+                                 .getOrCreateRawAsyncClientWithHashKey(
+                                     config_with_hash_key, server_context.scope(), true);
       THROW_IF_STATUS_NOT_OK(client_or_error, throw);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   }
-
   return callback;
 }
 

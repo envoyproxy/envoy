@@ -57,7 +57,13 @@ func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64
 }
 
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64, decodingState *C.processState, encodingState *C.processState,
+	reqHeaderNum, reqHeaderBytes, reqTrailerNum, reqTrailerBytes,
+	respHeaderNum, respHeaderBytes, respTrailerNum, respTrailerBytes uint64) {
+}
+
+//export envoyGoFilterOnHttpStreamComplete
+func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 }
 
 //export envoyGoFilterOnHttpDestroy
@@ -117,6 +123,10 @@ func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
 
 //export envoyGoRequestSemaDec
 func envoyGoRequestSemaDec(r *C.httpRequest) {
+}
+
+//export envoyGoFilterCleanUp
+func envoyGoFilterCleanUp() {
 }
 
 func main() {

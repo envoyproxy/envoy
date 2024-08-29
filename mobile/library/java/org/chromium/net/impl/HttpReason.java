@@ -23,6 +23,7 @@ public final class HttpReason {
     map.put(101, "Switching Protocols");
     map.put(102, "Processing");
     map.put(103, "Early Hints");
+    map.put(104, "Upload Resumption Supported");
     map.put(200, "OK");
     map.put(201, "Created");
     map.put(202, "Accepted");

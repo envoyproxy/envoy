@@ -30,6 +30,10 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
     envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
     san_matcher.mutable_matcher()->set_exact("foo.example");
     san_matcher.set_san_type(san_type);
+    if (san_type ==
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::OTHER_NAME) {
+      san_matcher.set_oid("1.3.6.1.4.1.311.20.2.3"); // Set dummy OID
+    }
     if (san_type == envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::
                         SAN_TYPE_UNSPECIFIED) {
       EXPECT_DEATH(createStringSanMatcher(san_matcher, context), "unhandled value");
@@ -40,6 +44,17 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
       TestUtility::validate(san_matcher);
     }
   }
+}
+
+// Verify that setting Invalid OID for OtherName SAN results in a panic.
+TEST(SanMatcherConfigTest, TestInvalidOidOtherNameSanType) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
+  san_matcher.mutable_matcher()->set_exact("foo.example");
+  san_matcher.set_oid("1.3.6.1.4.1.311.20.2.ffff");
+  san_matcher.set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::OTHER_NAME);
+  EXPECT_EQ(createStringSanMatcher(san_matcher, context), nullptr);
 }
 
 TEST(SanMatcherConfigTest, UnspecifiedSanType) {

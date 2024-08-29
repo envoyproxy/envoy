@@ -2,6 +2,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -181,19 +182,17 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                                       : Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
+void Filter::decodeComplete() {
   if (!config_->shouldParseRequestMetadata() || request_processing_finished_) {
-    return Http::FilterTrailersStatus::Continue;
+    return;
   }
 
   ENVOY_LOG(trace,
-            "thrift to metadata filter decodeTrailers: handle incomplete request thrift message");
+            "thrift to metadata filter decodeComplete: handle incomplete request thrift message");
 
   // Handle incomplete request thrift message while we reach here.
   handleAllOnMissing(config_->requestRules(), *decoder_callbacks_, request_processing_finished_);
   config_->rqstats().invalid_thrift_body_.inc();
-
-  return Http::FilterTrailersStatus::Continue;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -245,19 +244,17 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
                                        : Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
+void Filter::encodeComplete() {
   if (!config_->shouldParseResponseMetadata() || response_processing_finished_) {
-    return Http::FilterTrailersStatus::Continue;
+    return;
   }
 
   ENVOY_LOG(trace,
-            "thrift to metadata filter encodeTrailers: handle incomplete response thrift message");
+            "thrift to metadata filter encodeComplete: handle incomplete response thrift message");
 
   // Handle incomplete response thrift message while we reach here.
   handleAllOnMissing(config_->responseRules(), *encoder_callbacks_, response_processing_finished_);
   config_->respstats().invalid_thrift_body_.inc();
-
-  return Http::FilterTrailersStatus::Continue;
 }
 
 bool Filter::processData(Buffer::Instance& incoming_data, Buffer::Instance& buffer,
@@ -362,8 +359,7 @@ void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callbac
 }
 
 const std::string& Filter::decideNamespace(const std::string& nspace) const {
-  static const std::string& thriftToMetadata = "envoy.filters.http.thrift_to_metadata";
-  return nspace.empty() ? thriftToMetadata : nspace;
+  return nspace.empty() ? HttpFilterNames::get().ThriftToMetadata : nspace;
 }
 
 } // namespace ThriftToMetadata

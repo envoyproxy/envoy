@@ -1021,7 +1021,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   provider.set_issuer("https://other.com");
   provider.add_audiences("other_service");
   auto& uri = *provider.mutable_remote_jwks()->mutable_http_uri();
-  uri.set_uri("https://pubkey_server/pubkey_path");
+  uri.set_uri("https://www.pubkey-server.com/pubkey-path");
   uri.set_cluster("pubkey_cluster");
   auto header = provider.add_from_headers();
   header->set_name("expired-auth");

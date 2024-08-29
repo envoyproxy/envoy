@@ -37,8 +37,14 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
   ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
   absl::MutexLock guard(&mutex_);
   auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback, mutex_);
-  pending_queries_.emplace_back(std::move(new_query));
-  return pending_queries_.back().get();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
+      config_.has_num_retries()) {
+    // + 1 to include the initial query.
+    pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
+  } else {
+    pending_queries_.push_back({std::move(new_query), absl::nullopt});
+  }
+  return pending_queries_.back().pending_query_.get();
 }
 
 std::pair<DnsResolver::ResolutionStatus, std::list<DnsResponse>>
@@ -112,6 +118,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
   while (true) {
     PendingQuerySharedPtr next_query;
+    absl::optional<uint32_t> num_retries;
     const bool reresolve =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
     const bool treat_nodata_noname_as_success =
@@ -126,7 +133,9 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         break;
       }
 
-      next_query = std::move(pending_queries_.front());
+      PendingQueryInfo pending_query_info = std::move(pending_queries_.front());
+      next_query = pending_query_info.pending_query_;
+      num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
       if (reresolve && next_query->cancelled_) {
         continue;
@@ -137,6 +146,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
+    std::string details;
     {
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
@@ -153,10 +163,24 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       if (rc.return_value_ == 0) {
         response = processResponse(*next_query, addrinfo_wrapper.get());
       } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
-        ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
         absl::MutexLock guard(&mutex_);
-        pending_queries_.push_back(next_query);
-        continue;
+        if (num_retries.has_value()) {
+          (*num_retries)--;
+        }
+        if (!num_retries.has_value()) {
+          ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
+          pending_queries_.push_back({std::move(next_query), absl::nullopt});
+          continue;
+        }
+        if (*num_retries > 0) {
+          ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
+                    *num_retries);
+          pending_queries_.push_back({std::move(next_query), *num_retries});
+          continue;
+        }
+        ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
+                  *num_retries);
+        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       } else if (treat_nodata_noname_as_success &&
                  (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
         // Treat NONAME and NODATA as DNS records with no results.
@@ -172,16 +196,17 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       }
+      details = gai_strerror(rc.return_value_);
     }
 
-    dispatcher_.post(
-        [finished_query = std::move(next_query), response = std::move(response)]() mutable {
-          if (finished_query->cancelled_) {
-            ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
-          } else {
-            finished_query->callback_(response.first, std::move(response.second));
-          }
-        });
+    dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
+                      details = std::string(details)]() mutable {
+      if (finished_query->cancelled_) {
+        ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
+      } else {
+        finished_query->callback_(response.first, std::move(details), std::move(response.second));
+      }
+    });
   }
 
   ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");

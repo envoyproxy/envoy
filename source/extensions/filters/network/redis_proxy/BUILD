@@ -67,7 +67,7 @@ envoy_cc_library(
         "//envoy/stats:timespan_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
+        "//source/common/common:trie_lookup_table_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
@@ -106,11 +106,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "external_auth_lib",
+    srcs = ["external_auth.cc"],
+    hdrs = ["external_auth.h"],
+    deps = [
+        ":command_splitter_lib",
+        "//source/common/grpc:async_client_lib",
+        "//source/common/grpc:typed_async_client_lib",
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
         ":command_splitter_interface",
+        ":external_auth_lib",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -156,6 +169,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:trie_lookup_table_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",

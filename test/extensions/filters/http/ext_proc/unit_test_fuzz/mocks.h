@@ -21,6 +21,8 @@ public:
               (envoy::service::ext_proc::v3::ProcessingRequest && request, bool end_stream));
   MOCK_METHOD(bool, close, ());
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(void, notifyFilterDestroy, ());
 };
 
 class MockClient : public ExternalProcessing::ExternalProcessorClient {
@@ -31,7 +33,8 @@ public:
   MOCK_METHOD(ExternalProcessing::ExternalProcessorStreamPtr, start,
               (ExternalProcessing::ExternalProcessorCallbacks & callbacks,
                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-               const Envoy::Http::AsyncClient::StreamOptions&));
+               const Envoy::Http::AsyncClient::StreamOptions&,
+               Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&));
 };
 
 } // namespace UnitTestFuzz

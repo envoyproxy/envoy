@@ -48,10 +48,10 @@ SubsetSelector::SubsetSelector(const Protobuf::RepeatedPtrField<std::string>& se
   }
 }
 
-SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(const SubsetLbConfigProto& subset_config,
-                                                   ProtobufMessage::ValidationVisitor& visitor)
+SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
+    Upstream::LoadBalancerFactoryContext& lb_factory_context,
+    const SubsetLbConfigProto& subset_config, ProtobufMessage::ValidationVisitor& visitor)
     : subset_info_(std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config)) {
-
   absl::InlinedVector<absl::string_view, 4> missing_policies;
 
   for (const auto& policy : subset_config.subset_lb_policy().policies()) {
@@ -64,7 +64,7 @@ SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(const SubsetLbConfigProto& su
       Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
                                              visitor, *sub_lb_proto_message);
 
-      child_lb_config_ = factory->loadConfig(*sub_lb_proto_message, visitor);
+      child_lb_config_ = factory->loadConfig(lb_factory_context, *sub_lb_proto_message, visitor);
       child_lb_factory_ = factory;
       break;
     }
@@ -79,13 +79,14 @@ SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(const SubsetLbConfigProto& su
   }
 }
 
-SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(const ClusterProto& cluster,
-                                                   ProtobufMessage::ValidationVisitor& visitor)
+SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
+    Upstream::LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
+    ProtobufMessage::ValidationVisitor& visitor)
     : subset_info_(std::make_unique<LoadBalancerSubsetInfoImpl>(cluster.lb_subset_config())) {
   ASSERT(subset_info_->isEnabled());
 
-  auto sub_lb_pair =
-      LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(cluster, visitor);
+  auto sub_lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
+      lb_factory_context, cluster, visitor);
   if (!sub_lb_pair.ok()) {
     throw EnvoyException(std::string(sub_lb_pair.status().message()));
   }

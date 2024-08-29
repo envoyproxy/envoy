@@ -145,7 +145,8 @@ class ResponseEncoder : public virtual StreamEncoder {
 public:
   /**
    * Encode supported 1xx headers.
-   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * Currently 100-Continue, 102-Processing, 103-Early-Data, and 104-Upload-Resumption-Supported
+   * headers are supported.
    * @param headers supplies the 1xx header map to encode.
    */
   virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
@@ -270,7 +271,8 @@ class ResponseDecoder : public virtual StreamDecoder {
 public:
   /**
    * Called with decoded 1xx headers.
-   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * Currently 100-Continue, 102-Processing, 103-Early-Data, and 104-Upload-Resumption-Supported
+   * headers are supported.
    * @param headers supplies the decoded 1xx headers map.
    */
   virtual void decode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;

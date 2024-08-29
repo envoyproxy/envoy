@@ -1,6 +1,12 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
+import io.envoyproxy.envoy.config.route.v3.HeaderMatcher
+import io.envoyproxy.envoy.type.matcher.v3.StringMatcher
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -21,16 +27,6 @@ import org.robolectric.RobolectricTestRunner
 
 private const val MATCHER_TRAILER_NAME = "test-trailer"
 private const val MATCHER_TRAILER_VALUE = "test.code"
-private const val ASSERTION_FILTER_TEXT_PROTO =
-  """
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-    match_config: {
-      http_request_trailers_match: {
-        headers: { name: 'test-trailer', exact_match: 'test.code' }
-      }
-    }
-  }
-"""
 
 @RunWith(RobolectricTestRunner::class)
 class SendTrailersTest {
@@ -53,15 +49,26 @@ class SendTrailersTest {
   @Test
   fun `successful sending of trailers`() {
     val expectation = CountDownLatch(1)
+    StringMatcher.newBuilder().setExact("test.code")
+    val match = StringMatcher.newBuilder().setExact("test.code")
+    val trailers = HeaderMatcher.newBuilder().setName("test-trailer").setStringMatch(match).build()
+    val headersMatch = HttpHeadersMatch.newBuilder().addHeaders(trailers).build()
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestTrailersMatch(headersMatch).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
+        .setValue(configProto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
         .addNativeFilter(
-          "envoy.filters.http.buffer",
-          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 65000 } }"
+          "envoy.filters.http.assertion",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
         )
         .build()
 

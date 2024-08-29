@@ -20,16 +20,12 @@ public:
     options_.mutable_max_entries()->set_value(10);
   }
   void initialize() {
-    Http::AlternateProtocolsData data{context_.server_factory_context_,
-                                      context_.messageValidationVisitor()};
-    factory_ = std::make_unique<Http::HttpServerPropertiesCacheManagerFactoryImpl>(
-        singleton_manager_, tls_, data);
-    manager_ = factory_->get();
+    manager_ = std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+        context_.server_factory_context_, context_.messageValidationVisitor(), tls_);
   }
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<Http::HttpServerPropertiesCacheManagerFactoryImpl> factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr manager_;
   envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

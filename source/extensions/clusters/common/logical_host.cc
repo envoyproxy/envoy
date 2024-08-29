@@ -16,6 +16,8 @@ LogicalHost::LogicalHost(
           cluster, hostname, address,
           // TODO(zyfjeff): Created through metadata shared pool
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
+          std::make_shared<const envoy::config::core::v3::Metadata>(
+              locality_lb_endpoint.metadata()),
           locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
           locality_lb_endpoint.priority(), time_source),
       override_transport_socket_options_(override_transport_socket_options), address_(address),

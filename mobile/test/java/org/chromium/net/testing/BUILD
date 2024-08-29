@@ -69,6 +69,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "org.chromium.net.testing.CronetTestRuleTest",
     deps = [
         ":testing",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
@@ -93,6 +94,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "org.chromium.net.testing.Http2TestServerTest",
     deps = [
         ":testing",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -100,7 +102,7 @@ envoy_mobile_android_test(
 )
 
 envoy_mobile_android_test(
-    name = "temporary_test",
+    name = "android_envoy_explicit_h2_flow_test",
     srcs = [
         "AndroidEnvoyExplicitH2FlowTest.java",
     ],
@@ -113,6 +115,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "org.chromium.net.testing.AndroidEnvoyExplicitH2FlowTest",
     deps = [
         ":testing",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",

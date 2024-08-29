@@ -7,9 +7,10 @@
 namespace Envoy {
 namespace Random {
 
-const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
+constexpr size_t CONSTEXPR_UUID_LENGTH = 36;
+const size_t RandomGeneratorImpl::UUID_LENGTH = CONSTEXPR_UUID_LENGTH;
 
-uint64_t RandomGeneratorImpl::random() {
+uint64_t RandomUtility::random() {
   // Prefetch 256 * sizeof(uint64_t) bytes of randomness. buffered_idx is initialized to 256,
   // i.e. out-of-range value, so the buffer will be filled with randomness on the first call
   // to this function.
@@ -46,7 +47,7 @@ uint64_t RandomGeneratorImpl::random() {
   return buffered[buffered_idx++];
 }
 
-std::string RandomGeneratorImpl::uuid() {
+std::string RandomUtility::uuid() {
   // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
   // i.e. out-of-range value, so the buffer will be filled with randomness on the first
   // call to this function.
@@ -88,7 +89,7 @@ std::string RandomGeneratorImpl::uuid() {
 
   // Convert UUID to a string representation, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
   static const char* const hex = "0123456789abcdef";
-  char uuid[UUID_LENGTH];
+  char uuid[CONSTEXPR_UUID_LENGTH];
 
   for (uint8_t i = 0; i < 4; i++) {
     const uint8_t d = rand[i];
@@ -128,8 +129,11 @@ std::string RandomGeneratorImpl::uuid() {
     uuid[2 * i + 5] = hex[d & 0x0f];
   }
 
-  return {uuid, UUID_LENGTH};
+  return {uuid, CONSTEXPR_UUID_LENGTH};
 }
+
+uint64_t RandomGeneratorImpl::random() { return RandomUtility::random(); }
+std::string RandomGeneratorImpl::uuid() { return RandomUtility::uuid(); }
 
 } // namespace Random
 } // namespace Envoy

@@ -2,6 +2,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -262,6 +263,26 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
       headers_block, 60, 100, validator, details, rst);
   EXPECT_EQ(response_trailer->maxHeadersCount(), 100);
   EXPECT_EQ(response_trailer->maxHeadersKb(), 60);
+}
+
+TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {
+  EXPECT_ENVOY_BUG(envoyResetReasonToQuicRstError(Http::StreamResetReason::Overflow),
+                   "Resource overflow ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteRefusedStreamReset),
+      "Remote reset ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::Http1PrematureUpstreamHalfClose),
+      "not applicable");
+}
+
+TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
+  EXPECT_EQ(quicRstErrorToEnvoyLocalResetReason(quic::QUIC_STREAM_NO_ERROR),
+            Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECTION_ERROR),
+            Http::StreamResetReason::ConnectionTermination);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECT_ERROR),
+            Http::StreamResetReason::ConnectError);
 }
 
 } // namespace Quic

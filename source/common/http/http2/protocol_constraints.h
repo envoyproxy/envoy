@@ -9,11 +9,27 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/status.h"
 
+#ifdef ENVOY_NGHTTP2
 #include "nghttp2/nghttp2.h"
+#endif
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+// Frame types as inherited from nghttp2 and preserved for oghttp2
+enum FrameType {
+  OGHTTP2_DATA_FRAME_TYPE,
+  OGHTTP2_HEADERS_FRAME_TYPE,
+  OGHTTP2_PRIORITY_FRAME_TYPE,
+  OGHTTP2_RST_STREAM_FRAME_TYPE,
+  OGHTTP2_SETTINGS_FRAME_TYPE,
+  OGHTTP2_PUSH_PROMISE_FRAME_TYPE,
+  OGHTTP2_PING_FRAME_TYPE,
+  OGHTTP2_GOAWAY_FRAME_TYPE,
+  OGHTTP2_WINDOW_UPDATE_FRAME_TYPE,
+  OGHTTP2_CONTINUATION_FRAME_TYPE,
+};
 
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
 //  This class does not check protocol compliance with the H/2 standard, as this is checked by

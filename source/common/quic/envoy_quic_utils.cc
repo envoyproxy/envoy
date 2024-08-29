@@ -56,8 +56,8 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
   return quic::QuicSocketAddress(ss);
 }
 
-spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
-  spdy::Http2HeaderBlock header_block;
+quiche::HttpHeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
+  quiche::HttpHeaderBlock header_block;
   headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // The key-value pairs are copied.
     header_block.AppendValueOrAddHeader(header.key().getStringView(),
@@ -76,12 +76,28 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTimeout:
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
+  case Http::StreamResetReason::ConnectError:
+    return quic::QUIC_STREAM_CONNECT_ERROR;
   case Http::StreamResetReason::LocalReset:
+    return quic::QUIC_STREAM_REQUEST_REJECTED;
   case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
-  default:
-    return quic::QUIC_BAD_APPLICATION_PAYLOAD;
+  case Http::StreamResetReason::ProtocolError:
+    return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
+  case Http::StreamResetReason::Overflow:
+    IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
+    break;
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::RemoteReset:
+    IS_ENVOY_BUG("Remote reset shouldn't be initiated by self.");
+    break;
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
+    break;
   }
+
+  ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
+  return quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE;
 }
 
 Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamErrorCode rst_err) {
@@ -90,10 +106,15 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::LocalConnectionFailure;
-  case quic::QUIC_BAD_APPLICATION_PAYLOAD:
-    return Http::StreamResetReason::ProtocolError;
-  default:
+  case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_EXCESSIVE_LOAD:
+  case quic::QUIC_HEADERS_TOO_LARGE:
+  case quic::QUIC_STREAM_REQUEST_REJECTED:
     return Http::StreamResetReason::LocalReset;
+  case quic::QUIC_STREAM_CANCELLED:
+    return Http::StreamResetReason::OverloadManager;
+  default:
+    return Http::StreamResetReason::ProtocolError;
   }
 }
 
@@ -102,9 +123,20 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::RemoteRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectionTermination;
+  case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
-  default:
+  case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_REQUEST_REJECTED:
+  case quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE:
+  case quic::QUIC_STREAM_EXCESSIVE_LOAD:
+  case quic::QUIC_HEADERS_TOO_LARGE:
     return Http::StreamResetReason::RemoteReset;
+  case quic::QUIC_STREAM_CANCELLED:
+    return Http::StreamResetReason::OverloadManager;
+  case quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR:
+  default:
+    return Http::StreamResetReason::ProtocolError;
   }
 }
 
@@ -143,8 +175,14 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
+  size_t max_addresses_cache_size =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
+          ? 4u
+          : 0u;
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
+      Network::Socket::Type::Datagram, local_addr, peer_addr,
+      Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");

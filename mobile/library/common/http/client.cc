@@ -9,8 +9,8 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/http/header_utility.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
 
@@ -134,7 +134,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
     // We shouldn't be calling sendDataToBridge with newly arrived data if there's buffered data.
     ASSERT(!response_data_.get() || response_data_->length() == 0);
-    sendDataToBridge(data, end_stream);
+    sendData(data, end_stream);
   }
 
   // If not all the bytes have been sent up, buffer any remaining data in response_data.
@@ -147,7 +147,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   }
 }
 
-void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, bool end_stream) {
+void Client::DirectStreamCallbacks::sendData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!explicit_flow_control_ || bytes_to_send_ > 0);
 
   // Cap by bytes_to_send_ if and only if applying explicit flow control.
@@ -202,10 +202,10 @@ void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& tra
     return;
   }
 
-  sendTrailersToBridge(trailers);
+  sendTrailers(trailers);
 }
 
-void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMap& trailers) {
+void Client::DirectStreamCallbacks::sendTrailers(const ResponseTrailerMap& trailers) {
   ENVOY_LOG(debug, "[S{}] dispatching to platform response trailers for stream:\n{}",
             direct_stream_.stream_handle_, trailers);
 
@@ -237,13 +237,13 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
   // 1) it has been received from the peer and
   // 2) there are no trailers
   if (hasDataToSend()) {
-    sendDataToBridge(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
+    sendData(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
     bytes_to_send_ = 0;
   }
 
   // If all buffered data has been sent, send and free up trailers.
   if (!hasDataToSend() && response_trailers_.get() && bytes_to_send_ > 0) {
-    sendTrailersToBridge(*response_trailers_);
+    sendTrailers(*response_trailers_);
     response_trailers_.reset();
     bytes_to_send_ = 0;
   }
@@ -317,10 +317,10 @@ void Client::DirectStreamCallbacks::onError() {
 
   http_client_.removeStream(direct_stream_.stream_handle_);
   direct_stream_.request_decoder_ = nullptr;
-  sendErrorToBridge();
+  sendError();
 }
 
-void Client::DirectStreamCallbacks::sendErrorToBridge() {
+void Client::DirectStreamCallbacks::sendError() {
   if (remote_end_stream_forwarded_) {
     // If the request was not fully sent, but the response was complete, Envoy
     // will reset the stream after sending the fin bit. Don't pass this class of
@@ -442,34 +442,33 @@ void Client::DirectStreamCallbacks::latchError() {
   if (info.responseCode().has_value()) {
     error_->error_code_ = Bridge::Utility::errorCodeFromLocalStatus(
         static_cast<Http::Code>(info.responseCode().value()));
-    error_msg_details.push_back(absl::StrCat("RESPONSE_CODE: ", info.responseCode().value()));
+    error_msg_details.push_back(absl::StrCat("rc: ", info.responseCode().value()));
   } else if (StreamInfo::isStreamIdleTimeout(info)) {
     error_->error_code_ = ENVOY_REQUEST_TIMEOUT;
   } else {
     error_->error_code_ = ENVOY_STREAM_RESET;
   }
 
-  error_msg_details.push_back(absl::StrCat("ERROR_CODE: ", error_->error_code_));
+  error_msg_details.push_back(absl::StrCat("ec: ", error_->error_code_));
   std::vector<std::string> response_flags(info.responseFlags().size());
   std::transform(info.responseFlags().begin(), info.responseFlags().end(), response_flags.begin(),
                  [](StreamInfo::ResponseFlag flag) { return std::to_string(flag.value()); });
-  error_msg_details.push_back(absl::StrCat("RESPONSE_FLAGS: ", absl::StrJoin(response_flags, ",")));
+  error_msg_details.push_back(absl::StrCat("rsp_flags: ", absl::StrJoin(response_flags, ",")));
   if (info.protocol().has_value()) {
     // https://github.com/envoyproxy/envoy/blob/fbce85914421145b5ae3210c9313eced63e535b0/envoy/http/protocol.h#L13
-    error_msg_details.push_back(absl::StrCat("PROTOCOL: ", *info.protocol()));
+    error_msg_details.push_back(absl::StrCat("http: ", *info.protocol()));
   }
   if (std::string resp_code_details = info.responseCodeDetails().value_or("");
       !resp_code_details.empty()) {
-    error_msg_details.push_back(absl::StrCat("DETAILS: ", std::move(resp_code_details)));
+    error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
   }
   // The format of the error message propogated to callbacks is:
-  // RESPONSE_CODE: {value}|ERROR_CODE: {value}|RESPONSE_FLAGS: {value}|PROTOCOL: {value}|DETAILS:
-  // {value}
+  // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
   //
-  // Where RESPONSE_CODE is the HTTP response code from StreamInfo::responseCode().
-  // ERROR_CODE is of the envoy_error_code_t enum type, and gets mapped from RESPONSE_CODE.
-  // RESPONSE_FLAGS comes from StreamInfo::responseFlags().
-  // DETAILS is the contents of StreamInfo::responseCodeDetails().
+  // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
+  // envoy_ec is of the envoy_error_code_t enum type, and gets mapped from envoy_rc.
+  // rsp_flags comes from StreamInfo::responseFlags().
+  // det is the contents of StreamInfo::responseCodeDetails().
   error_->message_ = absl::StrJoin(std::move(error_msg_details), "|");
   error_->attempt_count_ = info.attemptCount().value_or(0);
 }
@@ -503,7 +502,7 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
   saveFinalStreamIntel();   // Take a snapshot now in case the stream gets destroyed.
   callbacks_->latchError(); // Latch the error in case the stream gets destroyed.
-  runResetCallbacks(reason);
+  runResetCallbacks(reason, absl::string_view());
   if (!parent_.getStream(stream_handle_, GetStreamFilters::AllowForAllStreams)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely
     // while still open locally. In this case the stream will already have been removed from
@@ -552,7 +551,8 @@ void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream,
+                         bool idempotent) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams);
@@ -597,6 +597,12 @@ void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, boo
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
   headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  // When the request is idempotent, it is safe to retry.
+  if (idempotent) {
+    // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on
+    headers->addCopy(Headers::get().EnvoyRetryOn,
+                     Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure);
+  }
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
             *headers);
   request_decoder->decodeHeaders(std::move(headers), end_stream);
@@ -718,7 +724,7 @@ void Client::cancelStream(envoy_stream_t stream) {
       // assertions checking stream presence, this is a likely potential culprit. However, it's
       // plausible that upstream guards will protect us here, given that Envoy allows streams to be
       // reset from a wide variety of contexts without apparent issue.
-      direct_stream->runResetCallbacks(StreamResetReason::RemoteReset);
+      direct_stream->runResetCallbacks(StreamResetReason::RemoteReset, absl::string_view());
     }
   }
 }

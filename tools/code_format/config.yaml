@@ -61,6 +61,8 @@ paths:
 
   build_fixer:
     exclude:
+    - BUILD
+    - tools/BUILD
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
@@ -97,9 +99,8 @@ paths:
     - source/common/config/context_provider_impl.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
+    - source/common/router/route_config_update_receiver_impl.cc
     - source/common/listener_manager/listener_impl.cc
-    - source/common/listener_manager/listener_manager_impl.cc
-    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
@@ -113,7 +114,6 @@ paths:
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
-    - source/common/quic/quic_server_transport_socket_factory.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/listener_manager/lds_api.cc
@@ -130,7 +130,6 @@ paths:
     - source/common/common/regex.h
     - source/exe/stripped_main_base.cc
     - source/server/options_impl.cc
-    - source/server/overload_manager_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
     - source/server/admin/runtime_handler.cc
@@ -150,8 +149,6 @@ paths:
     - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
-    - source/common/tls/server_context_impl.cc
-    - source/common/tls/context_config_impl.cc
     - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
@@ -185,6 +182,7 @@ paths:
     - source/extensions/matching
     - source/extensions/network
     - source/extensions/path
+    - source/extensions/quic/server_preferred_address
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/retry
@@ -205,6 +203,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
+    - source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -226,6 +225,7 @@ paths:
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/proto_message_extraction/extraction_util
     - test/extensions/bootstrap/wasm/test_data
 
   # Files that are allowed to use try without main thread assertion.
@@ -412,6 +412,7 @@ visibility_excludes:
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
+- source/extensions/filters/network/generic_proxy/interface/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/transport_sockets/tap/BUILD

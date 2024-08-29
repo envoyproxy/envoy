@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Singleton {
 
 InstanceSharedPtr ManagerImpl::get(const std::string& name, SingletonFactoryCb cb, bool pin) {
-  ASSERT(run_tid_ == thread_factory_.currentThreadId());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   ENVOY_BUG(Registry::FactoryRegistry<Registration>::getFactory(name) != nullptr,
             "invalid singleton name '" + name + "'. Make sure it is registered.");

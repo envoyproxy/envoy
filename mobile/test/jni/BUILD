@@ -83,6 +83,7 @@ cc_library(
     }),
     deps = [
         "//library/jni:jni_helper_lib",
+        "//library/jni:jni_utility_lib",
         "//test/common/integration:test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
         "@envoy_build_config//:extension_registry",
@@ -99,40 +100,6 @@ cc_binary(
     linkshared = True,
     deps = [
         ":jni_http_proxy_test_server_factory_lib",
-        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
-    ],
-)
-
-# Library which contains JNI functions for the XdsTestServer.
-cc_library(
-    name = "jni_xds_test_server_factory_lib",
-    testonly = True,
-    srcs = [
-        "jni_xds_test_server_factory.cc",
-    ],
-    linkopts = select({
-        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//library/jni:jni_helper_lib",
-        "//library/jni:jni_utility_lib",
-        "//test/common/integration:xds_test_server_lib",
-        "@envoy//test/test_common:test_version_linkstamp",
-        "@envoy_build_config//:extension_registry",
-        # This is needed since some tests use test extensions.
-        "@envoy_build_config//:test_extensions",
-    ],
-    # We need this to ensure that we link this into the .so even though there are no code references.
-    alwayslink = True,
-)
-
-cc_binary(
-    name = "libenvoy_jni_xds_test_server_factory.so",
-    testonly = True,
-    linkshared = True,
-    deps = [
-        ":jni_xds_test_server_factory_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )

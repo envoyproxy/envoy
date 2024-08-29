@@ -25,10 +25,11 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
-  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
+  auto cfg =
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
-      *server_.sslContextManager().createSslClientContext(*store.rootScope(), cfg));
+      *server_.sslContextManager().createSslClientContext(*store.rootScope(), *cfg));
 
   const std::string expected_empty_json = R"EOF({
  "certificates": [

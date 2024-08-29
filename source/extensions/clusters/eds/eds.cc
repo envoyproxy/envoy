@@ -14,9 +14,20 @@
 namespace Envoy {
 namespace Upstream {
 
+absl::StatusOr<std::unique_ptr<EdsClusterImpl>>
+EdsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
+                       ClusterFactoryContext& cluster_context) {
+  absl::Status creation_status = absl::OkStatus();
+  std::unique_ptr<EdsClusterImpl> ret =
+      absl::WrapUnique(new EdsClusterImpl(cluster, cluster_context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                               ClusterFactoryContext& cluster_context)
-    : BaseDynamicClusterImpl(cluster, cluster_context),
+                               ClusterFactoryContext& cluster_context,
+                               absl::Status& creation_status)
+    : BaseDynamicClusterImpl(cluster, cluster_context, creation_status),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           cluster_context.messageValidationVisitor(), "cluster_name"),
       local_info_(cluster_context.serverFactoryContext().localInfo()),
@@ -462,7 +473,10 @@ EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& 
     return absl::InvalidArgumentError("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(std::make_unique<EdsClusterImpl>(cluster, context), nullptr);
+  absl::StatusOr<std::unique_ptr<EdsClusterImpl>> cluster_or_error =
+      EdsClusterImpl::create(cluster, context);
+  RETURN_IF_NOT_OK(cluster_or_error.status());
+  return std::make_pair(std::move(*cluster_or_error), nullptr);
 }
 
 bool EdsClusterImpl::validateAllLedsUpdated() const {

@@ -94,11 +94,37 @@ GrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
               callbacks, std::move(grpc_mux_context.async_client_),
               grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
               grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-              grpc_mux_context.rate_limit_settings_);
+              grpc_mux_context.rate_limit_settings_,
+              GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+                         envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::
+                  FIRST_ENTRY);
         },
         /*failover_stream_creator=*/
-        // TODO(adisuissa): implement when failover is fully plumbed.
-        absl::nullopt,
+        grpc_mux_context.failover_async_client_
+            ? absl::make_optional(
+                  [&grpc_mux_context](
+                      GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>*
+                          callbacks)
+                      -> GrpcStreamInterfacePtr<envoy::service::discovery::v3::DiscoveryRequest,
+                                                envoy::service::discovery::v3::DiscoveryResponse> {
+                    return std::make_unique<
+                        GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+                                   envoy::service::discovery::v3::DiscoveryResponse>>(
+                        callbacks, std::move(grpc_mux_context.failover_async_client_),
+                        grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                        grpc_mux_context.scope_,
+                        // TODO(adisuissa): the backoff strategy for the failover should
+                        // be the same as the primary source.
+                        std::make_unique<FixedBackOffStrategy>(
+                            GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
+                                            envoy::service::discovery::v3::DiscoveryResponse>::
+                                DefaultFailoverBackoffMilliseconds),
+                        grpc_mux_context.rate_limit_settings_,
+                        GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+                                   envoy::service::discovery::v3::DiscoveryResponse>::
+                            ConnectedStateValue::SECOND_ENTRY);
+                  })
+            : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
         /*dispatch=*/grpc_mux_context.dispatcher_);
   }
@@ -106,7 +132,10 @@ GrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
                                      envoy::service::discovery::v3::DiscoveryResponse>>(
       this, std::move(grpc_mux_context.async_client_), grpc_mux_context.service_method_,
       grpc_mux_context.dispatcher_, grpc_mux_context.scope_,
-      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_);
+      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_,
+      GrpcStream<
+          envoy::service::discovery::v3::DiscoveryRequest,
+          envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() { AllMuxes::get().erase(this); }
@@ -506,7 +535,7 @@ void GrpcMuxImpl::onStreamEstablished() {
   }
 }
 
-void GrpcMuxImpl::onEstablishmentFailure() {
+void GrpcMuxImpl::onEstablishmentFailure(bool) {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second->watches_) {
       watch->callbacks_.onConfigUpdateFailed(

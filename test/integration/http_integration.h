@@ -55,6 +55,8 @@ public:
   void sendReset(Http::RequestEncoder& encoder);
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
+  IntegrationStreamDecoderPtr initRequest(const Http::RequestHeaderMap& headers,
+                                          bool header_only_request = false);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
@@ -266,7 +268,7 @@ protected:
       ConnectionCreationFunction* creator = nullptr);
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
-  void testRouterUpstreamResponseBeforeRequestComplete();
+  void testRouterUpstreamResponseBeforeRequestComplete(uint32_t status_code = 0);
 
   void testTwoRequests(bool force_network_backup = false);
   void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,
@@ -281,6 +283,8 @@ protected:
 
   void testAddEncodedTrailers();
   void testRetry();
+  void testRouterRetryOnResetBeforeRequestBeforeHeaders();
+  void testRouterRetryOnResetBeforeRequestAfterHeaders();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
   void testGrpcRetry();

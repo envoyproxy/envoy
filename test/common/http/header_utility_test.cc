@@ -1152,6 +1152,24 @@ TEST(HeaderIsValidTest, ValidHeaderValuesAreAccepted) {
 TEST(HeaderIsValidTest, AuthorityIsValid) {
   EXPECT_TRUE(HeaderUtility::authorityIsValid("strangebutlegal$-%&'"));
   EXPECT_FALSE(HeaderUtility::authorityIsValid("illegal{}"));
+  // Validate that the "@" character is allowed.
+  // TODO(adisuissa): Once the envoy.reloadable_features.internal_authority_header_validator
+  // runtime flag is deprecated, this test should only validate the assignment
+  // to "true".
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.internal_authority_header_validator", "true"}});
+    EXPECT_TRUE(HeaderUtility::authorityIsValid("username@example.com'"));
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.internal_authority_header_validator", "false"}});
+    // When the above is false, Envoy should use oghttp2's validator which will
+    // reject the "@" character.
+    EXPECT_FALSE(HeaderUtility::authorityIsValid("username@example.com'"));
+  }
 }
 
 TEST(HeaderIsValidTest, IsConnect) {
@@ -1263,6 +1281,28 @@ TEST(HeaderAddTest, HeaderAdd) {
     EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
+}
+
+void headerNameIsValid() {
+  // Isn't valid but passes legacy checks.
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid(":"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid("::"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid("\n"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid(":\n"));
+  EXPECT_FALSE(HeaderUtility::headerNameIsValid("asd\n"));
+
+  EXPECT_TRUE(HeaderUtility::headerNameIsValid("asd"));
+  // Not actually valid but passes legacy Envoy checks.
+  EXPECT_TRUE(HeaderUtility::headerNameIsValid(":asd"));
+}
+
+TEST(HeaderIsValidTest, HeaderNameIsValid) { headerNameIsValid(); }
+
+TEST(HeaderIsValidTest, HeaderNameIsValidLegacy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sanitize_http2_headers_without_nghttp2", "false"}});
+  headerNameIsValid();
 }
 
 TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {

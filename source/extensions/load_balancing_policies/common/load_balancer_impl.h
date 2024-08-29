@@ -367,15 +367,6 @@ private:
    * @return decision on quick exit from locality aware routing based on cluster configuration.
    * This gets recalculated on update callback.
    */
-  bool earlyExitNonLocalityRoutingNew();
-
-  /**
-   * @return decision on quick exit from locality aware routing based on cluster configuration.
-   * This gets recalculated on update callback.
-   *
-   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to reduce the risk of changes.
-   */
   bool earlyExitNonLocalityRouting();
 
   /**
@@ -390,29 +381,11 @@ private:
    * matches the ordering of upstream localities in the input upstream_hosts_per_locality.
    */
   absl::FixedArray<LocalityPercentages>
-  calculateLocalityPercentagesNew(const HostsPerLocality& local_hosts_per_locality,
-                                  const HostsPerLocality& upstream_hosts_per_locality);
-
-  /**
-   * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
-   * The result is stored as integer number and scaled by 10000 multiplier for better precision.
-   * Caller is responsible for allocation/de-allocation of `ret`.
-   *
-   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to reduce the risk of changes.
-   */
-  void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
+  calculateLocalityPercentages(const HostsPerLocality& local_hosts_per_locality,
+                               const HostsPerLocality& upstream_hosts_per_locality);
 
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
-   */
-  void regenerateLocalityRoutingStructuresNew();
-
-  /**
-   * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
-   *
-   * This is the legacy version of the function from previous versions of Envoy, kept temporarily
-   * as an alternate code-path to reduce the risk of changes.
    */
   void regenerateLocalityRoutingStructures();
 
@@ -468,7 +441,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;
-  const bool use_new_locality_routing_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;

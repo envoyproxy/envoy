@@ -11,6 +11,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/json/json_loader.h"
@@ -47,6 +48,26 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Formatter {
 namespace {
+
+using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
+using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
+
+// Helper class to test StreamInfoFormatter.
+class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+public:
+  StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
+                      absl::optional<size_t> max_length = absl::nullopt)
+      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
+    for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
+      auto formatter = cmd->parse(command, sub_command, max_length);
+      if (formatter) {
+        formatter_ = std::move(formatter);
+        return;
+      }
+    }
+    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
+  }
+};
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
@@ -144,20 +165,20 @@ REGISTER_FACTORY(TestSerializedStringFilterStateFactory, StreamInfo::FilterState
 // extracting tokens.
 TEST(SubstitutionFormatParser, commandParser) {
   std::vector<absl::string_view> tokens;
-  std::string token1;
+  absl::string_view token1;
 
   std::string command = "item1";
   SubstitutionFormatUtils::parseSubcommand(command, ':', token1);
   ASSERT_EQ(token1, "item1");
 
-  std::string token2;
+  absl::string_view token2;
   command = "item1:item2";
   SubstitutionFormatUtils::parseSubcommand(command, ':', token1, token2);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
 
   // Three tokens.
-  std::string token3;
+  absl::string_view token3;
   command = "item1?item2?item3";
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
@@ -175,7 +196,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 2 tokens but 3 are expected.
   // The third extracted token should be empty.
   command = "item1?item2";
-  token3.erase();
+  token3 = {};
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, token3);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
@@ -184,7 +205,7 @@ TEST(SubstitutionFormatParser, commandParser) {
   // Command string has 4 tokens. Get first 2 into the strings
   // and remaining 2 into a vector of strings.
   command = "item1?item2?item3?item4";
-  std::vector<std::string> bucket;
+  std::vector<absl::string_view> bucket;
   SubstitutionFormatUtils::parseSubcommand(command, '?', token1, token2, bucket);
   ASSERT_EQ(token1, "item1");
   ASSERT_EQ(token2, "item2");
@@ -610,7 +631,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("[::1]:19443")));
 
     // Validate for Pipe
-    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    address =
+        Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
     EXPECT_EQ("/foo", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
@@ -647,7 +669,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::numberValue(19443)));
 
     // Validate for Pipe
-    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    address =
+        Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
     EXPECT_EQ("", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
@@ -786,6 +809,27 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
+    const std::string raw_cluster_name = "raw_name";
+    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(raw_cluster_name));
+    EXPECT_EQ("raw_name", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("raw_name")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
@@ -848,7 +892,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::numberValue(9443)));
 
     // Validate for Pipe
-    address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
+    address =
+        Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.downstream_connection_info_provider_->setLocalAddress(address);
     EXPECT_EQ("", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
@@ -1042,7 +1087,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
           for (auto& precision : precisions) {
             const std::string sub_command =
                 absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
-            std::cout << sub_command << std::endl;
             StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
 
             if (start_index == end_index && start_index == 0) {
@@ -1120,7 +1164,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
             const std::string sub_command =
                 absl::StrCat(time_points[start_index], ":", time_points[end_index], ":", precision);
-            std::cout << sub_command << std::endl;
 
             StreamInfoFormatter duration_format("COMMON_DURATION", sub_command);
 
@@ -1652,6 +1695,109 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas{
+        "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f",
+        "1af1dfa857bf1d8814fe1af8983c18080019922e557f15a8a"};
+    auto joined_shas = absl::StrJoin(expected_shas, ",");
+    EXPECT_CALL(*connection_info, sha256PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(joined_shas, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(joined_shas)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas;
+    EXPECT_CALL(*connection_info, sha256PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas{
+        "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f",
+        "1af1dfa857bf1d8814fe1af8983c18080019922e557f15a8a"};
+    auto joined_shas = absl::StrJoin(expected_shas, ",");
+    EXPECT_CALL(*connection_info, sha1PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(joined_shas, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(joined_shas)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> expected_shas;
+    EXPECT_CALL(*connection_info, sha1PeerCertificateChainDigests())
+        .WillRepeatedly(Return(expected_shas));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_SERIALS");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::vector<std::string> serial_numbers{"b8b5ecc898f2124a", "9bf18bd79b46589902639871"};
+    auto joined_serials = absl::StrJoin(serial_numbers, ",");
+    EXPECT_CALL(*connection_info, serialNumbersPeerCertificates())
+        .WillRepeatedly(Return(serial_numbers));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(joined_serials, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(joined_serials)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_SERIALS");
+    std::vector<std::string> empty_vec;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, serialNumbersPeerCertificates())
+        .WillRepeatedly(Return(empty_vec));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CHAIN_SERIALS");
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -4140,16 +4286,21 @@ TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
   absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
       {"test_time", fmt::format("{}", expected_time_in_epoch)},
+      {"test_time_local", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
       {"default", "2018-03-28T23:35:58.000Z"},
+      {"default_local",
+       absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time), absl::LocalTimeZone())},
       {"all_zeroes", "000000000.0.00.000"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     simple_date: '%START_TIME(%Y/%m/%d)%'
     test_time: '%START_TIME(%s)%'
+    test_time_local: '%START_TIME_LOCAL(%s)%'
     bad_format: '%START_TIME(bad_format)%'
     default: '%START_TIME%'
+    default_local: '%START_TIME_LOCAL%'
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);
@@ -4801,6 +4952,37 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
                                                    std::get<1>(test_case), std::get<2>(test_case))
                     .ok());
   }
+}
+
+TEST(SubstitutionFormatterTest, UniqueIdFormatterTest) {
+  StreamInfo::MockStreamInfo stream_info;
+
+  // Simulate initial parsing of configuration
+  auto providers1 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  ASSERT_EQ(providers1.size(), 1);
+
+  // Generate first unique ID with the initial configuration
+  auto id1 = providers1[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id1.has_value());
+
+  // Generate second unique ID with the same initial configuration
+  auto id2 = providers1[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id2.has_value());
+
+  // Check the two generated IDs are unique
+  EXPECT_NE(id1, id2);
+
+  // Simulate configuration reload
+  auto providers2 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  ASSERT_EQ(providers2.size(), 1);
+
+  // Generate another unique ID after the simulated reload
+  auto id3 = providers2[0]->formatWithContext({}, stream_info);
+  ASSERT_TRUE(id3.has_value());
+
+  // Check the new ID is also unique compared to the previous ones
+  EXPECT_NE(id1, id3);
+  EXPECT_NE(id2, id3);
 }
 } // namespace
 } // namespace Formatter

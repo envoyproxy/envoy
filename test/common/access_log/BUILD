@@ -19,9 +19,9 @@ envoy_cc_test(
     }),
     deps = [
         "//source/common/access_log:access_log_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/stream_info:utility_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/access_loggers/stream:config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",

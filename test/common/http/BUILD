@@ -209,6 +209,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
         "//source/common/common:empty_string",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
@@ -239,6 +240,7 @@ envoy_cc_test_library(
     hdrs = ["conn_manager_impl_test_base.h"],
     deps = [
         ":xff_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:rds_lib",
@@ -285,6 +287,7 @@ envoy_cc_test(
         ":xff_extension_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:address_lib",
@@ -584,6 +587,7 @@ envoy_cc_test(
     name = "header_mutation_test",
     srcs = ["header_mutation_test.cc"],
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_mutation_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",

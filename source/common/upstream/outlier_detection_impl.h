@@ -290,6 +290,7 @@ public:
   uint64_t consecutive5xx() const { return consecutive_5xx_; }
   uint64_t consecutiveGatewayFailure() const { return consecutive_gateway_failure_; }
   uint64_t maxEjectionPercent() const { return max_ejection_percent_; }
+  bool alwaysEjectOneHost() const { return always_eject_one_host_; }
   uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
@@ -323,6 +324,7 @@ private:
   const uint64_t consecutive_5xx_;
   const uint64_t consecutive_gateway_failure_;
   const uint64_t max_ejection_percent_;
+  const bool always_eject_one_host_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;

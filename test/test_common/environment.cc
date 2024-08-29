@@ -22,7 +22,11 @@
 #include "source/common/signal/signal_action.h"
 #endif
 
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+#include "source/server/options_impl_base.h"
+#else
 #include "source/server/options_impl.h"
+#endif
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
@@ -261,8 +265,24 @@ std::vector<spdlog::logger*> TestEnvironment::getSpdLoggersForTest() {
 }
 
 Server::Options& TestEnvironment::getOptions() {
+#ifdef ENVOY_DISABLE_EXCEPTIONS
+  // tclap, used for command line parsing, throws exceptions. While Envoy won't
+  // do full command line parsing in exception-free mode, handling -l trace is a
+  // nice-to-have for Envoy mobile e2e tests.
+  static OptionsImplBase* options = new OptionsImplBase();
+  for (int i = 0; i < argc_; ++i) {
+    if (absl::StartsWith(argv_[i], "-l ")) {
+      static absl::StatusOr<spdlog::level::level_enum> level =
+          OptionsImplBase::parseAndValidateLogLevel(argv_[i] + 3);
+      if (level.status().ok()) {
+        options->setLogLevel(*level);
+      }
+    }
+  }
+#else
   static OptionsImpl* options = new OptionsImpl(
       argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
+#endif
   return *options;
 }
 

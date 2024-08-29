@@ -29,12 +29,12 @@ public:
 class MockAuthenticator : public Authenticator {
 public:
   MOCK_METHOD(void, doVerify,
-              (Http::HeaderMap & headers, Tracing::Span& parent_span,
+              (Http::RequestHeaderMap & headers, Tracing::Span& parent_span,
                std::vector<JwtLocationConstPtr>* tokens,
                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                AuthenticatorCallback callback));
 
-  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+  void verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
               SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
               ClearRouteCacheCallback) override {
@@ -61,7 +61,7 @@ class MockExtractor : public Extractor {
 public:
   MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::RequestHeaderMap& headers),
               (const));
-  MOCK_METHOD(void, sanitizeHeaders, (Http::HeaderMap & headers), (const));
+  MOCK_METHOD(void, sanitizeHeaders, (Http::RequestHeaderMap & headers), (const));
 };
 
 class MockJwtCache : public JwtCache {

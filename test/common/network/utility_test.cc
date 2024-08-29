@@ -31,6 +31,7 @@
 using testing::DoAll;
 using testing::Eq;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Network {
@@ -402,13 +403,13 @@ TEST(NetworkUtility, LocalConnection) {
   socket.connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   socket.connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+      *Network::Address::PipeInstance::create("/pipe/path"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+      *Network::Address::PipeInstance::create("/pipe/path"));
   socket.connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+      *Network::Address::PipeInstance::create("/pipe/path"));
   EXPECT_TRUE(Utility::isSameIpOrLoopback(socket.connectionInfoProvider()));
 
   socket.connection_info_provider_->setLocalAddress(
@@ -491,7 +492,7 @@ TEST(NetworkUtility, InternalAddress) {
   EXPECT_FALSE(Utility::isInternalAddress(Address::Ipv6Instance("fc00::")));
   EXPECT_FALSE(Utility::isInternalAddress(Address::Ipv6Instance("fe00::")));
 
-  EXPECT_FALSE(Utility::isInternalAddress(Address::PipeInstance("/hello")));
+  EXPECT_FALSE(Utility::isInternalAddress(**Address::PipeInstance::create("/hello")));
 }
 
 TEST(NetworkUtility, LoopbackAddress) {
@@ -504,8 +505,8 @@ TEST(NetworkUtility, LoopbackAddress) {
     EXPECT_FALSE(Utility::isLoopbackAddress(address));
   }
   {
-    Address::PipeInstance address("/foo");
-    EXPECT_FALSE(Utility::isLoopbackAddress(address));
+    auto address = *Address::PipeInstance::create("/foo");
+    EXPECT_FALSE(Utility::isLoopbackAddress(*address));
   }
   {
     Address::Ipv6Instance address("::1");
@@ -586,8 +587,8 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
   {
     envoy::config::core::v3::Address proto_address;
-    Address::PipeInstance address("/hello");
-    Utility::addressToProtobufAddress(address, proto_address);
+    auto address = *Address::PipeInstance::create("/hello");
+    Utility::addressToProtobufAddress(*address, proto_address);
     EXPECT_EQ(true, proto_address.has_pipe());
     EXPECT_EQ("/hello", proto_address.pipe().path());
   }
@@ -719,6 +720,8 @@ TEST(PacketLoss, LossTest) {
   IoSocketHandleImpl handle(fd);
   auto address = Network::Test::getCanonicalLoopbackAddress(version);
   NiceMock<MockUdpPacketProcessor> processor;
+  IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config;
+  ON_CALL(processor, saveCmsgConfig()).WillByDefault(ReturnRef(udp_save_cmsg_config));
   MonotonicTime time(std::chrono::seconds(0));
   uint32_t packets_dropped = 0;
   UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;

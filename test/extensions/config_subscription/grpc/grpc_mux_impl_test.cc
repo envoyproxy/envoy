@@ -1390,7 +1390,7 @@ TEST_F(NullGrpcMuxImplTest, OnStreamEstablishedImplemented) {
   EXPECT_NO_THROW(null_mux_.onStreamEstablished());
 }
 TEST_F(NullGrpcMuxImplTest, OnEstablishmentFailureImplemented) {
-  EXPECT_NO_THROW(null_mux_.onEstablishmentFailure());
+  EXPECT_NO_THROW(null_mux_.onEstablishmentFailure(false));
 }
 TEST_F(NullGrpcMuxImplTest, OnDiscoveryResponseImplemented) {
   std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response;

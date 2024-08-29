@@ -71,6 +71,18 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning&paths=", header_map, response));
 }
 
+TEST_P(AdminInstanceTest, LogLevelDisplay) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Logger::Context::enableFineGrainLogger();
+  FINE_GRAIN_LOG(info, "Build the logger for this file.");
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?level=warning", header_map, response));
+  postCallback("/logging", header_map, response);
+  FINE_GRAIN_LOG(error, response.toString());
+  EXPECT_THAT(response.toString(), HasSubstr("  " __FILE__ ": warning"));
+}
+
 TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;

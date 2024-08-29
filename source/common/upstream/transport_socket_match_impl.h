@@ -38,7 +38,8 @@ public:
     mutable TransportSocketMatchStats stats;
   };
 
-  MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const override;
+  MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                    const envoy::config::core::v3::Metadata* locality_metadata) const override;
 
   bool allMatchesSupportAlpn() const override {
     if (!default_match_.factory->supportsAlpn()) {

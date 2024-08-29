@@ -86,11 +86,7 @@ public:
       completion_state.status_ = status;
       return parent_->onComplete(status, context);
     }
-
-    if (Status::Ok == status) {
-      // We only set the extracted data to context when the JWT is verified.
-      context.setExtractedData();
-    }
+    context.setExtractedData();
     context.callback()->onComplete(status);
     context.cancel();
   }

@@ -1,5 +1,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -227,7 +229,24 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 }
 
 Address::InstanceConstSharedPtr
-maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port, os_fd_t fd, bool v6only) {
+IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss, socklen_t ss_len) {
+  if (recent_received_addresses_ == nullptr) {
+    return Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
+  }
+  quic::QuicSocketAddress quic_address(ss);
+  auto it = recent_received_addresses_->Lookup(quic_address);
+  if (it != recent_received_addresses_->end()) {
+    return *it->second;
+  }
+  Address::InstanceConstSharedPtr new_address =
+      Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
+  recent_received_addresses_->Insert(
+      quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
+  return new_address;
+}
+
+Address::InstanceConstSharedPtr
+IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
     auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_storage ss;
@@ -236,7 +255,7 @@ maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port, os_fd_t fd
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd, v6only);
+    return getOrCreateEnvoyAddressInstance(ss, sizeof(sockaddr_in6));
   }
 
   if (cmsg.cmsg_type == messageTypeContainsIP()) {
@@ -246,7 +265,7 @@ maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port, os_fd_t fd
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
-    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd, v6only);
+    return getOrCreateEnvoyAddressInstance(ss, sizeof(sockaddr_in));
   }
 
   return nullptr;
@@ -263,11 +282,13 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
+                                                    const UdpSaveCmsgConfig& save_cmsg_config,
                                                     RecvMsgOutput& output) {
   ASSERT(!output.msg_.empty());
 
-  absl::FixedArray<char> cbuf(cmsg_space_);
-  memset(cbuf.begin(), 0, cmsg_space_);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
+  absl::FixedArray<char> cbuf(cmsg_space);
+  memset(cbuf.begin(), 0, cmsg_space);
 
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_for_read = 0;
@@ -308,17 +329,21 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(
-      peer_addr, hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
+  output.msg_[0].peer_address_ = getOrCreateEnvoyAddressInstance(peer_addr, hdr.msg_namelen);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      if (save_cmsg_config.hasConfig() &&
+          cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
+          cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
+        Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+        output.msg_[0].saved_cmsg_ = cmsg_slice;
+      }
       if (output.msg_[0].local_address_ == nullptr) {
-        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
-            *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[0].local_address_ = std::move(addr);
@@ -353,6 +378,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                                     const UdpSaveCmsgConfig& save_cmsg_config,
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.empty()) {
@@ -363,8 +389,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   absl::FixedArray<absl::FixedArray<struct iovec>> iovs(
       num_packets_per_mmsg_call, absl::FixedArray<struct iovec>(slices[0].size()));
   absl::FixedArray<sockaddr_storage> raw_addresses(num_packets_per_mmsg_call);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
   absl::FixedArray<absl::FixedArray<char>> cbufs(num_packets_per_mmsg_call,
-                                                 absl::FixedArray<char>(cmsg_space_));
+                                                 absl::FixedArray<char>(cmsg_space));
 
   for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
     memset(&raw_addresses[i], 0, sizeof(sockaddr_storage));
@@ -416,13 +443,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
-    output.msg_[i].peer_address_ = Address::addressFromSockAddrOrDie(
-        raw_addresses[i], hdr.msg_namelen, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
+    output.msg_[i].peer_address_ =
+        getOrCreateEnvoyAddressInstance(raw_addresses[i], hdr.msg_namelen);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(
-            *cmsg, self_port, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
+        if (save_cmsg_config.hasConfig() &&
+            cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
+            cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
+          Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+          output.msg_[0].saved_cmsg_ = cmsg_slice;
+        }
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (receive_ecn_ &&
 #ifdef __APPLE__
             ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
@@ -477,7 +509,7 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
     return nullptr;
   }
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_);
+                                                         domain_, {});
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -516,7 +548,7 @@ IoHandlePtr IoSocketHandleImpl::duplicate() {
                  fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                              errorDetails(result.errno_)));
   return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_);
+                                                         domain_, {false, addressCacheMaxSize()});
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,

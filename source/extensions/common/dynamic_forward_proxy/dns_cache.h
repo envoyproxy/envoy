@@ -72,6 +72,12 @@ public:
    * TTL policy
    */
   virtual void touch() PURE;
+
+  /**
+   * Returns details about the resolution which resulted in the addresses above.
+   * This includes both success and failure details.
+   */
+  virtual std::string details() PURE;
 };
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;
@@ -264,6 +270,14 @@ public:
    * can be used in response to network changes which might alter DNS responses, for example.
    */
   virtual void forceRefreshHosts() PURE;
+
+  /**
+   * Sets the `IpVersion` addresses to be removed from the DNS response. This can be useful for a
+   * use case where the DNS response returns both IPv4 and IPv6 and we are only interested a
+   * specific IP version, we can save time not having to try to connect to both IPv4 and IPv6
+   * addresses.
+   */
+  virtual void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

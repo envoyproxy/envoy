@@ -84,8 +84,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, LoadBalancerBaseTest,
-                         ::testing::Values(LoadBalancerTestParam{true, false},
-                                           LoadBalancerTestParam{true, true}));
+                         ::testing::Values(LoadBalancerTestParam{true},
+                                           LoadBalancerTestParam{false}));
 
 // Basic test of host set selection.
 TEST_P(LoadBalancerBaseTest, PrioritySelection) {

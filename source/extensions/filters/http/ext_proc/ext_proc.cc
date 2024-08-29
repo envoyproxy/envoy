@@ -176,6 +176,53 @@ ProcessingMode allDisabledMode() {
 
 } // namespace
 
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+    const std::chrono::milliseconds message_timeout, const uint32_t max_message_timeout_ms,
+    Stats::Scope& scope, const std::string& stats_prefix, bool is_upstream,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
+    : failure_mode_allow_(config.failure_mode_allow()),
+      observability_mode_(config.observability_mode()),
+      route_cache_action_(config.route_cache_action()),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
+                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      processing_mode_(config.processing_mode()),
+      mutation_checker_(config.mutation_rules(), context.regexEngine()),
+      filter_metadata_(config.filter_metadata()),
+      allow_mode_override_(config.allow_mode_override()),
+      disable_immediate_response_(config.disable_immediate_response()),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
+      is_upstream_(is_upstream),
+      untyped_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().untyped().begin(),
+          config.metadata_options().forwarding_namespaces().untyped().end()),
+      typed_forwarding_namespaces_(
+          config.metadata_options().forwarding_namespaces().typed().begin(),
+          config.metadata_options().forwarding_namespaces().typed().end()),
+      untyped_receiving_namespaces_(
+          config.metadata_options().receiving_namespaces().untyped().begin(),
+          config.metadata_options().receiving_namespaces().untyped().end()),
+      expression_manager_(builder, context.localInfo(), config.request_attributes(),
+                          config.response_attributes()),
+      immediate_mutation_checker_(context.regexEngine()),
+      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+  if (config.disable_clear_route_cache() &&
+      (route_cache_action_ !=
+       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+    throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
+                         "be set to none-default at the same time.");
+  }
+  if (config.disable_clear_route_cache()) {
+    route_cache_action_ = envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN;
+  }
+  thread_local_stream_manager_slot_->set(
+      [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
+}
+
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
@@ -261,6 +308,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
+  filter_callbacks_ = &callbacks;
+  watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
@@ -276,6 +325,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setEncoderFilterCallbacks(callbacks);
   encoding_state_.setEncoderFilterCallbacks(callbacks);
+  watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
 Filter::StreamOpenState Filter::openStream() {
@@ -294,10 +344,10 @@ Filter::StreamOpenState Filter::openStream() {
     auto options = Http::AsyncClient::StreamOptions()
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
-                       .setBufferBodyForRetry(true);
+                       .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
     ExternalProcessorStreamPtr stream_object =
-        client_->start(*this, config_with_hash_key_, options);
+        client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -308,7 +358,8 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
-    stream_ = config_->threadLocalStreamManager().store(this, std::move(stream_object));
+    stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
+                                                        config_->deferredCloseTimeout());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -324,11 +375,16 @@ void Filter::closeStream() {
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
+    config_->threadLocalStreamManager().erase(stream_);
     stream_ = nullptr;
-    config_->threadLocalStreamManager().erase(this);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
+}
+
+void Filter::deferredCloseStream() {
+  ENVOY_LOG(debug, "Calling deferred close on stream");
+  config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
 }
 
 void Filter::onDestroy() {
@@ -336,9 +392,26 @@ void Filter::onDestroy() {
   // Make doubly-sure we no longer use the stream, as
   // per the filter contract.
   processing_complete_ = true;
-  closeStream();
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
+
+  if (config_->observabilityMode()) {
+    // In observability mode where the main stream processing and side stream processing are
+    // asynchronous, it is possible that filter instance is destroyed before the side stream request
+    // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
+    // closure is deferred upon filter destruction with a timer.
+
+    // First, release the referenced filter resource.
+    if (stream_ != nullptr) {
+      stream_->notifyFilterDestroy();
+    }
+
+    // Second, perform stream deferred closure.
+    deferredCloseStream();
+  } else {
+    // Perform immediate close on the stream otherwise.
+    closeStream();
+  }
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
@@ -355,13 +428,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 
   state.setHeaders(&headers);
   state.setHasNoBody(end_stream);
-  ProcessingRequest req;
-  addAttributes(state, req);
-  addDynamicMetadata(state, req);
-  auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
-                                *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_stream);
+  ProcessingRequest req =
+      buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/false);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
@@ -374,6 +442,12 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   mergePerRouteConfig();
+
+  // Send headers in observability mode.
+  if (decoding_state_.sendHeaders() && config_->observabilityMode()) {
+    return sendHeadersInObservabilityMode(headers, decoding_state_, end_stream);
+  }
+
   if (end_stream) {
     decoding_state_.setCompleteBodyAvailable(true);
   }
@@ -398,6 +472,10 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  if (config_->observabilityMode()) {
+    return sendDataInObservabilityMode(data, state, end_stream);
+  }
+
   if (end_stream) {
     state.setCompleteBodyAvailable(true);
   }
@@ -548,6 +626,73 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   return result;
 }
 
+ProcessingRequest Filter::buildHeaderRequest(ProcessorState& state,
+                                             Http::RequestOrResponseHeaderMap& headers,
+                                             bool end_stream, bool observability_mode) {
+  ProcessingRequest req;
+  if (observability_mode) {
+    req.set_observability_mode(true);
+  }
+  addAttributes(state, req);
+  addDynamicMetadata(state, req);
+  auto* headers_req = state.mutableHeaders(req);
+  MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
+                                *headers_req->mutable_headers());
+  headers_req->set_end_of_stream(end_stream);
+  return req;
+}
+
+FilterHeadersStatus
+Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers,
+                                       ProcessorState& state, bool end_stream) {
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
+  }
+
+  ProcessingRequest req =
+      buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
+  ENVOY_LOG(debug, "Sending headers message in observability mode");
+  stream_->send(std::move(req), false);
+  stats_.stream_msgs_sent_.inc();
+
+  return FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& data,
+                                                           ProcessorState& state, bool end_stream) {
+  // For the body processing mode in observability mode, only STREAMED body processing mode is
+  // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
+  // processing) will still work as expected.
+  if (state.bodyMode() == ProcessingMode::STREAMED) {
+    // Try to open the stream if the connection has not been established.
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterDataStatus::StopIterationNoBuffer;
+    case StreamOpenState::IgnoreError:
+      return FilterDataStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
+    // Set up the the body chunk and send.
+    auto req = setupBodyChunk(state, data, end_stream);
+    req.set_observability_mode(true);
+    stream_->send(std::move(req), false);
+    stats_.stream_msgs_sent_.inc();
+    ENVOY_LOG(debug, "Sending body message in ObservabilityMode");
+  } else if (state.bodyMode() != ProcessingMode::NONE) {
+    ENVOY_LOG(error, "Wrong body mode for observability mode, no data is sent.");
+  }
+
+  return FilterDataStatus::Continue;
+}
+
 std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& state) {
   switch (openStream()) {
   case StreamOpenState::Error:
@@ -578,6 +723,21 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
 FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& trailers) {
   if (processing_complete_) {
     ENVOY_LOG(trace, "trailers: Continue");
+    return FilterTrailersStatus::Continue;
+  }
+
+  // Send trailer in observability mode.
+  if (state.sendTrailers() && config_->observabilityMode()) {
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterTrailersStatus::StopIteration;
+    case StreamOpenState::IgnoreError:
+      return FilterTrailersStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
+    }
+    sendTrailers(state, trailers, /*observability_mode=*/true);
     return FilterTrailersStatus::Continue;
   }
 
@@ -657,6 +817,11 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // Try to merge the route config again in case the decodeHeaders() is not called when processing
   // local reply.
   mergePerRouteConfig();
+
+  if (encoding_state_.sendHeaders() && config_->observabilityMode()) {
+    return sendHeadersInObservabilityMode(headers, encoding_state_, end_stream);
+  }
+
   if (end_stream) {
     encoding_state_.setCompleteBodyAvailable(true);
   }
@@ -714,8 +879,10 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers) {
+void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
+                          bool observability_mode) {
   ProcessingRequest req;
+  req.set_observability_mode(observability_mode);
   addAttributes(state, req);
   addDynamicMetadata(state, req);
   auto* trailers_req = state.mutableTrailers(req);
@@ -874,6 +1041,13 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
 }
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
+
+  if (config_->observabilityMode()) {
+    ENVOY_LOG(trace, "Ignoring received message when observability mode is enabled");
+    // Ignore response messages in the observability mode.
+    return;
+  }
+
   if (processing_complete_) {
     ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
     // Ignore additional messages after we decided we were done with the stream
@@ -947,7 +1121,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   default:
     // Any other message is considered spurious
     ENVOY_LOG(debug, "Received unknown stream message {} -- ignoring and marking spurious",
-              response->response_case());
+              static_cast<int>(response->response_case()));
     processing_status = absl::FailedPreconditionError("unhandled message");
     break;
   }
@@ -962,7 +1136,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // ignore the stream for the rest of this filter instance's lifetime
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
-              response->response_case());
+              static_cast<int>(response->response_case()));
     closeStream();
     clearAsyncState();
     processing_complete_ = true;
@@ -1039,7 +1213,11 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+
+    errorResponse.mutable_status()->set_code(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_timeout_error")
+            ? StatusCode::GatewayTimeout
+            : StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
@@ -1076,17 +1254,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      absl::Status mut_status;
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.immediate_response_use_filter_mutation_rule")) {
-        mut_status = MutationUtils::applyHeaderMutations(response.headers(), headers, false,
-                                                         config().mutationChecker(),
-                                                         stats_.rejected_header_mutations_);
-      } else {
-        mut_status = MutationUtils::applyHeaderMutations(
-            response.headers(), headers, false, config().immediateMutationChecker().checker(),
-            stats_.rejected_header_mutations_);
-      }
+      const absl::Status mut_status = MutationUtils::applyHeaderMutations(
+          response.headers(), headers, false, config().mutationChecker(),
+          stats_.rejected_header_mutations_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());
@@ -1185,6 +1355,27 @@ void Filter::mergePerRouteConfig() {
     decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
   }
+}
+
+void DeferredDeletableStream::closeStreamOnTimer() {
+  // Close the stream.
+  if (stream_) {
+    ENVOY_LOG(debug, "Closing the stream");
+    if (stream_->close()) {
+      stats.streams_closed_.inc();
+    }
+    // Erase this entry from the map; this will also reset the stream_ pointer.
+    parent.erase(stream_.get());
+  } else {
+    ENVOY_LOG(debug, "Stream already closed");
+  }
+}
+
+// In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
+// to prevent unbounded resource usage growth.
+void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher) {
+  derferred_close_timer = dispatcher.createTimer([this] { closeStreamOnTimer(); });
+  derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {

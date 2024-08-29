@@ -54,7 +54,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
                         Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
             const uint32_t address = address_ptr->address_;
             // Keep changing the returned addresses to force address update.
-            dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+            dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
                          TestUtility::makeDnsResponse({
                              // The only significant address is the first one; the other ones are
                              // just used to populate a list whose maintenance is race-prone.

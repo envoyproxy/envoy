@@ -56,8 +56,8 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
   Api::ApiPtr api(Api::createApiForTest());
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
-  ConfigImpl config(proto_config, factory_context, ProtobufMessage::getNullValidationVisitor(),
-                    true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      proto_config, factory_context, ProtobufMessage::getNullValidationVisitor(), true);
 
   const auto stream_info = NiceMock<Envoy::StreamInfo::MockStreamInfo>();
   auto req_headers = Http::TestRequestHeaderMapImpl{
@@ -68,7 +68,7 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
   }
   req_headers.addReferenceKey(country_header_name, absl::StrCat("country", countries_num));
   for (auto _ : state) { // NOLINT
-    auto& result = config.route(req_headers, stream_info, 0)->routeEntry()->clusterName();
+    auto& result = config->route(req_headers, stream_info, 0)->routeEntry()->clusterName();
     benchmark::DoNotOptimize(result);
   }
 }

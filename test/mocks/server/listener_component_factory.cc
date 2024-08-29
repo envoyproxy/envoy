@@ -14,16 +14,16 @@ using ::testing::Invoke;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<testing::NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _, _, _))
-      .WillByDefault(Invoke(
-          [&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
-              const Network::Socket::OptionsSharedPtr& options, ListenerComponentFactory::BindType,
-              const Network::SocketCreationOptions&, uint32_t) -> Network::SocketSharedPtr {
-            if (!Network::Socket::applyOptions(
-                    options, *socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
-            }
-            return socket_;
-          }));
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                ListenerComponentFactory::BindType,
+                                const Network::SocketCreationOptions&, uint32_t) {
+        if (!Network::Socket::applyOptions(options, *socket_,
+                                           envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+          throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+        }
+        return socket_;
+      }));
 }
 
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;

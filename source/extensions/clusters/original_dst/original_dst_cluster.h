@@ -127,11 +127,13 @@ public:
   const absl::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
   const absl::optional<uint32_t> portOverride() { return port_override_; }
 
+protected:
+  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
+                     ClusterFactoryContext& context, absl::Status& creation_status);
+
 private:
   friend class OriginalDstClusterFactory;
   friend class OriginalDstClusterTest;
-  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context);
 
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
@@ -192,11 +194,12 @@ class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
   OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}
 
-private:
-  friend class OriginalDstClusterTest;
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
+
+private:
+  friend class OriginalDstClusterTest;
 };
 
 DECLARE_FACTORY(OriginalDstClusterFactory);

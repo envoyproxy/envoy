@@ -30,6 +30,10 @@ namespace Network {
 namespace Address {
 namespace {
 
+std::unique_ptr<PipeInstance> createPipeInstance(std::string path) {
+  return THROW_OR_RETURN_VALUE(PipeInstance::create(path), std::unique_ptr<PipeInstance>);
+}
+
 TEST(TruncateIpAddressAndLength, Various) {
   std::map<std::pair<std::string, int>, std::pair<std::string, int>> test_cases = {
       // IPv4
@@ -96,7 +100,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("9.255.255.255")));
     EXPECT_TRUE(rng.isInRange(Ipv4Instance("0.0.0.0")));
     EXPECT_FALSE(rng.isInRange(Ipv6Instance("::")));
-    EXPECT_FALSE(rng.isInRange(PipeInstance("foo")));
+    EXPECT_FALSE(rng.isInRange(*createPipeInstance("foo")));
   }
 
   {
@@ -119,7 +123,7 @@ TEST(IsInRange, Various) {
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("::1")));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance("2001::")));
     EXPECT_FALSE(rng.isInRange(Ipv4Instance("0.0.0.0")));
-    EXPECT_FALSE(rng.isInRange(PipeInstance("foo")));
+    EXPECT_FALSE(rng.isInRange(*createPipeInstance("foo")));
   }
 
   {
@@ -377,7 +381,7 @@ TEST(IpListTest, Normal) {
   EXPECT_FALSE(list->contains(Address::Ipv4Instance("10.16.0.0")));
 
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, AddressVersionMix) {
@@ -403,7 +407,7 @@ TEST(IpListTest, AddressVersionMix) {
   EXPECT_TRUE(list->contains(Address::Ipv6Instance("::1")));
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::")));
 
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAny) {
@@ -417,7 +421,7 @@ TEST(IpListTest, MatchAny) {
   EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyImplicitPrefixLen) {
@@ -436,7 +440,7 @@ TEST(IpListTest, MatchAnyImplicitPrefixLen) {
   EXPECT_TRUE(list->contains(Address::Ipv4Instance("1.1.1.1")));
 
   EXPECT_FALSE(list->contains(Address::Ipv6Instance("::1")));
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 TEST(IpListTest, MatchAnyAll) {
@@ -455,7 +459,7 @@ TEST(IpListTest, MatchAnyAll) {
   EXPECT_TRUE(list->contains(Address::Ipv6Instance("2001:db8:85a3::")));
   EXPECT_TRUE(list->contains(Address::Ipv6Instance("ffee::")));
 
-  EXPECT_FALSE(list->contains(Address::PipeInstance("foo")));
+  EXPECT_FALSE(list->contains(*createPipeInstance("foo")));
 }
 
 } // namespace

@@ -67,7 +67,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time, uint8_t tos) {
+    MonotonicTime receive_time, uint8_t tos, Buffer::RawSlice /*saved_cmsg*/) {
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(
@@ -172,10 +172,10 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
   Network::Address::InstanceConstSharedPtr new_local_address;
   if (current_local_address->ip()->version() == Network::Address::IpVersion::v4) {
     new_local_address = std::make_shared<Network::Address::Ipv4Instance>(
-        current_local_address->ip()->addressAsString());
+        current_local_address->ip()->addressAsString(), &current_local_address->socketInterface());
   } else {
     new_local_address = std::make_shared<Network::Address::Ipv6Instance>(
-        current_local_address->ip()->addressAsString());
+        current_local_address->ip()->addressAsString(), &current_local_address->socketInterface());
   }
 
   // The probing socket will have the same host but a different port.

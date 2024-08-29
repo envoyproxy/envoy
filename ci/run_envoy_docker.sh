@@ -2,8 +2,10 @@
 
 set -e
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 # shellcheck source=ci/envoy_build_sha.sh
-. "$(dirname "$0")"/envoy_build_sha.sh
+. "${CURRENT_SCRIPT_DIR}"/envoy_build_sha.sh
 
 function is_windows() {
   [[ "$(uname -s)" == *NT* ]]
@@ -91,6 +93,11 @@ export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
     -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
+
+if [[ -n "$MOUNT_GPG_HOME" ]]; then
+    VOLUMES+=(
+        -v "${HOME}/.gnupg:${BUILD_DIR_MOUNT_DEST}/.gnupg")
+fi
 
 if ! is_windows; then
     export BUILD_DIR="${BUILD_DIR_MOUNT_DEST}"

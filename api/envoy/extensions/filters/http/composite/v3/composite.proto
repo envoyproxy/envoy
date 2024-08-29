@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.composite.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
@@ -57,4 +58,13 @@ message ExecuteFilterAction {
   // Only one of ``typed_config`` or ``dynamic_config`` can be set.
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
+
+  // Probability of the action execution. If not specified, this is 100%.
+  // This allows sampling behavior for the configured actions.
+  // For example, if
+  // :ref:`default_value <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.default_value>`
+  // under the ``sample_percent`` is configured with 30%, a dice roll with that
+  // probability is done. The underline action will only be executed if the
+  // dice roll returns positive. Otherwise, the action is skipped.
+  config.core.v3.RuntimeFractionalPercent sample_percent = 3;
 }

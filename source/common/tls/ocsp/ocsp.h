@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
+#include "envoy/ssl/context.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -179,18 +180,12 @@ struct OcspResponse {
 /**
  * A wrapper used to own and query an OCSP response in DER-encoded format.
  */
-class OcspResponseWrapper {
+class OcspResponseWrapperImpl : public Ssl::OcspResponseWrapper {
 public:
-  OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source,
-                      std::unique_ptr<OcspResponse>&& response);
-  static absl::StatusOr<std::unique_ptr<OcspResponseWrapper>>
+  OcspResponseWrapperImpl(std::vector<uint8_t> der_response, TimeSource& time_source,
+                          std::unique_ptr<OcspResponse>&& response);
+  static absl::StatusOr<std::unique_ptr<OcspResponseWrapperImpl>>
   create(std::vector<uint8_t> der_response, TimeSource& time_source);
-
-  /**
-   * @return std::vector<uint8_t>& a reference to the underlying bytestring representation
-   * of the OCSP response
-   */
-  const std::vector<uint8_t>& rawBytes() const { return raw_bytes_; }
 
   /**
    * @return OcspResponseStatus whether the OCSP response was successfully created
@@ -204,42 +199,18 @@ public:
    */
   bool matchesCertificate(X509& cert) const;
 
-  /**
-   * Determines whether the OCSP response can no longer be considered valid.
-   * This can be true if the nextUpdate field of the response has passed
-   * or is not present, indicating that there is always more updated information
-   * available.
-   *
-   * @returns bool if the OCSP response is expired.
-   */
-  bool isExpired();
-
-  /**
-   * @returns the seconds until this OCSP response expires.
-   */
-  uint64_t secondsUntilExpiration() const;
-
-  /**
-   * @return The beginning of the validity window for this response.
-   */
-  Envoy::SystemTime getThisUpdate() const;
-
-  /**
-   * The time at which this response is considered to expire. If
-   * the underlying response does not have a value, then the current
-   * time is returned.
-   *
-   * @return The end of the validity window for this response.
-   */
-  Envoy::SystemTime getNextUpdate() const;
+  // OcspResponseWrapper
+  uint64_t secondsUntilExpiration() const override;
+  Envoy::SystemTime getThisUpdate() const override;
+  Envoy::SystemTime getNextUpdate() const override;
+  bool isExpired() override;
+  const std::vector<uint8_t>& rawBytes() const override { return raw_bytes_; }
 
 private:
   const std::vector<uint8_t> raw_bytes_;
   const std::unique_ptr<OcspResponse> response_;
   TimeSource& time_source_;
 };
-
-using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
 
 /**
  * `ASN.1` DER-encoded parsing functions similar to `Asn1Utility` but specifically

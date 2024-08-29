@@ -261,3 +261,21 @@ envoy_cc_test(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "xds_failover_integration_test",
+    srcs =
+        ["xds_failover_integration_test.cc"],
+    deps = [
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/protobuf:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration:ads_integration_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)

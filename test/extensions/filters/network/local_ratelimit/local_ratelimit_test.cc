@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
@@ -24,16 +23,11 @@ namespace LocalRateLimitFilter {
 
 class LocalRateLimitTestBase : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  LocalRateLimitTestBase() : singleton_manager_(Thread::threadFactoryForTest()) {}
+  LocalRateLimitTestBase() = default;
 
-  uint64_t initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
+  uint64_t initialize(const std::string& filter_yaml) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
-    fill_timer_ = new Event::MockTimer(&dispatcher_);
-    if (expect_timer_create) {
-      EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
-      EXPECT_CALL(*fill_timer_, disableTimer());
-    }
     config_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
                                        runtime_, singleton_manager_);
     return proto_config.token_bucket().max_tokens();
@@ -43,7 +37,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   Singleton::ManagerImpl singleton_manager_;
-  Event::MockTimer* fill_timer_{};
   ConfigSharedPtr config_;
 };
 
@@ -102,8 +95,7 @@ token_bucket:
                    ->value());
 
   // Refill the bucket.
-  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
-  fill_timer_->invokeCallback();
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
 
   // Third connection is OK.
   ActiveFilter active_filter3(config_);
@@ -145,11 +137,6 @@ public:
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml2, proto_config);
     const uint64_t config2_tokens = proto_config.token_bucket().max_tokens();
-    if (!expect_sharing) {
-      auto timer = new Event::MockTimer(&dispatcher_);
-      EXPECT_CALL(*timer, enableTimer(_, nullptr));
-      EXPECT_CALL(*timer, disableTimer());
-    }
     config2_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
                                         runtime_, singleton_manager_);
 

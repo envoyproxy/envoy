@@ -105,7 +105,10 @@ public:
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
 
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, factory_context);
+    absl::Status creation_status = absl::OkStatus();
+    cluster_ = std::shared_ptr<Cluster>(
+        new Cluster(cluster_config, config, factory_context, creation_status));
+    THROW_IF_NOT_OK(creation_status);
 
     server_context_.cluster_manager_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";

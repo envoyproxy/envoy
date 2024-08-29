@@ -74,8 +74,8 @@ public:
     TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
     TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
     TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-    TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds",
-                               1);
+    TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI",
+                               "http://127.0.0.1/path/to/creds", 1);
     TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   }
 
@@ -248,7 +248,7 @@ public:
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
         .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
                                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-          cb(Network::DnsResolver::ResolutionStatus::Success,
+          cb(Network::DnsResolver::ResolutionStatus::Success, "",
              TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
           return nullptr;
@@ -270,7 +270,6 @@ public:
         [&yaml_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 cfg) {
-          ENVOY_LOG_MISC(debug, "{}", yaml_config);
           envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute
               per_route_config;
           TestUtility::loadFromYaml(yaml_config, per_route_config);
@@ -319,8 +318,6 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
 
   initialize();
@@ -338,8 +335,6 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter(false);
   addUpstreamProtocolOptions();
   initialize();
@@ -355,8 +350,6 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
@@ -371,8 +364,6 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
@@ -390,8 +381,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   initialize();
   std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
@@ -412,8 +401,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
@@ -433,8 +420,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
@@ -452,8 +437,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
@@ -470,8 +453,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
@@ -488,8 +469,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstancePro
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "true");
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
@@ -500,6 +479,162 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstancePro
                                  "service_internal-ap-southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
+
+class CdsInteractionTest : public testing::Test, public HttpIntegrationTest {
+public:
+  CdsInteractionTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4),
+        dns_cluster_factory_(logical_dns_cluster_factory_),
+        registered_dns_factory_(dns_resolver_factory_) {}
+
+  void addStandardFilter(bool downstream = true) {
+    config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, downstream);
+  }
+
+  void expectResolve(Network::DnsLookupFamily, const std::string& expected_address) {
+    EXPECT_CALL(*dns_resolver_, resolve(expected_address, _, _))
+        .WillRepeatedly(Invoke([&](const std::string&, Network::DnsLookupFamily,
+                                   Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+          cb(Network::DnsResolver::ResolutionStatus::Success, "",
+             TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+          return nullptr;
+        }));
+  }
+
+  void dnsSetup() {
+    ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
+    expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+  }
+
+  NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
+  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> dns_cluster_factory_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+
+  Network::DnsResolver::ResolveCb dns_callback_;
+  Network::MockActiveDnsQuery active_dns_query_;
+  std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
+      new NiceMock<Network::MockDnsResolver>};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+
+  void SetUp() override {
+    TestEnvironment::unsetEnvVar("AWS_ACCESS_KEY_ID");
+    TestEnvironment::unsetEnvVar("AWS_SECRET_ACCESS_KEY");
+    TestEnvironment::unsetEnvVar("AWS_SESSION_TOKEN");
+    TestEnvironment::unsetEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE");
+    TestEnvironment::unsetEnvVar("AWS_ROLE_ARN");
+    TestEnvironment::unsetEnvVar("AWS_ROLE_SESSION_NAME");
+    TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
+    TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
+  }
+};
+
+TEST_F(CdsInteractionTest, ClusterRemovalRecreatesSTSCluster) {
+
+  // STS cluster requires dns mocking
+  dnsSetup();
+
+  // Web Identity Credentials only
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+
+  CdsHelper cds_helper_;
+
+  // Add CDS cluster using cds helper
+  config_helper_.addConfigModifier(
+      [&cds_helper_](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+            envoy::config::core::v3::ApiVersion::V3);
+        bootstrap.mutable_dynamic_resources()
+            ->mutable_cds_config()
+            ->mutable_path_config_source()
+            ->set_path(cds_helper_.cdsPath());
+        bootstrap.mutable_static_resources()->clear_clusters();
+      });
+
+  // Don't validate clusters so we can use the CDS cluster as a route target
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+
+  addStandardFilter();
+
+  // Use CDS helper to add initial CDS cluster
+  envoy::config::cluster::v3::Cluster cluster_;
+  cluster_.mutable_connect_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+  cluster_.set_name("cluster_0");
+  cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+
+  cds_helper_.setCds({cluster_});
+
+  initialize();
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 2);
+
+  cluster_.set_name("testing");
+  cds_helper_.setCds({cluster_});
+
+  // Should delete our sts cluster and cluster_0
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
+                                 "service_internal-ap-southeast-2.clusters_removed_by_cds",
+                                 1);
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
+                                 "service_internal-ap-southeast-2.clusters_readded_after_cds",
+                                 1);
+}
+
+TEST_F(CdsInteractionTest, ClusterRemovalRecreatesIMDSCluster) {
+  // Instance Metadata Service only
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
+
+  CdsHelper cds_helper_;
+
+  // Add CDS cluster using cds helper
+  config_helper_.addConfigModifier(
+      [&cds_helper_](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+            envoy::config::core::v3::ApiVersion::V3);
+        bootstrap.mutable_dynamic_resources()
+            ->mutable_cds_config()
+            ->mutable_path_config_source()
+            ->set_path(cds_helper_.cdsPath());
+        bootstrap.mutable_static_resources()->clear_clusters();
+      });
+
+  // Don't validate clusters so we can use the CDS cluster as a route target
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+
+  addStandardFilter();
+
+  // Use CDS helper to add initial CDS cluster
+  envoy::config::cluster::v3::Cluster cluster_;
+  cluster_.mutable_connect_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+  cluster_.set_name("cluster_0");
+  cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+
+  cds_helper_.setCds({cluster_});
+
+  initialize();
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 2);
+
+  cluster_.set_name("testing");
+  cds_helper_.setCds({cluster_});
+
+  // Should delete our sts cluster and cluster_0
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_metadata_server_"
+                                 "internal.clusters_removed_by_cds",
+                                 1);
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_metadata_server_"
+                                 "internal.clusters_readded_after_cds",
+                                 1);
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

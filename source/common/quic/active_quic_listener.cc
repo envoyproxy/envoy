@@ -78,9 +78,13 @@ ActiveQuicListener::ActiveQuicListener(
       socklen_t optlen = sizeof(optval);
       if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
         listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
+#ifndef __APPLE__
+        // Linux dual-stack sockets require setting IP_RECVTOS separately. Apple
+        // sockets will return an error.
         if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
           listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
         }
+#endif // __APPLE__
       } else {
         listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
       }
@@ -107,6 +111,22 @@ ActiveQuicListener::ActiveQuicListener(
     udp_packet_writer.release();
   } else {
     quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+  }
+
+  if (listener_config.udpListenerConfig()) {
+    const auto& save_cmsg_configs =
+        listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config();
+    if (save_cmsg_configs.size() > 0) {
+      // QUIC only supports a single cmsg config.
+      const envoy::config::core::v3::SocketCmsgHeaders save_cmsg_config = save_cmsg_configs.at(0);
+      if (save_cmsg_config.has_level()) {
+        udp_save_cmsg_config_.level = save_cmsg_config.level().value();
+      }
+      if (save_cmsg_config.has_type()) {
+        udp_save_cmsg_config_.type = save_cmsg_config.type().value();
+      }
+      udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
+    }
   }
 }
 
@@ -135,11 +155,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
   Buffer::RawSlice slice = data.buffer_->frontSlice();
   ASSERT(data.buffer_->length() == slice.len_);
   // TODO(danzh): pass in TTL and UDP header.
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
-                                  /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false,
-                                  getQuicEcnCodepointFromTosByte(data.tos_));
+  quic::QuicReceivedPacket packet(
+      reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
+      /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+      reinterpret_cast<char*>(data.saved_cmsg_.mem_), data.saved_cmsg_.len_,
+      /*owns_header_buffer*/ false, getQuicEcnCodepointFromTosByte(data.tos_));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
       non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
@@ -238,7 +258,7 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
-    ProcessContextOptRef context)
+    Server::Configuration::ServerFactoryContext& context)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
@@ -294,7 +314,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
         Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryInterface>(
             config.connection_debug_visitor_config());
     if (connection_debug_visitor_factory_.has_value()) {
-      connection_debug_visitor_factory_->setContext(context_);
+      connection_debug_visitor_factory_->setContext(context_.processContext());
     }
   }
 

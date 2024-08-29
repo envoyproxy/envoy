@@ -53,6 +53,15 @@ TEST_F(StderrAccessLogTest, LogFormatJson) {
       true);
 }
 
+TEST_F(StreamAccessLogExtensionConfigYamlTest, Stderr) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog
+  )EOF";
+  runTest(yaml, Filesystem::DestinationType::Stderr);
+}
+
 } // namespace
 } // namespace File
 } // namespace AccessLoggers

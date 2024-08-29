@@ -72,10 +72,10 @@ public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
                      const CNameMap& cnames, const std::chrono::seconds& record_ttl,
                      const std::chrono::seconds& cname_ttl_, bool refused, bool error_on_a,
-                     bool error_on_aaaa)
+                     bool error_on_aaaa, bool no_response)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
         cnames_(cnames), record_ttl_(record_ttl), cname_ttl_(cname_ttl_), refused_(refused),
-        error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa) {
+        error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa), no_response_(no_response) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -164,7 +164,9 @@ private:
           const auto addrs = getAddrs(q_type, lookup_name);
           auto buf = createAddrResolutionBuffer(q_type, addrs, request, name_len, encoded_cname,
                                                 encoded_name);
-          parent_.connection_->write(buf, false);
+          if (!parent_.no_response_) {
+            parent_.connection_->write(buf, false);
+          }
 
           // Reset query state, time for the next one.
           buffer_.drain(size_);
@@ -335,21 +337,23 @@ private:
   const bool refused_;
   const bool error_on_a_;
   const bool error_on_aaaa_;
+  const bool no_response_{false};
 };
 
 class TestDnsServer : public TcpListenerCallbacks {
 public:
-  TestDnsServer(Event::Dispatcher& dispatcher)
+  TestDnsServer(Event::Dispatcher& dispatcher, bool no_response)
       : dispatcher_(dispatcher), record_ttl_(0), cname_ttl_(0),
         stream_info_(dispatcher.timeSource(), nullptr,
-                     StreamInfo::FilterState::LifeSpan::Connection) {}
+                     StreamInfo::FilterState::LifeSpan::Connection),
+        no_response_(no_response) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
-    TestDnsServerQuery* query =
-        new TestDnsServerQuery(std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_,
-                               record_ttl_, cname_ttl_, refused_, error_on_a_, error_on_aaaa_);
+    TestDnsServerQuery* query = new TestDnsServerQuery(
+        std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_, record_ttl_, cname_ttl_,
+        refused_, error_on_a_, error_on_aaaa_, no_response_);
     queries_.emplace_back(query);
   }
 
@@ -389,6 +393,7 @@ private:
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
   StreamInfo::StreamInfoImpl stream_info_;
+  const bool no_response_{false};
 };
 
 } // namespace
@@ -730,7 +735,7 @@ public:
 
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
-    server_ = std::make_unique<TestDnsServer>(*dispatcher_);
+    server_ = std::make_unique<TestDnsServer>(*dispatcher_, queryTimeout());
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
@@ -763,7 +768,7 @@ public:
 
   void resetChannel() {
     if (tcpOnly()) {
-      peer_->resetChannelTcpOnly(zeroTimeout());
+      peer_->resetChannelTcpOnly(queryTimeout());
     }
     ares_set_servers_ports_csv(
         peer_->channel(), socket_->connectionInfoProvider().localAddress()->asString().c_str());
@@ -801,7 +806,8 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=, this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                  std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -832,14 +838,15 @@ public:
 
   ActiveDnsQuery* resolveWithNoRecordsExpectation(const std::string& address,
                                                   const DnsLookupFamily lookup_family) {
-    return resolver_->resolve(
-        address, lookup_family,
-        [=, this](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          std::list<std::string> address_as_string_list = getAddressAsStringList(results);
-          EXPECT_EQ(0, address_as_string_list.size());
-          dispatcher_->exit();
-        });
+    return resolver_->resolve(address, lookup_family,
+                              [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                        std::list<DnsResponse>&& results) -> void {
+                                EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                                std::list<std::string> address_as_string_list =
+                                    getAddressAsStringList(results);
+                                EXPECT_EQ(0, address_as_string_list.size());
+                                dispatcher_->exit();
+                              });
   }
 
   ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
@@ -847,6 +854,7 @@ public:
                                                     bool expected_to_execute) {
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
+                                                    absl::string_view,
                                                     std::list<DnsResponse>&& results) -> void {
                                 EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
@@ -859,6 +867,7 @@ public:
                                        const DnsLookupFamily lookup_family, T exception_object) {
     return resolver_->resolve(address, lookup_family,
                               [exception_object](DnsResolver::ResolutionStatus status,
+                                                 absl::string_view,
                                                  std::list<DnsResponse>&& results) -> void {
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
@@ -947,8 +956,8 @@ public:
   }
 
 protected:
-  // Should the DnsResolverImpl use a zero timeout for c-ares queries?
-  virtual bool zeroTimeout() const { return false; }
+  // Should the TestDnsServer cause c-ares queries to timeout, by not responding?
+  virtual bool queryTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
@@ -976,7 +985,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
 // development, where segfaults were encountered due to callback invocations on
 // destruction.
 TEST_P(DnsImplTest, DestructPending) {
-  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::V4Only, false);
+  ActiveDnsQuery* query =
+      resolveWithUnreferencedParameters("foo.bar.baz", DnsLookupFamily::V4Only, false);
   ASSERT_NE(nullptr, query);
   query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   // Also validate that pending events are around to exercise the resource
@@ -995,7 +1005,8 @@ TEST_P(DnsImplTest, DestructPending) {
 //    just via UDP.
 // Either way, we have no tests today that cover parallel queries. We can do this is a follow up.
 TEST_P(DnsImplTest, DestructPendingAllQuery) {
-  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::All, true);
+  ActiveDnsQuery* query =
+      resolveWithUnreferencedParameters("foo.bar.baz", DnsLookupFamily::All, true);
   ASSERT_NE(nullptr, query);
 }
 
@@ -1015,12 +1026,12 @@ TEST_P(DnsImplTest, DestructCallback) {
              1 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
-// Validate basic success/fail lookup behavior. The empty request will connect
+// Validate basic success/fail lookup behavior. The "foo.bar.baz" request will connect
 // to TestDnsServer, but localhost should resolve via the hosts file with no
 // asynchronous behavior or network events.
 TEST_P(DnsImplTest, LocalLookup) {
   std::list<Address::InstanceConstSharedPtr> address_list;
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("", DnsLookupFamily::V4Only));
+  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("foo.bar.baz", DnsLookupFamily::V4Only));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   if (GetParam() == Address::IpVersion::v4) {
@@ -1142,7 +1153,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   server_->setRefused(true);
 
   EXPECT_NE(nullptr,
-            resolveWithExpectations("", DnsLookupFamily::V4Only,
+            resolveWithExpectations("unresolvable.name", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1417,6 +1428,11 @@ TEST_P(DnsImplTest, Cancel) {
   query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+  if (stats_store_.counter("dns.cares.resolve_total").value() < 4) {
+    // if c-ares did not read both responses at once, run another loop iteration
+    // to make it read the second response.
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
@@ -1922,7 +1938,7 @@ TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV6) {
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
-  bool zeroTimeout() const override { return true; }
+  bool queryTimeout() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.

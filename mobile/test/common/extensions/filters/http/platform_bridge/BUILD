@@ -36,7 +36,7 @@ envoy_extension_cc_test(
         "//library/common/api:external_api_lib",
         "//library/common/extensions/filters/http/platform_bridge:config",
         "//library/common/extensions/filters/http/platform_bridge:filter_cc_proto",
-        "@envoy//test/integration:http_integration_lib",
+        "@envoy//test/integration:http_integration_lib_light",
         "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/test_common:simulated_time_system_lib",
         "@envoy//test/test_common:utility_lib",

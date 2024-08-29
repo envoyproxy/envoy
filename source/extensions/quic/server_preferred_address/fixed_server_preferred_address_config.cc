@@ -2,19 +2,12 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/quic/server_preferred_address/server_preferred_address.h"
 
 namespace Envoy {
 namespace Quic {
 
 namespace {
-
-quic::QuicSocketAddress ipOrAddressToAddress(const quic::QuicSocketAddress& address, int32_t port) {
-  if (address.port() == 0) {
-    return quic::QuicSocketAddress(address.host(), port);
-  }
-
-  return address;
-}
 
 quic::QuicIpAddress parseIp(const std::string& addr, absl::string_view address_family,
                             const Protobuf::Message& message) {
@@ -65,13 +58,13 @@ parseIpAddressFromSocketAddress(const envoy::config::core::v3::SocketAddress& ad
   return socket_addr.host();
 }
 
-FixedServerPreferredAddressConfig::FamilyAddresses
+ServerPreferredAddressConfig::IpVersionConfig
 parseFamily(const std::string& addr_string,
             const envoy::extensions::quic::server_preferred_address::v3::
                 FixedServerPreferredAddressConfig::AddressFamilyConfig* addresses,
             Network::Address::IpVersion version, absl::string_view address_family,
             const Protobuf::Message& message) {
-  FixedServerPreferredAddressConfig::FamilyAddresses ret;
+  ServerPreferredAddressConfig::IpVersionConfig ret;
   if (addresses != nullptr) {
     if (addresses->has_dnat_address() && !addresses->has_address()) {
       ProtoExceptionUtil::throwProtoValidationException(
@@ -107,35 +100,23 @@ parseFamily(const std::string& addr_string,
 
 } // namespace
 
-EnvoyQuicServerPreferredAddressConfig::Addresses
-FixedServerPreferredAddressConfig::getServerPreferredAddresses(
-    const Network::Address::InstanceConstSharedPtr& local_address) {
-  int32_t port = local_address->ip()->port();
-  Addresses addresses;
-  addresses.ipv4_ = ipOrAddressToAddress(v4_.spa_, port);
-  addresses.ipv6_ = ipOrAddressToAddress(v6_.spa_, port);
-  addresses.dnat_ipv4_ = quic::QuicSocketAddress(v4_.dnat_, port);
-  addresses.dnat_ipv6_ = quic::QuicSocketAddress(v6_.dnat_, port);
-  return addresses;
-}
-
 Quic::EnvoyQuicServerPreferredAddressConfigPtr
 FixedServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
     const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validation_visitor,
-    ProcessContextOptRef /*context*/) {
+    Server::Configuration::ServerFactoryContext& /*context*/) {
   auto& config =
       MessageUtil::downcastAndValidate<const envoy::extensions::quic::server_preferred_address::v3::
                                            FixedServerPreferredAddressConfig&>(message,
                                                                                validation_visitor);
 
-  FixedServerPreferredAddressConfig::FamilyAddresses v4 =
+  ServerPreferredAddressConfig::IpVersionConfig v4 =
       parseFamily(config.ipv4_address(), config.has_ipv4_config() ? &config.ipv4_config() : nullptr,
                   Network::Address::IpVersion::v4, "v4", message);
-  FixedServerPreferredAddressConfig::FamilyAddresses v6 =
+  ServerPreferredAddressConfig::IpVersionConfig v6 =
       parseFamily(config.ipv6_address(), config.has_ipv6_config() ? &config.ipv6_config() : nullptr,
                   Network::Address::IpVersion::v6, "v6", message);
 
-  return std::make_unique<FixedServerPreferredAddressConfig>(v4, v6);
+  return std::make_unique<ServerPreferredAddressConfig>(v4, v6);
 }
 
 REGISTER_FACTORY(FixedServerPreferredAddressConfigFactory,

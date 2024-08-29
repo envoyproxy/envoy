@@ -11,7 +11,6 @@
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -60,7 +59,6 @@ ValidationInstance::ValidationInstance(
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
-      singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
@@ -113,9 +111,11 @@ void ValidationInstance::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  overload_manager_ = THROW_OR_RETURN_VALUE(
+      OverloadManagerImpl::create(
+          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
+          messageValidationContext().staticValidationVisitor(), *api_, options_),
+      std::unique_ptr<OverloadManagerImpl>);
   null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
@@ -138,6 +138,11 @@ void ValidationInstance::initialize(const Options& options,
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
+
+  http_server_properties_cache_manager_ =
+      std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+          serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
+          thread_local_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,

@@ -137,8 +137,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
-  auto config = std::make_unique<Router::ConfigImpl>(
-      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
+  auto config = *Router::ConfigImpl::create(route_config, *factory_context,
+                                            ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
@@ -216,7 +216,7 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
@@ -332,11 +332,11 @@ bool RouterCheckTool::compareVirtualCluster(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   const bool has_virtual_cluster =
       has_route_entry &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr;
+      tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
     Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_)->statName();
+        tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -362,7 +362,7 @@ bool RouterCheckTool::compareVirtualHost(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   std::string actual = "";
   if (has_route_entry) {
-    Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
+    Stats::StatName stat_name = tool_config.route_->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =

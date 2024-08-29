@@ -1,6 +1,8 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -22,10 +24,6 @@ import java.util.concurrent.TimeUnit
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-
-private const val FILTER_NAME = "cancel_validation_filter"
-private const val LOCAL_ERROR_FILTER_CONFIG =
-  "[type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError] {}"
 
 @RunWith(RobolectricTestRunner::class)
 class CancelGRPCStreamTest {
@@ -72,15 +70,27 @@ class CancelGRPCStreamTest {
 
   @Test
   fun `cancel grpc stream calls onCancel callback`() {
+
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+        )
+        .setValue(ByteString.empty())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .addPlatformFilter(
-          name = FILTER_NAME,
+          name = "cancel_validation_filter",
           factory = { CancelValidationFilter(filterExpectation) }
         )
-        .addNativeFilter("envoy.filters.http.local_error", LOCAL_ERROR_FILTER_CONFIG)
+        .addNativeFilter(
+          "envoy.filters.http.local_error",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
 
     val client = GRPCClient(engine.streamClient())

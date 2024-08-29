@@ -50,15 +50,28 @@ TransportSocketMatchStats TransportSocketMatcherImpl::generateStats(const std::s
   return {ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_scope_, prefix))};
 }
 
-TransportSocketMatcher::MatchData
-TransportSocketMatcherImpl::resolve(const envoy::config::core::v3::Metadata* metadata) const {
+TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolve(
+    const envoy::config::core::v3::Metadata* endpoint_metadata,
+    const envoy::config::core::v3::Metadata* locality_metadata) const {
+  // We want to check for a match in the endpoint metadata first, since that will always take
+  // precedence for transport socket matching.
   for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
-            match.label_set, metadata,
+            match.label_set, endpoint_metadata,
             Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, false)) {
       return {*match.factory, match.stats, match.name};
     }
   }
+
+  // If we didn't match on any endpoint-specific metadata, let's check the locality-level metadata.
+  for (const auto& match : matches_) {
+    if (Config::Metadata::metadataLabelMatch(
+            match.label_set, locality_metadata,
+            Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, false)) {
+      return {*match.factory, match.stats, match.name};
+    }
+  }
+
   return {*default_match_.factory, default_match_.stats, default_match_.name};
 }
 

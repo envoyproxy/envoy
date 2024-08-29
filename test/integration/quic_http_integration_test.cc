@@ -166,6 +166,22 @@ public:
     return ret;
   }
 
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::RawSlice saved_cmsg) override {
+    last_local_address_ = local_address;
+    last_peer_address_ = peer_address;
+    EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
+                                             receive_time, tos, saved_cmsg);
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
+    return last_local_address_;
+  }
+
+  Network::Address::InstanceConstSharedPtr getLastPeerAddress() const { return last_peer_address_; }
+
 private:
   Event::Dispatcher& dispatcher_;
   bool saw_path_response_{false};
@@ -175,6 +191,8 @@ private:
   bool waiting_for_handshake_done_{false};
   bool waiting_for_new_cid_{false};
   bool validation_failure_on_path_response_{false};
+  Network::Address::InstanceConstSharedPtr last_local_address_;
+  Network::Address::InstanceConstSharedPtr last_peer_address_;
 };
 
 // A test that sets up its own client connection with customized quic version and connection ID.
@@ -391,6 +409,7 @@ public:
   }
 
   void testMultipleQuicConnections() {
+    autonomous_upstream_ = true;
     // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky
     // if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
     setConcurrency(8);
@@ -431,19 +450,11 @@ public:
       }
     }
     for (size_t i = 0; i < concurrency_; ++i) {
-      fake_upstream_connection_ = nullptr;
-      upstream_request_ = nullptr;
       auto encoder_decoder = codec_clients[i]->startRequest(default_request_headers_);
 
       auto& request_encoder = encoder_decoder.first;
       auto response = std::move(encoder_decoder.second);
       codec_clients[i]->sendData(request_encoder, 1000, true);
-      waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                                       {"set-cookie", "foo"},
-                                                                       {"set-cookie", "bar"}},
-                                       true);
-
       ASSERT_TRUE(response->waitForEndStream());
       EXPECT_TRUE(response->complete());
       codec_clients[i]->close();
@@ -645,7 +656,7 @@ TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
 TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_disable_version_draft_29",
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_disable_version_draft_29",
       "false");
   initialize();
 
@@ -850,6 +861,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   EXPECT_EQ(4u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
                     &quic_connection_->sent_packet_manager()));
 
+  Network::Address::InstanceConstSharedPtr last_peer_addr = quic_connection_->getLastPeerAddress();
+  Network::Address::InstanceConstSharedPtr last_local_addr =
+      quic_connection_->getLastLocalAddress();
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
@@ -862,6 +876,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   while (!quic_connection_->IsHandshakeConfirmed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+
+  EXPECT_EQ(last_peer_addr.get(), quic_connection_->getLastPeerAddress().get());
+  EXPECT_EQ(last_local_addr.get(), quic_connection_->getLastLocalAddress().get());
 
   // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -879,6 +896,8 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_NE(last_peer_addr.get(), quic_connection_->getLastPeerAddress().get());
+  EXPECT_NE(last_local_addr.get(), quic_connection_->getLastLocalAddress().get());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
@@ -1511,7 +1530,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithEnvoyReset) {
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_act_upon_invalid_header",
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_act_upon_invalid_header",
       "false");
 
   useAccessLog(
@@ -2115,6 +2134,10 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
     test_server_->waitForCounterGe(
         "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }
+
+  // Close connections before `SocketInterfaceSwap` goes out of scope to ensure packets aren't
+  // processed while it is being swapped back.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
@@ -2236,15 +2259,8 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
   ASSERT_TRUE(response->complete());
 
   EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
-    test_server_->waitForCounterGe(
-        "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
-  } else {
-    EXPECT_EQ(
-        0u,
-        test_server_->counter("listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address")
-            ->value());
-  }
+  test_server_->waitForCounterGe(
+      "listener.[__]_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
 }
 
 TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFilter) {
@@ -2399,12 +2415,10 @@ TEST_P(QuicHttpIntegrationTest, ConnectionDebugVisitor) {
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  // TODO(https://github.com/envoyproxy/envoy/issues/34492) fix
-  return;
   EnvoyQuicClientSession* quic_session =
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   std::string listener = version_ == Network::Address::IpVersion::v4 ? "127.0.0.1_0" : "[__1]_0";
-  EXPECT_LOG_CONTAINS(
+  WAIT_FOR_LOG_CONTAINS(
       "info",
       fmt::format("Quic connection from {} with id {} closed {} with details:",
                   quic_connection_->self_address().ToString(),
@@ -2440,6 +2454,43 @@ TEST_P(QuicHttpIntegrationTest, StreamTimeoutWithHalfClose) {
 
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
   codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
+  useAccessLog(fmt::format("%FILTER_STATE({}:PLAIN)%", TestFirstPacketReceivedFilterState::key()));
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    envoy::config::core::v3::SocketCmsgHeaders* cmsg =
+        listener->mutable_udp_listener_config()->mutable_quic_options()->add_save_cmsg_config();
+    cmsg->mutable_level()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 0 : 41);
+    cmsg->mutable_type()->set_value(GetParam() == Network::Address::IpVersion::v4 ? 1 : 50);
+    cmsg->set_expected_size(128);
+    auto* listener_filter = listener->add_listener_filters();
+    listener_filter->set_name("envoy.filters.quic_listener.test");
+    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+    configuration.set_added_value("foo");
+    configuration.set_allow_server_migration(false);
+    configuration.set_allow_client_migration(false);
+    listener_filter->mutable_typed_config()->PackFrom(configuration);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  codec_client_->close();
+
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  // Log format defined in TestFirstPacketReceivedFilterState::serializeAsString.
+  std::vector<std::string> metrics = absl::StrSplit(log, ',');
+  ASSERT_EQ(metrics.size(), 3);
+  // onFirstPacketReceived was called only once.
+  EXPECT_EQ(std::stoi(metrics.at(0)), 1);
+  // first packet has length greater than zero.
+  EXPECT_GT(std::stoi(metrics.at(1)), 0);
+  // first packet has packet headers length greater than zero.
+  EXPECT_GT(std::stoi(metrics.at(2)), 0);
 }
 
 } // namespace Quic

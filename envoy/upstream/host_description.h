@@ -205,6 +205,11 @@ public:
   virtual const envoy::config::core::v3::Locality& locality() const PURE;
 
   /**
+   * @return the metadata associated with the locality endpoints the host belongs to.
+   */
+  virtual const MetadataConstSharedPtr localityMetadata() const PURE;
+
+  /**
    * @return the human readable name of the host's locality zone as a StatName.
    */
   virtual Stats::StatName localityZoneStatName() const PURE;
@@ -269,10 +274,12 @@ public:
 
   /**
    * Resolve the transport socket configuration for a particular host.
-   * @param metadata the metadata of the given host.
+   * @param endpoint_metadata the metadata of the given host.
+   * @param locality_metadata the metadata of the host's locality.
    * @return the match information of the transport socket selected.
    */
-  virtual MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const PURE;
+  virtual MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                            const envoy::config::core::v3::Metadata* locality_metadata) const PURE;
 
   /*
    * return true if all matches support ALPN, false otherwise.

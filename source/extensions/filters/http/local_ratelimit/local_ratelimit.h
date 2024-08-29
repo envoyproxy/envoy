@@ -73,6 +73,7 @@ class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+               Upstream::ClusterManager& cm, Singleton::Manager& singleton_manager,
                Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
@@ -84,11 +85,8 @@ public:
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
-  bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
-  int64_t
-  remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
@@ -139,6 +137,7 @@ private:
       descriptors_;
   const bool rate_limit_per_connection_;
   const bool always_consume_default_token_bucket_{};
+  Filters::Common::LocalRateLimit::ShareProviderManagerSharedPtr share_provider_manager_;
   std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
@@ -161,7 +160,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(config) {}
+  Filter(FilterConfigSharedPtr config) : config_(config), used_config_(config_.get()) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -181,15 +180,15 @@ private:
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
-  bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
-  int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+  requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
-  const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
+  // Actual config used for the current request. Is config_ by default, but can be overridden by
+  // per-route config.
+  const FilterConfig* used_config_{};
+  OptRef<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
 
-  absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
   VhRateLimitOptions vh_rate_limits_;
 };
 

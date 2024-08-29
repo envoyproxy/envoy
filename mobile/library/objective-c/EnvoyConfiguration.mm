@@ -76,6 +76,7 @@
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
+                                    dnsNumRetries:(NSInteger)dnsNumRetries
                                       enableHttp3:(BOOL)enableHttp3
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                             quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
@@ -107,21 +108,7 @@
                                           stringAccessors
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
-                                           keyValueStores
-                                           nodeId:(nullable NSString *)nodeId
-                                       nodeRegion:(nullable NSString *)nodeRegion
-                                         nodeZone:(nullable NSString *)nodeZone
-                                      nodeSubZone:(nullable NSString *)nodeSubZone
-                                 xdsServerAddress:(nullable NSString *)xdsServerAddress
-                                    xdsServerPort:(UInt32)xdsServerPort
-                           xdsGrpcInitialMetadata:
-                               (NSDictionary<NSString *, NSString *> *)xdsGrpcInitialMetadata
-                                  xdsSslRootCerts:(nullable NSString *)xdsSslRootCerts
-                                 rtdsResourceName:(nullable NSString *)rtdsResourceName
-                               rtdsTimeoutSeconds:(UInt32)rtdsTimeoutSeconds
-                                        enableCds:(BOOL)enableCds
-                              cdsResourcesLocator:(nullable NSString *)cdsResourcesLocator
-                                cdsTimeoutSeconds:(UInt32)cdsTimeoutSeconds {
+                                           keyValueStores {
   self = [super init];
   if (!self) {
     return nil;
@@ -136,6 +123,7 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
+  self.dnsNumRetries = dnsNumRetries;
   self.enableHttp3 = enableHttp3;
   self.quicHints = quicHints;
   self.quicCanonicalSuffixes = quicCanonicalSuffixes;
@@ -161,19 +149,6 @@
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
-  self.nodeId = nodeId;
-  self.nodeRegion = nodeRegion;
-  self.nodeZone = nodeZone;
-  self.nodeSubZone = nodeSubZone;
-  self.xdsServerAddress = xdsServerAddress;
-  self.xdsServerPort = xdsServerPort;
-  self.xdsGrpcInitialMetadata = xdsGrpcInitialMetadata;
-  self.xdsSslRootCerts = xdsSslRootCerts;
-  self.rtdsResourceName = rtdsResourceName;
-  self.rtdsTimeoutSeconds = rtdsTimeoutSeconds;
-  self.cdsResourcesLocator = cdsResourcesLocator;
-  self.cdsTimeoutSeconds = cdsTimeoutSeconds;
-  self.enableCds = enableCds;
   self.bootstrapPointer = 0;
 
   return self;
@@ -193,7 +168,6 @@
     builder.addPlatformFilter([filterFactory.filterName toCXXString]);
   }
 
-#ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
   for (NSString *host in self.quicHints) {
     builder.addQuicHint([host toCXXString], [[self.quicHints objectForKey:host] intValue]);
@@ -201,7 +175,6 @@
   for (NSString *suffix in self.quicCanonicalSuffixes) {
     builder.addQuicCanonicalSuffix([suffix toCXXString]);
   }
-#endif
 
   builder.enableGzipDecompression(self.enableGzipDecompression);
   builder.enableBrotliDecompression(self.enableBrotliDecompression);
@@ -243,40 +216,12 @@
   builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.respectSystemProxySettings(self.respectSystemProxySettings);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
-
+  if (self.dnsNumRetries >= 0) {
+    builder.setDnsNumRetries(self.dnsNumRetries);
+  }
   if (self.upstreamTlsSni != nil) {
     builder.setUpstreamTlsSni([self.upstreamTlsSni toCXXString]);
   }
-  if (self.nodeRegion != nil) {
-    builder.setNodeLocality([self.nodeRegion toCXXString], [self.nodeZone toCXXString],
-                            [self.nodeSubZone toCXXString]);
-  }
-  if (self.nodeId != nil) {
-    builder.setNodeId([self.nodeId toCXXString]);
-  }
-
-#ifdef ENVOY_MOBILE_XDS
-  if (self.xdsServerAddress != nil) {
-    Envoy::Platform::XdsBuilder xdsBuilder([self.xdsServerAddress toCXXString], self.xdsServerPort);
-    for (NSString *header in self.xdsGrpcInitialMetadata) {
-      xdsBuilder.addInitialStreamHeader(
-          [header toCXXString], [[self.xdsGrpcInitialMetadata objectForKey:header] toCXXString]);
-    }
-    if (self.xdsSslRootCerts != nil) {
-      xdsBuilder.setSslRootCerts([self.xdsSslRootCerts toCXXString]);
-    }
-    if (self.rtdsResourceName != nil) {
-      xdsBuilder.addRuntimeDiscoveryService([self.rtdsResourceName toCXXString],
-                                            self.rtdsTimeoutSeconds);
-    }
-    if (self.enableCds) {
-      xdsBuilder.addClusterDiscoveryService(
-          self.cdsResourcesLocator != nil ? [self.cdsResourcesLocator toCXXString] : "",
-          self.cdsTimeoutSeconds);
-    }
-    builder.setXds(xdsBuilder);
-  }
-#endif
 
   return builder;
 }

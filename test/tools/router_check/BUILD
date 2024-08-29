@@ -41,6 +41,7 @@ envoy_cc_test_library(
         ":validation_proto_cc_proto",
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",

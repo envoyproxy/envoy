@@ -51,7 +51,8 @@ public:
   void OnClose() override;
   void OnCanWrite() override;
   // quic::Stream
-  void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
+                          quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
 

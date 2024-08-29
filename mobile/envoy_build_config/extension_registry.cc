@@ -36,7 +36,6 @@
 #include "source/common/listener_manager/connection_handler_impl.h"
 #endif
 
-#ifdef ENVOY_ENABLE_QUIC
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
@@ -44,9 +43,8 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
-#include "source/common/quic/quic_client_transport_socket_factory.h"
-#endif
 
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
@@ -56,14 +54,6 @@
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
-
-#ifdef ENVOY_MOBILE_XDS
-#include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
-#include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
-#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
-#include "source/common/tls/cert_validator/default_validator.h"
-#endif
 
 #if !defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
@@ -190,8 +180,6 @@ void ExtensionRegistry::registerFactories() {
   Server::FilterChain::forceRegisterFilterChainNameActionFactory();
 #endif
 
-#ifdef ENVOY_ENABLE_QUIC
-
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are QUIC downstream factories required if Envoy Mobile is compiled with
   // proxy functionality and QUIC support.
@@ -203,20 +191,8 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 #endif
-  Quic::forceRegisterQuicClientTransportSocketConfigFactory();
-#endif
 
-#ifdef ENVOY_MOBILE_XDS
-  // These extensions are required for xDS over gRPC using ADS, which is what Envoy Mobile
-  // supports for xDS.
-  Config::forceRegisterAdsConfigSubscriptionFactory();
-  Config::forceRegisterGrpcConfigSubscriptionFactory();
-  Config::forceRegisterAggregatedGrpcCollectionConfigSubscriptionFactory();
-  Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
-  Config::forceRegisterGrpcMuxFactory();
-  Config::forceRegisterNewGrpcMuxFactory();
-  Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
-#endif
+  Quic::forceRegisterQuicClientTransportSocketConfigFactory();
 }
 
 } // namespace Envoy

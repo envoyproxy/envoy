@@ -29,6 +29,7 @@ constexpr absl::string_view QUERY_SEPERATOR = "&";
 constexpr absl::string_view QUERY_SPLITTER = "?";
 constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view S3_SERVICE_NAME = "s3";
+constexpr absl::string_view S3_OUTPOSTS_SERVICE_NAME = "s3-outposts";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
 constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
@@ -125,8 +126,9 @@ std::string Utility::createCanonicalRequest(
  */
 std::string Utility::canonicalizePathString(absl::string_view path_string,
                                             absl::string_view service_name) {
-  // If service is S3, do not normalize but only encode the path
-  if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME)) {
+  // If service is S3 or outposts, do not normalize but only encode the path
+  if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME) ||
+      absl::EqualsIgnoreCase(service_name, S3_OUTPOSTS_SERVICE_NAME)) {
     return encodePathSegment(path_string, service_name);
   }
   // If service is not S3, normalize and encode the path
@@ -153,8 +155,8 @@ bool isReservedChar(const char c) {
 }
 
 void encodeS3Path(std::string& encoded, const char& c) {
-  // Do not encode '/' for S3
-  if (c == PATH_SPLITTER[0]) {
+  // Do not encode '/' for S3 and do not double encode
+  if ((c == PATH_SPLITTER[0]) || (c == '%')) {
     encoded.push_back(c);
   } else {
     absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
@@ -163,11 +165,13 @@ void encodeS3Path(std::string& encoded, const char& c) {
 
 std::string Utility::encodePathSegment(absl::string_view decoded, absl::string_view service_name) {
   std::string encoded;
+
   for (char c : decoded) {
     if (isReservedChar(c)) {
       // Escape unreserved chars from RFC 3986
       encoded.push_back(c);
-    } else if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME)) {
+    } else if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME) ||
+               absl::EqualsIgnoreCase(service_name, S3_OUTPOSTS_SERVICE_NAME)) {
       encodeS3Path(encoded, c);
     } else {
       // TODO: @aws, There is some inconsistency between AWS services if this should be double

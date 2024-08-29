@@ -56,8 +56,9 @@ Cluster::Cluster(
     Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Upstream::ClusterFactoryContext& context,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager)
-    : Upstream::BaseDynamicClusterImpl(cluster, context),
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+    absl::Status& creation_status)
+    : Upstream::BaseDynamicClusterImpl(cluster, context, creation_status),
       dns_cache_manager_(std::move(cache_manager)), dns_cache_(std::move(cache)),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
       local_info_(context.serverFactoryContext().localInfo()),
@@ -186,7 +187,9 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
 Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
                                                  Upstream::LoadBalancerContext* context) const {
   uint16_t default_port = 80;
-  if (info_->transportSocketMatcher().resolve(nullptr).factory_.implementsSecureTransport()) {
+  if (info_->transportSocketMatcher()
+          .resolve(nullptr, nullptr)
+          .factory_.implementsSecureTransport()) {
     default_port = 443;
   }
 
@@ -365,7 +368,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // stream metadata, or configuration (which is then added as stream metadata).
   const bool is_secure = cluster_.info()
                              ->transportSocketMatcher()
-                             .resolve(nullptr)
+                             .resolve(nullptr, nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
   if (context->requestStreamInfo()) {
@@ -496,11 +499,13 @@ ClusterFactory::createClusterWithConfig(
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
   auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
-  RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
+  RETURN_IF_NOT_OK_REF(dns_cache_or_error.status());
 
-  auto new_cluster =
-      std::shared_ptr<Cluster>(new Cluster(cluster_config, std::move(dns_cache_or_error.value()),
-                                           proto_config, context, std::move(cache_manager)));
+  absl::Status creation_status = absl::OkStatus();
+  auto new_cluster = std::shared_ptr<Cluster>(
+      new Cluster(cluster_config, std::move(dns_cache_or_error.value()), proto_config, context,
+                  std::move(cache_manager), creation_status));
+  RETURN_IF_NOT_OK(creation_status);
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       context.serverFactoryContext().singletonManager());

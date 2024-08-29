@@ -585,7 +585,8 @@ public class AndroidEngineExplicitFlowTest {
             .start(requestScenario.useDirectExecutor ? Runnable::run
                                                      : Executors.newSingleThreadExecutor());
     streamRef.set(stream); // Set before sending headers to avoid race conditions.
-    stream.sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
+    stream.sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody(),
+                       /* idempotent= */ false);
     if (requestScenario.hasBody()) {
       // The first "send" is assumes that the window is available - API contract.
       onSendWindowAvailable(requestScenario, streamRef.get(), chunkIterator, response.get());

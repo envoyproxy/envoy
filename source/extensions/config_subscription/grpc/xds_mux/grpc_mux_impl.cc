@@ -69,18 +69,33 @@ GrpcMuxImpl<S, F, RQ, RS>::createGrpcStreamObject(GrpcMuxContext& grpc_mux_conte
               callbacks, std::move(grpc_mux_context.async_client_),
               grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
               grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-              grpc_mux_context.rate_limit_settings_);
+              grpc_mux_context.rate_limit_settings_,
+              GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
         },
         /*failover_stream_creator=*/
-        // TODO(adisuissa): implement when failover is fully plumbed.
-        absl::nullopt,
+        grpc_mux_context.failover_async_client_
+            ? absl::make_optional([&grpc_mux_context](GrpcStreamCallbacks<RS>* callbacks)
+                                      -> GrpcStreamInterfacePtr<RQ, RS> {
+                return std::make_unique<GrpcStream<RQ, RS>>(
+                    callbacks, std::move(grpc_mux_context.failover_async_client_),
+                    grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
+                    grpc_mux_context.scope_,
+                    // TODO(adisuissa): the backoff strategy for the failover should
+                    // be the same as the primary source.
+                    std::make_unique<FixedBackOffStrategy>(
+                        GrpcMuxFailover<RQ, RS>::DefaultFailoverBackoffMilliseconds),
+                    grpc_mux_context.rate_limit_settings_,
+                    GrpcStream<RQ, RS>::ConnectedStateValue::SECOND_ENTRY);
+              })
+            : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
         /*dispatch=*/grpc_mux_context.dispatcher_);
   }
   return std::make_unique<GrpcStream<RQ, RS>>(
       this, std::move(grpc_mux_context.async_client_), grpc_mux_context.service_method_,
       grpc_mux_context.dispatcher_, grpc_mux_context.scope_,
-      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_);
+      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_,
+      GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
 }
 template <class S, class F, class RQ, class RS> GrpcMuxImpl<S, F, RQ, RS>::~GrpcMuxImpl() {
   AllMuxes::get().erase(this);
@@ -259,7 +274,7 @@ template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::handleEstablishedStream() {
   ENVOY_LOG(debug, "GrpcMuxImpl stream successfully established");
   for (auto& [type_url, subscription_state] : subscriptions_) {
-    subscription_state->markStreamFresh();
+    subscription_state->markStreamFresh(should_send_initial_resource_versions_);
   }
   setAnyRequestSentYetInCurrentStream(false);
   maybeUpdateQueueSizeStat(0);
@@ -268,7 +283,8 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleEstablishedStream() {
 }
 
 template <class S, class F, class RQ, class RS>
-void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure() {
+void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure(
+    bool next_attempt_may_send_initial_resource_version) {
   ENVOY_LOG(debug, "GrpcMuxImpl stream failed to establish");
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
@@ -287,6 +303,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleStreamEstablishmentFailure() {
       }
     }
   } while (all_subscribed.size() != subscriptions_.size());
+  should_send_initial_resource_versions_ = next_attempt_may_send_initial_resource_version;
 }
 
 template <class S, class F, class RQ, class RS>

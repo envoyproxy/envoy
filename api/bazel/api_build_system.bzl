@@ -22,6 +22,7 @@ _CC_PROTO_DESCRIPTOR_SUFFIX = "_cc_proto_descriptor"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
+_JAVA_PROTO_SUFFIX = "_java_proto"
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",
@@ -67,7 +68,8 @@ def api_cc_py_proto_library(
         srcs = [],
         deps = [],
         linkstatic = 0,
-        has_services = 0):
+        has_services = 0,
+        java = True):
     relative_name = ":" + name
     proto_library(
         name = name,
@@ -108,6 +110,13 @@ def api_cc_py_proto_library(
         deps = [relative_name],
         visibility = ["//visibility:public"],
     )
+
+    if java:
+        native.java_proto_library(
+            name = name + _JAVA_PROTO_SUFFIX,
+            visibility = ["//visibility:public"],
+            deps = [relative_name],
+        )
 
     # Optionally define gRPC services
     if has_services:

@@ -197,6 +197,9 @@ TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) 
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(500);
+}
 TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
@@ -1118,8 +1121,6 @@ TEST_P(MultiplexedIntegrationTest, GoAway) {
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
@@ -1159,8 +1160,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
                                     absl::StrCat(total_streams));
@@ -1187,8 +1186,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyRes
 TEST_P(MultiplexedIntegrationTestWithSimulatedTime, DontGoAwayAfterTooManyResetsForLongStreams) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
-  config_helper_.addRuntimeOverride("envoy.restart_features.send_goaway_for_premature_rst_streams",
-                                    "true");
   const int total_streams = 100;
   const int stream_lifetime_seconds = 2;
   config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
@@ -1847,6 +1844,45 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSe
   EXPECT_EQ(set_cookies.size(), 1);
 }
 
+TEST_P(MultiplexedRingHashIntegrationTest,
+       CookieRoutingNoCookieWithNonzeroTtlSetAndWithAttributes) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+        cookie->mutable_ttl()->set_seconds(15);
+        auto* attribute_1 = cookie->mutable_attributes()->Add();
+        attribute_1->set_name("test1");
+        attribute_1->set_value("value1");
+        auto* attribute_2 = cookie->mutable_attributes()->Add();
+        attribute_2->set_name("test2");
+        attribute_2->set_value("value2");
+      });
+
+  std::set<std::string> set_cookies;
+  sendMultipleRequests(
+      1024,
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_EQ("200", response.headers().getStatusValue());
+        std::string value(
+            response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
+        set_cookies.insert(value);
+        EXPECT_THAT(value,
+                    MatchesRegex("foo=.*; Max-Age=15; test1=value1; test2=value2; HttpOnly"));
+      });
+  EXPECT_EQ(set_cookies.size(), 1);
+}
+
 TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1969,6 +2005,8 @@ public:
     }
     return v;
   }
+
+  void sendRequestsAndResponses(uint32_t num_requests);
 };
 
 TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHeader) {
@@ -2408,7 +2446,6 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   )EOF");
 
   const int kRequestsSentPerIOCycle = 20;
-  autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   beginSession();
 
@@ -2434,6 +2471,17 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  std::vector<FakeStreamPtr> upstream_requests(kRequestsSentPerIOCycle);
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    FakeStreamPtr upstream_request;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+    ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(upstream_request->receivedData());
+    upstream_request->encodeHeaders(default_response_headers_, true);
+    upstream_requests.push_back(std::move(upstream_request));
+  }
 
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
     auto frame = readFrame();
@@ -2480,43 +2528,72 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   tcp_client_->close();
 }
 
-TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
-  const int kRequestsSentPerIOCycle = 20;
-  autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) {
   beginSession();
 
   std::string buffer;
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
-    auto request =
-        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
-                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"request_no", absl::StrCat(i)}});
     absl::StrAppend(&buffer, std::string(request));
   }
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
     absl::StrAppend(&buffer, std::string(data));
   }
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto trailers = Http2Frame::makeEmptyHeadersFrame(
         Http2Frame::makeClientStreamId(i),
         static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
             Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
-    trailers.appendHeaderWithoutIndexing({"k", "v"});
+    trailers.appendHeaderWithoutIndexing({"k", absl::StrCat("v", i)});
     trailers.adjustPayloadSize();
     absl::StrAppend(&buffer, std::string(trailers));
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  std::vector<FakeStreamPtr> upstream_requests(num_requests);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    FakeStreamPtr upstream_request;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+    ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(upstream_request->receivedData());
+    ASSERT_FALSE(upstream_request->trailers()
+                     ->get(Http::LowerCaseString("k"))[0]
+                     ->value()
+                     .getStringView()
+                     .empty());
+    upstream_request->encodeHeaders(default_response_headers_, true);
+    upstream_requests.push_back(std::move(upstream_request));
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto frame = readFrame();
     EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
     EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
   }
   tcp_client_->close();
+}
+
+// Validate that processing of deferred requests with body and trailers is handled correctly
+// when there is a filter that pauses and resumes iteration.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPause) {
+  const int kRequestsSentPerIOCycle = 20;
+  // Add filter that stops iteration in the decodeHeaders and resumes in
+  // decodeData to verify that downstream end_stream is handled correctly by the filter manager.
+  config_helper_.addFilter("name: stop-in-headers-continue-in-body-filter");
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  sendRequestsAndResponses(kRequestsSentPerIOCycle);
+}
+
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersNoPauseInFilterChain) {
+  const int kRequestsSentPerIOCycle = 20;
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  sendRequestsAndResponses(kRequestsSentPerIOCycle);
 }
 
 // Validate the request completion during processing of headers in the deferred requests,
@@ -2842,7 +2919,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   ASSERT_TRUE(response->waitForReset());
   // http3.inconsistent_content_length.
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
@@ -2894,8 +2971,6 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read", "true");
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");

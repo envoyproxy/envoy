@@ -32,9 +32,9 @@ public:
 
   TestIoSocketHandle(ConnectOverrideProc connect_override_proc,
                      WriteOverrideProc write_override_proc, ReadOverrideProc read_override_proc,
-                     os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                     absl::optional<int> domain = absl::nullopt)
-      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
+                     size_t address_cache_max_capacity, os_fd_t fd = INVALID_SOCKET,
+                     bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
+      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain, address_cache_max_capacity),
         connect_override_(connect_override_proc), write_override_(write_override_proc),
         read_override_(read_override_proc) {
     int type;
@@ -80,7 +80,8 @@ private:
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port, const UdpSaveCmsgConfig& save_cmsg_config,
+                                  RecvMsgOutput& output) override;
 
   IoHandlePtr duplicate() override;
 
@@ -119,8 +120,8 @@ public:
 
 private:
   // SocketInterfaceImpl
-  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
-                         absl::optional<int> domain) const override;
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+                         const SocketCreationOptions& options) const override;
 
   const TestIoSocketHandle::ConnectOverrideProc connect_override_proc_;
   const TestIoSocketHandle::WriteOverrideProc write_override_proc_;

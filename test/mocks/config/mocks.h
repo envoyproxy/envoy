@@ -140,7 +140,7 @@ public:
   ~MockGrpcStreamCallbacks() override;
 
   MOCK_METHOD(void, onStreamEstablished, ());
-  MOCK_METHOD(void, onEstablishmentFailure, ());
+  MOCK_METHOD(void, onEstablishmentFailure, (bool));
   MOCK_METHOD(void, onDiscoveryResponse,
               (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
                ControlPlaneStats& control_plane_stats));
@@ -156,10 +156,6 @@ public:
               (const Protobuf::Message& config_source_proto,
                Server::Configuration::ServerFactoryContext& factory_context,
                Init::Manager& init_manager, const std::string& stat_prefix,
-               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
-  MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
-              (const Protobuf::Message& config_proto,
-               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,

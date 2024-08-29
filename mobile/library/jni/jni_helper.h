@@ -4,22 +4,22 @@
 
 #include <memory>
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace JNI {
 
 /** A custom deleter to delete JNI global ref. */
 class GlobalRefDeleter {
 public:
-  explicit GlobalRefDeleter(JNIEnv* env) : env_(env) {}
+  explicit GlobalRefDeleter() = default;
 
-  void operator()(jobject object) const {
-    if (object != nullptr) {
-      env_->DeleteGlobalRef(object);
-    }
-  }
+  GlobalRefDeleter(const GlobalRefDeleter&) = default;
 
-private:
-  JNIEnv* const env_;
+  // This is to allow move semantics in `GlobalRefUniquePtr`.
+  GlobalRefDeleter& operator=(const GlobalRefDeleter&) = default;
+
+  void operator()(jobject object) const;
 };
 
 /** A unique pointer for JNI global ref. */
@@ -29,21 +29,14 @@ using GlobalRefUniquePtr = std::unique_ptr<typename std::remove_pointer<T>::type
 /** A custom deleter to delete JNI local ref. */
 class LocalRefDeleter {
 public:
-  explicit LocalRefDeleter(JNIEnv* env) : env_(env) {}
+  explicit LocalRefDeleter() = default;
 
   LocalRefDeleter(const LocalRefDeleter&) = default;
 
   // This is to allow move semantics in `LocalRefUniquePtr`.
-  LocalRefDeleter& operator=(const LocalRefDeleter&) { return *this; }
+  LocalRefDeleter& operator=(const LocalRefDeleter&) = default;
 
-  void operator()(jobject object) const {
-    if (object != nullptr) {
-      env_->DeleteLocalRef(object);
-    }
-  }
-
-private:
-  JNIEnv* const env_;
+  void operator()(jobject object) const;
 };
 
 /** A unique pointer for JNI local ref. */
@@ -53,16 +46,11 @@ using LocalRefUniquePtr = std::unique_ptr<typename std::remove_pointer<T>::type,
 /** A custom deleter for UTF strings. */
 class StringUtfDeleter {
 public:
-  StringUtfDeleter(JNIEnv* env, jstring j_str) : env_(env), j_str_(j_str) {}
+  explicit StringUtfDeleter(jstring j_str) : j_str_(j_str) {}
 
-  void operator()(const char* c_str) const {
-    if (c_str != nullptr) {
-      env_->ReleaseStringUTFChars(j_str_, c_str);
-    }
-  }
+  void operator()(const char* c_str) const;
 
 private:
-  JNIEnv* const env_;
   jstring j_str_;
 };
 
@@ -111,16 +99,11 @@ using ArrayElementsUniquePtr = std::unique_ptr<
 /** A custom deleter for JNI primitive array critical. */
 class PrimitiveArrayCriticalDeleter {
 public:
-  PrimitiveArrayCriticalDeleter(JNIEnv* env, jarray array) : env_(env), array_(array) {}
+  explicit PrimitiveArrayCriticalDeleter(jarray array) : array_(array) {}
 
-  void operator()(void* c_array) const {
-    if (c_array != nullptr) {
-      env_->ReleasePrimitiveArrayCritical(array_, c_array, 0);
-    }
-  }
+  void operator()(void* c_array) const;
 
 private:
-  JNIEnv* const env_;
   jarray array_;
 };
 
@@ -138,6 +121,16 @@ class JniHelper {
 public:
   explicit JniHelper(JNIEnv* env) : env_(env) {}
 
+  struct Method {
+    absl::string_view name_;
+    absl::string_view signature_;
+  };
+
+  struct Field {
+    absl::string_view name_;
+    absl::string_view signature_;
+  };
+
   /** Gets the JNI version supported. */
   static jint getVersion();
 
@@ -148,7 +141,8 @@ public:
   static void finalize();
 
   /**
-   * Adds the `jclass` object into a cache. This function is typically called inside `JNI_OnLoad`.
+   * Adds the `jclass`, `jmethodID`, and `jfieldID` objects into a cache. This function is typically
+   * called inside `JNI_OnLoad`.
    *
    * Caching the `jclass` can be useful for performance.
    * See https://developer.android.com/training/articles/perf-jni#jclass,-jmethodid,-and-jfieldid
@@ -163,7 +157,9 @@ public:
    * See
    * https://developer.android.com/training/articles/perf-jni#faq:-why-didnt-findclass-find-my-class
    */
-  static void addClassToCache(const char* class_name);
+  static void addToCache(absl::string_view class_name, const std::vector<Method>& methods,
+                         const std::vector<Method>& static_methods,
+                         const std::vector<Field>& fields, const std::vector<Field>& static_fields);
 
   /** Gets the `JavaVM`. The `initialize(JavaVM*) must be called first. */
   static JavaVM* getJavaVm();
@@ -194,11 +190,25 @@ public:
   jfieldID getFieldId(jclass clazz, const char* name, const char* signature);
 
   /**
+   * Gets the field ID for an instance field of a class from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getfieldid
+   */
+  jfieldID getFieldIdFromCache(jclass clazz, const char* name, const char* signature);
+
+  /**
    * Gets the field ID for a static field of a class.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticfieldid
    */
   jfieldID getStaticFieldId(jclass clazz, const char* name, const char* signature);
+
+  /**
+   * Gets the field ID for a static field of a class from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticfieldid
+   */
+  jfieldID getStaticFieldIdFromCache(jclass clazz, const char* name, const char* signature);
 
   /** A macro to create `Call<Type>Method` helper function. */
 #define DECLARE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                     \
@@ -221,7 +231,7 @@ public:
   template <typename T = jobject>
   [[nodiscard]] LocalRefUniquePtr<T> getObjectField(jobject object, jfieldID field_id) {
     LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectField(object, field_id)),
-                                LocalRefDeleter(env_));
+                                LocalRefDeleter());
     return result;
   }
 
@@ -233,6 +243,13 @@ public:
   jmethodID getMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
+   * Gets the object method with the given signature from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getmethodid
+   */
+  jmethodID getMethodIdFromCache(jclass clazz, const char* name, const char* signature);
+
+  /**
    * Gets the static method with the given signature.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticmethodid
@@ -240,11 +257,18 @@ public:
   jmethodID getStaticMethodId(jclass clazz, const char* name, const char* signature);
 
   /**
+   * Gets the static method with the given signature from the cache.
+   *
+   * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#getstaticmethodid
+   */
+  jmethodID getStaticMethodIdFromCache(jclass clazz, const char* name, const char* signature);
+
+  /**
    * Finds the given `class_name` using from the cache.
    *
    * https://docs.oracle.com/en/java/javase/17/docs/specs/jni/functions.html#findclass
    */
-  [[nodiscard]] jclass findClass(const char* class_name);
+  [[nodiscard]] jclass findClassFromCache(const char* class_name);
 
   /**
    * Returns the class of a given `object`.
@@ -360,7 +384,7 @@ public:
   template <typename T = jobject>
   [[nodiscard]] LocalRefUniquePtr<T> getObjectArrayElement(jobjectArray array, jsize index) {
     LocalRefUniquePtr<T> result(static_cast<T>(env_->GetObjectArrayElement(array, index)),
-                                LocalRefDeleter(env_));
+                                LocalRefDeleter());
     rethrowException();
     return result;
   }
@@ -382,7 +406,7 @@ public:
                                                                              jboolean* is_copy) {
     PrimitiveArrayCriticalUniquePtr<T> result(
         static_cast<T>(env_->GetPrimitiveArrayCritical(array, is_copy)),
-        PrimitiveArrayCriticalDeleter(env_, array));
+        PrimitiveArrayCriticalDeleter(array));
     return result;
   }
 
@@ -429,7 +453,7 @@ public:
     va_list args;
     va_start(args, method_id);
     LocalRefUniquePtr<T> result(static_cast<T>(env_->CallObjectMethodV(object, method_id, args)),
-                                LocalRefDeleter(env_));
+                                LocalRefDeleter());
     va_end(args);
     rethrowException();
     return result;
@@ -461,8 +485,7 @@ public:
     va_list args;
     va_start(args, method_id);
     LocalRefUniquePtr<T> result(
-        static_cast<T>(env_->CallStaticObjectMethodV(clazz, method_id, args)),
-        LocalRefDeleter(env_));
+        static_cast<T>(env_->CallStaticObjectMethodV(clazz, method_id, args)), LocalRefDeleter());
     va_end(args);
     rethrowException();
     return result;

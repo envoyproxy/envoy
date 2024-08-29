@@ -1,0 +1,97 @@
+# An example config to validate JWT tokens issued by Firebase.
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          stat_prefix: ingress_http
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: default
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: "OK"
+          http_filters:
+          - name: envoy.extensions.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                firebase:
+                  claim_to_headers:
+                  - claim_name: user_id
+                    header_name: x-firebase-uid
+                  - claim_name: firebase.sign_in_provider
+                    header_name: x-firebase-provider
+                  issuer: https://securetoken.google.com/example.com:example-project-1234567890
+                  audiences:
+                  - example.com:example-project-1234567890
+                  remoteJwks:
+                    httpUri:
+                      uri: https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com
+                      cluster: www.googleapis.com
+                      timeout: 1s
+                    async_fetch:
+                      fast_listener: false
+                    retry_policy:
+                      num_retries: 10
+                  forward: true
+                  jwt_cache_config:
+                    jwt_cache_size: 1024
+              rules:
+              - match:
+                  prefix: "/"
+                requires:
+                  provider_name: firebase
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: www.googleapis.com
+    type: STRICT_DNS
+    connect_timeout: 2s
+    lb_policy: ROUND_ROBIN
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options:
+          auto_sni: true
+        auto_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: www.googleapis.com
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: www.googleapis.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: www.googleapis.com

@@ -73,9 +73,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     if (!error_msg.empty()) {
       stats_.denied_.inc();
       state_ = Responded;
-      decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
-                                         absl::StrCat("Failed JWT authentication: ", error_msg),
-                                         nullptr, absl::nullopt, generateRcDetails(error_msg));
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::Forbidden,
+          config_.get()->stripFailureResponse()
+              ? ""
+              : absl::StrCat("Failed JWT authentication: ", error_msg),
+          nullptr, absl::nullopt, generateRcDetails(error_msg));
       return Http::FilterHeadersStatus::StopIteration;
     }
   } else {
@@ -120,6 +123,12 @@ void Filter::onComplete(const Status& status) {
     Http::Code code =
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
+    if (config_.get()->stripFailureResponse()) {
+      decoder_callbacks_->sendLocalReply(
+          code, "", nullptr, absl::nullopt,
+          generateRcDetails(::google::jwt_verify::getStatusString(status)));
+      return;
+    }
     decoder_callbacks_->sendLocalReply(
         code, ::google::jwt_verify::getStatusString(status),
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {

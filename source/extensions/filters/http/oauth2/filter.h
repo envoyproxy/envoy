@@ -141,12 +141,14 @@ public:
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
+  const std::string& cookieDomain() const { return cookie_domain_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
   }
+  bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -164,15 +166,17 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const bool forward_bearer_token_ : 1;
-  const bool preserve_authorization_header_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
+  const std::string cookie_domain_;
   const AuthType auth_type_;
-  const bool use_refresh_token_{};
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const bool forward_bearer_token_ : 1;
+  const bool preserve_authorization_header_ : 1;
+  const bool use_refresh_token_ : 1;
+  const bool disable_id_token_set_cookie_ : 1;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -272,6 +276,7 @@ private:
   std::string refresh_token_;
   std::string expires_in_;
   std::string expires_refresh_token_in_;
+  std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;
@@ -293,6 +298,8 @@ private:
   std::string getEncodedToken() const;
   std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
                                             const std::chrono::seconds& expires_in) const;
+  std::string getExpiresTimeForIdToken(const std::string& id_token,
+                                       const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };

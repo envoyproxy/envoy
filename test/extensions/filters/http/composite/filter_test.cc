@@ -515,6 +515,75 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
+// Config test to check if sample_percent config is not specified.
+TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+   )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  ExecuteFilterActionFactory factory;
+  EXPECT_TRUE(factory.isSampled(config, runtime));
+}
+
+// Config test to check if sample_percent config is in place and feature enabled.
+TEST(ConfigTest, TestSamplePercentInPlaceFeatureEnabled) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+      sample_percent:
+        default_value:
+          numerator: 30
+          denominator: HUNDRED
+   )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  ExecuteFilterActionFactory factory;
+  EXPECT_CALL(runtime.snapshot_,
+              featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(testing::Return(true));
+  EXPECT_TRUE(factory.isSampled(config, runtime));
+}
+
+// Config test to check if sample_percent config is in place and feature not enabled.
+TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
+  const std::string yaml_string = R"EOF(
+      typed_config:
+        name: set-response-code
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+          abort:
+            http_status: 503
+      sample_percent:
+        runtime_key:
+   )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+  ExecuteFilterActionFactory factory;
+  EXPECT_CALL(runtime.snapshot_,
+              featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(testing::Return(false));
+  EXPECT_FALSE(factory.isSampled(config, runtime));
+}
+
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
   const std::string yaml_string = R"EOF(
       dynamic_config:

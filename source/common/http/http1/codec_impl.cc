@@ -1341,7 +1341,7 @@ CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   if (active_request_) {
-    active_request_->response_encoder_.runResetCallbacks(reason);
+    active_request_->response_encoder_.runResetCallbacks(reason, absl::string_view());
     connection_.dispatcher().deferredDelete(std::move(active_request_));
   }
 }
@@ -1436,7 +1436,9 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
-      passing_through_proxy_(passing_through_proxy) {
+      passing_through_proxy_(passing_through_proxy),
+      force_reset_on_premature_upstream_half_close_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1587,6 +1589,16 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
       response.decoder_->decodeData(buffer, true);
     }
 
+    if (force_reset_on_premature_upstream_half_close_ && !encode_complete_) {
+      // H/1 connections are always reset if upstream is done before downstream.
+      // When the allow_multiplexed_upstream_half_close is enabled the router filter does not
+      // reset streams where upstream half closed before downstream. In this case the H/1 codec
+      // has to reset the stream.
+      ENVOY_CONN_LOG(trace, "Resetting stream due to premature H/1 upstream close.", connection_);
+      response.encoder_.runResetCallbacks(StreamResetReason::Http1PrematureUpstreamHalfClose,
+                                          absl::string_view());
+    }
+
     // Reset to ensure no information from one requests persists to the next.
     pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
@@ -1599,7 +1611,7 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
   if (pending_response_.has_value() && !pending_response_done_) {
-    pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_.value().encoder_.runResetCallbacks(reason, absl::string_view());
     pending_response_done_ = true;
     pending_response_.reset();
   }

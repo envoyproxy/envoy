@@ -3,7 +3,12 @@
 Using the Envoy Docker Image
 ============================
 
-The following examples use the :ref:`official Envoy Docker image <start_install_docker>`.
+.. note::
+  Envoy OCI images are built using Docker and have been extensively tested in large scale
+  deployments running with Docker. Use of other container technologies such as Podman might
+  function correctly but have not been extensively tested and are not expressly supported.
+
+The following examples use the :ref:`official Envoy OCI image <start_install_docker>`.
 
 These instructions are known to work for the ``x86_64`` and ``arm64`` architectures.
 
@@ -29,13 +34,13 @@ either by ensuring the correct permissions on the file, or making it world-reada
 below.
 
 
-Build and run a Docker image
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Build and run an Envoy image with Docker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create a simple Dockerfile to execute Envoy.
+Create a simple ``Dockerfile`` to execute Envoy.
 
 If you create a custom ``envoy.yaml`` you can create your own Docker image with it using the following
-Dockerfile recipe:
+``Dockerfile`` recipe:
 
 .. substitution-code-block:: dockerfile
 
@@ -50,16 +55,32 @@ Build the Docker image using:
    $ docker build -t envoy:v1 .
 
 Assuming Envoy is configured to listen on ports ``9901`` and ``10000``, you can now start it
-with:
+in Docker with:
 
 .. code-block:: console
 
    $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-Permissions for running Docker Envoy containers as a non-root user
+or in Podman (unsupported) with:
+
+.. code-block:: console
+
+   $ podman run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
+
+Root filesystem permissions for running Envoy in containers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, the Envoy Docker image will start as the root user but will switch to the ``envoy``
+The Envoy container image can be run with the container's root filesystem mounted read-only.
+For example, using Docker and Podman, you can use the ``--read-only`` option of the ``run`` command.
+
+With Kubernetes, this means setting ``podSpec.containers.securityContext.readOnlyFilesystem`` to ``true``.
+
+With Nomad, this means setting ``readonly_rootfs = true`` in the task's ``config`` block when using the ``docker`` or ``podman`` driver.
+
+Permissions for running Envoy in containers as a non-root user
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, the Envoy OCI image will start as the root user but will switch to the ``envoy``
 user created at build time, in the Docker ``ENTRYPOINT``.
 
 Alternatively, you can start the container specifying the Docker ``user``.
@@ -125,7 +146,7 @@ host user's ``uid``, for example:
 
   $ docker run -d --name envoy -v $(pwd)/envoy.yaml:/etc/envoy/envoy.yaml -e ENVOY_UID=$(id -u) envoyproxy/|envoy_docker_image|
 
-Listen only on ports > 1024 inside the Docker Envoy container
+Listen only on ports > 1024 inside the Envoy container
 *************************************************************
 
 Unix-based systems restrict opening ``well-known`` ports (ie. with a port number < ``1024``) to the ``root`` user.

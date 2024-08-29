@@ -34,7 +34,7 @@ TEST(MatchingData, DestinationIPInput) {
 
   {
     socket.connection_info_provider_->setLocalAddress(
-        std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+        *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -126,7 +126,7 @@ TEST(MatchingData, DestinationPortInput) {
 
   {
     socket.connection_info_provider_->setLocalAddress(
-        std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+        *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -152,7 +152,7 @@ TEST(MatchingData, SourceIPInput) {
 
   {
     socket.connection_info_provider_->setRemoteAddress(
-        std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+        *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -178,7 +178,7 @@ TEST(MatchingData, SourcePortInput) {
 
   {
     socket.connection_info_provider_->setRemoteAddress(
-        std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+        *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -204,7 +204,7 @@ TEST(MatchingData, DirectSourceIPInput) {
 
   {
     socket.connection_info_provider_->setDirectRemoteAddressForTest(
-        std::make_shared<Network::Address::PipeInstance>("/pipe/path"));
+        *Network::Address::PipeInstance::create("/pipe/path"));
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -365,7 +365,7 @@ TEST(MatchingData, FilterStateInput) {
 TEST(UdpMatchingData, UdpDestinationIPInput) {
   DestinationIPInput<UdpMatchingData> input;
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
-  const Address::PipeInstance pipe("/pipe/path");
+  const auto pipe = *Address::PipeInstance::create("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -376,7 +376,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
   }
 
   {
-    UdpMatchingDataImpl data(pipe, ip);
+    UdpMatchingDataImpl data(*pipe, ip);
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -387,7 +387,7 @@ TEST(UdpMatchingData, UdpDestinationIPInput) {
 TEST(UdpMatchingData, UdpDestinationPortInput) {
   DestinationPortInput<UdpMatchingData> input;
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
-  const Address::PipeInstance pipe("/pipe/path");
+  const auto pipe = *Address::PipeInstance::create("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -398,7 +398,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
   }
 
   {
-    UdpMatchingDataImpl data(pipe, ip);
+    UdpMatchingDataImpl data(*pipe, ip);
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -409,7 +409,7 @@ TEST(UdpMatchingData, UdpDestinationPortInput) {
 TEST(UdpMatchingData, UdpSourceIPInput) {
   SourceIPInput<UdpMatchingData> input;
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
-  const Address::PipeInstance pipe("/pipe/path");
+  const auto pipe = *Address::PipeInstance::create("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -420,7 +420,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
   }
 
   {
-    UdpMatchingDataImpl data(ip, pipe);
+    UdpMatchingDataImpl data(ip, *pipe);
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
@@ -431,7 +431,7 @@ TEST(UdpMatchingData, UdpSourceIPInput) {
 TEST(UdpMatchingData, UdpSourcePortInput) {
   SourcePortInput<UdpMatchingData> input;
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
-  const Address::PipeInstance pipe("/pipe/path");
+  const auto pipe = *Address::PipeInstance::create("/pipe/path");
 
   {
     UdpMatchingDataImpl data(ip, ip);
@@ -442,7 +442,7 @@ TEST(UdpMatchingData, UdpSourcePortInput) {
   }
 
   {
-    UdpMatchingDataImpl data(ip, pipe);
+    UdpMatchingDataImpl data(ip, *pipe);
     const auto result = input.get(data);
     EXPECT_EQ(result.data_availability_,
               Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);

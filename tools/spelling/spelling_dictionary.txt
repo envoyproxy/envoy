@@ -27,6 +27,7 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+CCL
 ECN
 ECS
 EKS
@@ -38,6 +39,8 @@ BPF
 Bdecoded
 Bencoded
 CIO
+cbegin
+cend
 deadcode
 DFP
 Dynatrace
@@ -93,6 +96,7 @@ OWS
 Preconnecting
 RCVBUF
 RTCP
+RTLD
 RTP
 SOH
 SPC
@@ -306,6 +310,7 @@ NOAUTH
 NOCHECKRESP
 NODATA
 NODELAY
+NODELETE
 NOLINT
 NOLINTNEXTLINE
 NONAME
@@ -324,6 +329,9 @@ middlewildcard
 monostate
 mpd
 mutators
+mybucket
+myobject
+myproject
 na
 oghttp
 OID
@@ -374,6 +382,7 @@ RDS
 README
 RECVDSTADDR
 RECVPKTINFO
+RECVTOS
 REFNIL
 REQ
 REUSEADDR
@@ -464,6 +473,7 @@ UDP
 UDS
 UHV
 UNC
+UPN
 URI
 URL
 USEVC
@@ -696,6 +706,8 @@ deleter
 delim
 denylist
 deque
+dep
+deps
 deprecations
 dereference
 dereferences
@@ -718,6 +730,9 @@ dgst
 dir
 dirname
 djb
+dlclose
+dlopen
+dlsym
 downcalls
 downcasted
 downcased
@@ -873,6 +888,7 @@ inotify
 inserter
 instantiation
 instantiations
+interop
 interpretable
 intra
 ints
@@ -1175,6 +1191,7 @@ refcount
 referencee
 referer
 refetch
+reframed
 refvec
 regex
 regexes
@@ -1205,6 +1222,7 @@ resolv
 resolvers
 responder
 restarter
+resumable
 resync
 ret
 retransmissions
@@ -1224,6 +1242,7 @@ rollout
 roundtrip
 rpcs
 rq
+rtest
 rtrim
 rtt
 ruleset
@@ -1254,6 +1273,7 @@ servercert
 setenv
 setsockopt
 sfixed
+sidestream
 sig
 sigaction
 sigactions
@@ -1349,6 +1369,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars
@@ -1456,6 +1477,7 @@ virtualize
 virtualized
 vptr
 vtable
+vtest
 vtt
 wakeup
 wakeups
@@ -1514,5 +1536,5 @@ CNAME
 NAT
 NXDOMAIN
 DNAT
+RSP
 EWMA
-

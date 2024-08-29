@@ -44,6 +44,7 @@ envoy_cc_test(
         "//source/common/tls:ssl_handshaker_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/common/tls/cert_selector:async_cert_selector",
         "//test/common/tls/cert_validator:timed_cert_validator",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/mocks/secret:secret_mocks",

@@ -60,6 +60,106 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
 
 } // namespace
 
+FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
+                           Stats::Scope& scope, const std::string& stats_prefix,
+                           Server::Configuration::ServerFactoryContext& factory_context)
+    : allow_partial_message_(config.with_request_body().allow_partial_message()),
+      failure_mode_allow_(config.failure_mode_allow()),
+      failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
+      clear_route_cache_(config.clear_route_cache()),
+      max_request_bytes_(config.with_request_body().max_request_bytes()),
+
+      // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
+      // difference to where the body is written in http requests, and a value of false here will
+      // cause non UTF-8 body content to be changed when it doesn't need to.
+      pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
+
+      encode_raw_headers_(config.encode_raw_headers()),
+
+      status_on_error_(toErrorCode(config.status_on_error().code())),
+      validate_mutations_(config.validate_mutations()), scope_(scope),
+      decoder_header_mutation_checker_(
+          config.has_decoder_header_mutation_rules()
+              ? absl::optional<Filters::Common::MutationRules::Checker>(
+                    Filters::Common::MutationRules::Checker(config.decoder_header_mutation_rules(),
+                                                            factory_context.regexEngine()))
+              : absl::nullopt),
+      enable_dynamic_metadata_ingestion_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_dynamic_metadata_ingestion, true)),
+      runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
+      filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
+                                                    : absl::nullopt),
+      filter_enabled_(config.has_filter_enabled()
+                          ? absl::optional<Runtime::FractionalPercent>(
+                                Runtime::FractionalPercent(config.filter_enabled(), runtime_))
+                          : absl::nullopt),
+      filter_enabled_metadata_(
+          config.has_filter_enabled_metadata()
+              ? absl::optional<Matchers::MetadataMatcher>(
+                    Matchers::MetadataMatcher(config.filter_enabled_metadata(), factory_context))
+              : absl::nullopt),
+      deny_at_disable_(config.has_deny_at_disable()
+                           ? absl::optional<Runtime::FeatureFlag>(
+                                 Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
+                           : absl::nullopt),
+      pool_(scope_.symbolTable()),
+      metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
+                                   config.metadata_context_namespaces().end()),
+      typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
+                                         config.typed_metadata_context_namespaces().end()),
+      route_metadata_context_namespaces_(config.route_metadata_context_namespaces().begin(),
+                                         config.route_metadata_context_namespaces().end()),
+      route_typed_metadata_context_namespaces_(
+          config.route_typed_metadata_context_namespaces().begin(),
+          config.route_typed_metadata_context_namespaces().end()),
+      include_peer_certificate_(config.include_peer_certificate()),
+      include_tls_session_(config.include_tls_session()),
+      charge_cluster_response_stats_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
+      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
+      ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
+      ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
+      ext_authz_invalid_(pool_.add(createPoolStatName(config.stat_prefix(), "invalid"))),
+      ext_authz_failure_mode_allowed_(
+          pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+  auto bootstrap = factory_context.bootstrap();
+  auto labels_key_it =
+      bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+  if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+    for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
+      destination_labels_[labels_it.first] = labels_it.second.string_value();
+    }
+  }
+
+  if (config.has_allowed_headers() &&
+      config.http_service().authorization_request().has_allowed_headers()) {
+    throw EnvoyException("Invalid duplicate configuration for allowed_headers.");
+  }
+
+  // An unset request_headers_matchers_ means that all client request headers are allowed through
+  // to the authz server; this is to preserve backwards compatibility when introducing
+  // allowlisting of request headers for gRPC authz servers. Pre-existing support is for
+  // HTTP authz servers only and defaults to blocking all but a few headers (i.e. Authorization,
+  // Method, Path and Host).
+  if (config.has_grpc_service() && config.has_allowed_headers()) {
+    allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+        config.allowed_headers(), false, factory_context);
+  } else if (config.has_http_service()) {
+    if (config.http_service().authorization_request().has_allowed_headers()) {
+      allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+          config.http_service().authorization_request().allowed_headers(), true, factory_context);
+    } else {
+      allowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+          config.allowed_headers(), true, factory_context);
+    }
+  }
+  if (config.has_disallowed_headers()) {
+    disallowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+        config.disallowed_headers(), false, factory_context);
+  }
+}
+
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   // We only merge context extensions here, and leave boolean flags untouched since those flags are
   // not used from the merged config.
@@ -278,6 +378,15 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if (config_->filterMetadata().has_value() &&
+      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+    filter_state->setData(decoder_callbacks_->filterConfigName(),
+                          std::make_shared<ExtAuthzLoggingInfo>(*config_->filterMetadata()),
+                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  }
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -308,18 +417,26 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
-    // Add duration of call to dynamic metadata if applicable
-    if (start_time_.has_value() && response->status == CheckStatus::OK) {
-      ProtobufWkt::Value ext_authz_duration_value;
-      auto duration =
-          decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
-      ext_authz_duration_value.set_number_value(
-          std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
-      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
-          ext_authz_duration_value;
+    if (!config_->enableDynamicMetadataIngestion()) {
+      ENVOY_STREAM_LOG(trace,
+                       "Response is trying to inject dynamic metadata, but dynamic metadata "
+                       "ingestion is disabled. Ignoring...",
+                       *decoder_callbacks_);
+      stats_.ignored_dynamic_metadata_.inc();
+    } else {
+      // Add duration of call to dynamic metadata if applicable
+      if (start_time_.has_value() && response->status == CheckStatus::OK) {
+        ProtobufWkt::Value ext_authz_duration_value;
+        auto duration =
+            decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
+        ext_authz_duration_value.set_number_value(
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+        (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            ext_authz_duration_value;
+      }
+      decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
+                                                          response->dynamic_metadata);
     }
-    decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
-                                                        response->dynamic_metadata);
   }
 
   switch (response->status) {

@@ -1,5 +1,5 @@
 ARG BUILD_OS=ubuntu
-ARG BUILD_TAG=22.04@sha256:a6d2b38300ce017add71440577d5b0a90460d0e57fd7aec21dd0d1b0761bbfb2
+ARG BUILD_TAG=22.04@sha256:340d9b015b194dc6e2a13938944e0d016e57b9679963fdeb9ce021daac430221
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
@@ -58,7 +58,7 @@ COPY --chown=0:0 --chmod=755 \
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:8a09e5752fb3ab9c9534fcc627eb1f451cd9bcfe66a6b149df62dcb84fb841a6 AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:9652482d535c6e2b68823b7dbd9175eefe33edf12e86c02ab8e68fb38fd159b4 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
@@ -93,13 +93,13 @@ ADD --chown=0:0 --chmod=755 configs/google-vrp/supervisor.conf /etc/supervisor.c
 
 
 # STAGE: envoy-google-vrp
-FROM envoy-google-vrp-base as envoy-google-vrp
+FROM envoy-google-vrp-base AS envoy-google-vrp
 COPY  --from=binary --chown=0:0 --chmod=755 \
     /usr/local/bin/envoy /usr/local/bin/envoy
 
 
 # STAGE: envoy-google-vrp-custom
-FROM envoy-google-vrp-base as envoy-google-vrp-custom
+FROM envoy-google-vrp-base AS envoy-google-vrp-custom
 ARG ENVOY_CTX_BINARY_PATH
 ADD "${ENVOY_CTX_BINARY_PATH}" /usr/local/bin/envoy
 

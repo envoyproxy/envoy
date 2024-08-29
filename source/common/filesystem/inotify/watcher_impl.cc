@@ -36,7 +36,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
   auto result_or_error = file_system_.splitPathFromFilename(path);
-  RETURN_IF_STATUS_NOT_OK(result_or_error);
+  RETURN_IF_NOT_OK_REF(result_or_error.status());
   const PathSplitResult result = result_or_error.value();
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
@@ -54,7 +54,10 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
 
 absl::Status WatcherImpl::onInotifyEvent() {
   while (true) {
-    uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
+    // The buffer needs to be suitably aligned to store the first inotify_event structure.
+    // If there are multiple events returned by the read call, the kernel is responsible for
+    // properly aligning subsequent inotify_event structures (per `man inotify`).
+    alignas(inotify_event) uint8_t buffer[sizeof(inotify_event) + NAME_MAX + 1];
     ssize_t rc = read(inotify_fd_, &buffer, sizeof(buffer));
     if (rc == -1 && errno == EAGAIN) {
       return absl::OkStatus();

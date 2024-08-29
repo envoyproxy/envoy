@@ -8,6 +8,8 @@ import android.util.Log
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.Element
 import io.envoyproxy.envoymobile.Engine
@@ -45,16 +47,20 @@ class MainActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
+    val config =
+      Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+        .setValue(ByteString.empty())
+        .build()
+        .toByteArray()
+        .toString(Charsets.UTF_8)
 
     engine =
       AndroidEngineBuilder(application)
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> Log.d(TAG, msg) }
         .addPlatformFilter(::DemoFilter)
-        .addNativeFilter(
-          "envoy.filters.http.buffer",
-          "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
-        )
+        .addNativeFilter("envoy.filters.http.buffer", config)
         .addStringAccessor("demo-accessor", { "PlatformString" })
         .setOnEngineRunning { Log.d(TAG, "Envoy async internal setup completed") }
         .setEventTracker({
@@ -62,7 +68,6 @@ class MainActivity : Activity() {
             Log.d(TAG, "Event emitted: ${entry.key}, ${entry.value}")
           }
         })
-        .setLogger { _, message -> Log.d(TAG, message) }
         .build()
 
     recyclerView = findViewById<RecyclerView>(R.id.recycler_view)!!

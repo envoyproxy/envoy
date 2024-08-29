@@ -13,11 +13,13 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
     Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
     std::shared_ptr<QuicSslConnectionInfo>&& info,
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicStatNames& quic_stat_names,
+    Stats::Scope& stats_scope)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
       network_connection_(&connection), quic_ssl_info_(std::move(info)),
+      quic_stat_names_(quic_stat_names), stats_scope_(stats_scope),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
       stream_info_(std::move(stream_info)),
@@ -25,10 +27,9 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
   stream_info_->protocol(Http::Protocol::Http3);
+  network_connection_->connectionSocket()->connectionInfoProvider().setConnectionID(id());
   network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
-  fix_quic_lifetime_issues_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_fix_filter_manager_uaf");
 }
 
 void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {
@@ -181,9 +182,6 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     network_connection_ = nullptr;
   }
 
-  if (!fix_quic_lifetime_issues_) {
-    filter_manager_ = nullptr;
-  }
   if (!codec_stats_.has_value()) {
     // The connection was closed before it could be used. Stats are not recorded.
     return;
@@ -273,6 +271,11 @@ void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
     close(close_type_during_initialize_.value());
     close_type_during_initialize_ = absl::nullopt;
   }
+}
+
+void QuicFilterManagerConnectionImpl::incrementSentQuicResetStreamErrorStats(
+    quic::QuicResetStreamError error, bool from_self, bool is_upstream) {
+  quic_stat_names_.chargeQuicResetStreamErrorStats(stats_scope_, error, from_self, is_upstream);
 }
 
 } // namespace Quic

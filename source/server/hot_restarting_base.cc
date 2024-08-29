@@ -38,9 +38,11 @@ sockaddr_un RpcStream::createDomainSocketAddress(uint64_t id, const std::string&
   id = id % MaxConcurrentProcesses;
   sockaddr_un address;
   initDomainSocketAddress(&address);
-  Network::Address::PipeInstance addr(fmt::format("{}_{}_{}", socket_path, role, base_id_ + id),
-                                      socket_mode, nullptr);
-  safeMemcpy(&address, &(addr.getSockAddr()));
+  auto addr = THROW_OR_RETURN_VALUE(
+      Network::Address::PipeInstance::create(
+          fmt::format("{}_{}_{}", socket_path, role, base_id_ + id), socket_mode, nullptr),
+      std::unique_ptr<Network::Address::PipeInstance>);
+  safeMemcpy(&address, &(addr->getSockAddr()));
   fchmod(domain_socket_, socket_mode);
 
   return address;

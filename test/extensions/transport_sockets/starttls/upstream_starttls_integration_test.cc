@@ -2,7 +2,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/connection_impl.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
@@ -270,8 +270,8 @@ void StartTlsIntegrationTest::initialize() {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      downstream_tls_context, mock_factory_ctx);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      downstream_tls_context, mock_factory_ctx, false);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(

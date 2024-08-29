@@ -23,7 +23,7 @@ namespace {
 
 class FuzzerMocks {
 public:
-  FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
+  FuzzerMocks() : addr_(*Network::Address::PipeInstance::create("/test/test.sock")) {
 
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
@@ -54,8 +54,12 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::golang::GolangFilter
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpData(_, _, _, _))
       .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Continue)));
-  ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpLog(_, _))
-      .WillByDefault(Invoke([&](httpRequest*, int) -> void {}));
+  ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpLog(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillByDefault(
+          Invoke([&](httpRequest*, int, processState*, processState*, GoUint64, GoUint64, GoUint64,
+                     GoUint64, GoUint64, GoUint64, GoUint64, GoUint64) -> void {}));
+  ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpStreamComplete(_))
+      .WillByDefault(Invoke([&](httpRequest*) -> void {}));
   ON_CALL(*dso_lib.get(), envoyGoFilterOnHttpDestroy(_, _))
       .WillByDefault(Invoke([&](httpRequest* p0, int) -> void {
         // delete the filter->req_, make LeakSanitizer happy.

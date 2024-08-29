@@ -14,6 +14,8 @@ const Decorator* DelegatingRoute::decorator() const { return base_route_->decora
 
 const RouteTracing* DelegatingRoute::tracingConfig() const { return base_route_->tracingConfig(); }
 
+const VirtualHost& DelegatingRoute::virtualHost() const { return base_route_->virtualHost(); }
+
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
     Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
@@ -28,6 +30,11 @@ DelegatingRouteEntry::responseHeaderTransforms(const StreamInfo::StreamInfo& str
 
 const std::string& DelegatingRouteEntry::clusterName() const {
   return base_route_->routeEntry()->clusterName();
+}
+
+const std::string
+DelegatingRouteEntry::getRequestHostValue(const Http::RequestHeaderMap& headers) const {
+  return base_route_->routeEntry()->getRequestHostValue(headers);
 }
 
 Http::Code DelegatingRouteEntry::clusterNotFoundResponseCode() const {
@@ -126,14 +133,6 @@ absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::maxGrpcTimeout()
 
 absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::grpcTimeoutOffset() const {
   return base_route_->routeEntry()->grpcTimeoutOffset();
-}
-
-const VirtualCluster* DelegatingRouteEntry::virtualCluster(const Http::HeaderMap& headers) const {
-  return base_route_->routeEntry()->virtualCluster(headers);
-}
-
-const VirtualHost& DelegatingRouteEntry::virtualHost() const {
-  return base_route_->routeEntry()->virtualHost();
 }
 
 bool DelegatingRouteEntry::autoHostRewrite() const {

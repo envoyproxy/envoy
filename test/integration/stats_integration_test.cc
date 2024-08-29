@@ -9,7 +9,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/memory/stats.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
@@ -276,7 +276,7 @@ private:
    * @return size_t the total memory allocated
    */
   size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);

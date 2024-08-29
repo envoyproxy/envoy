@@ -223,7 +223,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           cluster, "",
           *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
-          nullptr, envoy::config::core::v3::Locality().default_instance(),
+          nullptr, nullptr, envoy::config::core::v3::Locality().default_instance(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
           time_system);
 

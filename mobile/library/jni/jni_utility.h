@@ -16,6 +16,11 @@
 namespace Envoy {
 namespace JNI {
 
+struct JniUtility {
+  /** Initializes the caches for the `JniUtility`. */
+  static void initCache();
+};
+
 void jniDeleteGlobalRef(void* context);
 
 void jniDeleteConstGlobalRef(const void* context);
@@ -93,12 +98,11 @@ void javaByteArrayToByteVector(JniHelper& jni_helper, jbyteArray array, std::vec
 void javaByteArrayToString(JniHelper& jni_helper, jbyteArray jbytes, std::string* out);
 
 /** Parses the proto from Java byte array and stores the output into `dest` proto. */
-void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source,
-                          Envoy::Protobuf::MessageLite* dest);
+void javaByteArrayToProto(JniHelper& jni_helper, jbyteArray source, Envoy::Protobuf::Message* dest);
 
 /** Converts from Proto to Java byte array. */
 LocalRefUniquePtr<jbyteArray> protoToJavaByteArray(JniHelper& jni_helper,
-                                                   const Envoy::Protobuf::MessageLite& source);
+                                                   const Envoy::Protobuf::Message& source);
 
 /** Converts from Java `String` to C++ `std::string`. */
 std::string javaStringToCppString(JniHelper& jni_helper, jstring java_string);
@@ -110,9 +114,9 @@ LocalRefUniquePtr<jstring> cppStringToJavaString(JniHelper& jni_helper,
 /** Converts from C++'s map-type<std::string, std::string> to Java `HashMap<String, String>`. */
 template <typename MapType>
 LocalRefUniquePtr<jobject> cppMapToJavaMap(JniHelper& jni_helper, const MapType& cpp_map) {
-  jclass java_map_class = jni_helper.findClass("java/util/HashMap");
-  auto java_map_init_method_id = jni_helper.getMethodId(java_map_class, "<init>", "(I)V");
-  auto java_map_put_method_id = jni_helper.getMethodId(
+  jclass java_map_class = jni_helper.findClassFromCache("java/util/HashMap");
+  auto java_map_init_method_id = jni_helper.getMethodIdFromCache(java_map_class, "<init>", "(I)V");
+  auto java_map_put_method_id = jni_helper.getMethodIdFromCache(
       java_map_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
   auto java_map_object =
       jni_helper.newObject(java_map_class, java_map_init_method_id, cpp_map.size());

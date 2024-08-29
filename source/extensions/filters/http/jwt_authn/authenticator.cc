@@ -60,7 +60,7 @@ public:
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface.
-  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+  void verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
               SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
               ClearRouteCacheCallback clear_route_cb) override;
@@ -111,7 +111,7 @@ private:
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
-  Http::HeaderMap* headers_{};
+  Http::RequestHeaderMap* headers_{};
   // The active span for the request
   Tracing::Span* parent_span_{&Tracing::NullSpan::instance()};
   // The callback function called to set the extracted payload and header from a verified JWT.
@@ -145,7 +145,7 @@ std::string AuthenticatorImpl::name() const {
   return "_UNKNOWN_";
 }
 
-void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+void AuthenticatorImpl::verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
                                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                                AuthenticatorCallback callback,
@@ -361,7 +361,7 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
     }
     default:
       ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'", claim_name,
-                claim_value->kind_case());
+                static_cast<int>(claim_value->kind_case()));
       break;
     }
 

@@ -13,8 +13,7 @@ using ::testing::ReturnRef;
 
 MockInstance::MockInstance()
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(admin_.getConfigTracker())),
-      cluster_manager_(timeSource()),
-      singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
+      cluster_manager_(timeSource()), singleton_manager_(new Singleton::ManagerImpl()),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), quic_stat_names_(stats_store_.symbolTable()),
       stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
@@ -32,6 +31,8 @@ MockInstance::MockInstance()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, httpServerPropertiesCacheManager())
+      .WillByDefault(ReturnRef(http_server_properties_cache_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));

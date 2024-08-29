@@ -85,7 +85,9 @@ public:
     TestEnvironment::writeStringToFileForTest("file_direct_updated.txt", "dummy-updated");
     TestEnvironment::renameFile(TestEnvironment::temporaryPath("file_direct_updated.txt"),
                                 TestEnvironment::temporaryPath("file_direct.txt"));
-
+    // This is needed to avoid a race between file rename, and the file being reloaded by data
+    // source provider.
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder_updated = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
         {":method", "POST"},
@@ -114,7 +116,11 @@ TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseBodySize) {
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLarge) {
   // Test with a large direct response body size, and with constrained buffer limits.
   config_helper_.setBufferLimits(1024, 1024);
-  testDirectResponseBodySize(1000 * 4096);
+  // Envoy takes much time to load the big configuration in TSAN mode and will result in the test to
+  // be flaky. See https://github.com/envoyproxy/envoy/issues/33957 for more detail and context.
+  // We reduce the body size from 4MB to 2MB to reduce the size of configuration to make the CI more
+  // stable.
+  testDirectResponseBodySize(/*1000*/ 500 * 4096);
 }
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {

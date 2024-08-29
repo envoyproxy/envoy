@@ -147,7 +147,7 @@ message LedsClusterLocalityConfig {
 // A group of endpoints belonging to a Locality.
 // One can have multiple LocalityLbEndpoints for a locality, but only if
 // they have different priorities.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message LocalityLbEndpoints {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.LocalityLbEndpoints";
@@ -160,6 +160,9 @@ message LocalityLbEndpoints {
 
   // Identifies location of where the upstream hosts run.
   core.v3.Locality locality = 1;
+
+  // Metadata to provide additional information about the locality endpoints in aggregate.
+  core.v3.Metadata metadata = 9;
 
   // The group of endpoints belonging to the locality specified.
   // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be

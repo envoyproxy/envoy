@@ -98,6 +98,13 @@ struct SuccessResponse {
   ResponsePtr response_;
 };
 
+absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
+  if (!path_prefix.empty() && path_prefix[0] != '/') {
+    return absl::InvalidArgumentError("path_prefix should start with \"/\".");
+  }
+  return std::string(path_prefix);
+}
+
 } // namespace
 
 // Config
@@ -117,7 +124,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_upstream_headers_to_append(),
           context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
-      path_prefix_(path_prefix),
+      path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 
 namespace Envoy {
@@ -88,6 +89,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       stats_(generateStats(config.stat_prefix(), context.scope())),
       // Default prefer_gro to true for upstream client traffic.
       upstream_socket_config_(config.upstream_socket_config(), true),
+      udp_session_filter_config_provider_manager_(
+          createSingletonUdpSessionFilterConfigProviderManager(context.serverFactoryContext())),
       random_generator_(context.serverFactoryContext().api().randomGenerator()) {
   if (use_per_packet_load_balancing_ && config.has_tunneling_config()) {
     throw EnvoyException(
@@ -102,7 +105,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.serverFactoryContext().options().localAddressIpVersion())) {
-    ExceptionUtil::throwEnvoyException(
+    throw EnvoyException(
         "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
         "is not running with the CAP_NET_ADMIN capability.");
   }
@@ -145,12 +148,27 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(filter.typed_config()), true));
 
-    auto& factory = Config::Utility::getAndCheckFactory<NamedUdpSessionFilterConfigFactory>(filter);
+    auto& factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedUdpSessionFilterConfigFactory>(filter);
     ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
         filter, context.messageValidationVisitor(), factory);
-    FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
-    filter_factories_.push_back(callback);
+
+    Network::UdpSessionFilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, context);
+    filter_factories_.push_back(
+        udp_session_filter_config_provider_manager_->createStaticFilterConfigProvider(
+            callback, filter.name()));
   }
+}
+
+SINGLETON_MANAGER_REGISTRATION(udp_session_filter_config_provider_manager);
+
+std::shared_ptr<UdpSessionFilterConfigProviderManager>
+UdpProxyFilterConfigImpl::createSingletonUdpSessionFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<UdpSessionFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(udp_session_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UdpSessionFilterConfigProviderManagerImpl>(); });
 }
 
 static Registry::RegisterFactory<UdpProxyFilterConfigFactory,

@@ -12,7 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/res
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Downstream connections]
-// [#extension: envoy.resource_monitors.downstream_connections]
+// [#extension: envoy.resource_monitors.global_downstream_max_connections]
 
 // The downstream connections resource monitor tracks the global number of open downstream connections.
 message DownstreamConnectionsConfig {

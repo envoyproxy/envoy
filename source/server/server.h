@@ -38,6 +38,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
@@ -177,6 +178,9 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return server_.httpServerPropertiesCacheManager();
+  }
   Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
@@ -252,7 +256,7 @@ public:
   ~InstanceBase() override;
 
   virtual void maybeCreateHeapShrinker() PURE;
-  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
 
@@ -263,6 +267,9 @@ public:
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
   const Upstream::ClusterManager& clusterManager() const override;
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return *http_server_properties_cache_manager_;
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -282,7 +289,7 @@ public:
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
   void shutdownAdmin() override;
-  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   bool healthCheckFailed() override;
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
@@ -383,7 +390,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::shared_ptr<Admin> admin_;
-  Singleton::ManagerPtr singleton_manager_;
+  Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
@@ -407,6 +414,7 @@ private:
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

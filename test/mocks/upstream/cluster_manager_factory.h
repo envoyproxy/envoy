@@ -51,7 +51,7 @@ public:
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
 };
 } // namespace Upstream
 } // namespace Envoy

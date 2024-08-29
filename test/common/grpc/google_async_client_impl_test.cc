@@ -108,13 +108,30 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
 TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   initialize();
 
+  Tracing::MockSpan parent_span;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+
+  EXPECT_CALL(parent_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("fake_address")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(*child_span, injectContext(_, _));
+  EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+
   EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
-  auto grpc_stream =
-      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  Http::AsyncClient::StreamOptions stream_options;
+  stream_options.setParentSpan(parent_span).setSampled(true);
+
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
   EXPECT_TRUE(grpc_stream == nullptr);
 }
 

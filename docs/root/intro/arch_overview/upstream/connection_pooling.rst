@@ -107,6 +107,14 @@ is still connecting, then a backup connection attempt will be made to the next a
 Eventually an attempt will succeed to one of the addresses in which case that connection will be used, or else
 all attempts will fail in which case a connection error will be reported.
 
+HTTP/3 has limited Happy-Eyeballs-like support.
+When using ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`
+for HTTP/3 with TCP-failover, Envoy will make a best-effort attempt to try two address families. As with TCP
+Happy Eyeballs support, Envoy allows 300ms for the first HTTP/3 attempt to connect. If the connection explicitly
+fails or the 300ms timeout expires, if DNS resolution results in the first two resolved addresses being of
+different address families, a second HTTP/3 connection pool using the second address will be created and Envoy
+will attempt to establish an HTTP/3 connection using the alternate address family. In this case HTTP/3 will only
+be marked broken if TCP connectivity is established and both HTTP/3 connections fail.
 
 .. _arch_overview_conn_pool_how_many:
 

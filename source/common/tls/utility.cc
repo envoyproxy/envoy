@@ -1,6 +1,7 @@
 #include "source/common/tls/utility.h"
 
 #include <cstdint>
+#include <vector>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
@@ -226,6 +227,136 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     }
     break;
   }
+  case GEN_OTHERNAME: {
+    ASN1_TYPE* value = general_name->d.otherName->value;
+    if (value == nullptr) {
+      break;
+    }
+    switch (value->type) {
+    case V_ASN1_NULL:
+      break;
+    case V_ASN1_BOOLEAN:
+      san = value->value.boolean ? "true" : "false";
+      break;
+    case V_ASN1_ENUMERATED:
+    case V_ASN1_INTEGER: {
+      BIGNUM san_bn;
+      BN_init(&san_bn);
+      value->type == V_ASN1_ENUMERATED ? ASN1_ENUMERATED_to_BN(value->value.enumerated, &san_bn)
+                                       : ASN1_INTEGER_to_BN(value->value.integer, &san_bn);
+      char* san_char = BN_bn2dec(&san_bn);
+      BN_free(&san_bn);
+      if (san_char != nullptr) {
+        san.assign(san_char);
+        OPENSSL_free(san_char);
+      }
+      break;
+    }
+    case V_ASN1_OBJECT: {
+      char tmp_obj[256]; // OID Max length
+      int obj_len = OBJ_obj2txt(tmp_obj, 256, value->value.object, 1);
+      if (obj_len > 256 || obj_len < 0) {
+        break;
+      }
+      san.assign(tmp_obj);
+      break;
+    }
+    case V_ASN1_BIT_STRING: {
+      ASN1_BIT_STRING* tmp_str = value->value.bit_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_OCTET_STRING: {
+      ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_PRINTABLESTRING: {
+      ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_T61STRING: {
+      ASN1_T61STRING* tmp_str = value->value.t61string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_IA5STRING: {
+      ASN1_IA5STRING* tmp_str = value->value.ia5string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_GENERALSTRING: {
+      ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_BMPSTRING: {
+      // `ASN1_BMPSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
+      unsigned char* tmp = nullptr;
+      if (ASN1_STRING_to_UTF8(&tmp, value->value.bmpstring) < 0) {
+        break;
+      }
+      san.assign(reinterpret_cast<const char*>(tmp));
+      OPENSSL_free(tmp);
+      break;
+    }
+    case V_ASN1_UNIVERSALSTRING: {
+      // `ASN1_UNIVERSALSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
+      unsigned char* tmp = nullptr;
+      if (ASN1_STRING_to_UTF8(&tmp, value->value.universalstring) < 0) {
+        break;
+      }
+      san.assign(reinterpret_cast<const char*>(tmp));
+      OPENSSL_free(tmp);
+      break;
+    }
+    case V_ASN1_UTCTIME: {
+      ASN1_UTCTIME* tmp_str = value->value.utctime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_GENERALIZEDTIME: {
+      ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_VISIBLESTRING: {
+      ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_UTF8STRING: {
+      ASN1_UTF8STRING* tmp_str = value->value.utf8string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_SET: {
+      ASN1_STRING* tmp_str = value->value.set;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    case V_ASN1_SEQUENCE: {
+      ASN1_STRING* tmp_str = value->value.sequence;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+                 ASN1_STRING_length(tmp_str));
+      break;
+    }
+    default:
+      break;
+    }
+  }
   }
   return san;
 }
@@ -331,6 +462,30 @@ std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
       absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
                    X509_verify_cert_error_string(n));
   return error_details;
+}
+
+std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
+                                               std::function<std::string(X509&)> field_extractor) {
+  std::vector<std::string> result;
+  if (sk_X509_num(&stack) <= 0) {
+    IS_ENVOY_BUG("x509 stack is empty or NULL");
+    return result;
+  }
+  if (field_extractor == nullptr) {
+    IS_ENVOY_BUG("field_extractor is nullptr");
+    return result;
+  }
+
+  for (uint64_t i = 0; i < sk_X509_num(&stack); i++) {
+    X509* cert = sk_X509_value(&stack, i);
+    if (!cert) {
+      result.push_back(""); // Add an empty string so it's clear something was omitted.
+    } else {
+      result.push_back(field_extractor(*cert));
+    }
+  }
+
+  return result;
 }
 
 } // namespace Tls
