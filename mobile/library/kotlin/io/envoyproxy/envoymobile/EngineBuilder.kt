@@ -39,6 +39,7 @@ open class EngineBuilder() {
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
   internal var useCares = false
+  internal var forceV6 = true
   private var useGro = false
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
@@ -215,6 +216,17 @@ open class EngineBuilder() {
    */
   fun useCares(useCares: Boolean): EngineBuilder {
     this.useCares = useCares
+    return this
+  }
+
+  /**
+   * Specify whether local ipv4 addresses should be mapped to ipv6. Defaults to true.
+   *
+   * @param forceV6 whether or not to translate v4 to v6.
+   * @return This builder.
+   */
+  fun forceV6(forceV6: Boolean): EngineBuilder {
+    this.forceV6 = forceV6
     return this
   }
 
@@ -544,6 +556,7 @@ open class EngineBuilder() {
         enableDrainPostDnsRefresh,
         enableHttp3,
         useCares,
+        forceV6,
         useGro,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
