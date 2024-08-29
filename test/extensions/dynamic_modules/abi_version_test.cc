@@ -27,16 +27,6 @@ TEST(DynamicModules, ABIVersionCheck) {
   EXPECT_EQ(sha256, kAbiVersion);
 }
 
-TEST(DynamicModules, IdenticalABIHeaders) {
-  const std::string original_abi_header = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_rundir }}/source/extensions/dynamic_modules/abi.h"));
-  const std::string rust_sdk_abi_header =
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/source/extensions/dynamic_modules/sdk/rust/abi.h"));
-  EXPECT_EQ(original_abi_header, rust_sdk_abi_header);
-  // TODO: Go SDK.
-}
-
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

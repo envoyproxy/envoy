@@ -27,10 +27,3 @@ envoy_cc_library(
         "abi_version.h",
     ],
 )
-
-envoy_cc_library(
-    name = "abi_lib",
-    hdrs = [
-        "abi.h",
-    ],
-)
