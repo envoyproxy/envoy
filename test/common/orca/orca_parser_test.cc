@@ -50,7 +50,7 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
        "rps_fractional:1000,eps:2,"
        "named_metrics.foo:123,named_metrics.bar:0.2"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
-              StatusHelpers::IsOkAndHolds(ProtoEq(ExampleOrcaLoadReport())));
+              StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderIncorrectFieldType) {
@@ -129,7 +129,7 @@ TEST(OrcaParserUtilTest, JsonHeader) {
        "\"mem_utilization\": 0.9, \"rps_fractional\": 1000, \"eps\": 2, "
        "\"named_metrics\": {\"foo\": 123,\"bar\": 0.2}}"}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
-              StatusHelpers::IsOkAndHolds(ProtoEq(ExampleOrcaLoadReport())));
+              StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }
 
 TEST(OrcaParserUtilTest, InvalidJsonHeader) {
