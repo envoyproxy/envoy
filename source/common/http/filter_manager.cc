@@ -399,7 +399,7 @@ bool ActiveStreamDecoderFilter::canContinue() {
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent.
-  return !parent_.state_.remote_encode_complete_;
+  return !parent_.state_.remote_encode_complete_ && !parent_.state_.encoder_filter_chain_aborted_;
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
