@@ -4671,5 +4671,4 @@ TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedTest) {
   verifyDownstreamResponse(*response, 200);
 }
 
-
 } // namespace Envoy
